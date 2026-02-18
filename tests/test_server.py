@@ -33,7 +33,11 @@ def test_get_saisons(client):
     saisons = client.get_saisons()
     if not saisons:
         import warnings
-        warnings.warn("Aucune saison trouvée via l'API, vérifiez si c'est normal.")
+
+        warnings.warn(
+            "Aucune saison trouvée via l'API, vérifiez si c'est normal.",
+            stacklevel=2,
+        )
     else:
         assert len(saisons) > 0
 
@@ -86,6 +90,7 @@ def test_get_organisme_from_search(client):
 def test_server_tools_importable():
     """Vérifie que le module server est importable et les outils enregistrés."""
     from ffbb_mcp.server import mcp
+
     tools = mcp._tool_manager.list_tools()
     tool_names = [t.name for t in tools]
     expected = [

@@ -7,3 +7,6 @@ dist/
 build/
 .env
 .DS_Store
+
+reproduce_issue.py
+http_cache.db
