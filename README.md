@@ -40,7 +40,7 @@ npx @modelcontextprotocol/inspector python -m ffbb_mcp
 python -m ffbb_mcp
 ```
 
-## Configuration dans Gemini CLI
+## Configuration dans Google Antigravity (Gemini Code Assist)
 
 Ajouter dans `~/.gemini/settings.json` :
 
@@ -55,6 +55,27 @@ Ajouter dans `~/.gemini/settings.json` :
   }
 }
 ```
+
+## Configuration dans VS Code & IDE JetBrains (via Extensions MCP)
+
+Si vous utilisez des extensions comme **Cline**, **Roo Code**, ou **EnMasse**, ajoutez cette configuration dans les paramètres de l'extension ou le fichier de config approprié :
+
+```json
+{
+  "mcpServers": {
+    "ffbb": {
+      "command": "/chemin/vers/.venv/bin/python",
+      "args": ["-m", "ffbb_mcp"],
+      "cwd": "/chemin/vers/FFBB MCP server",
+      "env": {
+        "PYTHONPATH": "/chemin/vers/FFBB MCP server/src"
+      }
+    }
+  }
+}
+```
+
+> **Note :** Il est recommandé d'utiliser le chemin absolu vers l'interpréteur Python de votre environnement virtuel (`.venv/bin/python`).
 
 ## Configuration dans Claude Desktop
 
