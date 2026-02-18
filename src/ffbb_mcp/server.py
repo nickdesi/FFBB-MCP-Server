@@ -10,9 +10,11 @@ Expose 10 outils MCP pour accéder aux données FFBB :
 
 import logging
 from typing import Optional
+import os
 
 from mcp.server.fastmcp import FastMCP
 from ffbb_api_client_v2 import FFBBAPIClientV2, TokenManager
+from ffbb_api_client_v2.utils.cache_manager import CacheManager, CacheConfig
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -40,17 +42,54 @@ mcp = FastMCP(
 _client: Optional[FFBBAPIClientV2] = None
 
 
+import os
+import traceback
+
 def get_client() -> FFBBAPIClientV2:
     """Retourne le client FFBB, en le créant si nécessaire."""
     global _client
     if _client is None:
-        logger.info("Initialisation du client FFBB (récupération automatique des tokens)...")
-        tokens = TokenManager.get_tokens()
-        _client = FFBBAPIClientV2.create(
-            api_bearer_token=tokens.api_token,
-            meilisearch_bearer_token=tokens.meilisearch_token,
-        )
-        logger.info("Client FFBB initialisé avec succès.")
+        try:
+            logger.info("Initialisation du client FFBB...")
+            cwd = os.getcwd()
+            logger.info(f"CWD: {cwd}")
+            
+            # Tentative de suppression du fichier cache
+            db_path = os.path.join(cwd, "http_cache.db")
+            if os.path.exists(db_path):
+                try:
+                    os.remove(db_path)
+                    logger.info(f"Supprimé {db_path}")
+                except Exception as e:
+                    logger.error(f"Impossible de supprimer {db_path}: {e}")
+
+            # Force reset du singleton pour être sÃ»r d'appliquer notre config
+            CacheManager.reset_instance()
+            
+            # Configuration explicite en mémoire (desactivé pour debug)
+            cache_config = CacheConfig(backend="memory", enabled=False, expire_after=3600)
+            cache_manager = CacheManager(config=cache_config)
+            
+            logger.info(f"CacheManager config: backend={cache_manager.config.backend}, enabled={cache_manager.config.enabled}")
+            try:
+                backend_info = getattr(cache_manager.session.cache, 'backend_name', getattr(cache_manager.session.cache, 'cache_name', 'Unknown'))
+                logger.info(f"CacheManager session backend: {backend_info if cache_manager.session else 'None'}")
+            except Exception:
+                logger.info("CacheManager session initialized (backend details unavailable)")
+            
+            # On force use_cache=False pour le token manager
+            tokens = TokenManager.get_tokens(use_cache=False)
+            
+            _client = FFBBAPIClientV2.create(
+                api_bearer_token=tokens.api_token,
+                meilisearch_bearer_token=tokens.meilisearch_token,
+                cached_session=cache_manager.session
+            )
+            logger.info("Client FFBB initialisé avec succès (Cache: Memory).")
+        except Exception as e:
+            logger.error(f"Erreur lors de l'initialisation du client: {e}")
+            logger.error(traceback.format_exc())
+            raise e
     return _client
 
 
