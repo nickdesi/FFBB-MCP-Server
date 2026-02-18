@@ -37,4 +37,20 @@
     <ideal-output>La salle Astroballe se situe à...</ideal-output>
     <tool-use>ffbb_search_salles</tool-use>
   </test-case>
+
+  <test-case>
+    <prompt>Quel est le prochain match du SCBA U11M1 ?</prompt>
+    <ideal-output>Le prochain match du Stade Clermontois U11M1 est...</ideal-output>
+    <tool-use>ffbb_search_organismes</tool-use>
+    <tool-use>ffbb_get_organisme</tool-use>
+    <tool-use>ffbb_get_poule</tool-use>
+  </test-case>
+
+  <test-case>
+    <prompt>Donne moi le classement de la poule B de NM1</prompt>
+    <ideal-output>Voici le classement de la poule B de Nationale 1...</ideal-output>
+    <tool-use>ffbb_search_competitions</tool-use>
+    <tool-use>ffbb_get_competition</tool-use>
+    <tool-use>ffbb_get_poule</tool-use>
+  </test-case>
 </evaluation>
