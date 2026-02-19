@@ -12,7 +12,6 @@ license = { text = "MIT" }
 dependencies = [
     "mcp[cli]>=1.0.0",
     "ffbb-api-client-v2>=1.2.0",
-    "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]

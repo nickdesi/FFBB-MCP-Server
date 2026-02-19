@@ -8,6 +8,7 @@ Expose des outils MCP pour accéder aux données FFBB :
 - Recherche multi-types
 """
 
+import json
 import logging
 from typing import Any
 
@@ -261,7 +262,8 @@ def resource_lives() -> str:
     """Retourne les matchs en direct au format JSON."""
     client = get_client()
     lives = client.get_lives()
-    return str([serialize_model(live) for live in lives])
+    lives = client.get_lives()
+    return json.dumps([serialize_model(live) for live in lives], default=str)
 
 
 @mcp.resource("ffbb://saisons")
@@ -269,7 +271,8 @@ def resource_saisons() -> str:
     """Retourne la liste des saisons au format JSON."""
     client = get_client()
     saisons = client.get_saisons()
-    return str([serialize_model(s) for s in saisons])
+    saisons = client.get_saisons()
+    return json.dumps([serialize_model(s) for s in saisons], default=str)
 
 
 @mcp.resource("ffbb://competition/{competition_id}")
@@ -277,7 +280,8 @@ def resource_competition(competition_id: int) -> str:
     """Retourne les détails d'une compétition au format JSON."""
     client = get_client()
     comp = client.get_competition(competition_id)
-    return str(serialize_model(comp))
+    comp = client.get_competition(competition_id)
+    return json.dumps(serialize_model(comp), default=str)
 
 
 @mcp.resource("ffbb://poule/{poule_id}")
@@ -285,7 +289,8 @@ def resource_poule(poule_id: int) -> str:
     """Retourne les détails d'une poule au format JSON."""
     client = get_client()
     poule = client.get_poule(poule_id)
-    return str(serialize_model(poule))
+    poule = client.get_poule(poule_id)
+    return json.dumps(serialize_model(poule), default=str)
 
 
 @mcp.resource("ffbb://organisme/{organisme_id}")
@@ -293,7 +298,8 @@ def resource_organisme(organisme_id: int) -> str:
     """Retourne les détails d'un organisme au format JSON."""
     client = get_client()
     org = client.get_organisme(organisme_id)
-    return str(serialize_model(org))
+    org = client.get_organisme(organisme_id)
+    return json.dumps(serialize_model(org), default=str)
 
 
 # ---------------------------------------------------------------------------

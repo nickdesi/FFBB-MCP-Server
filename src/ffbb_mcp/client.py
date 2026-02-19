@@ -20,18 +20,6 @@ class FFBBClientFactory:
                 cwd = os.getcwd()
                 logger.info(f"CWD: {cwd}")
 
-                # Tentative de suppression du fichier cache (legacy cleanup)
-                db_path = os.path.join(cwd, "http_cache.db")
-                if os.path.exists(db_path):
-                    try:
-                        os.remove(db_path)
-                        logger.info(f"Supprimé {db_path}")
-                    except Exception as e:
-                        logger.error(f"Impossible de supprimer {db_path}: {e}")
-
-                # Force reset du singleton
-                CacheManager.reset_instance()
-
                 # Configuration explicite en mémoire
                 cache_config = CacheConfig(
                     backend="memory", enabled=False, expire_after=3600

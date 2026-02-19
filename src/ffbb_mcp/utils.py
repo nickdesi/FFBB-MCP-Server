@@ -11,6 +11,10 @@ def serialize_model(obj: Any) -> Any:
         return {k: serialize_model(v) for k, v in obj.items()}
     if isinstance(obj, list):
         return [serialize_model(item) for item in obj]
+    if hasattr(obj, "model_dump"):  # Pydantic v2
+        return serialize_model(obj.model_dump())
+    if hasattr(obj, "dict"):  # Pydantic v1
+        return serialize_model(obj.dict())
     if hasattr(obj, "__dict__"):
         return {
             k: serialize_model(v)
