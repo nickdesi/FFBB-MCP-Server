@@ -9,68 +9,18 @@ Expose des outils MCP pour accéder aux données FFBB :
 """
 
 import logging
-import os
-import traceback
 from typing import Any
 
-from ffbb_api_client_v2 import FFBBAPIClientV2, TokenManager
-from ffbb_api_client_v2.utils.cache_manager import CacheConfig, CacheManager
 from mcp.server.fastmcp import FastMCP
-from pydantic import BaseModel
+
+from ffbb_mcp.client import get_client
+from ffbb_mcp.utils import serialize_model
 
 # ---------------------------------------------------------------------------
-# Logging
+# Logging initialization
 # ---------------------------------------------------------------------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ffbb-mcp")
-
-# ---------------------------------------------------------------------------
-# Models (Pydantic)
-# ---------------------------------------------------------------------------
-
-
-class Competition(BaseModel):
-    id: int
-    libelle: str
-    type: str
-    saison: str
-    organisateur: str | None = None
-
-
-class Organisme(BaseModel):
-    id: int
-    libelle: str
-    type: str
-    adresse: str | None = None
-    code_postal: str | None = None
-    ville: str | None = None
-
-
-class Rencontre(BaseModel):
-    id: int
-    competition: str
-    equipe_domicile: str
-    equipe_exterieur: str
-    score_domicile: int | None = None
-    score_exterieur: int | None = None
-    statut: str
-    date: str
-
-
-class Salle(BaseModel):
-    id: int
-    libelle: str
-    adresse: str
-    ville: str
-    capacite: int | None = None
-
-
-class MultiSearchResult(BaseModel):
-    id: int
-    libelle: str
-    type: str  # Competition, Organisme, Rencontre, etc.
-    details: dict[str, Any]
-
 
 # ---------------------------------------------------------------------------
 # MCP Server
@@ -86,78 +36,6 @@ mcp = FastMCP(
         "puis utilise get_* pour les détails."
     ),
 )
-
-# ---------------------------------------------------------------------------
-# Client FFBB — initialisé à la demande (lazy)
-# ---------------------------------------------------------------------------
-_client: FFBBAPIClientV2 | None = None
-
-
-def get_client() -> FFBBAPIClientV2:
-    """Retourne le client FFBB, en le créant si nécessaire."""
-    global _client
-    if _client is None:
-        try:
-            logger.info("Initialisation du client FFBB...")
-            cwd = os.getcwd()
-            logger.info(f"CWD: {cwd}")
-
-            # Tentative de suppression du fichier cache
-            db_path = os.path.join(cwd, "http_cache.db")
-            if os.path.exists(db_path):
-                try:
-                    os.remove(db_path)
-                    logger.info(f"Supprimé {db_path}")
-                except Exception as e:
-                    logger.error(f"Impossible de supprimer {db_path}: {e}")
-
-            # Force reset du singleton pour être sûr d'appliquer notre config
-            CacheManager.reset_instance()
-
-            # Configuration explicite en mémoire (desactivé pour debug)
-            cache_config = CacheConfig(
-                backend="memory", enabled=False, expire_after=3600
-            )
-            cache_manager = CacheManager(config=cache_config)
-
-            # On force use_cache=False pour le token manager
-            tokens = TokenManager.get_tokens(use_cache=False)
-
-            _client = FFBBAPIClientV2.create(
-                api_bearer_token=tokens.api_token,
-                meilisearch_bearer_token=tokens.meilisearch_token,
-                cached_session=cache_manager.session,
-            )
-            logger.info("Client FFBB initialisé avec succès (Cache: Memory).")
-        except Exception as e:
-            logger.error(f"Erreur lors de l'initialisation du client: {e}")
-            logger.error(traceback.format_exc())
-            raise e
-    return _client
-
-
-# ---------------------------------------------------------------------------
-# Utilitaire de sérialisation
-# ---------------------------------------------------------------------------
-
-
-def _serialize(obj: Any) -> Any:
-    """Convertit un objet FFBB en dict JSON-serializable de manière récursive."""
-    if obj is None:
-        return None
-    if isinstance(obj, (str, int, float, bool)):
-        return obj
-    if isinstance(obj, dict):
-        return {k: _serialize(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_serialize(item) for item in obj]
-    if hasattr(obj, "__dict__"):
-        return {
-            k: _serialize(v)
-            for k, v in obj.__dict__.items()
-            if not k.startswith("_")
-        }
-    return str(obj)
 
 
 # ---------------------------------------------------------------------------
@@ -179,7 +57,7 @@ def ffbb_get_lives() -> list[dict[str, Any]]:
     lives = client.get_lives()
     if not lives:
         return []
-    return [_serialize(live) for live in lives]
+    return [serialize_model(live) for live in lives]
 
 
 @mcp.tool(
@@ -201,7 +79,7 @@ def ffbb_get_saisons(active_only: bool = False) -> list[dict[str, Any]]:
     )
     if not saisons:
         return []
-    return [_serialize(s) for s in saisons]
+    return [serialize_model(s) for s in saisons]
 
 
 @mcp.tool(
@@ -216,7 +94,7 @@ def ffbb_get_competition(competition_id: int) -> dict[str, Any]:
     """Détails d'une compétition par ID."""
     client = get_client()
     competition = client.get_competition(competition_id=competition_id)
-    return _serialize(competition) or {}
+    return serialize_model(competition) or {}
 
 
 @mcp.tool(
@@ -232,7 +110,7 @@ def ffbb_get_poule(poule_id: int) -> dict[str, Any]:
     """Détails d'une poule/groupe par ID (classement, matchs)."""
     client = get_client()
     poule = client.get_poule(poule_id=poule_id)
-    return _serialize(poule) or {}
+    return serialize_model(poule) or {}
 
 
 @mcp.tool(
@@ -247,7 +125,7 @@ def ffbb_get_organisme(organisme_id: int) -> dict[str, Any]:
     """Informations détaillées d'un club/organisme (adresse, équipes...)."""
     client = get_client()
     organisme = client.get_organisme(organisme_id=organisme_id)
-    return _serialize(organisme) or {}
+    return serialize_model(organisme) or {}
 
 
 @mcp.tool(
@@ -263,7 +141,7 @@ def ffbb_search_competitions(name: str) -> list[dict[str, Any]]:
     results = client.search_competitions(name)
     if not results or not results.hits:
         return []
-    return [_serialize(hit) for hit in results.hits]
+    return [serialize_model(hit) for hit in results.hits]
 
 
 @mcp.tool(
@@ -279,7 +157,7 @@ def ffbb_search_organismes(name: str) -> list[dict[str, Any]]:
     results = client.search_organismes(name)
     if not results or not results.hits:
         return []
-    return [_serialize(hit) for hit in results.hits]
+    return [serialize_model(hit) for hit in results.hits]
 
 
 @mcp.tool(
@@ -296,7 +174,7 @@ def ffbb_search_rencontres(name: str) -> list[dict[str, Any]]:
     results = client.search_rencontres(name)
     if not results or not results.hits:
         return []
-    return [_serialize(hit) for hit in results.hits]
+    return [serialize_model(hit) for hit in results.hits]
 
 
 @mcp.tool(
@@ -313,7 +191,37 @@ def ffbb_search_salles(name: str) -> list[dict[str, Any]]:
     results = client.search_salles(name)
     if not results or not results.hits:
         return []
-    return [_serialize(hit) for hit in results.hits]
+    return [serialize_model(hit) for hit in results.hits]
+
+
+@mcp.tool(description=("Recherche des pratiques (3x3, 5x5, VxE, etc.)."))
+def ffbb_search_pratiques(name: str) -> list[dict[str, Any]]:
+    """Recherche de pratiques."""
+    client = get_client()
+    results = client.search_pratiques(name)
+    if not results or not results.hits:
+        return []
+    return [serialize_model(hit) for hit in results.hits]
+
+
+@mcp.tool(description=("Recherche des terrains."))
+def ffbb_search_terrains(name: str) -> list[dict[str, Any]]:
+    """Recherche de terrains."""
+    client = get_client()
+    results = client.search_terrains(name)
+    if not results or not results.hits:
+        return []
+    return [serialize_model(hit) for hit in results.hits]
+
+
+@mcp.tool(description=("Recherche des tournois."))
+def ffbb_search_tournois(name: str) -> list[dict[str, Any]]:
+    """Recherche de tournois."""
+    client = get_client()
+    results = client.search_tournois(name)
+    if not results or not results.hits:
+        return []
+    return [serialize_model(hit) for hit in results.hits]
 
 
 @mcp.tool(
@@ -337,10 +245,83 @@ def ffbb_multi_search(name: str) -> list[dict[str, Any]]:
         if hasattr(result, "hits") and result.hits:
             category = type(result).__name__
             for hit in result.hits:
-                item = _serialize(hit)
+                item = serialize_model(hit)
                 item["_category"] = category
                 output.append(item)
     return output
+
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+
+
+@mcp.resource("ffbb://lives")
+def resource_lives() -> str:
+    """Retourne les matchs en direct au format JSON."""
+    client = get_client()
+    lives = client.get_lives()
+    return str([serialize_model(live) for live in lives])
+
+
+@mcp.resource("ffbb://saisons")
+def resource_saisons() -> str:
+    """Retourne la liste des saisons au format JSON."""
+    client = get_client()
+    saisons = client.get_saisons()
+    return str([serialize_model(s) for s in saisons])
+
+
+@mcp.resource("ffbb://competition/{competition_id}")
+def resource_competition(competition_id: int) -> str:
+    """Retourne les détails d'une compétition au format JSON."""
+    client = get_client()
+    comp = client.get_competition(competition_id)
+    return str(serialize_model(comp))
+
+
+@mcp.resource("ffbb://poule/{poule_id}")
+def resource_poule(poule_id: int) -> str:
+    """Retourne les détails d'une poule au format JSON."""
+    client = get_client()
+    poule = client.get_poule(poule_id)
+    return str(serialize_model(poule))
+
+
+@mcp.resource("ffbb://organisme/{organisme_id}")
+def resource_organisme(organisme_id: int) -> str:
+    """Retourne les détails d'un organisme au format JSON."""
+    client = get_client()
+    org = client.get_organisme(organisme_id)
+    return str(serialize_model(org))
+
+
+# ---------------------------------------------------------------------------
+# Prompts
+# ---------------------------------------------------------------------------
+
+
+@mcp.prompt()
+def analyze_match(match_id: str) -> str:
+    """Génère un prompt pour analyser un match spécifique."""
+    return (
+        f"Analyse le match avec l'ID {match_id}.\n"
+        "Utilise l'outil `ffbb_search_rencontres` ou les ressources disponibles "
+        "pour trouver les détails.\n"
+        "Donne le contexte, les enjeux si possible, et le résultat probable ou affiché."
+    )
+
+
+@mcp.prompt()
+def find_club(club_name: str, department: str = "") -> str:
+    """Aide à trouver un club et ses informations."""
+    prompt = f"Je cherche des informations sur le club '{club_name}'"
+    if department:
+        prompt += f" dans le département ou la ville '{department}'"
+    return (
+        f"{prompt}.\n"
+        "Trouve l'ID du club, son adresse, et liste ses équipes engagées cette saison."
+    )
 
 
 # ---------------------------------------------------------------------------

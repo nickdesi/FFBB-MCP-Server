@@ -30,10 +30,12 @@ graph TD
 
 ## ✨ Fonctionnalités Clés
 
-- **⚡ Temps Réel** : Accès aux scores live via `ffbb_get_lives`.
-- **🔍 Recherche Puissante** : Recherche globale via `ffbb_multi_search` (Clubs, Salles, Compétitions).
+- **⚡ Temps Réel** : Accès aux scores live via `ffbb_get_lives` ou la ressource `ffbb://lives`.
+- **🔍 Recherche Puissante** : Recherche globale via `ffbb_multi_search` (Clubs, Salles, Compétitions, Tournois, Terrains...).
 - **📋 Calendriers & Résultats** : Historique et matchs à venir pour n'importe quelle équipe.
 - **🏆 Classements** : Positions actualisées dans toutes les poules (Nationale, Régionale, Départementale).
+- **📦 Ressources Directes** : Accès simplifié aux données via URIs (`ffbb://competition/{id}`, `ffbb://poule/{id}`).
+- **💡 Prompts Intelligents** : Modèles prêts à l'emploi (`analyze-match`, `find-club`) pour guider l'IA.
 - **🛠️ Zero Config Auth** : Les jetons d'accès sont récupérés automatiquement, aucune clé API manuelle n'est nécessaire.
 
 ---
