@@ -302,7 +302,7 @@ def resource_organisme(organisme_id: int) -> str:
 
 
 @mcp.prompt()
-def analyze_match(match_id: str) -> str:
+def analyser_match(match_id: str) -> str:
     """Génère un prompt pour analyser un match spécifique."""
     return (
         f"Analyse le match avec l'ID {match_id}.\n"
@@ -313,7 +313,7 @@ def analyze_match(match_id: str) -> str:
 
 
 @mcp.prompt()
-def find_club(club_name: str, department: str = "") -> str:
+def trouver_club(club_name: str, department: str = "") -> str:
     """Aide à trouver un club et ses informations."""
     prompt = f"Je cherche des informations sur le club '{club_name}'"
     if department:
