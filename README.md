@@ -5,7 +5,7 @@
 [![FFBB](https://img.shields.io/badge/Data-FFBB-orange)](https://www.ffbb.com)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 
-> Un pont intelligent entre les données de la **Fédération Française de Basketball** et les assistants IA du futur.
+> Un pont intelligent entre les données de la **Fédération Française de Basketball** et les assistants IA.
 
 Le serveur **FFBB MCP** permet à votre IA (Claude Desktop, Google Antigravity, Cursor, etc.) d'accéder nativement et en temps réel aux calendriers, classements et résultats du basketball français.
 
