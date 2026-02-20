@@ -1,14 +1,14 @@
 """Tests d'intégration pour le serveur MCP FFBB."""
 
 import pytest
-from ffbb_api_client_v2 import FFBBAPIClientV2, TokenManager
+from ffbb_api_client_v3 import FFBBAPIClientV3, TokenManager
 
 
 @pytest.fixture(scope="module")
 def client():
     """Client FFBB partagé pour tous les tests."""
     tokens = TokenManager.get_tokens()
-    return FFBBAPIClientV2.create(
+    return FFBBAPIClientV3.create(
         api_bearer_token=tokens.api_token,
         meilisearch_bearer_token=tokens.meilisearch_token,
     )
