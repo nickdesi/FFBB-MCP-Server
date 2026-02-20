@@ -20,9 +20,9 @@ class FFBBClientFactory:
                 cwd = os.getcwd()
                 logger.info(f"CWD: {cwd}")
 
-                # Configuration explicite en mémoire
+                # Configuration explicite en mémoire avec un TTL court pour la fraîcheur des données live
                 cache_config = CacheConfig(
-                    backend="memory", enabled=False, expire_after=3600
+                    backend="memory", enabled=True, expire_after=60
                 )
                 cache_manager = CacheManager(config=cache_config)
 

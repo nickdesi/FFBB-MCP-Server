@@ -2,19 +2,23 @@ from typing import Any
 
 
 def serialize_model(obj: Any) -> Any:
-    """Convertit un objet FFBB en dict JSON-serializable de manière récursive."""
+    """Convertit un objet FFBB en dict JSON-serializable."""
     if obj is None:
         return None
     if isinstance(obj, (str, int, float, bool)):
         return obj
+    
+    # Let Pydantic do the heavy lifting natively in C/Rust (V2)
+    if hasattr(obj, "model_dump"):  # Pydantic v2
+        return obj.model_dump(mode="json")
+    if hasattr(obj, "dict"):  # Pydantic v1
+        return obj.dict()
+
     if isinstance(obj, dict):
         return {k: serialize_model(v) for k, v in obj.items()}
     if isinstance(obj, list):
         return [serialize_model(item) for item in obj]
-    if hasattr(obj, "model_dump"):  # Pydantic v2
-        return serialize_model(obj.model_dump())
-    if hasattr(obj, "dict"):  # Pydantic v1
-        return serialize_model(obj.dict())
+    
     if hasattr(obj, "__dict__"):
         return {
             k: serialize_model(v)

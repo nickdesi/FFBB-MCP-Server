@@ -262,7 +262,6 @@ def resource_lives() -> str:
     """Retourne les matchs en direct au format JSON."""
     client = get_client()
     lives = client.get_lives()
-    lives = client.get_lives()
     return json.dumps([serialize_model(live) for live in lives], default=str)
 
 
@@ -270,7 +269,6 @@ def resource_lives() -> str:
 def resource_saisons() -> str:
     """Retourne la liste des saisons au format JSON."""
     client = get_client()
-    saisons = client.get_saisons()
     saisons = client.get_saisons()
     return json.dumps([serialize_model(s) for s in saisons], default=str)
 
@@ -280,7 +278,6 @@ def resource_competition(competition_id: int) -> str:
     """Retourne les détails d'une compétition au format JSON."""
     client = get_client()
     comp = client.get_competition(competition_id)
-    comp = client.get_competition(competition_id)
     return json.dumps(serialize_model(comp), default=str)
 
 
@@ -289,7 +286,6 @@ def resource_poule(poule_id: int) -> str:
     """Retourne les détails d'une poule au format JSON."""
     client = get_client()
     poule = client.get_poule(poule_id)
-    poule = client.get_poule(poule_id)
     return json.dumps(serialize_model(poule), default=str)
 
 
@@ -297,7 +293,6 @@ def resource_poule(poule_id: int) -> str:
 def resource_organisme(organisme_id: int) -> str:
     """Retourne les détails d'un organisme au format JSON."""
     client = get_client()
-    org = client.get_organisme(organisme_id)
     org = client.get_organisme(organisme_id)
     return json.dumps(serialize_model(org), default=str)
 
