@@ -52,10 +52,10 @@ mcp = FastMCP(
         "Utilise cet outil pour suivre les matchs en temps réel."
     )
 )
-def ffbb_get_lives() -> list[dict[str, Any]]:
+async def ffbb_get_lives() -> list[dict[str, Any]]:
     """Matchs en cours (scores live)."""
     client = get_client()
-    lives = client.get_lives()
+    lives = await client.get_lives_async()
     if not lives:
         return []
     return [serialize_model(live) for live in lives]
@@ -69,15 +69,10 @@ def ffbb_get_lives() -> list[dict[str, Any]]:
         "Retourne les IDs et noms des saisons, utiles pour filtrer les compétitions."
     )
 )
-def ffbb_get_saisons(active_only: bool = False) -> list[dict[str, Any]]:
+async def ffbb_get_saisons(active_only: bool = False) -> list[dict[str, Any]]:
     """Liste des saisons (filtre actif possible)."""
     client = get_client()
-    filter_criteria = '{"actif":{"_eq":true}}' if active_only else None
-    saisons = (
-        client.get_saisons(filter_criteria=filter_criteria)
-        if filter_criteria
-        else client.get_saisons()
-    )
+    saisons = await client.get_saisons_async(active_only=active_only)
     if not saisons:
         return []
     return [serialize_model(s) for s in saisons]
@@ -91,10 +86,10 @@ def ffbb_get_saisons(active_only: bool = False) -> list[dict[str, Any]]:
         "Utilise ffbb_search_competitions pour trouver l'ID d'une compétition."
     )
 )
-def ffbb_get_competition(competition_id: int) -> dict[str, Any]:
+async def ffbb_get_competition(competition_id: int) -> dict[str, Any]:
     """Détails d'une compétition par ID."""
     client = get_client()
-    competition = client.get_competition(competition_id=competition_id)
+    competition = await client.get_competition_async(competition_id=competition_id)
     return serialize_model(competition) or {}
 
 
@@ -107,10 +102,10 @@ def ffbb_get_competition(competition_id: int) -> dict[str, Any]:
         "(ffbb_get_competition)."
     )
 )
-def ffbb_get_poule(poule_id: int) -> dict[str, Any]:
+async def ffbb_get_poule(poule_id: int) -> dict[str, Any]:
     """Détails d'une poule/groupe par ID (classement, matchs)."""
     client = get_client()
-    poule = client.get_poule(poule_id=poule_id)
+    poule = await client.get_poule_async(poule_id=poule_id)
     return serialize_model(poule) or {}
 
 
@@ -122,10 +117,10 @@ def ffbb_get_poule(poule_id: int) -> dict[str, Any]:
         "Utilise ffbb_search_organismes pour trouver l'ID d'un club."
     )
 )
-def ffbb_get_organisme(organisme_id: int) -> dict[str, Any]:
+async def ffbb_get_organisme(organisme_id: int) -> dict[str, Any]:
     """Informations détaillées d'un club/organisme (adresse, équipes...)."""
     client = get_client()
-    organisme = client.get_organisme(organisme_id=organisme_id)
+    organisme = await client.get_organisme_async(organisme_id=organisme_id)
     return serialize_model(organisme) or {}
 
 
@@ -136,10 +131,11 @@ def ffbb_get_organisme(organisme_id: int) -> dict[str, Any]:
         "Exemples : 'Championnat', 'Nationale', 'Pro B', 'Coupe de France'."
     )
 )
-def ffbb_search_competitions(name: str) -> list[dict[str, Any]]:
+async def ffbb_search_competitions(name: str) -> list[dict[str, Any]]:
     """Recherche de compétitions par nom."""
     client = get_client()
-    results = client.search_competitions(name)
+    results = await client.search_competitions_async(name)
+    
     if not results or not results.hits:
         return []
     return [serialize_model(hit) for hit in results.hits]
@@ -152,10 +148,11 @@ def ffbb_search_competitions(name: str) -> list[dict[str, Any]]:
         "Exemples : 'Paris', 'Lyon', 'Basket Club', 'ASVEL'."
     )
 )
-def ffbb_search_organismes(name: str) -> list[dict[str, Any]]:
+async def ffbb_search_organismes(name: str) -> list[dict[str, Any]]:
     """Recherche de clubs/associations par nom ou ville."""
     client = get_client()
-    results = client.search_organismes(name)
+    results = await client.search_organismes_async(name)
+    
     if not results or not results.hits:
         return []
     return [serialize_model(hit) for hit in results.hits]
@@ -169,10 +166,11 @@ def ffbb_search_organismes(name: str) -> list[dict[str, Any]]:
         "Exemples : 'ASVEL', 'Metropolitans', 'Nationale 1'."
     )
 )
-def ffbb_search_rencontres(name: str) -> list[dict[str, Any]]:
+async def ffbb_search_rencontres(name: str) -> list[dict[str, Any]]:
     """Recherche de matchs/rencontres par nom d'équipe ou compétition."""
     client = get_client()
-    results = client.search_rencontres(name)
+    results = await client.search_rencontres_async(name)
+    
     if not results or not results.hits:
         return []
     return [serialize_model(hit) for hit in results.hits]
@@ -186,40 +184,44 @@ def ffbb_search_rencontres(name: str) -> list[dict[str, Any]]:
         "'Astroballe'."
     )
 )
-def ffbb_search_salles(name: str) -> list[dict[str, Any]]:
+async def ffbb_search_salles(name: str) -> list[dict[str, Any]]:
     """Recherche de salles de sport par nom ou ville."""
     client = get_client()
-    results = client.search_salles(name)
+    results = await client.search_salles_async(name)
+    
     if not results or not results.hits:
         return []
     return [serialize_model(hit) for hit in results.hits]
 
 
 @mcp.tool(description=("Recherche des pratiques (3x3, 5x5, VxE, etc.)."))
-def ffbb_search_pratiques(name: str) -> list[dict[str, Any]]:
+async def ffbb_search_pratiques(name: str) -> list[dict[str, Any]]:
     """Recherche de pratiques."""
     client = get_client()
-    results = client.search_pratiques(name)
+    results = await client.search_pratiques_async(name)
+    
     if not results or not results.hits:
         return []
     return [serialize_model(hit) for hit in results.hits]
 
 
 @mcp.tool(description=("Recherche des terrains."))
-def ffbb_search_terrains(name: str) -> list[dict[str, Any]]:
+async def ffbb_search_terrains(name: str) -> list[dict[str, Any]]:
     """Recherche de terrains."""
     client = get_client()
-    results = client.search_terrains(name)
+    results = await client.search_terrains_async(name)
+    
     if not results or not results.hits:
         return []
     return [serialize_model(hit) for hit in results.hits]
 
 
 @mcp.tool(description=("Recherche des tournois."))
-def ffbb_search_tournois(name: str) -> list[dict[str, Any]]:
+async def ffbb_search_tournois(name: str) -> list[dict[str, Any]]:
     """Recherche de tournois."""
     client = get_client()
-    results = client.search_tournois(name)
+    results = await client.search_tournois_async(name)
+    
     if not results or not results.hits:
         return []
     return [serialize_model(hit) for hit in results.hits]
@@ -235,17 +237,21 @@ def ffbb_search_tournois(name: str) -> list[dict[str, Any]]:
         "Exemples : 'Lyon', 'Pro A', 'Palais des Sports'."
     )
 )
-def ffbb_multi_search(name: str) -> list[dict[str, Any]]:
+async def ffbb_multi_search(name: str) -> list[dict[str, Any]]:
     """Recherche globale sur tous les types (compétitions, clubs, matchs, salles...)."""
     client = get_client()
-    results = client.multi_search(name)
-    if not results:
+    from ffbb_api_client_v2.helpers.multi_search_query_helper import generate_queries
+    
+    queries = generate_queries(name)
+    results = await client.multi_search_async(queries=queries)
+    if not results or not results.results:
         return []
+    
     output = []
-    for result in results:
-        if hasattr(result, "hits") and result.hits:
-            category = type(result).__name__
-            for hit in result.hits:
+    for res in results.results:
+        if res.hits:
+            category = res.index_uid
+            for hit in res.hits:
                 item = serialize_model(hit)
                 item["_category"] = category
                 output.append(item)
@@ -258,43 +264,43 @@ def ffbb_multi_search(name: str) -> list[dict[str, Any]]:
 
 
 @mcp.resource("ffbb://lives")
-def resource_lives() -> str:
+async def resource_lives() -> str:
     """Retourne les matchs en direct au format JSON."""
     client = get_client()
-    lives = client.get_lives()
-    return json.dumps([serialize_model(live) for live in lives], default=str)
+    lives = await client.get_lives_async()
+    return json.dumps([serialize_model(live) for live in lives] if lives else [], default=str)
 
 
 @mcp.resource("ffbb://saisons")
-def resource_saisons() -> str:
+async def resource_saisons() -> str:
     """Retourne la liste des saisons au format JSON."""
     client = get_client()
-    saisons = client.get_saisons()
-    return json.dumps([serialize_model(s) for s in saisons], default=str)
+    saisons = await client.get_saisons_async()
+    return json.dumps([serialize_model(s) for s in saisons] if saisons else [], default=str)
 
 
 @mcp.resource("ffbb://competition/{competition_id}")
-def resource_competition(competition_id: int) -> str:
+async def resource_competition(competition_id: int) -> str:
     """Retourne les détails d'une compétition au format JSON."""
     client = get_client()
-    comp = client.get_competition(competition_id)
-    return json.dumps(serialize_model(comp), default=str)
+    comp = await client.get_competition_async(competition_id)
+    return json.dumps(serialize_model(comp) or {}, default=str)
 
 
 @mcp.resource("ffbb://poule/{poule_id}")
-def resource_poule(poule_id: int) -> str:
+async def resource_poule(poule_id: int) -> str:
     """Retourne les détails d'une poule au format JSON."""
     client = get_client()
-    poule = client.get_poule(poule_id)
-    return json.dumps(serialize_model(poule), default=str)
+    poule = await client.get_poule_async(poule_id)
+    return json.dumps(serialize_model(poule) or {}, default=str)
 
 
 @mcp.resource("ffbb://organisme/{organisme_id}")
-def resource_organisme(organisme_id: int) -> str:
+async def resource_organisme(organisme_id: int) -> str:
     """Retourne les détails d'un organisme au format JSON."""
     client = get_client()
-    org = client.get_organisme(organisme_id)
-    return json.dumps(serialize_model(org), default=str)
+    org = await client.get_organisme_async(organisme_id)
+    return json.dumps(serialize_model(org) or {}, default=str)
 
 
 # ---------------------------------------------------------------------------
