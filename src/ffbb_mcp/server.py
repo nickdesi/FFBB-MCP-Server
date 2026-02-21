@@ -588,7 +588,7 @@ def _create_search_tool(search_type: str, method_name: str, description: str) ->
             list[dict]: Liste de résultats. Chaque dict contient un ID et des infos de base.
             Liste vide si aucun résultat.
         """
-        client = ctx.app_context.client
+        client = get_client()
         method = getattr(client, mn)
         results = await _safe_call(
             ctx,
