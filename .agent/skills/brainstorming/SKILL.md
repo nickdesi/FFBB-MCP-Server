@@ -15,7 +15,6 @@ Turn raw ideas into **clear, validated designs and specifications**
 through structured dialogue **before any implementation begins**.
 
 This skill exists to prevent:
-
 - premature implementation
 - hidden assumptions
 - misaligned solutions
@@ -99,9 +98,7 @@ If the user is unsure:
 Before proposing **any design**, you MUST pause and do the following:
 
 #### Understanding Summary
-
 Provide a concise summary (5–7 bullets) covering:
-
 - What is being built  
 - Why it exists  
 - Who it is for  
@@ -109,11 +106,9 @@ Provide a concise summary (5–7 bullets) covering:
 - Explicit non-goals  
 
 #### Assumptions
-
 List all assumptions explicitly.
 
 #### Open Questions
-
 List unresolved questions, if any.
 
 Then ask:
@@ -167,7 +162,6 @@ Cover, as relevant:
 Maintain a running **Decision Log** throughout the design discussion.
 
 For each decision:
-
 - What was decided  
 - Alternatives considered  
 - Why this option was chosen  
@@ -193,6 +187,19 @@ Persist the document according to the project’s standard workflow.
 
 ---
 
+### 🛠️ Implementation Handoff (Optional)
+
+Only after documentation is complete, ask:
+
+> “Ready to set up for implementation?”
+
+If yes:
+- Create an explicit implementation plan
+- Isolate work if the workflow supports it
+- Proceed incrementally
+
+---
+
 ## Exit Criteria (Hard Stop Conditions)
 
 You may exit brainstorming mode **only when all of the following are true**:
@@ -204,7 +211,6 @@ You may exit brainstorming mode **only when all of the following are true**:
 - Decision Log is complete  
 
 If any criterion is unmet:
-
 - Continue refinement  
 - **Do NOT proceed to implementation**
 

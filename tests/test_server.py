@@ -103,6 +103,9 @@ def test_server_tools_importable():
         "ffbb_search_organismes",
         "ffbb_search_rencontres",
         "ffbb_search_salles",
+        "ffbb_search_pratiques",
+        "ffbb_search_terrains",
+        "ffbb_search_tournois",
         "ffbb_multi_search",
     ]
     for name in expected:
