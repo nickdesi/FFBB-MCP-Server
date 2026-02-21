@@ -28,15 +28,33 @@ graph TD
 
 ---
 
-## ✨ Fonctionnalités Clés
+### ⚡ Temps Réel
 
-- **⚡ Temps Réel** : Accès aux scores live via `ffbb_get_lives` ou la ressource `ffbb://lives`.
-- **🔍 Recherche Puissante** : Recherche globale via `ffbb_multi_search` (Clubs, Salles, Compétitions, Tournois, Terrains...).
-- **📋 Calendriers & Résultats** : Historique et matchs à venir pour n'importe quelle équipe.
-- **🏆 Classements** : Positions actualisées dans toutes les poules (Nationale, Régionale, Départementale).
-- **📦 Ressources Directes** : Accès simplifié aux données via URIs (`ffbb://competition/{id}`, `ffbb://poule/{id}`).
-- **💡 Prompts Intelligents** : Modèles prêts à l'emploi (`analyser-match`, `trouver-club`) pour guider l'IA.
-- **🛠️ Zero Config Auth** : Les jetons d'accès sont récupérés automatiquement, aucune clé API manuelle n'est nécessaire.
+Accès aux scores live via l'outil `ffbb_get_lives`.
+
+### 🔍 Recherche Puissante
+
+Recherche globale via `ffbb_multi_search` (Clubs, Salles, Compétitions, Tournois, Terrains...).
+
+### 📋 Calendriers & Résultats
+
+Historique et matchs à venir pour n'importe quelle équipe.
+
+### 🏆 Classements
+
+Positions actualisées dans toutes les poules (Nationale, Régionale, Départementale).
+
+### 📦 Ressources Directes
+
+Accès simplifié aux données via URIs (`ffbb://competition/{id}`, `ffbb://poule/{id}`, `ffbb://organisme/{id}`).
+
+### 💡 Prompts Intelligents
+
+Modèles prêts à l'emploi (`analyser_match`, `trouver_club`, `prochain_match`) pour guider l'IA.
+
+### 🛠️ Zero Config Auth
+
+Les jetons d'accès sont récupérés automatiquement, aucune clé API manuelle n'est nécessaire.
 
 ---
 
@@ -67,7 +85,7 @@ npx @modelcontextprotocol/inspector python -m ffbb_mcp
 ```json
 {
   "mcpServers": {
-    "ffbb": {
+    "ffbb_mcp": {
       "command": "python",
       "args": ["-m", "ffbb_mcp"],
       "cwd": "/votre/chemin/FFBB-MCP-Server"
@@ -83,7 +101,7 @@ Installez l'extension et configurez la source :
 ```json
 {
   "mcpServers": {
-    "ffbb": {
+    "ffbb_mcp": {
       "command": "/votre/chemin/.venv/bin/python",
       "args": ["-m", "ffbb_mcp"],
       "cwd": "/votre/chemin/FFBB-MCP-Server"
@@ -99,7 +117,7 @@ Installez l'extension et configurez la source :
 ```json
 {
   "mcpServers": {
-    "ffbb": {
+    "ffbb_mcp": {
       "command": "/votre/chemin/.venv/bin/python",
       "args": ["-m", "ffbb_mcp"],
       "cwd": "/votre/chemin/FFBB-MCP-Server"
@@ -123,7 +141,7 @@ Pour les développeurs d'agents, ce serveur a été optimisé pour une utilisati
 ## 📚 Source & Crédits
 
 - **Données** : Fédération Française de Basketball.
-- **Core Library** : [`ffbb-api-client-v2`](https://github.com/Rinzler78/FFBBApiClientV2_Python).
+- **Core Library** : [`ffbb-api-client-v3`](https://github.com/nickdesi/FFBBApiClientV3).
 - **Maintenance** : Nicolas De Simone.
 
 ---
