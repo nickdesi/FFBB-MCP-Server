@@ -125,28 +125,6 @@ class CalendrierClubInput(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Lifespan — typed application context
-# ---------------------------------------------------------------------------
-@dataclass
-class FFBBContext:
-    """Contexte applicatif typé injecté dans chaque tool via ctx.app_context."""
-
-    client: FFBBAPIClientV3
-
-
-@asynccontextmanager
-async def ffbb_lifespan(server: FastMCP) -> AsyncIterator[FFBBContext]:
-    """Initialise le client FFBB une seule fois au démarrage du serveur."""
-    logger.info("Initialisation du client FFBB via lifespan...")
-    client = get_client()
-    logger.info("Client FFBB prêt.")
-    try:
-        yield FFBBContext(client=client)
-    finally:
-        logger.info("Arrêt du serveur MCP FFBB.")
-
-
-# ---------------------------------------------------------------------------
 # MCP Server
 # ---------------------------------------------------------------------------
 mcp = FastMCP(
@@ -163,12 +141,9 @@ mcp = FastMCP(
         "3. Puis `ffbb_get_*` avec l'ID obtenu pour les détails complets\n\n"
         "Tous les outils renvoient du JSON structuré."
     ),
-    lifespan=ffbb_lifespan,
     json_response=True,
 )
 
-# Type alias for the context used in tools
-Ctx = Context[ServerSession, FFBBContext]
 
 # Read-only annotations (all FFBB tools are read-only)
 _READONLY_ANNOTATIONS = {
@@ -236,7 +211,7 @@ async def ffbb_get_lives(ctx: Ctx) -> list[dict[str, Any]]:
             - statut (str): Statut du match
         Liste vide si aucun match en cours.
     """
-    client = ctx.app_context.client
+    client = get_client()
     lives = await _safe_call(ctx, "Récupération des matchs en direct", client.get_lives_async())
     if not lives:
         return []
@@ -269,7 +244,7 @@ async def ffbb_get_saisons(params: SaisonsInput, ctx: Ctx) -> list[dict[str, Any
             - nom (str): Nom de la saison (ex: "2024-2025")
             - actif (bool): Si la saison est active
     """
-    client = ctx.app_context.client
+    client = get_client()
     label = "saisons actives" if params.active_only else "toutes les saisons"
     saisons = await _safe_call(
         ctx,
@@ -305,7 +280,7 @@ async def ffbb_get_competition(params: CompetitionIdInput, ctx: Ctx) -> dict[str
         dict: Détails de la compétition incluant nom, type, saison, poules, équipes.
         Dict vide si l'ID est introuvable.
     """
-    client = ctx.app_context.client
+    client = get_client()
     comp = await _safe_call(
         ctx,
         f"Récupération compétition #{params.competition_id}",
@@ -334,7 +309,7 @@ async def ffbb_get_poule(params: PouleIdInput, ctx: Ctx) -> dict[str, Any]:
         dict: Détails de la poule incluant classement, équipes, matchs.
         Dict vide si l'ID est introuvable.
     """
-    client = ctx.app_context.client
+    client = get_client()
     poule = await _safe_call(
         ctx,
         f"Récupération poule #{params.poule_id}",
@@ -363,7 +338,7 @@ async def ffbb_get_organisme(params: OrganismeIdInput, ctx: Ctx) -> dict[str, An
         dict: Détails de l'organisme incluant nom, adresse, type, équipes.
         Dict vide si l'ID est introuvable.
     """
-    client = ctx.app_context.client
+    client = get_client()
     org = await _safe_call(
         ctx,
         f"Récupération organisme #{params.organisme_id}",
@@ -392,7 +367,7 @@ async def ffbb_equipes_club(params: OrganismeIdInput, ctx: Ctx) -> list[dict[str
         list[dict]: Liste aplatie avec nom_equipe, numero_equipe, competition,
             poule_id, sexe, categorie. Liste vide si aucune équipe.
     """
-    client = ctx.app_context.client
+    client = get_client()
     org = await _safe_call(
         ctx,
         f"Récupération des équipes du club #{params.organisme_id}",
@@ -447,7 +422,7 @@ async def ffbb_get_classement(params: PouleIdInput, ctx: Ctx) -> list[dict[str, 
             - position, equipe, points, victoires, defaites, etc.
         Liste vide si non disponible.
     """
-    client = ctx.app_context.client
+    client = get_client()
     poule = await _safe_call(
         ctx,
         f"Récupération classement poule #{params.poule_id}",
@@ -506,7 +481,7 @@ async def ffbb_calendrier_club(
         list[dict]: Liste de matchs avec dates, équipes, résultats.
         Liste vide si aucun match trouvé.
     """
-    client = ctx.app_context.client
+    client = get_client()
     query = params.club_name
     if params.categorie:
         query += f" {params.categorie}"
