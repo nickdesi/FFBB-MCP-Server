@@ -106,6 +106,24 @@ class SaisonsInput(BaseModel):
     )
 
 
+class CalendrierClubInput(BaseModel):
+    """Paramètres pour récupérer le calendrier d'un club."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    club_name: str = Field(
+        ...,
+        description="Nom du club (ex: 'Stade Clermontois', 'ASVEL')",
+        min_length=1,
+        max_length=200,
+    )
+    categorie: str = Field(
+        default="",
+        description="Catégorie optionnelle (ex: 'U11M', 'Seniors F', 'U13F')",
+        max_length=50,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Lifespan — typed application context
 # ---------------------------------------------------------------------------
@@ -354,6 +372,115 @@ async def ffbb_get_organisme(params: OrganismeIdInput, ctx: Ctx) -> dict[str, An
     return serialize_model(org) or {}
 
 
+@mcp.tool(
+    name="ffbb_equipes_club",
+    annotations=_READONLY_ANNOTATIONS,
+    description=(
+        "Récupère uniquement la liste des équipes engagées par un club/organisme. "
+        "Plus léger que ffbb_get_organisme car ne retourne que les engagements. "
+        "Utilise ffbb_search_organismes pour trouver l'ID du club d'abord."
+    ),
+)
+async def ffbb_equipes_club(params: OrganismeIdInput, ctx: Ctx) -> list[dict[str, Any]]:
+    """Liste allégée des équipes engagées par un club.
+
+    Args:
+        params (OrganismeIdInput): Paramètres validés contenant :
+            - organisme_id (int): ID de l'organisme
+
+    Returns:
+        list[dict]: Liste des équipes engagées avec compétition, catégorie, poule.
+        Liste vide si aucune équipe.
+    """
+    client = ctx.app_context.client
+    org = await _safe_call(
+        ctx,
+        f"Récupération des équipes du club #{params.organisme_id}",
+        client.get_organisme_async(organisme_id=params.organisme_id),
+    )
+    if not org:
+        return []
+    data = serialize_model(org)
+    engagements = data.get("engagements", []) if isinstance(data, dict) else []
+    await ctx.info(f"✅ {len(engagements)} équipe(s) trouvée(s)")
+    return engagements
+
+
+@mcp.tool(
+    name="ffbb_get_classement",
+    annotations=_READONLY_ANNOTATIONS,
+    description=(
+        "Récupère uniquement le classement d'une poule/groupe (sans les matchs). "
+        "Plus léger que ffbb_get_poule pour obtenir les positions des équipes. "
+        "L'ID de poule est disponible via ffbb_get_competition."
+    ),
+)
+async def ffbb_get_classement(params: PouleIdInput, ctx: Ctx) -> list[dict[str, Any]]:
+    """Classement seul d'une poule (sans les rencontres).
+
+    Args:
+        params (PouleIdInput): Paramètres validés contenant :
+            - poule_id (int): ID de la poule
+
+    Returns:
+        list[dict]: Classement trié. Chaque dict contient :
+            - position, equipe, points, victoires, defaites, etc.
+        Liste vide si non disponible.
+    """
+    client = ctx.app_context.client
+    poule = await _safe_call(
+        ctx,
+        f"Récupération classement poule #{params.poule_id}",
+        client.get_poule_async(poule_id=params.poule_id),
+    )
+    if not poule:
+        return []
+    data = serialize_model(poule)
+    classement = data.get("classement", []) if isinstance(data, dict) else []
+    await ctx.info(f"✅ {len(classement)} équipe(s) au classement")
+    return classement
+
+
+@mcp.tool(
+    name="ffbb_calendrier_club",
+    annotations=_READONLY_ANNOTATIONS,
+    description=(
+        "Recherche les matchs à venir et passés d'un club, avec filtre optionnel "
+        "par catégorie. Combine le nom du club et la catégorie pour la recherche. "
+        "Exemples : club='ASVEL' catégorie='U13M', club='Vichy' catégorie='Seniors'."
+    ),
+)
+async def ffbb_calendrier_club(
+    params: CalendrierClubInput, ctx: Ctx
+) -> list[dict[str, Any]]:
+    """Calendrier des matchs d'un club (filtrage optionnel par catégorie).
+
+    Args:
+        params (CalendrierClubInput): Paramètres validés contenant :
+            - club_name (str): Nom du club
+            - categorie (str): Catégorie optionnelle (ex: 'U11M')
+
+    Returns:
+        list[dict]: Liste de matchs avec dates, équipes, résultats.
+        Liste vide si aucun match trouvé.
+    """
+    client = ctx.app_context.client
+    query = params.club_name
+    if params.categorie:
+        query += f" {params.categorie}"
+
+    results = await _safe_call(
+        ctx,
+        f"Recherche calendrier: « {query} »",
+        client.search_rencontres_async(query),
+    )
+    if not results or not results.hits:
+        await ctx.info(f"Aucun match trouvé pour « {query} »")
+        return []
+    await ctx.info(f"✅ {len(results.hits)} match(s) trouvé(s)")
+    return [serialize_model(hit) for hit in results.hits]
+
+
 # ---------------------------------------------------------------------------
 # Outils MCP — Recherche par type (factory pattern)
 # ---------------------------------------------------------------------------
@@ -578,9 +705,22 @@ def prochain_match(club_name: str, categorie: str = "") -> str:
         query += f" {categorie}"
     return (
         f"Je cherche le prochain match de '{query}'.\n"
-        f"1. Utilise `ffbb_search_rencontres` avec le terme « {query} »\n"
+        f"1. Utilise `ffbb_calendrier_club` avec club_name='{club_name}'"
+        + (f" et categorie='{categorie}'" if categorie else "") + "\n"
         "2. Filtre les résultats pour ne garder que les matchs à venir\n"
         "3. Donne la date, l'heure, l'adversaire et le lieu du prochain match."
+    )
+
+
+@mcp.prompt()
+def classement_poule(competition_name: str) -> str:
+    """Aide à consulter le classement d'une compétition."""
+    return (
+        f"Je veux le classement de la compétition '{competition_name}'.\n"
+        f"1. Utilise `ffbb_search_competitions` avec « {competition_name} »\n"
+        "2. Puis `ffbb_get_competition` pour obtenir les poules\n"
+        "3. Puis `ffbb_get_classement` pour le classement de la poule souhaitée\n"
+        "4. Présente le classement sous forme de tableau."
     )
 
 

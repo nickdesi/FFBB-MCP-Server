@@ -1,13 +1,12 @@
 # 🏀 FFBB MCP Server
 
-[![MCP](https://img.shields.io/badge/MCP-Supported-blue)](https://modelcontextprotocol.io)
+[![CI](https://github.com/nickdesi/FFBB-MCP-Server/actions/workflows/ci.yml/badge.svg)](https://github.com/nickdesi/FFBB-MCP-Server/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/Python-3.10+-yellow)](https://www.python.org)
+[![MCP](https://img.shields.io/badge/MCP-Supported-blue)](https://modelcontextprotocol.io)
 [![FFBB](https://img.shields.io/badge/Data-FFBB-orange)](https://www.ffbb.com)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE)
 
-> Un pont intelligent entre les données de la **Fédération Française de Basketball** et les assistants IA.
-
-Le serveur **FFBB MCP** permet à votre IA (Claude Desktop, Google Antigravity, Cursor, etc.) d'accéder nativement et en temps réel aux calendriers, classements et résultats du basketball français.
+Ce serveur MCP expose les données de la **Fédération Française de Basketball (FFBB)** pour les agents IA (Claude, IDEs). Il utilise la bibliothèque `ffbb-api-client-v3` pour un accès performant et sécurisé.
 
 ---
 
@@ -28,33 +27,30 @@ graph TD
 
 ---
 
-### ⚡ Temps Réel
+## ✨ Fonctionnalités
 
-Accès aux scores live via l'outil `ffbb_get_lives`.
+- 📡 **Données en Temps Réel** : Matchs en direct, scores, calendrier.
+- 🔍 **Recherche Puissante** : Recherche globale ou ciblée (clubs, compétitions, salles).
+- 📂 **Ressources Directes** : Accès stable aux saisons, poules et organismes via URIs (`ffbb://competition/{id}`, `ffbb://poule/{id}`).
+- 💡 **Prompts Intelligents** : Workflows pré-configurés (`analyser_match`, `trouver_club`, `prochain_match`, `classement_poule`).
+- 🔑 **Auth Zéro-Config** : Gestion automatique des jetons API et Meilisearch avec rafraîchissement proactif.
 
-### 🔍 Recherche Puissante
+## 🛠 Outils disponibles
 
-Recherche globale via `ffbb_multi_search` (Clubs, Salles, Compétitions, Tournois, Terrains...).
+| Catégorie | Outil | Description |
+|-----------|-------|-------------|
+| **Direct** | `ffbb_get_lives` | Matchs en cours (Live) |
+| | `ffbb_get_saisons` | Liste des saisons |
+| **Clubs** | `ffbb_get_organisme` | Détails complets d'un club |
+| | `ffbb_equipes_club` | Liste des équipes engagées |
+| | `ffbb_calendrier_club`| Matchs (passés/futurs) d'un club |
+| **Compét.**| `ffbb_get_competition`| Détails d'un championnat |
+| | `ffbb_get_poule` | Rencontres et classement complet |
+| | `ffbb_get_classement`| Classement d'une poule seul (léger) |
+| **Recherche**| `ffbb_multi_search` | Recherche globale multi-critères |
+| | `ffbb_search_*` | Recherche ciblée (salles, terrains...) |
 
-### 📋 Calendriers & Résultats
-
-Historique et matchs à venir pour n'importe quelle équipe.
-
-### 🏆 Classements
-
-Positions actualisées dans toutes les poules (Nationale, Régionale, Départementale).
-
-### 📦 Ressources Directes
-
-Accès simplifié aux données via URIs (`ffbb://competition/{id}`, `ffbb://poule/{id}`, `ffbb://organisme/{id}`).
-
-### 💡 Prompts Intelligents
-
-Modèles prêts à l'emploi (`analyser_match`, `trouver_club`, `prochain_match`) pour guider l'IA.
-
-### 🛠️ Zero Config Auth
-
-Les jetons d'accès sont récupérés automatiquement, aucune clé API manuelle n'est nécessaire.
+> Retrouvez l'aide détaillée de chaque outil dans [docs/TOOLS_REFERENCE.md](docs/TOOLS_REFERENCE.md).
 
 ---
 
@@ -132,9 +128,10 @@ Installez l'extension et configurez la source :
 
 Pour les développeurs d'agents, ce serveur a été optimisé pour une utilisation sémantique :
 
-1. **Fiabilité Max** : Ne tentez pas de deviner les IDs. Utilisez `ffbb_search_organismes` pour trouver le club, puis listez les équipes via `ffbb_get_organisme`.
+1. **Fiabilité Max** : Ne tentez pas de deviner les IDs. Utilisez `ffbb_search_organismes` pour trouver le club, puis listez les équipes via `ffbb_equipes_club`.
 2. **Filtrage Intelligent** : Les agents doivent utiliser les indices de texte (ex: "Equipe 2", "U11M") pour filtrer les résultats d'engagement avant d'appeler `ffbb_get_poule`.
-3. **Gestion des Alias** : Le serveur supporte les recherches par acronymes si l'agent est capable de faire le lien (ex: SCBA -> Stade Clermontois).
+3. **Classement Rapide** : Pour obtenir uniquement le classement, utilisez `ffbb_get_classement` (plus léger que `ffbb_get_poule`).
+4. **Gestion des Alias** : Le serveur supporte les recherches par acronymes si l'agent est capable de faire le lien (ex: SCBA -> Stade Clermontois).
 
 ---
 

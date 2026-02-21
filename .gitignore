@@ -7,6 +7,10 @@ dist/
 build/
 .env
 .DS_Store
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
 
 reproduce_issue.py
 http_cache.db
