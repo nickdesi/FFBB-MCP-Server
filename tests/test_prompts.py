@@ -1,6 +1,12 @@
 """Tests des prompts MCP FFBB."""
 
-from ffbb_mcp.server import analyser_match, classement_poule, prochain_match, trouver_club
+from ffbb_mcp.server import (
+    analyser_match,
+    bilan_equipe,
+    classement_poule,
+    prochain_match,
+    trouver_club,
+)
 
 
 class TestPrompts:
@@ -37,3 +43,12 @@ class TestPrompts:
         assert "Nationale 1" in result
         assert "ffbb_search_competitions" in result
         assert "ffbb_get_classement" in result
+
+    def test_bilan_equipe(self):
+        result = bilan_equipe("SCBA", "U11M")
+        assert "SCBA" in result
+        assert "U11M" in result
+        assert "ffbb_equipes_club" in result
+        assert "ffbb_get_classement" in result
+        assert "cumule" in result.lower()
+

@@ -389,8 +389,8 @@ async def ffbb_equipes_club(params: OrganismeIdInput, ctx: Ctx) -> list[dict[str
             - organisme_id (int): ID de l'organisme
 
     Returns:
-        list[dict]: Liste des équipes engagées avec compétition, catégorie, poule.
-        Liste vide si aucune équipe.
+        list[dict]: Liste aplatie avec nom_equipe, numero_equipe, competition,
+            poule_id, sexe, categorie. Liste vide si aucune équipe.
     """
     client = ctx.app_context.client
     org = await _safe_call(
@@ -401,9 +401,29 @@ async def ffbb_equipes_club(params: OrganismeIdInput, ctx: Ctx) -> list[dict[str
     if not org:
         return []
     data = serialize_model(org)
-    engagements = data.get("engagements", []) if isinstance(data, dict) else []
-    await ctx.info(f"✅ {len(engagements)} équipe(s) trouvée(s)")
-    return engagements
+    raw = data.get("engagements", []) if isinstance(data, dict) else []
+    # Aplatir la structure imbriquée pour la rendre lisible par l'IA
+    flat: list[dict[str, Any]] = []
+    club_nom = data.get("nom", "")
+    for e in raw:
+        comp = e.get("idCompetition", {}) or {}
+        poule = e.get("idPoule", {}) or {}
+        cat = comp.get("categorie", {}) or {}
+        flat.append({
+            "engagement_id": e.get("id"),
+            "nom_equipe": club_nom,
+            "numero_equipe": None,  # rempli plus tard via classement
+            "competition": comp.get("nom", ""),
+            "competition_id": comp.get("id"),
+            "competition_code": comp.get("code", ""),
+            "poule_id": poule.get("id"),
+            "sexe": comp.get("sexe", ""),
+            "categorie": cat.get("code", ""),
+            "type": comp.get("typeCompetition", ""),
+            "niveau": comp.get("competition_origine_niveau"),
+        })
+    await ctx.info(f"✅ {len(flat)} équipe(s) trouvée(s)")
+    return flat
 
 
 @mcp.tool(
@@ -436,9 +456,31 @@ async def ffbb_get_classement(params: PouleIdInput, ctx: Ctx) -> list[dict[str, 
     if not poule:
         return []
     data = serialize_model(poule)
-    classement = data.get("classement", []) if isinstance(data, dict) else []
-    await ctx.info(f"✅ {len(classement)} équipe(s) au classement")
-    return classement
+    # L'API retourne 'classements' au pluriel
+    raw = data.get("classements", data.get("classement", []))
+    if not isinstance(raw, list):
+        raw = []
+    # Aplatir la structure imbriquée id_engagement
+    flat: list[dict[str, Any]] = []
+    for c in raw:
+        eng = c.get("id_engagement", {}) or {}
+        flat.append({
+            "position": c.get("position"),
+            "equipe": eng.get("nom", ""),
+            "numero_equipe": eng.get("numero_equipe", ""),
+            "points": c.get("points"),
+            "match_joues": c.get("match_joues"),
+            "gagnes": c.get("gagnes"),
+            "perdus": c.get("perdus"),
+            "nuls": c.get("nuls"),
+            "paniers_marques": c.get("paniers_marques"),
+            "paniers_encaisses": c.get("paniers_encaisses"),
+            "difference": c.get("difference"),
+            "quotient": c.get("quotient"),
+            "forfaits": c.get("nombre_forfaits"),
+        })
+    await ctx.info(f"✅ {len(flat)} équipe(s) au classement")
+    return flat
 
 
 @mcp.tool(
@@ -477,8 +519,20 @@ async def ffbb_calendrier_club(
     if not results or not results.hits:
         await ctx.info(f"Aucun match trouvé pour « {query} »")
         return []
-    await ctx.info(f"✅ {len(results.hits)} match(s) trouvé(s)")
-    return [serialize_model(hit) for hit in results.hits]
+    # Aplatir les hits pour extraire les champs utiles
+    flat: list[dict[str, Any]] = []
+    for hit in results.hits:
+        raw = serialize_model(hit)
+        flat.append({
+            "id": raw.get("id"),
+            "date": raw.get("date_rencontre", raw.get("date")),
+            "nom_equipe1": raw.get("nom_equipe1", ""),
+            "nom_equipe2": raw.get("nom_equipe2", ""),
+            "numero_journee": raw.get("numero_journee"),
+            "gs_id": raw.get("gs_id"),
+        })
+    await ctx.info(f"✅ {len(flat)} match(s) trouvé(s)")
+    return flat
 
 
 # ---------------------------------------------------------------------------
@@ -721,6 +775,22 @@ def classement_poule(competition_name: str) -> str:
         "2. Puis `ffbb_get_competition` pour obtenir les poules\n"
         "3. Puis `ffbb_get_classement` pour le classement de la poule souhaitée\n"
         "4. Présente le classement sous forme de tableau."
+    )
+
+
+@mcp.prompt()
+def bilan_equipe(club_name: str, categorie: str) -> str:
+    """Aide à faire le bilan complet d'une équipe sur toute la saison."""
+    return (
+        f"Je veux le bilan complet de l'équipe '{categorie}' du club '{club_name}' "
+        "sur la saison actuelle (toutes phases confondues).\n"
+        f"1. Utilise `ffbb_search_organismes` avec « {club_name} » pour trouver l'ID\n"
+        f"2. Utilise `ffbb_equipes_club` pour lister les engagements du club\n"
+        f"3. Filtre les engagements contenant « {categorie} » dans la compétition\n"
+        "4. Pour CHAQUE poule_id trouvé (Phase 1, Phase 2, Phase 3...), "
+        "appelle `ffbb_get_classement` et trouve la ligne de l'équipe\n"
+        "5. Cumule les matchs joués, victoires, défaites sur toutes les phases\n"
+        "6. Présente un tableau par phase + un total cumulé de la saison."
     )
 
 

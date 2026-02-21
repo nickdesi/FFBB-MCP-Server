@@ -148,7 +148,7 @@ class TestEquipesClub:
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_extracts_engagements(self, mock_ctx, mock_client):
+    async def test_extracts_engagements_flattened(self, mock_ctx, mock_client):
         from ffbb_mcp.server import OrganismeIdInput
 
         org_mock = MagicMock()
@@ -156,15 +156,22 @@ class TestEquipesClub:
             return_value={
                 "nom": "Club Test",
                 "engagements": [
-                    {"competition": "U11M", "poule_id": 1},
-                    {"competition": "U13F", "poule_id": 2},
+                    {
+                        "id": "eng1",
+                        "idCompetition": {"nom": "U11M", "id": "comp1", "code": "C1", "sexe": "M"},
+                        "idPoule": {"id": "poule1"},
+                    }
                 ],
             }
         )
         mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
         params = OrganismeIdInput(organisme_id=123)
         result = await ffbb_equipes_club(params, mock_ctx)
-        assert len(result) == 2
+        assert len(result) == 1
+        assert result[0]["nom_equipe"] == "Club Test"
+        assert result[0]["competition"] == "U11M"
+        assert result[0]["poule_id"] == "poule1"
+        assert result[0]["sexe"] == "M"
 
 
 # ---------------------------------------------------------------------------
@@ -185,24 +192,27 @@ class TestGetClassement:
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_extracts_classement(self, mock_ctx, mock_client):
+    async def test_extracts_classement_plural_and_flattened(self, mock_ctx, mock_client):
         from ffbb_mcp.server import PouleIdInput
 
         poule_mock = MagicMock()
         poule_mock.model_dump = MagicMock(
             return_value={
-                "nom": "Poule A",
-                "classement": [
-                    {"position": 1, "equipe": "Team A", "points": 10},
-                    {"position": 2, "equipe": "Team B", "points": 8},
-                ],
-                "rencontres": [],
+                "classements": [
+                    {
+                        "position": 1,
+                        "points": 10,
+                        "id_engagement": {"nom": "Team A", "numero_equipe": "1"},
+                    }
+                ]
             }
         )
         mock_client.get_poule_async = AsyncMock(return_value=poule_mock)
         params = PouleIdInput(poule_id=123)
         result = await ffbb_get_classement(params, mock_ctx)
-        assert len(result) == 2
+        assert len(result) == 1
+        assert result[0]["equipe"] == "Team A"
+        assert result[0]["numero_equipe"] == "1"
         assert result[0]["position"] == 1
 
 
@@ -229,13 +239,21 @@ class TestCalendrierClub:
 
         hits_mock = MagicMock()
         hit1 = MagicMock()
-        hit1.model_dump = MagicMock(return_value={"equipe1": "ASVEL U13M", "date": "2025-03-01"})
+        # Simulation d'une rencontre avec structure réelle
+        hit1.model_dump = MagicMock(return_value={
+            "id": "m1",
+            "date_rencontre": "2025-03-01",
+            "nom_equipe1": "ASVEL U13M",
+            "nom_equipe2": "Vichy U13M"
+        })
         hits_mock.hits = [hit1]
         mock_client.search_rencontres_async = AsyncMock(return_value=hits_mock)
 
         params = CalendrierClubInput(club_name="ASVEL", categorie="U13M")
         result = await ffbb_calendrier_club(params, mock_ctx)
         assert len(result) == 1
+        assert result[0]["nom_equipe1"] == "ASVEL U13M"
+        assert result[0]["date"] == "2025-03-01"
 
         # Vérifier que la recherche combine club + catégorie
         call_args = mock_client.search_rencontres_async.call_args
