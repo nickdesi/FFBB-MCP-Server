@@ -46,10 +46,11 @@ logger = logging.getLogger("ffbb-mcp")
 class SearchInput(BaseModel):
     """Paramètres de recherche FFBB."""
 
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", populate_by_name=True)
 
     name: str = Field(
         ...,
+        alias="nom",
         description="Terme de recherche (ex: 'Vichy', 'Pro B', 'Astroballe')",
         min_length=1,
         max_length=200,
