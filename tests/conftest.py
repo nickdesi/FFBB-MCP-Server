@@ -1,6 +1,6 @@
 """Fixtures partagées pour les tests du serveur MCP FFBB."""
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -26,16 +26,17 @@ def mock_client():
     return client
 
 
+@pytest.fixture(autouse=True)
+def patch_get_client(mock_client):
+    """Patch get_client pour qu'il retourne le mock_client par défaut."""
+    with patch("ffbb_mcp.server.get_client", return_value=mock_client):
+        yield
+
+
 @pytest.fixture
-def mock_ctx(mock_client):
+def mock_ctx():
     """Contexte MCP mocké pour les tests unitaires."""
     ctx = MagicMock()
     ctx.info = AsyncMock()
     ctx.error = AsyncMock()
-
-    # Simuler l'app_context avec le client
-    app_context = MagicMock()
-    app_context.client = mock_client
-    ctx.app_context = app_context
-
     return ctx
