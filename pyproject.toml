@@ -13,6 +13,8 @@ dependencies = [
     "mcp[cli]>=1.0.0",
     "ffbb-api-client-v3 @ git+https://github.com/nickdesi/FFBBApiClientV3.git",
     "anysqlite>=0.0.5",
+    "uvicorn",
+    "starlette",
 ]
 
 [project.optional-dependencies]

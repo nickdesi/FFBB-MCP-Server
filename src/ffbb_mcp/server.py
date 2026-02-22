@@ -130,6 +130,8 @@ class CalendrierClubInput(BaseModel):
 # ---------------------------------------------------------------------------
 mcp = FastMCP(
     name="ffbb_mcp",
+    host="0.0.0.0",
+    port=9123,
     instructions=(
         "Ce serveur expose les données de la Fédération Française de Basketball "
         "(FFBB). "
@@ -803,9 +805,17 @@ def bilan_equipe(club_name: str, categorie: str) -> str:
 
 
 def main():
-    """Lance le serveur MCP FFBB en mode stdio."""
-    logger.info("Démarrage du serveur MCP FFBB...")
-    mcp.run(transport="stdio")
+    """Lance le serveur MCP FFBB."""
+    import os
+    
+    mode = os.environ.get("MCP_MODE", "stdio").lower()
+    
+    if mode == "http":
+        logger.info("Démarrage du serveur MCP FFBB en mode Streamable HTTP sur 0.0.0.0:9123...")
+        mcp.run(transport="streamable-http")
+    else:
+        logger.info("Démarrage du serveur MCP FFBB en mode stdio...")
+        mcp.run(transport="stdio")
 
 
 if __name__ == "__main__":
