@@ -5,7 +5,8 @@ Expose des outils MCP pour accéder aux données FFBB :
 - Matchs en direct
 - Compétitions, poules, saisons
 - Clubs/organismes, salles
-- Recherche multi-types (compétitions, clubs, rencontres, salles, pratiques, terrains, tournois)
+- Recherche multi-types (compétitions, clubs, rencontres, salles, 
+  pratiques, terrains, tournois)
 
 Architecture :
 - Lifespan : initialisation unique du client FFBB au démarrage
@@ -23,12 +24,10 @@ import logging
 from typing import Any
 
 import httpx
+from ffbb_api_client_v3.helpers.multi_search_query_helper import generate_queries
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.session import ServerSession
 from pydantic import BaseModel, ConfigDict, Field
-
-from ffbb_api_client_v3 import FFBBAPIClientV3
-from ffbb_api_client_v3.helpers.multi_search_query_helper import generate_queries
 
 from ffbb_mcp.client import get_client
 from ffbb_mcp.utils import serialize_model
@@ -46,7 +45,9 @@ logger = logging.getLogger("ffbb-mcp")
 class SearchInput(BaseModel):
     """Paramètres de recherche FFBB."""
 
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid", populate_by_name=True)
+    model_config = ConfigDict(
+        str_strip_whitespace=True, extra="forbid", populate_by_name=True
+    )
 
     name: str = Field(
         ...,
@@ -64,7 +65,9 @@ class CompetitionIdInput(BaseModel):
 
     competition_id: int = Field(
         ...,
-        description="ID numérique de la compétition (obtenu via ffbb_search_competitions)",
+        description=(
+            "ID numérique de la compétition (obtenu via ffbb_search_competitions)"
+        ),
         ge=1,
     )
 
@@ -166,9 +169,15 @@ def _handle_api_error(e: Exception) -> str:
         if status == 404:
             return "Erreur : Ressource introuvable. Vérifiez l'ID fourni."
         if status == 403:
-            return "Erreur : Accès refusé. Ce endpoint nécessite des permissions spécifiques."
+            return (
+                "Erreur : Accès refusé. Ce endpoint nécessite des permissions "
+                "spécifiques."
+            )
         if status == 429:
-            return "Erreur : Limite de requêtes dépassée. Réessayez dans quelques instants."
+            return (
+                "Erreur : Limite de requêtes dépassée. Réessayez dans "
+                "quelques instants."
+            )
         return f"Erreur : L'API FFBB a retourné le code {status}."
     if isinstance(e, httpx.TimeoutException):
         return "Erreur : Délai d'attente dépassé. Réessayez."
@@ -192,6 +201,7 @@ async def _safe_call(ctx: Ctx, operation: str, coro) -> Any:
 # Outils MCP — Données en direct
 # ---------------------------------------------------------------------------
 
+
 @mcp.tool(
     name="ffbb_get_lives",
     annotations=_READONLY_ANNOTATIONS,
@@ -214,7 +224,9 @@ async def ffbb_get_lives(ctx: Ctx) -> list[dict[str, Any]]:
         Liste vide si aucun match en cours.
     """
     client = get_client()
-    lives = await _safe_call(ctx, "Récupération des matchs en direct", client.get_lives_async())
+    lives = await _safe_call(
+        ctx, "Récupération des matchs en direct", client.get_lives_async()
+    )
     if not lives:
         return []
     return [serialize_model(live) for live in lives]
@@ -223,6 +235,7 @@ async def ffbb_get_lives(ctx: Ctx) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # Outils MCP — Saisons
 # ---------------------------------------------------------------------------
+
 
 @mcp.tool(
     name="ffbb_get_saisons",
@@ -261,6 +274,7 @@ async def ffbb_get_saisons(params: SaisonsInput, ctx: Ctx) -> list[dict[str, Any
 # ---------------------------------------------------------------------------
 # Outils MCP — Détails par ID
 # ---------------------------------------------------------------------------
+
 
 @mcp.tool(
     name="ffbb_get_competition",
@@ -386,19 +400,21 @@ async def ffbb_equipes_club(params: OrganismeIdInput, ctx: Ctx) -> list[dict[str
         comp = e.get("idCompetition", {}) or {}
         poule = e.get("idPoule", {}) or {}
         cat = comp.get("categorie", {}) or {}
-        flat.append({
-            "engagement_id": e.get("id"),
-            "nom_equipe": club_nom,
-            "numero_equipe": None,  # rempli plus tard via classement
-            "competition": comp.get("nom", ""),
-            "competition_id": comp.get("id"),
-            "competition_code": comp.get("code", ""),
-            "poule_id": poule.get("id"),
-            "sexe": comp.get("sexe", ""),
-            "categorie": cat.get("code", ""),
-            "type": comp.get("typeCompetition", ""),
-            "niveau": comp.get("competition_origine_niveau"),
-        })
+        flat.append(
+            {
+                "engagement_id": e.get("id"),
+                "nom_equipe": club_nom,
+                "numero_equipe": None,  # rempli plus tard via classement
+                "competition": comp.get("nom", ""),
+                "competition_id": comp.get("id"),
+                "competition_code": comp.get("code", ""),
+                "poule_id": poule.get("id"),
+                "sexe": comp.get("sexe", ""),
+                "categorie": cat.get("code", ""),
+                "type": comp.get("typeCompetition", ""),
+                "niveau": comp.get("competition_origine_niveau"),
+            }
+        )
     await ctx.info(f"✅ {len(flat)} équipe(s) trouvée(s)")
     return flat
 
@@ -441,21 +457,23 @@ async def ffbb_get_classement(params: PouleIdInput, ctx: Ctx) -> list[dict[str, 
     flat: list[dict[str, Any]] = []
     for c in raw:
         eng = c.get("id_engagement", {}) or {}
-        flat.append({
-            "position": c.get("position"),
-            "equipe": eng.get("nom", ""),
-            "numero_equipe": eng.get("numero_equipe", ""),
-            "points": c.get("points"),
-            "match_joues": c.get("match_joues"),
-            "gagnes": c.get("gagnes"),
-            "perdus": c.get("perdus"),
-            "nuls": c.get("nuls"),
-            "paniers_marques": c.get("paniers_marques"),
-            "paniers_encaisses": c.get("paniers_encaisses"),
-            "difference": c.get("difference"),
-            "quotient": c.get("quotient"),
-            "forfaits": c.get("nombre_forfaits"),
-        })
+        flat.append(
+            {
+                "position": c.get("position"),
+                "equipe": eng.get("nom", ""),
+                "numero_equipe": eng.get("numero_equipe", ""),
+                "points": c.get("points"),
+                "match_joues": c.get("match_joues"),
+                "gagnes": c.get("gagnes"),
+                "perdus": c.get("perdus"),
+                "nuls": c.get("nuls"),
+                "paniers_marques": c.get("paniers_marques"),
+                "paniers_encaisses": c.get("paniers_encaisses"),
+                "difference": c.get("difference"),
+                "quotient": c.get("quotient"),
+                "forfaits": c.get("nombre_forfaits"),
+            }
+        )
     await ctx.info(f"✅ {len(flat)} équipe(s) au classement")
     return flat
 
@@ -500,14 +518,16 @@ async def ffbb_calendrier_club(
     flat: list[dict[str, Any]] = []
     for hit in results.hits:
         raw = serialize_model(hit)
-        flat.append({
-            "id": raw.get("id"),
-            "date": raw.get("date_rencontre", raw.get("date")),
-            "nom_equipe1": raw.get("nom_equipe1", ""),
-            "nom_equipe2": raw.get("nom_equipe2", ""),
-            "numero_journee": raw.get("numero_journee"),
-            "gs_id": raw.get("gs_id"),
-        })
+        flat.append(
+            {
+                "id": raw.get("id"),
+                "date": raw.get("date_rencontre", raw.get("date")),
+                "nom_equipe1": raw.get("nom_equipe1", ""),
+                "nom_equipe2": raw.get("nom_equipe2", ""),
+                "numero_journee": raw.get("numero_journee"),
+                "gs_id": raw.get("gs_id"),
+            }
+        )
     await ctx.info(f"✅ {len(flat)} match(s) trouvé(s)")
     return flat
 
@@ -580,14 +600,15 @@ def _create_search_tool(search_type: str, method_name: str, description: str) ->
         description=description,
     )
     async def search_fn(params: SearchInput, ctx: Ctx) -> list[dict[str, Any]]:
-        f"""Recherche de {st} par nom.
+        """Recherche de {search_type} par nom.
 
         Args:
             params (SearchInput): Paramètres validés contenant :
                 - name (str): Terme de recherche (1-200 caractères)
 
         Returns:
-            list[dict]: Liste de résultats. Chaque dict contient un ID et des infos de base.
+            list[dict]: Liste de résultats. Chaque dict contient un ID 
+            et des infos de base.
             Liste vide si aucun résultat.
         """
         client = get_client()
@@ -612,6 +633,7 @@ _register_search_tools()
 # Outils MCP — Recherche globale multi-types
 # ---------------------------------------------------------------------------
 
+
 @mcp.tool(
     name="ffbb_multi_search",
     annotations=_READONLY_ANNOTATIONS,
@@ -631,7 +653,8 @@ async def ffbb_multi_search(params: SearchInput, ctx: Ctx) -> list[dict[str, Any
 
     Returns:
         list[dict]: Liste de résultats multi-types. Chaque dict contient :
-            - _category (str): Type du résultat (compétitions, organismes, rencontres, salles...)
+            - _category (str): Type du résultat (compétitions, organismes, 
+              rencontres, salles...)
             - id (str): ID du résultat
             - Plus les champs spécifiques à chaque catégorie.
         Liste vide si aucun résultat.
@@ -663,6 +686,7 @@ async def ffbb_multi_search(params: SearchInput, ctx: Ctx) -> list[dict[str, Any
 # ---------------------------------------------------------------------------
 # Resources — données référentielles stables (URI-addressable)
 # ---------------------------------------------------------------------------
+
 
 @mcp.resource("ffbb://saisons")
 async def resource_saisons() -> str:
@@ -703,6 +727,7 @@ async def resource_organisme(organisme_id: int) -> str:
 # Prompts — templates réutilisables pour workflows courants
 # ---------------------------------------------------------------------------
 
+
 @mcp.prompt()
 def analyser_match(match_id: str) -> str:
     """Génère un prompt pour analyser un match spécifique."""
@@ -737,7 +762,8 @@ def prochain_match(club_name: str, categorie: str = "") -> str:
     return (
         f"Je cherche le prochain match de '{query}'.\n"
         f"1. Utilise `ffbb_calendrier_club` avec club_name='{club_name}'"
-        + (f" et categorie='{categorie}'" if categorie else "") + "\n"
+        + (f" et categorie='{categorie}'" if categorie else "")
+        + "\n"
         "2. Filtre les résultats pour ne garder que les matchs à venir\n"
         "3. Donne la date, l'heure, l'adversaire et le lieu du prochain match."
     )
@@ -774,6 +800,7 @@ def bilan_equipe(club_name: str, categorie: str) -> str:
 # ---------------------------------------------------------------------------
 # Point d'entrée
 # ---------------------------------------------------------------------------
+
 
 def main():
     """Lance le serveur MCP FFBB en mode stdio."""

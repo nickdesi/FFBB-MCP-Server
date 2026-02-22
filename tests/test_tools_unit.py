@@ -16,7 +16,6 @@ from ffbb_mcp.server import (
     ffbb_get_saisons,
 )
 
-
 # ---------------------------------------------------------------------------
 # Tests — _handle_api_error
 # ---------------------------------------------------------------------------
@@ -158,7 +157,12 @@ class TestEquipesClub:
                 "engagements": [
                     {
                         "id": "eng1",
-                        "idCompetition": {"nom": "U11M", "id": "comp1", "code": "C1", "sexe": "M"},
+                        "idCompetition": {
+                            "nom": "U11M",
+                            "id": "comp1",
+                            "code": "C1",
+                            "sexe": "M",
+                        },
                         "idPoule": {"id": "poule1"},
                     }
                 ],
@@ -192,7 +196,9 @@ class TestGetClassement:
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_extracts_classement_plural_and_flattened(self, mock_ctx, mock_client):
+    async def test_extracts_classement_plural_and_flattened(
+        self, mock_ctx, mock_client
+    ):
         from ffbb_mcp.server import PouleIdInput
 
         poule_mock = MagicMock()
@@ -240,12 +246,14 @@ class TestCalendrierClub:
         hits_mock = MagicMock()
         hit1 = MagicMock()
         # Simulation d'une rencontre avec structure réelle
-        hit1.model_dump = MagicMock(return_value={
-            "id": "m1",
-            "date_rencontre": "2025-03-01",
-            "nom_equipe1": "ASVEL U13M",
-            "nom_equipe2": "Vichy U13M"
-        })
+        hit1.model_dump = MagicMock(
+            return_value={
+                "id": "m1",
+                "date_rencontre": "2025-03-01",
+                "nom_equipe1": "ASVEL U13M",
+                "nom_equipe2": "Vichy U13M",
+            }
+        )
         hits_mock.hits = [hit1]
         mock_client.search_rencontres_async = AsyncMock(return_value=hits_mock)
 
