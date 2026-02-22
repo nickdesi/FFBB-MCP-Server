@@ -5,7 +5,7 @@ Expose des outils MCP pour accéder aux données FFBB :
 - Matchs en direct
 - Compétitions, poules, saisons
 - Clubs/organismes, salles
-- Recherche multi-types (compétitions, clubs, rencontres, salles, 
+- Recherche multi-types (compétitions, clubs, rencontres, salles,
   pratiques, terrains, tournois)
 
 Architecture :
@@ -607,7 +607,7 @@ def _create_search_tool(search_type: str, method_name: str, description: str) ->
                 - name (str): Terme de recherche (1-200 caractères)
 
         Returns:
-            list[dict]: Liste de résultats. Chaque dict contient un ID 
+            list[dict]: Liste de résultats. Chaque dict contient un ID
             et des infos de base.
             Liste vide si aucun résultat.
         """
@@ -653,7 +653,7 @@ async def ffbb_multi_search(params: SearchInput, ctx: Ctx) -> list[dict[str, Any
 
     Returns:
         list[dict]: Liste de résultats multi-types. Chaque dict contient :
-            - _category (str): Type du résultat (compétitions, organismes, 
+            - _category (str): Type du résultat (compétitions, organismes,
               rencontres, salles...)
             - id (str): ID du résultat
             - Plus les champs spécifiques à chaque catégorie.

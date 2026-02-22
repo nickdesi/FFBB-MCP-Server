@@ -51,4 +51,3 @@ class TestPrompts:
         assert "ffbb_equipes_club" in result
         assert "ffbb_get_classement" in result
         assert "cumule" in result.lower()
-
