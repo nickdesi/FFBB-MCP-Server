@@ -20,9 +20,6 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -143,6 +140,10 @@ mcp = FastMCP(
     ),
     json_response=True,
 )
+
+
+# Type alias for the context used in tools
+Ctx = Context[ServerSession, Any]
 
 
 # Read-only annotations (all FFBB tools are read-only)
