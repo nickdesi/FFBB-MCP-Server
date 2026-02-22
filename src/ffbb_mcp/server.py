@@ -635,7 +635,7 @@ async def ffbb_multi_search(params: SearchInput, ctx: Ctx) -> list[dict[str, Any
             - Plus les champs spécifiques à chaque catégorie.
         Liste vide si aucun résultat.
     """
-    client = ctx.app_context.client
+    client = get_client()
     queries = generate_queries(params.name)
     results = await _safe_call(
         ctx,
