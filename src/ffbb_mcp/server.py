@@ -128,10 +128,14 @@ class CalendrierClubInput(BaseModel):
 # ---------------------------------------------------------------------------
 # MCP Server
 # ---------------------------------------------------------------------------
+from mcp.server.transport_security import TransportSecuritySettings
+
 mcp = FastMCP(
     name="ffbb_mcp",
     host="0.0.0.0",
     port=9123,
+    sse_path="/mcp",
+    message_path="/mcp/messages",
     instructions=(
         "Ce serveur expose les données de la Fédération Française de Basketball "
         "(FFBB). "
@@ -145,6 +149,11 @@ mcp = FastMCP(
         "Tous les outils renvoient du JSON structuré."
     ),
     json_response=True,
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=["ffbb.desimone.fr", "localhost", "127.0.0.1", "0.0.0.0"],
+        allowed_origins=["https://ffbb.desimone.fr", "http://localhost", "http://127.0.0.1"],
+    ),
 )
 
 

@@ -10,21 +10,32 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Installation de 'uv' pour une installation plus rapide et stricte (optionnel mais fortement recommandé)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Installation de 'uv'
 COPY --from=ghcr.io/astral-sh/uv:0.4.15 /uv /bin/uv
 
-# Copie d'abord les fichiers de de configuration pour le cache Docker
-COPY pyproject.toml .
+# Settings for uv to work properly in Docker
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    PATH="/app/.venv/bin:$PATH"
 
-# Installe les dépendances avec uv
-RUN uv pip install --system --no-cache .
+# Copie des fichiers de config pour le cache
+COPY pyproject.toml uv.lock ./
 
-# Ensuite, on copie le reste du code source
-COPY . /app/
+# Installe les dépendances sans le projet lui-même
+RUN uv sync --frozen --no-dev --no-install-project
 
-# Expose le port de l'app
+# Copie du reste du code source
+COPY . .
+
+# Installe le projet
+RUN uv sync --frozen --no-dev
+
+# Expose le port
 EXPOSE 9123
 
-# Lancement de l'app
+# Lancement
 CMD ["ffbb-mcp"]
-
