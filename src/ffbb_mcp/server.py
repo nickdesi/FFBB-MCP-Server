@@ -136,8 +136,8 @@ mcp = FastMCP(
     name="ffbb_mcp",
     host="0.0.0.0",
     port=9123,
-    sse_path="/mcp/sse",
-    message_path="/mcp/messages/",
+    sse_path="/sse",
+    message_path="/messages/",
     instructions=(
         "Ce serveur expose les données de la Fédération Française de Basketball "
         "(FFBB). "
