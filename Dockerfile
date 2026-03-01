@@ -1,40 +1,27 @@
-# Utilise l'image officielle python slim
-FROM python:3.12-slim
+FROM python:3.11-slim
 
-# Environnement optimisé pour l'exécution Python
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    MCP_MODE=http \
-    PORT=9123 \
-    HOST=0.0.0.0
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Configurer l'environnement MCP en mode Serveur Web (SSE)
+ENV MCP_MODE=sse
+ENV PORT=9123
+ENV HOST=0.0.0.0
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+# Installation de Git (requis car ffbb-api-client-v3 est tapé via url locale/git)
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
-# Installation de 'uv'
-COPY --from=ghcr.io/astral-sh/uv:0.4.15 /uv /bin/uv
+# Installer UV, rapide et léger
+RUN pip install --no-cache-dir uv
 
-# Settings for uv to work properly in Docker
-ENV UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy \
-    PATH="/app/.venv/bin:$PATH"
+COPY pyproject.toml README.md ./
+COPY src/ ./src/
 
-# Copie des fichiers de config pour le cache
-COPY pyproject.toml uv.lock ./
+# Lier et l'installer
+RUN uv pip install --system -e .
 
-# Installe les dépendances sans le projet lui-même
-RUN uv sync --frozen --no-dev --no-install-project
-
-# Copie du reste du code source
-COPY . .
-
-# Installe le projet
-RUN uv sync --frozen --no-dev
-
-# Expose le port
 EXPOSE 9123
 
 # Lancement

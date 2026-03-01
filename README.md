@@ -124,6 +124,19 @@ Installez l'extension et configurez la source :
 
 ---
 
+## 🚀 Déploiement distant (Coolify)
+
+Idéal pour exposer le serveur sur une IP publique pour des Agents (ou Cursor distant).
+
+1. Sur **Coolify**, ajoutez un nouveau service basé sur un **Dépôt Git Public / Privé** pointant vers ce repo.
+2. Choisissez le **Build Pack Docker** (le fichier `Dockerfile` mettra tout en place).
+3. Définissez les variables d'environnement optionnelles pour votre URL Coolify :
+   - `MCP_MODE=sse` *(obligatoire, configuré par défaut dans le Dockerfile)*
+   - `PORT=9123` *(obligatoire pour matcher le port exposé)*
+4. Déployez ! Il sera en ligne sur `https://votre-domaine.fr/mcp`.
+
+---
+
 ## 🤖 Guide de Survie pour Agents IA (Best Practices)
 
 Pour les développeurs d'agents, ce serveur a été optimisé pour une utilisation sémantique :

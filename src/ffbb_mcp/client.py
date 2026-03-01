@@ -7,6 +7,7 @@ Le singleton FFBBClientFactory gère :
 - Le cache SQLite pour les réponses API (TTL 30 min)
 """
 
+import asyncio
 import logging
 import os
 import time
@@ -28,6 +29,7 @@ class FFBBClientFactory:
 
     _instance: FFBBAPIClientV3 | None = None
     _token_created_at: float = 0.0
+    _init_lock: asyncio.Lock = asyncio.Lock()
 
     @classmethod
     def _is_token_expired(cls) -> bool:
@@ -39,7 +41,7 @@ class FFBBClientFactory:
 
     @classmethod
     def _create_client(cls) -> FFBBAPIClientV3:
-        """Crée une nouvelle instance du client avec des tokens frais."""
+        """Crée une nouvelle instance du client avec des tokens frais. Synchrone."""
         logger.info("Initialisation du client FFBB...")
         cwd = os.getcwd()
         logger.info(f"CWD: {cwd}")
@@ -63,19 +65,26 @@ class FFBBClientFactory:
         return client
 
     @classmethod
-    def get_client(cls) -> FFBBAPIClientV3:
-        """Retourne le client FFBB, en le créant ou rafraîchissant si nécessaire."""
-        if cls._is_token_expired():
-            if cls._instance is not None:
-                logger.info("Token FFBB expiré, rafraîchissement en cours...")
-            try:
-                cls._instance = cls._create_client()
-                cls._token_created_at = time.monotonic()
-            except Exception as e:
-                logger.error(f"Erreur lors de l'initialisation du client: {e}")
-                logger.error(traceback.format_exc())
-                raise
-        return cls._instance
+    async def get_client_async(cls) -> FFBBAPIClientV3:
+        """Retourne le client FFBB en asynchrone, en le créant ou rafraîchissant si nécessaire."""
+        # Première vérification rapide sans lock
+        if not cls._is_token_expired():
+            return cls._instance
+
+        async with cls._init_lock:
+            # Deuxième vérification avec le lock (au cas où un autre appel l'a déjà rafraîchi)
+            if cls._is_token_expired():
+                if cls._instance is not None:
+                    logger.info("Token FFBB expiré, rafraîchissement en cours...")
+                try:
+                    # Exécuter la création synchrone dans un thread séparé pour ne pas bloquer l'Event Loop
+                    cls._instance = await asyncio.to_thread(cls._create_client)
+                    cls._token_created_at = time.monotonic()
+                except Exception as e:
+                    logger.error(f"Erreur lors de l'initialisation asynchrone du client: {e}")
+                    logger.error(traceback.format_exc())
+                    raise
+            return cls._instance
 
     @classmethod
     def reset(cls) -> None:
@@ -84,6 +93,6 @@ class FFBBClientFactory:
         cls._token_created_at = 0.0
 
 
-def get_client() -> FFBBAPIClientV3:
-    """Helper shortcut for FFBBClientFactory.get_client()."""
-    return FFBBClientFactory.get_client()
+async def get_client_async() -> FFBBAPIClientV3:
+    """Helper shortcut for FFBBClientFactory.get_client_async()."""
+    return await FFBBClientFactory.get_client_async()

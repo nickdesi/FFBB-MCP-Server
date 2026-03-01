@@ -28,9 +28,10 @@ def mock_client():
 
 @pytest.fixture(autouse=True)
 def patch_get_client(mock_client):
-    """Patch get_client pour qu'il retourne le mock_client par défaut."""
-    with patch("ffbb_mcp.server.get_client", return_value=mock_client):
-        yield
+    """Patch get_client_async pour qu'il retourne le mock_client par défaut."""
+    with patch("ffbb_mcp.server.get_client_async", new_callable=AsyncMock) as mock_get_client:
+        mock_get_client.return_value = mock_client
+        yield mock_get_client
 
 
 @pytest.fixture

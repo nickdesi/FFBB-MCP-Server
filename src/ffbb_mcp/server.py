@@ -29,7 +29,9 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.session import ServerSession
 from pydantic import BaseModel, ConfigDict, Field
 
-from ffbb_mcp.client import get_client
+from pydantic import BaseModel, ConfigDict, Field
+
+from ffbb_mcp.client import get_client_async
 from ffbb_mcp.utils import serialize_model
 
 # ---------------------------------------------------------------------------
@@ -234,7 +236,7 @@ async def ffbb_get_lives(ctx: Ctx) -> list[dict[str, Any]]:
             - statut (str): Statut du match
         Liste vide si aucun match en cours.
     """
-    client = get_client()
+    client = await get_client_async()
     lives = await _safe_call(
         ctx, "Récupération des matchs en direct", client.get_lives_async()
     )
@@ -270,7 +272,7 @@ async def ffbb_get_saisons(params: SaisonsInput, ctx: Ctx) -> list[dict[str, Any
             - nom (str): Nom de la saison (ex: "2024-2025")
             - actif (bool): Si la saison est active
     """
-    client = get_client()
+    client = await get_client_async()
     label = "saisons actives" if params.active_only else "toutes les saisons"
     saisons = await _safe_call(
         ctx,
@@ -307,7 +309,7 @@ async def ffbb_get_competition(params: CompetitionIdInput, ctx: Ctx) -> dict[str
         dict: Détails de la compétition incluant nom, type, saison, poules, équipes.
         Dict vide si l'ID est introuvable.
     """
-    client = get_client()
+    client = await get_client_async()
     comp = await _safe_call(
         ctx,
         f"Récupération compétition #{params.competition_id}",
@@ -336,7 +338,7 @@ async def ffbb_get_poule(params: PouleIdInput, ctx: Ctx) -> dict[str, Any]:
         dict: Détails de la poule incluant classement, équipes, matchs.
         Dict vide si l'ID est introuvable.
     """
-    client = get_client()
+    client = await get_client_async()
     poule = await _safe_call(
         ctx,
         f"Récupération poule #{params.poule_id}",
@@ -365,7 +367,7 @@ async def ffbb_get_organisme(params: OrganismeIdInput, ctx: Ctx) -> dict[str, An
         dict: Détails de l'organisme incluant nom, adresse, type, équipes.
         Dict vide si l'ID est introuvable.
     """
-    client = get_client()
+    client = await get_client_async()
     org = await _safe_call(
         ctx,
         f"Récupération organisme #{params.organisme_id}",
@@ -394,7 +396,7 @@ async def ffbb_equipes_club(params: OrganismeIdInput, ctx: Ctx) -> list[dict[str
         list[dict]: Liste aplatie avec nom_equipe, numero_equipe, competition,
             poule_id, sexe, categorie. Liste vide si aucune équipe.
     """
-    client = get_client()
+    client = await get_client_async()
     org = await _safe_call(
         ctx,
         f"Récupération des équipes du club #{params.organisme_id}",
@@ -451,7 +453,7 @@ async def ffbb_get_classement(params: PouleIdInput, ctx: Ctx) -> list[dict[str, 
             - position, equipe, points, victoires, defaites, etc.
         Liste vide si non disponible.
     """
-    client = get_client()
+    client = await get_client_async()
     poule = await _safe_call(
         ctx,
         f"Récupération classement poule #{params.poule_id}",
@@ -512,7 +514,7 @@ async def ffbb_calendrier_club(
         list[dict]: Liste de matchs avec dates, équipes, résultats.
         Liste vide si aucun match trouvé.
     """
-    client = get_client()
+    client = await get_client_async()
     query = params.club_name
     if params.categorie:
         query += f" {params.categorie}"
@@ -622,7 +624,7 @@ def _create_search_tool(search_type: str, method_name: str, description: str) ->
             et des infos de base.
             Liste vide si aucun résultat.
         """
-        client = get_client()
+        client = await get_client_async()
         method = getattr(client, mn)
         results = await _safe_call(
             ctx,
@@ -670,7 +672,7 @@ async def ffbb_multi_search(params: SearchInput, ctx: Ctx) -> list[dict[str, Any
             - Plus les champs spécifiques à chaque catégorie.
         Liste vide si aucun résultat.
     """
-    client = get_client()
+    client = await get_client_async()
     queries = generate_queries(params.name)
     results = await _safe_call(
         ctx,
@@ -702,7 +704,7 @@ async def ffbb_multi_search(params: SearchInput, ctx: Ctx) -> list[dict[str, Any
 @mcp.resource("ffbb://saisons")
 async def resource_saisons() -> str:
     """Liste des saisons FFBB au format JSON."""
-    client = get_client()
+    client = await get_client_async()
     saisons = await client.get_saisons_async()
     return json.dumps(
         [serialize_model(s) for s in saisons] if saisons else [],
@@ -713,7 +715,7 @@ async def resource_saisons() -> str:
 @mcp.resource("ffbb://competition/{competition_id}")
 async def resource_competition(competition_id: int) -> str:
     """Détails d'une compétition au format JSON."""
-    client = get_client()
+    client = await get_client_async()
     comp = await client.get_competition_async(competition_id)
     return json.dumps(serialize_model(comp) or {}, default=str)
 
@@ -721,7 +723,7 @@ async def resource_competition(competition_id: int) -> str:
 @mcp.resource("ffbb://poule/{poule_id}")
 async def resource_poule(poule_id: int) -> str:
     """Détails d'une poule au format JSON."""
-    client = get_client()
+    client = await get_client_async()
     poule = await client.get_poule_async(poule_id)
     return json.dumps(serialize_model(poule) or {}, default=str)
 
@@ -729,7 +731,7 @@ async def resource_poule(poule_id: int) -> str:
 @mcp.resource("ffbb://organisme/{organisme_id}")
 async def resource_organisme(organisme_id: int) -> str:
     """Détails d'un organisme/club au format JSON."""
-    client = get_client()
+    client = await get_client_async()
     org = await client.get_organisme_async(organisme_id)
     return json.dumps(serialize_model(org) or {}, default=str)
 
@@ -819,9 +821,13 @@ def main():
     
     mode = os.environ.get("MCP_MODE", "stdio").lower()
     
-    if mode == "http":
-        logger.info("Démarrage du serveur MCP FFBB en mode Streamable HTTP sur 0.0.0.0:9123...")
-        mcp.run(transport="streamable-http")
+    if mode == "sse":
+        host = os.environ.get("HOST", "0.0.0.0")
+        port = int(os.environ.get("PORT", "9123"))
+        logger.info(f"Démarrage du serveur MCP FFBB en mode SSE sur {host}:{port}...")
+        mcp.settings.host = host
+        mcp.settings.port = port
+        mcp.run(transport="sse")
     else:
         logger.info("Démarrage du serveur MCP FFBB en mode stdio...")
         mcp.run(transport="stdio")
