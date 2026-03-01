@@ -136,8 +136,8 @@ mcp = FastMCP(
     name="ffbb_mcp",
     host="0.0.0.0",
     port=9123,
-    sse_path="/mcp",
-    message_path="/mcp/messages",
+    sse_path="/mcp/sse",
+    message_path="/mcp/messages/",
     instructions=(
         "Ce serveur expose les données de la Fédération Française de Basketball "
         "(FFBB). "
@@ -152,9 +152,9 @@ mcp = FastMCP(
     ),
     json_response=True,
     transport_security=TransportSecuritySettings(
-        enable_dns_rebinding_protection=True,
-        allowed_hosts=["ffbb.desimone.fr", "localhost", "127.0.0.1", "0.0.0.0"],
-        allowed_origins=["https://ffbb.desimone.fr", "http://localhost", "http://127.0.0.1"],
+        enable_dns_rebinding_protection=False, # Rebinding géré par Nginx Proxy Manager
+        allowed_hosts=["*"], # On laisse le proxy gérer les vérifications d'hôtes
+        allowed_origins=["*"],
     ),
 )
 
@@ -822,12 +822,23 @@ def main():
     mode = os.environ.get("MCP_MODE", "stdio").lower()
     
     if mode == "sse":
+        import uvicorn
         host = os.environ.get("HOST", "0.0.0.0")
         port = int(os.environ.get("PORT", "9123"))
-        logger.info(f"Démarrage du serveur MCP FFBB en mode SSE sur {host}:{port}...")
-        mcp.settings.host = host
-        mcp.settings.port = port
-        mcp.run(transport="sse")
+        logger.info(f"Démarrage du serveur MCP FFBB en mode SSE sur {host}:{port} derrière un proxy...")
+        
+        # On utilise uvicorn directement pour forcer `proxy_headers=True`
+        # Ce qui est indispensable avec Nginx Proxy Manager pour que l'URL 
+        # retournée lors de l'initialisation SSE contienne le bon domaine et https.
+        app = mcp.sse_app()
+        uvicorn.run(
+            app,
+            host=host,
+            port=port,
+            log_level="info",
+            proxy_headers=True,
+            forwarded_allow_ips="*"
+        )
     else:
         logger.info("Démarrage du serveur MCP FFBB en mode stdio...")
         mcp.run(transport="stdio")
