@@ -54,7 +54,7 @@ Il existe deux manières ultra-simples d'utiliser ce serveur MCP.
 
 Connectez-vous directement à l'instance hébergée via HTTP/SSE. **Aucune installation locale requise.**
 
-- **URL de connexion** : `https://ffbb.desimone.fr/mcp/sse`
+- **URL de connexion** : `https://ffbb.desimone.fr/mcp`
 
 ### 2. Mode Local (Sans installation)
 
@@ -135,7 +135,7 @@ Le serveur est prêt pour la production. Pour un déploiement sur **Coolify** :
 2. Définissez la variable d'environnement `MCP_MODE=sse`.
 3. Configurez le domaine sur `ffbb.desimone.fr`.
 4. Le serveur écoute sur le port `9123` par défaut.
-5. **Important** : Le path `/mcp` est automatiquement géré par le serveur. Votre endpoint final sera `https://ffbb.desimone.fr/mcp/sse`.
+5. **Important** : Le path `/mcp` est automatiquement géré par le serveur. Votre endpoint final sera `https://ffbb.desimone.fr/mcp`.
 
 ---
 

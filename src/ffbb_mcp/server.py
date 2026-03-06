@@ -227,14 +227,14 @@ def main() -> None:
         host = os.environ.get("HOST", "0.0.0.0")
         port = int(os.environ.get("PORT", "9123"))
         
-        # Le transport SSE de FastMCP renvoie une application FastAPI
-        # On la monte sous le path /mcp pour correspondre à l'URL souhaitée
-        mcp_app = mcp.sse_app()
+        # On utilise streamable_http_app pour avoir un endpoint unique /mcp
+        # Comme demandé, cela permet d'avoir l'URL : https://ffbb.desimone.fr/mcp
+        mcp_app = mcp.streamable_http_app()
         app = FastAPI()
         app.mount("/mcp", mcp_app)
         
-        logger.info(f"Démarrage du serveur MCP FFBB en mode SSE sur {host}:{port}...")
-        logger.info(f"Endpoint disponible sur : http://{host}:{port}/mcp/sse")
+        logger.info(f"Démarrage du serveur MCP FFBB en mode SSE (Streamable HTTP) sur {host}:{port}...")
+        logger.info(f"Endpoint disponible sur : http://{host}:{port}/mcp")
         
         uvicorn.run(
             app,
