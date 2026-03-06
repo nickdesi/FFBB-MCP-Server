@@ -1,7 +1,7 @@
 # 🏀 FFBB MCP Server
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/modelcontextprotocol/docs/main/static/img/favicon.svg" width="80" alt="MCP Logo" />
+  <img src="./assets/logo.png" width="250" alt="FFBB MCP Logo" />
   <br />
   <b>Connectez vos agents IA aux données officielles du Basket français.</b>
   <br />
