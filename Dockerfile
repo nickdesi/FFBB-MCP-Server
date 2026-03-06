@@ -18,6 +18,7 @@ RUN pip install --no-cache-dir uv
 
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
+COPY FFBBApiClientV3_Ref/ ./FFBBApiClientV3_Ref/
 
 # Lier et l'installer
 RUN uv pip install --system -e .
