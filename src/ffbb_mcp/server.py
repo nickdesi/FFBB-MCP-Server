@@ -222,11 +222,20 @@ def main() -> None:
     
     if mode == "sse":
         import uvicorn
+        from fastapi import FastAPI
+        
         host = os.environ.get("HOST", "0.0.0.0")
         port = int(os.environ.get("PORT", "9123"))
-        logger.info(f"Démarrage du serveur MCP FFBB en mode SSE sur {host}:{port} derrière un proxy...")
         
-        app = mcp.sse_app()
+        # Le transport SSE de FastMCP renvoie une application FastAPI
+        # On la monte sous le path /mcp pour correspondre à l'URL souhaitée
+        mcp_app = mcp.sse_app()
+        app = FastAPI()
+        app.mount("/mcp", mcp_app)
+        
+        logger.info(f"Démarrage du serveur MCP FFBB en mode SSE sur {host}:{port}...")
+        logger.info(f"Endpoint disponible sur : http://{host}:{port}/mcp/sse")
+        
         uvicorn.run(
             app,
             host=host,

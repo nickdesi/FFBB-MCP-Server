@@ -3,9 +3,9 @@
 <p align="center">
   <img src="./assets/logo.png" width="250" alt="FFBB MCP Logo" />
   <br />
-  <b>Connectez vos agents IA aux données officielles du Basket français.</b>
+  <b>Le pont entre l'IA et le Basketball français.</b>
   <br />
-  <i>Statistiques, calendriers, classements et lives directement dans vos outils de développement.</i>
+  <i>Statistiques, calendriers, classements et lives officiels FFBB directement dans vos LLMs.</i>
 </p>
 
 <p align="center">
@@ -46,17 +46,19 @@ flowchart TD
 
 ---
 
-## 🚀 Installation Rapide
+## 🚀 Installation & Connexion
 
-### Installation via `pip`
+Il existe deux manières ultra-simples d'utiliser ce serveur MCP.
 
-```bash
-pip install "ffbb-mcp @ git+https://github.com/nickdesi/FFBB-MCP-Server.git"
-```
+### 1. Mode Remote (Recommandé) ✨
 
-### Utilisation avec `npx` (via uv)
+Connectez-vous directement à l'instance hébergée via HTTP/SSE. **Aucune installation locale requise.**
 
-Si vous utilisez [uv](https://github.com/astral-sh/uv), vous pouvez lancer le serveur sans installation permanente :
+- **URL de connexion** : `https://ffbb.desimone.fr/mcp/sse`
+
+### 2. Mode Local (Sans installation)
+
+Utilisez `uvx` pour lancer le serveur à la volée.
 
 ```bash
 uvx --from "git+https://github.com/nickdesi/FFBB-MCP-Server.git" ffbb_mcp
@@ -64,9 +66,53 @@ uvx --from "git+https://github.com/nickdesi/FFBB-MCP-Server.git" ffbb_mcp
 
 ---
 
-## 🛠️ Outils Disponibles
+## ⚙️ Configuration par Client
 
-Le serveur propose une suite complète d'outils pour explorer le basket français :
+Choisissez votre client IA et copiez la configuration :
+
+<details>
+<summary><b>Claude Desktop</b></summary>
+
+Ajoutez ceci à votre fichier de configuration (`Library/Application Support/Claude/claude_desktop_config.json`) :
+
+```json
+{
+  "mcpServers": {
+    "ffbb": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://ffbb.desimone.fr/mcp/sse"
+      ]
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>Cursor</b></summary>
+
+1. Allez dans **Settings** > **Features** > **MCP Servers**.
+2. Cliquez sur **+ Add New MCP Server**.
+3. **Name**: `FFBB`
+4. **Type**: `command`
+5. **Command**: `uv run --from git+https://github.com/nickdesi/FFBB-MCP-Server.git ffbb_mcp`
+   *(Ou via URL si supporté par votre version : `https://ffbb.desimone.fr/mcp/sse`)*
+
+</details>
+
+<details>
+<summary><b>AnythingLLM</b></summary>
+
+Ajoutez un serveur MCP de type `streamable` avec l'URL :
+`https://ffbb.desimone.fr/mcp/sse`
+</details>
+
+---
+
+## 🛠️ Outils Disponibles
 
 | Outil | Description | Paramètres clés |
 |-------|-------------|-----------------|
@@ -75,65 +121,21 @@ Le serveur propose une suite complète d'outils pour explorer le basket françai
 | `ffbb_get_lives` | Scores en direct (tous matchs) | - |
 | `ffbb_get_classement` | Classement d'une poule | `poule_id` |
 | `ffbb_get_poule` | Détails complets d'un groupe | `poule_id` |
-| `ffbb_search_*` | Recherches ciblées | `nom` (salles, terrains...) |
 
 > [!TIP]
-> Pour une documentation détaillée de chaque paramètre et des exemples de réponses, consultez la [Référence des Outils](docs/TOOLS_REFERENCE.md).
+> Pour une documentation détaillée, consultez la [Référence des Outils](docs/TOOLS_REFERENCE.md).
 
 ---
 
-## ⚙️ Configuration
+## 🐳 Déploiement & Coolify
 
-### Google Antigravity (Gemini)
+Le serveur est prêt pour la production. Pour un déploiement sur **Coolify** :
 
-Ajoutez ceci à votre configuration Antigravity :
-
-```json
-{
-  "mcpServers": {
-    "ffbb_mcp": {
-      "command": "python3",
-      "args": ["-m", "ffbb_mcp.server"]
-    }
-  }
-}
-```
-
-### Claude Desktop
-
-Modifiez `~/Library/Application Support/Claude/claude_desktop_config.json` :
-
-```json
-{
-  "mcpServers": {
-    "ffbb_mcp": {
-      "command": "uv",
-      "args": ["run", "--from", "git+https://github.com/nickdesi/FFBB-MCP-Server.git", "ffbb_mcp"]
-    }
-  }
-}
-```
-
-### Cursor
-
-1. Allez dans `Settings` > `Features` > `MCP Servers`.
-2. Cliquez sur `+ Add New MCP Server`.
-3. Name: `FFBB`. Type: `command`.
-4. Command: `uv run --from git+https://github.com/nickdesi/FFBB-MCP-Server.git ffbb_mcp`
-
----
-
-## 🐳 Déploiement
-
-Le serveur est prêt pour la production via Docker ou **Coolify**.
-
-```bash
-docker build -t ffbb-mcp-server .
-docker run -p 8000:8000 ffbb-mcp-server
-```
-
-> [!NOTE]
-> En mode HTTP/SSE (utilisé par Coolify), le serveur écoute par défaut sur le port 8000.
+1. Créez une nouvelle ressource à partir du repo GitHub.
+2. Définissez la variable d'environnement `MCP_MODE=sse`.
+3. Configurez le domaine sur `ffbb.desimone.fr`.
+4. Le serveur écoute sur le port `9123` par défaut.
+5. **Important** : Le path `/mcp` est automatiquement géré par le serveur. Votre endpoint final sera `https://ffbb.desimone.fr/mcp/sse`.
 
 ---
 
