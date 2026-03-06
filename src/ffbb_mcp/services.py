@@ -7,7 +7,6 @@ from mcp.shared.exceptions import McpError
 from mcp.types import INTERNAL_ERROR, ErrorData
 
 from .client import get_client_async
-from .schemas import SearchInput, CalendrierClubInput
 from .utils import serialize_model
 
 logger = logging.getLogger("ffbb-mcp")
@@ -47,7 +46,6 @@ async def _safe_call(operation_name: str, coro) -> Any:
 # Services -- Données en direct
 # ---------------------------------------------------------------------------
 
-from typing import Any, TypeVar, Union, Optional
 
 async def get_lives_service() -> list[dict]:
     client = await get_client_async()
@@ -68,7 +66,7 @@ async def get_saisons_service(active_only: bool = False) -> list[dict]:
     return [serialize_model(s) for s in saisons]
 
 
-async def get_competition_service(competition_id: Union[int, str]) -> dict:
+async def get_competition_service(competition_id: int | str) -> dict:
     client = await get_client_async()
     comp = await _safe_call(
         f"Compétition {competition_id}",
@@ -77,7 +75,7 @@ async def get_competition_service(competition_id: Union[int, str]) -> dict:
     return serialize_model(comp) or {}
 
 
-async def get_poule_service(poule_id: Union[int, str]) -> dict:
+async def get_poule_service(poule_id: int | str) -> dict:
     client = await get_client_async()
     poule = await _safe_call(
         f"Poule {poule_id}",
@@ -86,7 +84,7 @@ async def get_poule_service(poule_id: Union[int, str]) -> dict:
     return serialize_model(poule) or {}
 
 
-async def get_organisme_service(organisme_id: Union[int, str]) -> dict:
+async def get_organisme_service(organisme_id: int | str) -> dict:
     client = await get_client_async()
     org = await _safe_call(
         f"Organisme {organisme_id}",
@@ -96,8 +94,8 @@ async def get_organisme_service(organisme_id: Union[int, str]) -> dict:
 
 
 async def ffbb_equipes_club_service(
-    organisme_id: Union[int, str], 
-    filtre: Optional[str] = None
+    organisme_id: int | str, 
+    filtre: str | None = None
 ) -> list[dict[str, Any]]:
     client = await get_client_async()
     org = await _safe_call(
@@ -137,7 +135,7 @@ async def ffbb_equipes_club_service(
     return flat
 
 
-async def ffbb_get_classement_service(poule_id: Union[int, str]) -> list[dict[str, Any]]:
+async def ffbb_get_classement_service(poule_id: int | str) -> list[dict[str, Any]]:
     client = await get_client_async()
     poule = await _safe_call(
         f"Classement poule {poule_id}",
@@ -226,9 +224,9 @@ async def multi_search_service(nom: str) -> list[dict[str, Any]]:
 
 
 async def get_calendrier_club_service(
-    club_name: Optional[str] = None, 
-    organisme_id: Optional[Union[int, str]] = None,
-    categorie: Optional[str] = None
+    club_name: str | None = None, 
+    organisme_id: int | str | None = None,
+    categorie: str | None = None
 ) -> list[dict]:
     client = await get_client_async()
     

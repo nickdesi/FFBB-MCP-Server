@@ -1,5 +1,5 @@
-from pydantic import BaseModel, ConfigDict, Field, AliasChoices
-from typing import Optional, Union
+
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 class SearchInput(BaseModel):
@@ -20,6 +20,6 @@ class CalendrierClubInput(BaseModel):
     """
     OBSOLETE: Gardé pour compatibilité interne si besoin.
     """
-    club_name: Optional[str] = None
-    organisme_id: Optional[Union[int, str]] = None
-    categorie: Optional[str] = None
+    club_name: str | None = None
+    organisme_id: int | str | None = None
+    categorie: str | None = None

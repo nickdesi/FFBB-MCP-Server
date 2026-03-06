@@ -45,11 +45,12 @@ exclude = [
     ".venv",
     ".mypy_cache",
     ".ruff_cache",
+    "FFBBApiClientV3_Ref",
 ]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
-ignore = []
+ignore = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"

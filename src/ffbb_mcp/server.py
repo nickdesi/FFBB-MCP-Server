@@ -1,13 +1,13 @@
 import logging
 import os
-from typing import Any
+from typing import Annotated, Any
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
+from pydantic import AliasChoices, Field
 
 from .prompts import register_prompts
 from .resources import register_resources
-from .schemas import CalendrierClubInput, SearchInput
 from .services import (
     ffbb_equipes_club_service,
     ffbb_get_classement_service,
@@ -81,13 +81,6 @@ async def ffbb_get_lives() -> list[dict[str, Any]]:
 # Outils MCP — Saisons
 # ---------------------------------------------------------------------------
 
-from typing import Annotated, Optional, Union
-from pydantic import Field, AliasChoices
-
-# ---------------------------------------------------------------------------
-# Outils MCP — Saisons
-# ---------------------------------------------------------------------------
-
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def ffbb_get_saisons(
     active_only: bool = False
@@ -101,36 +94,36 @@ async def ffbb_get_saisons(
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def ffbb_get_competition(
-    competition_id: Annotated[Union[int, str], Field(validation_alias=AliasChoices("competition_id", "id"))]
+    competition_id: Annotated[int | str, Field(validation_alias=AliasChoices("competition_id", "id"))]
 ) -> dict[str, Any]:
     """Détails d'une compétition par ID."""
     return await get_competition_service(competition_id=competition_id)
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def ffbb_get_poule(
-    poule_id: Annotated[Union[int, str], Field(validation_alias=AliasChoices("poule_id", "id"))]
+    poule_id: Annotated[int | str, Field(validation_alias=AliasChoices("poule_id", "id"))]
 ) -> dict[str, Any]:
     """Détails d'une poule/groupe par ID (classement, matchs)."""
     return await get_poule_service(poule_id=poule_id)
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def ffbb_get_organisme(
-    organisme_id: Annotated[Union[int, str], Field(validation_alias=AliasChoices("organisme_id", "id", "club_id"))]
+    organisme_id: Annotated[int | str, Field(validation_alias=AliasChoices("organisme_id", "id", "club_id"))]
 ) -> dict[str, Any]:
     """Informations détaillées d'un club/organisme (adresse, équipes...)."""
     return await get_organisme_service(organisme_id=organisme_id)
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def ffbb_equipes_club(
-    organisme_id: Annotated[Union[int, str], Field(validation_alias=AliasChoices("organisme_id", "id", "club_id"))],
-    filtre: Optional[str] = None
+    organisme_id: Annotated[int | str, Field(validation_alias=AliasChoices("organisme_id", "id", "club_id"))],
+    filtre: str | None = None
 ) -> list[dict[str, Any]]:
     """Récupère uniquement la liste des équipes engagées par un club/organisme."""
     return await ffbb_equipes_club_service(organisme_id=organisme_id, filtre=filtre)
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def ffbb_get_classement(
-    poule_id: Annotated[Union[int, str], Field(validation_alias=AliasChoices("poule_id", "id"))]
+    poule_id: Annotated[int | str, Field(validation_alias=AliasChoices("poule_id", "id"))]
 ) -> list[dict[str, Any]]:
     """Récupère uniquement le classement d'une poule/groupe (sans les matchs)."""
     return await ffbb_get_classement_service(poule_id=poule_id)
@@ -201,9 +194,9 @@ async def ffbb_multi_search(
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def ffbb_calendrier_club(
-    club_name: Annotated[Optional[str], Field(validation_alias=AliasChoices("club_name", "nom"))] = None,
-    organisme_id: Annotated[Optional[Union[int, str]], Field(validation_alias=AliasChoices("organisme_id", "club_id", "id"))] = None,
-    categorie: Optional[str] = None
+    club_name: Annotated[str | None, Field(validation_alias=AliasChoices("club_name", "nom"))] = None,
+    organisme_id: Annotated[int | str | None, Field(validation_alias=AliasChoices("organisme_id", "club_id", "id"))] = None,
+    categorie: str | None = None
 ) -> list[dict[str, Any]]:
     """Récupère le calendrier (prochains matchs) d'un club (via club_name ou organisme_id)."""
     return await get_calendrier_club_service(

@@ -4,80 +4,77 @@
   <img src="https://raw.githubusercontent.com/modelcontextprotocol/mcp/main/logo.png" width="100" alt="MCP Logo" />
   <br />
   <b>Connectez vos agents IA aux données officielles du Basket français.</b>
+  <br />
+  <i>Statistiques, calendriers, classements et lives directement dans vos outils de développement.</i>
 </p>
 
 <p align="center">
-  <a href="https://github.com/nickdesi/FFBB-MCP-Server/actions"><img src="https://github.com/nickdesi/FFBB-MCP-Server/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
-  <a href="https://www.python.org"><img src="https://img.shields.io/badge/Python-3.10+-yellow?style=flat-square&logo=python" alt="Python" /></a>
-  <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-Supported-blue?style=flat-square" alt="MCP" /></a>
-  <a href="https://www.ffbb.com"><img src="https://img.shields.io/badge/Data-FFBB-orange?style=flat-square" alt="FFBB" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square" alt="License" /></a>
+  <img src="https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python" alt="Python Version" />
+  <img src="https://img.shields.io/badge/MCP-Latest-orange?style=for-the-badge" alt="MCP Version" />
+  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
 </p>
 
 ---
 
-## 📖 Présentation
+## 🌟 Aperçu
 
-Le serveur **FFBB MCP** est une passerelle intelligente entre le **Model Context Protocol (MCP)** et les données de la **Fédération Française de Basketball**. Il permet à vos assistants IA (Claude, Gemini, Cursor) de consulter en temps réel :
+Le serveur **FFBB MCP** expose les données de la Fédération Française de Basketball (FFBB). Il permet aux agents IA (comme Claude, Gemini, Cursor) de naviguer intelligemment dans l'écosystème du basket français : des ligues nationales aux championnats départementaux.
 
-* 🏆 **Compétitions** : Championnats nationaux, régionaux et départementaux.
-* 🏀 **Matchs** : Scores en direct, calendriers et résultats historiques.
-* 🏢 **Clubs & Organismes** : Coordonnées, équipes engagées et salles.
-* 📊 **Classements** : Tableaux de poules mis à jour instantanément.
-
----
-
-## 🏗️ Architecture
-
-Le serveur agit comme un pont sécurisé, gérant l'authentification automatique et optimisant les réponses pour une compréhension maximale par les LLMs.
+### 🏗️ Architecture
 
 ```mermaid
-graph TD
-    User("Utilisateur") -->|Question| Agent("Agent IA")
-    Agent -->|Appel MCP| Server("FFBB MCP Server")
-    
-    subgraph "Interface Server"
-        Server -->|Transport| Transport("STDIO / SSE")
+flowchart TD
+    subgraph "Clients IA"
+        A["Agent (Claude, Gemini, Cursor)"]
     end
 
-    subgraph "Logique Interne"
-        Transport -->|Validation| Schemas("Schemas Pydantic")
-        Schemas -->|Traitement| Services("Core Services")
+    subgraph "MCP Server (ffbb_mcp)"
+        B["Transport (Stdio/SSE)"]
+        C["Logic (Python)"]
+        D["Tools Definition"]
     end
 
-    subgraph "Données FFBB"
-        Services -->|Query| API("API FFBB External")
+    subgraph "External"
+        E["FFBB Official API"]
     end
 
-    API -.->|JSON| Services
-    Services -->|Contexte| Agent
-    Agent -->|Réponse| User
-
-    style Server fill:#f9f,stroke:#333,stroke-width:2px
-    style API fill:#fff,stroke:#ff9800,stroke-width:2px
+    A <--> B
+    B <--> C
+    C <--> D
+    C <--> E
 ```
 
 ---
 
-## ✨ Fonctionnalités Clés
+## 🚀 Installation Rapide
 
-* 🚀 **Performance** : Utilisation de recherches Meilisearch asynchrones pour des résultats instantanés.
-* 🔐 **Zéro-Config** : Aucune clé API manuelle requise, les tokens sont gérés dynamiquement.
-* 🏷️ **Sémantique** : Conçu spécifiquement pour que les agents IA comprennent les structures de données complexes du basket.
-* 📡 **Multi-Mode** : Supporte à la fois le mode **Stdio** (local) et **SSE** (déploiement cloud).
+### Installation via `pip`
+
+```bash
+pip install "ffbb-mcp @ git+https://github.com/nickdesi/FFBB-MCP-Server.git"
+```
+
+### Utilisation avec `npx` (via uv)
+
+Si vous utilisez [uv](https://github.com/astral-sh/uv), vous pouvez lancer le serveur sans installation permanente :
+
+```bash
+uvx --from "git+https://github.com/nickdesi/FFBB-MCP-Server.git" ffbb_mcp
+```
 
 ---
 
-## 🛠 Outils Disponibles
+## 🛠️ Outils Disponibles
 
-| Outil | Description | Paramètres Clés |
-| :--- | :--- | :--- |
-| `ffbb_multi_search` | Recherche globale | `nom` (ex: "Clermont") |
-| `ffbb_equipes_club` | Liste les équipes d'un club | `organisme_id`, `filtre` |
-| `ffbb_calendrier_club`| Calendrier d'un club | `club_name` ou `organisme_id` |
-| `ffbb_get_classement` | Classement rapide | `poule_id` |
-| `ffbb_get_lives` | Scores en temps réel | - |
-| `ffbb_get_poule` | Détails d'un groupe | `poule_id` |
+Le serveur propose une suite complète d'outils pour explorer le basket français :
+
+| Outil | Description | Paramètres clés |
+|-------|-------------|-----------------|
+| `ffbb_multi_search` | Recherche globale multi-critères | `nom` (club, ville, etc.) |
+| `ffbb_calendrier_club` | Matchs à venir d'un club | `organisme_id` |
+| `ffbb_get_lives` | Scores en direct (tous matchs) | - |
+| `ffbb_get_classement` | Classement d'une poule | `poule_id` |
+| `ffbb_get_poule` | Détails complets d'un groupe | `poule_id` |
 | `ffbb_search_*` | Recherches ciblées | `nom` (salles, terrains...) |
 
 > [!TIP]
@@ -85,100 +82,71 @@ graph TD
 
 ---
 
-## 🚀 Installation Rapide
+## ⚙️ Configuration
+
+### Google Antigravity (Gemini)
+
+Ajoutez ceci à votre configuration Antigravity :
+
+```json
+{
+  "mcpServers": {
+    "ffbb_mcp": {
+      "command": "python3",
+      "args": ["-m", "ffbb_mcp.server"]
+    }
+  }
+}
+```
+
+### Claude Desktop
+
+Modifiez `~/Library/Application Support/Claude/claude_desktop_config.json` :
+
+```json
+{
+  "mcpServers": {
+    "ffbb_mcp": {
+      "command": "uv",
+      "args": ["run", "--from", "git+https://github.com/nickdesi/FFBB-MCP-Server.git", "ffbb_mcp"]
+    }
+  }
+}
+```
+
+### Cursor
+
+1. Allez dans `Settings` > `Features` > `MCP Servers`.
+2. Cliquez sur `+ Add New MCP Server`.
+3. Name: `FFBB`. Type: `command`.
+4. Command: `uv run --from git+https://github.com/nickdesi/FFBB-MCP-Server.git ffbb_mcp`
+
+---
+
+## 🐳 Déploiement
+
+Le serveur est prêt pour la production via Docker ou **Coolify**.
 
 ```bash
-# 1. Installation du package
-pip install ffbb-mcp
-
-# 2. Test direct avec l'inspecteur MCP
-npx @modelcontextprotocol/inspector python -m ffbb_mcp
+docker build -t ffbb-mcp-server .
+docker run -p 8000:8000 ffbb-mcp-server
 ```
 
----
-
-## ⚙️ Configuration par Environnement
-
-### 🪐 Google Antigravity (Gemini Code Assist / CLI)
-
-Éditez votre fichier `~/.gemini/settings.json` :
-
-```json
-{
-  "mcpServers": {
-    "ffbb": {
-      "command": "python",
-      "args": ["-m", "ffbb_mcp"],
-      "cwd": "/votre-chemin/FFBB-MCP-Server"
-    }
-  }
-}
-```
-
-### 🧠 Claude Desktop
-
-Éditez `~/Library/Application Support/Claude/claude_desktop_config.json` :
-
-```json
-{
-  "mcpServers": {
-    "ffbb": {
-      "command": "/chemin/vers/venv/bin/python",
-      "args": ["-m", "ffbb_mcp"]
-    }
-  }
-}
-```
-
-### 💻 VS Code (Roo Code / Cline)
-
-Installez l'extension et configurez la source :
-
-```json
-{
-  "mcpServers": {
-    "ffbb": {
-      "command": "python",
-      "args": ["-m", "ffbb_mcp"],
-      "env": { "PYTHONPATH": "./src" }
-    }
-  }
-}
-```
+> [!NOTE]
+> En mode HTTP/SSE (utilisé par Coolify), le serveur écoute par défaut sur le port 8000.
 
 ---
 
-## 🤖 Guide de Survie pour les Agents IA
+## 🤖 Guide pour l'Agent IA
 
-> [!IMPORTANT]
-> Pour une fiabilité optimale, suivez ce workflow :
->
-> 1. Utilisez `ffbb_multi_search` pour confirmer l'ID d'un club ou d'une compétition.
-> 2. Listez les équipes via `ffbb_equipes_club` pour récupérer l'ID de poule (`poule_id`).
-> 3. Ne demandez jamais à l'utilisateur de fournir un ID technique.
+Lorsqu'un agent utilise ce serveur, il devrait suivre ce workflow :
 
-> [!TIP]
-> Si vous cherchez un club par son acronyme (ex: `JDA`), le serveur effectuera une recherche intelligente sur les noms complets.
+1. **Exploration** : Commencer par `ffbb_multi_search` pour trouver un `organisme_id` (club).
+2. **Contexte** : Utiliser `ffbb_equipes_club` pour lister les équipes engagées.
+3. **Détails** : Récupérer le calendrier ou le classement via les IDs obtenus.
 
 ---
 
-## 🐳 Déploiement Cloud (Coolify / Docker)
+## 📄 Licence
 
-Le serveur est prêt pour la production avec **SSE**.
-
-1. **Variables d'env** :
-   * `MCP_MODE=sse`
-   * `PORT=9123`
-2. **Build** : Utilisez le `Dockerfile` fourni.
-3. **URL d'accès** : `https://votre-mcp.com/mcp`
-
----
-
-## 📚 Crédits
-
-* **Auteur** : Nicolas De Simone
-* **Données** : Fédération Française de Basketball
-* **Bibliothèque core** : [`ffbb-api-client-v3`](https://github.com/nickdesi/FFBBApiClientV3)
-
----
-<p align="center">🏀 <i>L'IA au service du basketball français.</i></p>
+Ce projet est sous licence [MIT](LICENSE).

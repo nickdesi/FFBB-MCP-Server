@@ -8,6 +8,7 @@ sys.path.append(os.path.join(os.getcwd(), "src"))
 
 from ffbb_mcp.client import get_client
 
+
 async def main():
     client = get_client()
     poule_id = 200000003030720 # Poule U11M1 Phase 3
@@ -48,11 +49,11 @@ async def main():
                     else:
                         away_count += 1
                         print(f"  [EXTÉRIEUR] chez {n1} le {date_str}")
-            except Exception as e:
+            except Exception:
                 # Si format date différent
                 print(f"  [ERREUR DATE] {date_str} - {n1} vs {n2}")
 
-    print(f"\nRÉSULTATS FINAUX (Après le 24/02/2026) :")
+    print("\nRÉSULTATS FINAUX (Après le 24/02/2026) :")
     print(f"Matchs à DOMICILE restants : {home_count}")
     print(f"Matchs à l'EXTÉRIEUR restants : {away_count}")
     print(f"TOTAL : {home_count + away_count}")

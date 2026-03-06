@@ -3,17 +3,13 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from mcp.shared.exceptions import McpError
 
 from ffbb_mcp.services import (
-    _handle_api_error,
     ffbb_equipes_club_service,
     ffbb_get_classement_service,
     get_calendrier_club_service,
     get_competition_service,
-    get_lives_service,
     get_organisme_service,
-    get_poule_service,
     get_saisons_service,
 )
 
