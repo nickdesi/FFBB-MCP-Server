@@ -24,21 +24,26 @@ Le serveur **FFBB MCP** expose les données de la Fédération Française de Bas
 
 ```mermaid
 flowchart TD
-    subgraph "Clients IA"
-        A["Agent (Claude, Cursor, AnythingLLM)"]
+    subgraph Clients ["Clients IA & IDEs"]
+        direction TB
+        A1["Google Antigravity"]
+        A2["VS Code (MCP Extension)"]
+        A3["Claude Desktop"]
+        A4["Cursor / AnythingLLM"]
     end
 
-    subgraph "MCP Server (ffbb_mcp)"
+    subgraph Server ["MCP Server (ffbb_mcp)"]
+        direction TB
         B["Transport (Stdio / SSE)"]
         C["Core Logic (FastMCP)"]
         D["FFBB API Client"]
     end
 
-    subgraph "External"
+    subgraph Remote ["External Services"]
         E["Official FFBB API"]
     end
 
-    A <-->|JSON-RPC| B
+    Clients <-->|JSON-RPC| B
     B <--> C
     C <--> D
     D <-->|HTTPS| E
@@ -96,6 +101,34 @@ Ajoutez ceci à votre configuration (`claude_desktop_config.json`) :
 2. **+ Add New MCP Server**.
 3. **Name**: `FFBB` | **Type**: `command`
 4. **Command**: `uvx --from git+https://github.com/nickdesi/FFBB-MCP-Server.git ffbb_mcp`
+
+</details>
+
+<details>
+<summary><b>Google Antigravity</b></summary>
+
+Ajoutez votre serveur dans `mcp_config.json` :
+
+```json
+{
+  "mcpServers": {
+    "ffbb_mcp": {
+      "url": "https://ffbb.desimone.fr/mcp"
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>VS Code (Extension MCP)</b></summary>
+
+Si vous utilisez l'extension MCP pour VS Code :
+
+1. Ouvrez les réglages de l'extension.
+2. Ajoutez un nouveau serveur de type **SSE**.
+3. **URL** : `https://ffbb.desimone.fr/mcp`
 
 </details>
 

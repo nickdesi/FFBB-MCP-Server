@@ -47,3 +47,12 @@ Nous utilisons `mcp.streamable_http_app()` qui permet d'exposer le serveur sur u
 ### Sécurité
 
 La configuration actuelle utilise `allowed_origins=["*"]` pour faciliter l'intégration avec divers clients web, mais peut être restreinte via les variables d'environnement si nécessaire.
+
+## 🖥️ Clients Supportés
+
+Le serveur **FFBB MCP** est conçu pour être compatible avec les principaux clients du marché :
+
+- **Google Antigravity** : Intégration native via SSE. La configuration se fait dans `mcp_config.json`.
+- **VS Code** : Utilisation recommandée de l'extension **MCP for VS Code** via le transport SSE.
+- **Claude Desktop** : Support complet via Stdio (local) ou SSE (remote).
+- **Cursor / AnythingLLM** : Compatibilité assurée via les protocoles standards MCP.
