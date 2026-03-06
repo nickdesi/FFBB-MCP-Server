@@ -25,40 +25,38 @@ Le serveur **FFBB MCP** expose les données de la Fédération Française de Bas
 ```mermaid
 flowchart TD
     subgraph "Clients IA"
-        A["Agent (Claude, Gemini, Cursor)"]
+        A["Agent (Claude, Cursor, AnythingLLM)"]
     end
 
     subgraph "MCP Server (ffbb_mcp)"
-        B["Transport (Stdio/SSE)"]
-        C["Logic (Python)"]
-        D["Tools Definition"]
+        B["Transport (Stdio / SSE)"]
+        C["Core Logic (FastMCP)"]
+        D["FFBB API Client"]
     end
 
     subgraph "External"
-        E["FFBB Official API"]
+        E["Official FFBB API"]
     end
 
-    A <--> B
+    A <-->|JSON-RPC| B
     B <--> C
     C <--> D
-    C <--> E
+    D <-->|HTTPS| E
 ```
 
 ---
 
 ## 🚀 Installation & Connexion
 
-Il existe deux manières ultra-simples d'utiliser ce serveur MCP.
-
 ### 1. Mode Remote (Recommandé) ✨
 
-Connectez-vous directement à l'instance hébergée via HTTP/SSE. **Aucune installation locale requise.**
+Connectez-vous directement à l'instance hébergée. **Aucune installation Python requise.**
 
 - **URL de connexion** : `https://ffbb.desimone.fr/mcp`
 
-### 2. Mode Local (Sans installation)
+### 2. Mode Local (via uvx)
 
-Utilisez `uvx` pour lancer le serveur à la volée.
+Lancez le serveur à la volée sans rien installer :
 
 ```bash
 uvx --from "git+https://github.com/nickdesi/FFBB-MCP-Server.git" ffbb_mcp
@@ -68,12 +66,10 @@ uvx --from "git+https://github.com/nickdesi/FFBB-MCP-Server.git" ffbb_mcp
 
 ## ⚙️ Configuration par Client
 
-Choisissez votre client IA et copiez la configuration :
-
 <details>
 <summary><b>Claude Desktop</b></summary>
 
-Ajoutez ceci à votre fichier de configuration (`Library/Application Support/Claude/claude_desktop_config.json`) :
+Ajoutez ceci à votre configuration (`claude_desktop_config.json`) :
 
 ```json
 {
@@ -81,8 +77,10 @@ Ajoutez ceci à votre fichier de configuration (`Library/Application Support/Cla
     "ffbb": {
       "command": "npx",
       "args": [
-        "mcp-remote",
-        "https://ffbb.desimone.fr/mcp/sse"
+        "-y",
+        "@modelcontextprotocol/server-remote",
+        "--url",
+        "https://ffbb.desimone.fr/mcp"
       ]
     }
   }
@@ -94,60 +92,49 @@ Ajoutez ceci à votre fichier de configuration (`Library/Application Support/Cla
 <details>
 <summary><b>Cursor</b></summary>
 
-1. Allez dans **Settings** > **Features** > **MCP Servers**.
-2. Cliquez sur **+ Add New MCP Server**.
-3. **Name**: `FFBB`
-4. **Type**: `command`
-5. **Command**: `uv run --from git+https://github.com/nickdesi/FFBB-MCP-Server.git ffbb_mcp`
-   *(Ou via URL si supporté par votre version : `https://ffbb.desimone.fr/mcp/sse`)*
+1. **Settings** > **Features** > **MCP Servers**.
+2. **+ Add New MCP Server**.
+3. **Name**: `FFBB` | **Type**: `command`
+4. **Command**: `uvx --from git+https://github.com/nickdesi/FFBB-MCP-Server.git ffbb_mcp`
 
 </details>
 
 <details>
 <summary><b>AnythingLLM</b></summary>
 
-Ajoutez un serveur MCP de type `streamable` avec l'URL :
-`https://ffbb.desimone.fr/mcp/sse`
+Ajoutez un serveur MCP de type `streamable` :
+
+- **URL** : `https://ffbb.desimone.fr/mcp`
+
 </details>
 
 ---
 
 ## 🛠️ Outils Disponibles
 
-| Outil | Description | Paramètres clés |
-|-------|-------------|-----------------|
-| `ffbb_multi_search` | Recherche globale multi-critères | `nom` (club, ville, etc.) |
-| `ffbb_calendrier_club` | Matchs à venir d'un club | `organisme_id` |
-| `ffbb_get_lives` | Scores en direct (tous matchs) | - |
-| `ffbb_get_classement` | Classement d'une poule | `poule_id` |
-| `ffbb_get_poule` | Détails complets d'un groupe | `poule_id` |
+| Catégorie | Outils | Description |
+|-----------|---------|-------------|
+| **Lives** | `ffbb_get_lives` | Scores en direct de tous les matchs en cours. |
+| **Search** | `ffbb_multi_search` | Recherche globale (clubs, compétitions, salles). |
+| **Club** | `ffbb_calendrier_club` | Matchs à venir pour un club spécifique. |
+| **Stats** | `ffbb_get_classement` | Classement détaillé d'une poule/groupe. |
 
 > [!TIP]
-> Pour une documentation détaillée, consultez la [Référence des Outils](docs/TOOLS_REFERENCE.md).
+> Voir la [Référence complète des outils](docs/CLI_REFERENCE.md) pour la liste exhaustive des 15+ outils.
 
 ---
 
-## 🐳 Déploiement & Coolify
+## 🔧 Troubleshooting (FAQ)
 
-Le serveur est prêt pour la production. Pour un déploiement sur **Coolify** :
-
-1. Créez une nouvelle ressource à partir du repo GitHub.
-2. Définissez la variable d'environnement `MCP_MODE=sse`.
-3. Configurez le domaine sur `ffbb.desimone.fr`.
-4. Le serveur écoute sur le port `9123` par défaut.
-5. **Important** : Le path `/mcp` est automatiquement géré par le serveur. Votre endpoint final sera `https://ffbb.desimone.fr/mcp`.
+- **Erreur 404 sur /mcp** : Assurez-vous d'utiliser `https` et non `http`.
+- **Délai de réponse** : L'API FFBB peut parfois être lente, augmentez le timeout de votre client si possible.
+- **WebSocket / SSE** : Sur Nginx Proxy Manager, activez impérativement **"Websockets Support"**.
 
 ---
 
-## 🤖 Guide pour l'Agent IA
+## 👨‍💻 Développement
 
-Lorsqu'un agent utilise ce serveur, il devrait suivre ce workflow :
-
-1. **Exploration** : Commencer par `ffbb_multi_search` pour trouver un `organisme_id` (club).
-2. **Contexte** : Utiliser `ffbb_equipes_club` pour lister les équipes engagées.
-3. **Détails** : Récupérer le calendrier ou le classement via les IDs obtenus.
-
----
+Consultez le guide [CONTRIBUTING.md](CONTRIBUTING.md) pour installer l'environnement de développement et soumettre des PRs.
 
 ## 📄 Licence
 
