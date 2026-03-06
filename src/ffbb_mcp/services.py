@@ -18,7 +18,7 @@ def _handle_api_error(e: Exception) -> McpError:
     """Formatage cohérent des erreurs API pour tous les outils."""
     if isinstance(e, McpError):
         return e
-    
+
     error_msg = str(e)
     logger.error(f"FFBB API Error: {error_msg}")
     logger.error(traceback.format_exc())
@@ -58,8 +58,7 @@ async def get_lives_service() -> list[dict]:
 async def get_saisons_service(active_only: bool = False) -> list[dict]:
     client = await get_client_async()
     saisons = await _safe_call(
-        "Saisons", 
-        client.get_saisons_async(active_only=active_only)
+        "Saisons", client.get_saisons_async(active_only=active_only)
     )
     if not saisons:
         return []
@@ -70,7 +69,7 @@ async def get_competition_service(competition_id: int | str) -> dict:
     client = await get_client_async()
     comp = await _safe_call(
         f"Compétition {competition_id}",
-        client.get_competition_async(competition_id=int(competition_id))
+        client.get_competition_async(competition_id=int(competition_id)),
     )
     return serialize_model(comp) or {}
 
@@ -78,8 +77,7 @@ async def get_competition_service(competition_id: int | str) -> dict:
 async def get_poule_service(poule_id: int | str) -> dict:
     client = await get_client_async()
     poule = await _safe_call(
-        f"Poule {poule_id}",
-        client.get_poule_async(poule_id=int(poule_id))
+        f"Poule {poule_id}", client.get_poule_async(poule_id=int(poule_id))
     )
     return serialize_model(poule) or {}
 
@@ -88,34 +86,33 @@ async def get_organisme_service(organisme_id: int | str) -> dict:
     client = await get_client_async()
     org = await _safe_call(
         f"Organisme {organisme_id}",
-        client.get_organisme_async(organisme_id=int(organisme_id))
+        client.get_organisme_async(organisme_id=int(organisme_id)),
     )
     return serialize_model(org) or {}
 
 
 async def ffbb_equipes_club_service(
-    organisme_id: int | str, 
-    filtre: str | None = None
+    organisme_id: int | str, filtre: str | None = None
 ) -> list[dict[str, Any]]:
     client = await get_client_async()
     org = await _safe_call(
         f"Equipes club {organisme_id}",
-        client.get_organisme_async(organisme_id=int(organisme_id))
+        client.get_organisme_async(organisme_id=int(organisme_id)),
     )
     if not org:
         return []
-    
+
     data = serialize_model(org)
     raw = data.get("engagements", []) if isinstance(data, dict) else []
     flat: list[dict[str, Any]] = []
     club_nom = data.get("nom", "")
-    
+
     for e in raw:
         comp = e.get("idCompetition", {}) or {}
         poule = e.get("idPoule", {}) or {}
         cat = comp.get("categorie", {}) or {}
         nom_comp = comp.get("nom", "")
-        
+
         # Filtre optionnel pour gagner du temps agents
         if filtre and filtre.lower() not in nom_comp.lower():
             continue
@@ -138,8 +135,7 @@ async def ffbb_equipes_club_service(
 async def ffbb_get_classement_service(poule_id: int | str) -> list[dict[str, Any]]:
     client = await get_client_async()
     poule = await _safe_call(
-        f"Classement poule {poule_id}",
-        client.get_poule_async(poule_id=int(poule_id))
+        f"Classement poule {poule_id}", client.get_poule_async(poule_id=int(poule_id))
     )
     if not poule:
         return []
@@ -205,8 +201,7 @@ async def multi_search_service(nom: str) -> list[dict[str, Any]]:
     client = await get_client_async()
     queries = generate_queries(nom)
     results = await _safe_call(
-        f"Recherche multi-types: {nom}",
-        client.multi_search_async(queries=queries)
+        f"Recherche multi-types: {nom}", client.multi_search_async(queries=queries)
     )
     if not results or not results.results:
         return []
@@ -224,34 +219,33 @@ async def multi_search_service(nom: str) -> list[dict[str, Any]]:
 
 
 async def get_calendrier_club_service(
-    club_name: str | None = None, 
+    club_name: str | None = None,
     organisme_id: int | str | None = None,
-    categorie: str | None = None
+    categorie: str | None = None,
 ) -> list[dict]:
     client = await get_client_async()
-    
+
     search_term = club_name or ""
-    
+
     # Auto-résolution du nom via ID pour une recherche plus précise
     if organisme_id:
         org = await _safe_call(
             f"Résolution club {organisme_id}",
-            client.get_organisme_async(organisme_id=int(organisme_id))
+            client.get_organisme_async(organisme_id=int(organisme_id)),
         )
         if org:
             data = serialize_model(org)
             search_term = data.get("nom", search_term)
-    
+
     if not search_term:
         return []
-        
+
     query = search_term
     if categorie:
         query += f" {categorie}"
 
     results = await _safe_call(
-        f"Calendrier club: {query}",
-        client.search_rencontres_async(query)
+        f"Calendrier club: {query}", client.search_rencontres_async(query)
     )
     if not results or not results.hits:
         return []

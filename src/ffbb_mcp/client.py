@@ -81,7 +81,9 @@ class FFBBClientFactory:
                     cls._instance = await asyncio.to_thread(cls._create_client)
                     cls._token_created_at = time.monotonic()
                 except Exception as e:
-                    logger.error(f"Erreur lors de l'initialisation asynchrone du client: {e}")
+                    logger.error(
+                        f"Erreur lors de l'initialisation asynchrone du client: {e}"
+                    )
                     logger.error(traceback.format_exc())
                     raise
             return cls._instance

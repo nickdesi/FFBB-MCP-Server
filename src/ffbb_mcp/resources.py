@@ -8,7 +8,7 @@ from .utils import serialize_model
 
 def register_resources(mcp):
     """Enregistre les ressources sur l'instance FastMCP."""
-    
+
     @mcp.resource("ffbb://saisons")
     async def resource_saisons() -> str:
         """Liste des saisons FFBB au format JSON."""

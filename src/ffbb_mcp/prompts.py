@@ -1,8 +1,9 @@
 """Définition des prompts MCP réutilisables."""
 
+
 def register_prompts(mcp):
     """Enregistre les prompts sur l'instance FastMCP."""
-    
+
     @mcp.prompt()
     def analyser_match(match_id: str) -> str:
         """Génère un prompt pour analyser un match spécifique."""
@@ -67,6 +68,7 @@ def register_prompts(mcp):
             "6. Présente un tableau par phase + un total cumulé de la saison."
         )
 
+
 # Fonctions nues exposées pour les tests
 def analyser_match(match_id: str) -> str:
     return (
@@ -75,6 +77,7 @@ def analyser_match(match_id: str) -> str:
         "pour trouver les détails.\n"
         "Donne le contexte, les enjeux si possible, et le résultat probable ou affiché."
     )
+
 
 def trouver_club(club_name: str, department: str = "") -> str:
     prompt = f"Je cherche des informations sur le club '{club_name}'"
@@ -86,6 +89,7 @@ def trouver_club(club_name: str, department: str = "") -> str:
         "2. Puis `ffbb_get_organisme` pour les détails complets\n"
         "3. Liste son adresse et ses équipes engagées cette saison."
     )
+
 
 def prochain_match(club_name: str, categorie: str = "") -> str:
     query = club_name
@@ -100,6 +104,7 @@ def prochain_match(club_name: str, categorie: str = "") -> str:
         "3. Donne la date, l'heure, l'adversaire et le lieu du prochain match."
     )
 
+
 def classement_poule(competition_name: str) -> str:
     return (
         f"Je veux le classement de la compétition '{competition_name}'.\n"
@@ -108,6 +113,7 @@ def classement_poule(competition_name: str) -> str:
         "3. Puis `ffbb_get_classement` pour le classement de la poule souhaitée\n"
         "4. Présente le classement sous forme de tableau."
     )
+
 
 def bilan_equipe(club_name: str, categorie: str) -> str:
     return (

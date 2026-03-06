@@ -19,10 +19,12 @@ from ffbb_mcp.services import (
 # Tests — get_saisons_service
 # ---------------------------------------------------------------------------
 
-class TestGetSaisonsService:
 
+class TestGetSaisonsService:
     @pytest.mark.asyncio
-    async def test_returns_empty_list_when_no_saisons(self, patch_get_client, mock_client):
+    async def test_returns_empty_list_when_no_saisons(
+        self, patch_get_client, mock_client
+    ):
         mock_client.get_saisons_async = AsyncMock(return_value=[])
         result = await get_saisons_service(active_only=True)
         assert result == []
@@ -37,9 +39,9 @@ class TestGetSaisonsService:
             if active_only:
                 return [d for d in data if d.get("actif")]
             return data
-            
+
         mock_client.get_saisons_async = AsyncMock(side_effect=mock_get_saisons)
-        
+
         result_active = await get_saisons_service(active_only=True)
         assert len(result_active) == 1
         assert result_active[0]["nom"] == "2024-2025"
@@ -49,10 +51,12 @@ class TestGetSaisonsService:
 # Tests — get_competition_service
 # ---------------------------------------------------------------------------
 
-class TestGetCompetitionService:
 
+class TestGetCompetitionService:
     @pytest.mark.asyncio
-    async def test_returns_empty_dict_when_not_found(self, patch_get_client, mock_client):
+    async def test_returns_empty_dict_when_not_found(
+        self, patch_get_client, mock_client
+    ):
         mock_client.get_competition_async = AsyncMock(return_value=None)
         result = await get_competition_service(competition_id=99999)
         assert result == {}
@@ -62,10 +66,12 @@ class TestGetCompetitionService:
 # Tests — get_organisme_service
 # ---------------------------------------------------------------------------
 
-class TestGetOrganismeService:
 
+class TestGetOrganismeService:
     @pytest.mark.asyncio
-    async def test_returns_empty_dict_when_not_found(self, patch_get_client, mock_client):
+    async def test_returns_empty_dict_when_not_found(
+        self, patch_get_client, mock_client
+    ):
         mock_client.get_organisme_async = AsyncMock(return_value=None)
         result = await get_organisme_service(organisme_id=99999)
         assert result == {}
@@ -75,8 +81,8 @@ class TestGetOrganismeService:
 # Tests — ffbb_equipes_club_service
 # ---------------------------------------------------------------------------
 
-class TestEquipesClubService:
 
+class TestEquipesClubService:
     @pytest.mark.asyncio
     async def test_returns_empty_when_no_org(self, patch_get_client, mock_client):
         mock_client.get_organisme_async = AsyncMock(return_value=None)
@@ -92,10 +98,7 @@ class TestEquipesClubService:
                 "engagements": [
                     {
                         "id": "eng1",
-                        "idCompetition": {
-                            "nom": "U11M",
-                            "id": "comp1"
-                        },
+                        "idCompetition": {"nom": "U11M", "id": "comp1"},
                         "idPoule": {"id": "poule1"},
                     }
                 ],
@@ -115,12 +118,12 @@ class TestEquipesClubService:
                 "nom": "Club",
                 "engagements": [
                     {"idCompetition": {"nom": "U11M"}, "idPoule": {"id": "p1"}},
-                    {"idCompetition": {"nom": "U13F"}, "idPoule": {"id": "p2"}}
-                ]
+                    {"idCompetition": {"nom": "U13F"}, "idPoule": {"id": "p2"}},
+                ],
             }
         )
         mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
-        
+
         # Test filtre U11
         result = await ffbb_equipes_club_service(organisme_id=1, filtre="U11")
         assert len(result) == 1
@@ -131,8 +134,8 @@ class TestEquipesClubService:
 # Tests — ffbb_get_classement_service
 # ---------------------------------------------------------------------------
 
-class TestGetClassementService:
 
+class TestGetClassementService:
     @pytest.mark.asyncio
     async def test_returns_empty_when_no_poule(self, patch_get_client, mock_client):
         mock_client.get_poule_async = AsyncMock(return_value=None)
@@ -144,8 +147,8 @@ class TestGetClassementService:
 # Tests — get_calendrier_club_service
 # ---------------------------------------------------------------------------
 
-class TestCalendrierClubService:
 
+class TestCalendrierClubService:
     @pytest.mark.asyncio
     async def test_returns_empty_when_no_results(self, patch_get_client, mock_client):
         mock_client.search_rencontres_async = AsyncMock(return_value=None)
@@ -157,11 +160,11 @@ class TestCalendrierClubService:
         org_mock = MagicMock()
         org_mock.model_dump = MagicMock(return_value={"nom": "BASKET CLUB"})
         mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
-        
+
         mock_client.search_rencontres_async = AsyncMock(return_value=None)
-        
+
         await get_calendrier_club_service(organisme_id=123)
-        
+
         # Doit avoir appelé get_organisme puis search_rencontres avec le nom résolu
         mock_client.get_organisme_async.assert_called_with(organisme_id=123)
         mock_client.search_rencontres_async.assert_called_with("BASKET CLUB")
