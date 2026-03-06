@@ -6,6 +6,9 @@ Pour que ton serveur soit accessible sur `https://ffbb.desimone.fr/mcp`, voici l
 
 - **Source** : Ton dépôt GitHub `FFBB-MCP-Server`.
 - **Build Pack** : `Docker`.
+- **Domain** : `http://ffbb.desimone.fr`
+  > [!IMPORTANT]
+  > Utilise impérativement `http://` dans Coolify. Si tu mets `https://`, Coolify va essayer de générer son propre certificat Let's Encrypt, ce qui entrera en conflit avec **Nginx Proxy Manager**.
 
 ## 2. Variables d'Environnement (Coolify)
 
