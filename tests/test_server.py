@@ -46,16 +46,26 @@ async def test_server_tools_importable():
 @pytest.mark.asyncio
 async def test_schemas_instantiation():
     """Vérifie que les Pydantic Models peuvent être instanciés correctement."""
-    from ffbb_mcp.schemas import OrganismeIdInput, SaisonsInput, SearchInput
+    from ffbb_mcp.schemas import SearchInput
     
-    # Doit valider avec l'alias "nom" (si défini tel quel)
-    si = SearchInput(nom="Vichy")
-    assert si.name == "Vichy"
-    
-    # Doit valider active_only = True
-    saisons = SaisonsInput(active_only=True)
-    assert saisons.active_only is True
+    # Doit valider avec l'alias "nom" (via validation_alias)
+    si_nom = SearchInput(nom="Vichy")
+    assert si_nom.name == "Vichy"
 
-    # Doit refuser organisme_id <= 0
-    with pytest.raises(ValueError):
-        OrganismeIdInput(organisme_id=-1)
+    # Doit valider avec l'alias "query" (via validation_alias)
+    si_query = SearchInput(query="Vichy")
+    assert si_query.name == "Vichy"
+
+
+@pytest.mark.asyncio
+async def test_server_tool_signatures():
+    """Vérifie que les outils ont des signatures aplaties."""
+    tools = await mcp.list_tools()
+    
+    # Recherche d'un outil spécifique pour inspecter ses arguments
+    tool = next(t for t in tools if t.name == "ffbb_get_organisme")
+    
+    # Dans FastMCP, les paramètres sont dans inputSchema
+    props = tool.inputSchema.get("properties", {})
+    assert "organisme_id" in props, "organisme_id devrait être un argument direct"
+    assert "params" not in props, "L'argument 'params' ne devrait plus exister"

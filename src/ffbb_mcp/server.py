@@ -7,14 +7,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 from .prompts import register_prompts
 from .resources import register_resources
-from .schemas import (
-    CalendrierClubInput,
-    CompetitionIdInput,
-    OrganismeIdInput,
-    PouleIdInput,
-    SaisonsInput,
-    SearchInput,
-)
+from .schemas import CalendrierClubInput, SearchInput
 from .services import (
     ffbb_equipes_club_service,
     ffbb_get_classement_service,
@@ -88,92 +81,136 @@ async def ffbb_get_lives() -> list[dict[str, Any]]:
 # Outils MCP — Saisons
 # ---------------------------------------------------------------------------
 
+from typing import Annotated, Optional, Union
+from pydantic import Field, AliasChoices
+
+# ---------------------------------------------------------------------------
+# Outils MCP — Saisons
+# ---------------------------------------------------------------------------
+
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def ffbb_get_saisons(params: SaisonsInput) -> list[dict[str, Any]]:
+async def ffbb_get_saisons(
+    active_only: bool = False
+) -> list[dict[str, Any]]:
     """Liste des saisons (filtre actif possible)."""
-    return await get_saisons_service(params)
+    return await get_saisons_service(active_only=active_only)
 
 # ---------------------------------------------------------------------------
 # Outils MCP — Détails par ID
 # ---------------------------------------------------------------------------
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def ffbb_get_competition(params: CompetitionIdInput) -> dict[str, Any]:
+async def ffbb_get_competition(
+    competition_id: Annotated[Union[int, str], Field(validation_alias=AliasChoices("competition_id", "id"))]
+) -> dict[str, Any]:
     """Détails d'une compétition par ID."""
-    return await get_competition_service(params)
+    return await get_competition_service(competition_id=competition_id)
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def ffbb_get_poule(params: PouleIdInput) -> dict[str, Any]:
+async def ffbb_get_poule(
+    poule_id: Annotated[Union[int, str], Field(validation_alias=AliasChoices("poule_id", "id"))]
+) -> dict[str, Any]:
     """Détails d'une poule/groupe par ID (classement, matchs)."""
-    return await get_poule_service(params)
+    return await get_poule_service(poule_id=poule_id)
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def ffbb_get_organisme(params: OrganismeIdInput) -> dict[str, Any]:
+async def ffbb_get_organisme(
+    organisme_id: Annotated[Union[int, str], Field(validation_alias=AliasChoices("organisme_id", "id", "club_id"))]
+) -> dict[str, Any]:
     """Informations détaillées d'un club/organisme (adresse, équipes...)."""
-    return await get_organisme_service(params)
+    return await get_organisme_service(organisme_id=organisme_id)
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def ffbb_equipes_club(params: OrganismeIdInput) -> list[dict[str, Any]]:
+async def ffbb_equipes_club(
+    organisme_id: Annotated[Union[int, str], Field(validation_alias=AliasChoices("organisme_id", "id", "club_id"))],
+    filtre: Optional[str] = None
+) -> list[dict[str, Any]]:
     """Récupère uniquement la liste des équipes engagées par un club/organisme."""
-    return await ffbb_equipes_club_service(params)
+    return await ffbb_equipes_club_service(organisme_id=organisme_id, filtre=filtre)
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def ffbb_get_classement(params: PouleIdInput) -> list[dict[str, Any]]:
+async def ffbb_get_classement(
+    poule_id: Annotated[Union[int, str], Field(validation_alias=AliasChoices("poule_id", "id"))]
+) -> list[dict[str, Any]]:
     """Récupère uniquement le classement d'une poule/groupe (sans les matchs)."""
-    return await ffbb_get_classement_service(params)
+    return await ffbb_get_classement_service(poule_id=poule_id)
 
 # ---------------------------------------------------------------------------
 # Outils MCP — Recherche
 # ---------------------------------------------------------------------------
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def ffbb_search_competitions(params: SearchInput) -> list[dict[str, Any]]:
-    """Recherche des compétitions FFBB par nom."""
-    return await search_competitions_service(params)
+async def ffbb_search_competitions(
+    nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))]
+) -> list[dict[str, Any]]:
+    """Recherche des compétitions FFBB par nom (paramètres: nom ou query)."""
+    return await search_competitions_service(nom=nom)
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def ffbb_search_organismes(params: SearchInput) -> list[dict[str, Any]]:
-    """Recherche des clubs/organismes FFBB par nom."""
-    return await search_organismes_service(params)
+async def ffbb_search_organismes(
+    nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))]
+) -> list[dict[str, Any]]:
+    """Recherche des clubs/organismes FFBB par nom (paramètres: nom ou query)."""
+    return await search_organismes_service(nom=nom)
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def ffbb_search_salles(params: SearchInput) -> list[dict[str, Any]]:
-    """Recherche des salles de basket par nom/ville."""
-    return await search_salles_service(params)
+async def ffbb_search_salles(
+    nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))]
+) -> list[dict[str, Any]]:
+    """Recherche des salles de basket par nom/ville (paramètres: nom ou query)."""
+    return await search_salles_service(nom=nom)
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def ffbb_search_rencontres(params: SearchInput) -> list[dict[str, Any]]:
-    """Recherche des rencontres (matchs) FFBB par nom d'équipe ou de compétition."""
-    return await search_rencontres_service(params)
+async def ffbb_search_rencontres(
+    nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))]
+) -> list[dict[str, Any]]:
+    """Recherche des rencontres (matchs) FFBB (paramètres: nom ou query)."""
+    return await search_rencontres_service(nom=nom)
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def ffbb_search_pratiques(params: SearchInput) -> list[dict[str, Any]]:
-    """Recherche des pratiques de basketball (3x3, 5x5, VxE, etc.)."""
-    return await search_pratiques_service(params)
+async def ffbb_search_pratiques(
+    nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))]
+) -> list[dict[str, Any]]:
+    """Recherche des pratiques de basketball (paramètres: nom ou query)."""
+    return await search_pratiques_service(nom=nom)
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def ffbb_search_terrains(params: SearchInput) -> list[dict[str, Any]]:
-    """Recherche des terrains de basketball par nom ou ville."""
-    return await search_terrains_service(params)
+async def ffbb_search_terrains(
+    nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))]
+) -> list[dict[str, Any]]:
+    """Recherche des terrains de basketball (paramètres: nom ou query)."""
+    return await search_terrains_service(nom=nom)
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def ffbb_search_tournois(params: SearchInput) -> list[dict[str, Any]]:
-    """Recherche des tournois de basketball."""
-    return await search_tournois_service(params)
+async def ffbb_search_tournois(
+    nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))]
+) -> list[dict[str, Any]]:
+    """Recherche des tournois de basketball (paramètres: nom ou query)."""
+    return await search_tournois_service(nom=nom)
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def ffbb_multi_search(params: SearchInput) -> list[dict[str, Any]]:
-    """Recherche globale sur tous les types FFBB en une seule requête."""
-    return await multi_search_service(params)
+async def ffbb_multi_search(
+    nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))]
+) -> list[dict[str, Any]]:
+    """Recherche globale FFBB (paramètres: nom ou query)."""
+    return await multi_search_service(nom=nom)
 
 # ---------------------------------------------------------------------------
 # Outils MCP — Aggrégation
 # ---------------------------------------------------------------------------
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def ffbb_calendrier_club(params: CalendrierClubInput) -> dict[str, Any]:
-    """Récupère le calendrier (prochains matchs) d'un club et de ses équipes."""
-    return await get_calendrier_club_service(params)
+async def ffbb_calendrier_club(
+    club_name: Annotated[Optional[str], Field(validation_alias=AliasChoices("club_name", "nom"))] = None,
+    organisme_id: Annotated[Optional[Union[int, str]], Field(validation_alias=AliasChoices("organisme_id", "club_id", "id"))] = None,
+    categorie: Optional[str] = None
+) -> list[dict[str, Any]]:
+    """Récupère le calendrier (prochains matchs) d'un club (via club_name ou organisme_id)."""
+    return await get_calendrier_club_service(
+        club_name=club_name, 
+        organisme_id=organisme_id, 
+        categorie=categorie
+    )
 
 # ---------------------------------------------------------------------------
 # Injections 
