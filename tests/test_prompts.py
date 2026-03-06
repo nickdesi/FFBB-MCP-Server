@@ -1,6 +1,6 @@
 """Tests des prompts MCP FFBB."""
 
-from ffbb_mcp.server import (
+from ffbb_mcp.prompts import (
     analyser_match,
     bilan_equipe,
     classement_poule,

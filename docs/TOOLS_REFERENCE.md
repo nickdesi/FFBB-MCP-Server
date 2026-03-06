@@ -13,6 +13,14 @@ Récupère les matchs de basketball en cours (live). Retourne la liste des renco
 - **Paramètres** : Aucun
 - **Usage recommandé** : Suivre les scores en direct le week-end.
 
+### `ffbb_get_saisons`
+
+Récupère la liste de toutes les saisons disponibles.
+
+- **Paramètres** :
+  - `active_only` (boolean, optionnel) : Si true, ne retourne que la saison active.
+- **Usage recommandé** : Trouver l'année en cours ou l'identifiant pour la saison actuelle.
+
 ### `ffbb_calendrier_club`
 
 Recherche les matchs à venir et passés d'un club.

@@ -396,6 +396,7 @@ dependencies = [
     { name = "anysqlite" },
     { name = "ffbb-api-client-v3" },
     { name = "mcp", extra = ["cli"] },
+    { name = "pydantic" },
     { name = "starlette" },
     { name = "uvicorn" },
 ]
@@ -413,6 +414,7 @@ requires-dist = [
     { name = "anysqlite", specifier = ">=0.0.5" },
     { name = "ffbb-api-client-v3", git = "https://github.com/nickdesi/FFBBApiClientV3.git" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.0.0" },
+    { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },

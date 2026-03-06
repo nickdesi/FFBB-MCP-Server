@@ -15,6 +15,7 @@ dependencies = [
     "anysqlite>=0.0.5",
     "uvicorn",
     "starlette",
+    "pydantic>=2.12.5",
 ]
 
 [project.optional-dependencies]

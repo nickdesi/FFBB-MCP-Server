@@ -6,6 +6,7 @@
       "skills": [
         "3d-web-experience",
         "agent-framework-azure-ai-py",
+        "agentmail",
         "algolia-search",
         "android-jetpack-compose-expert",
         "android_ui_verification",
@@ -157,6 +158,7 @@
         "frontend-ui-dark-ts",
         "game-development/mobile-games",
         "gemini-api-dev",
+        "gemini-api-integration",
         "go-concurrency-patterns",
         "go-playwright",
         "go-rod-master",
@@ -312,6 +314,7 @@
         "quant-analyst",
         "risk-manager",
         "risk-metrics-calculation",
+        "saas-mvp-launcher",
         "sast-configuration",
         "scanning-tools",
         "secrets-management",

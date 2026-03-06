@@ -17,11 +17,13 @@ Le serveur agit comme une interface normalisée entre les agents IA et l'API FFB
 ```mermaid
 graph TD
     User([Utilisateur]) --> Agent[Assistant IA / Agent]
-    Agent -->|Requête MCP| Server[FFBB MCP Server]
-    Server -->|Token Auto| Auth[Token Manager]
-    Server -->|Fetch| API[FFBB Public API]
-    API -.->|Data JSON| Server
-    Server -->|Réponse Structurée| Agent
+    Agent -->|Requête MCP| Server[FFBB MCP Server (server.py)]
+    Server -->|Validation Schema| Schemas[schemas.py]
+    Server -->|Exécution| Services[services.py]
+    Services -->|Token Auto| Auth[client.py (Token Manager)]
+    Auth -->|Fetch| API[FFBB Public API]
+    API -.->|Data JSON| Services
+    Services -->|Réponse Structurée| Agent
     Agent -->|Réponse Naturelle| User
 ```
 
