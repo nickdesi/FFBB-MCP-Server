@@ -169,6 +169,8 @@ Ajoutez un serveur MCP de type `streamable` :
 
 Consultez le guide [CONTRIBUTING.md](CONTRIBUTING.md) pour installer l'environnement de développement et soumettre des PRs.
 
+Pour le déploiement sur votre propre serveur, voir [docs/COOLIFY_DEPLOYMENT.md](docs/COOLIFY_DEPLOYMENT.md).
+
 ## 📄 Licence
 
 Ce projet est sous licence [MIT](LICENSE).
