@@ -65,12 +65,11 @@ Ajoutez ce bloc dans votre configuration (souvent `~/.config/Claude/claude_deskt
 {
   "mcpServers": {
     "ffbb": {
-      "command": "npx",
+      "command": "uvx",
       "args": [
-        "-y",
-        "@modelcontextprotocol/server-remote",
-        "--url",
-        "https://ffbb.desimone.fr/mcp"
+        "--from",
+        "git+https://github.com/nickdesi/FFBB-MCP-Server.git",
+        "ffbb_mcp"
       ]
     }
   }
@@ -121,7 +120,7 @@ Ajoutez simplement l'URL dans le fichier de configuration de l'espace de travail
 {
   "mcpServers": {
     "ffbb_mcp": {
-      "url": "https://ffbb.desimone.fr/mcp"
+      "serverUrl": "https://ffbb.desimone.fr/mcp"
     }
   }
 }
