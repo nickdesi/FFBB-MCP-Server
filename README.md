@@ -137,7 +137,7 @@ Ajoutez simplement l'URL dans le fichier de configuration de l'espace de travail
 Vous pouvez installer ce serveur pour Claude Desktop directement avec Smithery CLI en utilisant l'URL du repository :
 
 ```bash
-npx -y @smithery/cli@latest install https://github.com/nickdesi/FFBB-MCP-Server --client claude
+npx -y @smithery/cli@latest install @nickdesi/mcpffbb --client claude
 ```
 
 ---
