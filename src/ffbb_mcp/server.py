@@ -5,6 +5,8 @@ from typing import Annotated, Any
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import AliasChoices, Field
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
 
 from .prompts import register_prompts
 from .resources import register_resources
@@ -62,6 +64,12 @@ mcp = FastMCP(
         allowed_origins=["*"],
     ),
 )
+
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health(request: Request) -> Response:
+    """Endpoint de santé pour Coolify."""
+    return JSONResponse({"status": "ok", "service": "ffbb-mcp"})
 
 
 # ---------------------------------------------------------------------------
@@ -437,37 +445,18 @@ def main() -> None:
     mode = os.environ.get("MCP_MODE", "stdio").lower()
 
     if mode == "sse":
-        import uvicorn
-        from fastapi import FastAPI
-        from fastapi.responses import JSONResponse
-
         host = os.environ.get("HOST", "0.0.0.0")
         port = int(os.environ.get("PORT", "9123"))
 
-        # On utilise streamable_http_app pour avoir un endpoint unique /mcp
-        # Comme demandé, cela permet d'avoir l'URL : https://ffbb.desimone.fr/mcp
-        mcp_app = mcp.streamable_http_app()
-        app = FastAPI()
-
-        @app.get("/health")
-        async def health():
-            return JSONResponse({"status": "ok", "service": "ffbb-mcp"})
-
-        app.mount("/mcp", mcp_app)
-
         logger.info(
-            f"Démarrage du serveur MCP FFBB en mode SSE (Streamable HTTP) sur {host}:{port}..."
+            f"Démarrage du serveur MCP FFBB en mode Streamable HTTP sur {host}:{port}..."
         )
-        logger.info(f"Endpoint disponible sur : http://{host}:{port}/mcp")
-
-        uvicorn.run(
-            app,
-            host=host,
-            port=port,
-            log_level="info",
-            proxy_headers=True,
-            forwarded_allow_ips="*",
-        )
+        # On utilise mcp.run pour gérer tout le cycle de vie du serveur (TaskGroups, sessions, etc.)
+        # On définit le chemin vers /mcp pour correspondre à l'attendue.
+        mcp.settings.streamable_http_path = "/mcp"
+        mcp.settings.host = host
+        mcp.settings.port = port
+        mcp.run(transport="streamable-http")
     else:
         logger.info("Démarrage du serveur MCP FFBB en mode stdio...")
         mcp.run(transport="stdio")

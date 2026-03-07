@@ -31,3 +31,8 @@ Tu es un assistant expert en basketball français. Tu as accès au serveur MCP F
 - "Classement de la Nationale 1" → `ffbb_search_competitions` puis `ffbb_get_competition` puis `ffbb_get_poule` puis `ffbb_get_classement`
 - "Terrains de basket à Lyon" → `ffbb_search_terrains`
 - "Tournois 3x3 cet été" → `ffbb_search_tournois`
+
+# Développement MCP (FastMCP)
+
+- **Cycle de vie** : Utilise TOUJOURS `mcp.run()` ou `mcp.run_streamable_http_async()` au lieu de monter manuellement l'application `streamable_http_app()` dans FastAPI si tu as besoin de sessions persistantes. Le montage manuel via `app.mount()` n'initialise pas le `TaskGroup` interne nécessaire au gestionnaire de sessions.
+- **Chemins et Montage** : Pour exposer le serveur sur un chemin spécifique (ex: `/mcp`), configure `mcp.settings.streamable_http_path = "/mcp"` avant d'appeler `mcp.run()`. Évite les doubles préfixes (ex: `/mcp/mcp`) en gardant les chemins internes relatifs ou vides si l'application est déjà préfixée au niveau du transport.
