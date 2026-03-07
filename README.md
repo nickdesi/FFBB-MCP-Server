@@ -11,6 +11,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python" alt="Python Version" />
   <img src="https://img.shields.io/badge/MCP-Latest-orange?style=for-the-badge" alt="MCP Version" />
+  <a href="https://smithery.ai/server/ffbb-mcp-server"><img src="https://img.shields.io/badge/Smithery-Supported-yellow?style=for-the-badge&logo=codeigniter" alt="Smithery Badge" /></a>
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
 </p>
 
@@ -49,32 +50,15 @@ flowchart TD
     D <-->|HTTPS| E
 ```
 
----
+## 🌐 Connecter votre assistant IA (Clients)
 
-## 🚀 Installation & Connexion
+Le serveur gère nativement le transport **SSE (Streamable HTTP)** sur `https://ffbb.desimone.fr/mcp` et le transport **Stdio** en local via `uvx`.
 
-### 1. Mode Remote (Recommandé) ✨
+Trouvez la configuration correspondant à votre outil préféré ci-dessous :
 
-Connectez-vous directement à l'instance hébergée. **Aucune installation Python requise.**
+### Claude Desktop
 
-- **URL de connexion** : `https://ffbb.desimone.fr/mcp`
-
-### 2. Mode Local (via uvx)
-
-Lancez le serveur à la volée sans rien installer :
-
-```bash
-uvx --from "git+https://github.com/nickdesi/FFBB-MCP-Server.git" ffbb_mcp
-```
-
----
-
-## ⚙️ Configuration par Client
-
-<details>
-<summary><b>Claude Desktop</b></summary>
-
-Ajoutez ceci à votre configuration (`claude_desktop_config.json`) :
+Ajoutez ce bloc dans votre configuration (souvent `~/.config/Claude/claude_desktop_config.json` ou `%APPDATA%\Claude\claude_desktop_config.json`) pour utiliser la version distante :
 
 ```json
 {
@@ -92,22 +76,45 @@ Ajoutez ceci à votre configuration (`claude_desktop_config.json`) :
 }
 ```
 
-</details>
+### Claude Code
 
-<details>
-<summary><b>Cursor</b></summary>
+Ajoutez le serveur distant avec la commande CLI native :
 
-1. **Settings** > **Features** > **MCP Servers**.
-2. **+ Add New MCP Server**.
-3. **Name**: `FFBB` | **Type**: `command`
-4. **Command**: `uvx --from git+https://github.com/nickdesi/FFBB-MCP-Server.git ffbb_mcp`
+```shell
+claude mcp add --transport http ffbb https://ffbb.desimone.fr/mcp
+```
 
-</details>
+*Alternative locale via uvx :*
 
-<details>
-<summary><b>Google Antigravity</b></summary>
+```shell
+claude mcp add ffbb uvx --from "git+https://github.com/nickdesi/FFBB-MCP-Server.git" ffbb_mcp
+```
 
-Ajoutez votre serveur dans `mcp_config.json` :
+### Cursor
+
+1. Allez dans **Settings** > **Features** > **MCP Servers**.
+2. Cliquez sur **+ Add New MCP Server**.
+3. Configurez selon votre préférence :
+   - **Mode Remote (Rapide)** : Type `sse`, URL `https://ffbb.desimone.fr/mcp`
+   - **Mode Local** : Type `command`, Command `uvx --from git+https://github.com/nickdesi/FFBB-MCP-Server.git ffbb_mcp`
+
+### Gemini CLI
+
+Ajoutez le serveur dans `~/.gemini/settings.json` :
+
+```json
+{
+  "mcpServers": {
+    "ffbb": {
+      "httpUrl": "https://ffbb.desimone.fr/mcp"
+    }
+  }
+}
+```
+
+### Google Antigravity
+
+Ajoutez simplement l'URL dans le fichier de configuration de l'espace de travail (`mcp_config.json`) :
 
 ```json
 {
@@ -119,41 +126,33 @@ Ajoutez votre serveur dans `mcp_config.json` :
 }
 ```
 
-</details>
+### AnythingLLM
 
-<details>
-<summary><b>VS Code (Extension MCP)</b></summary>
+1. Allez dans les paramètres et locatez les MCP Servers.
+2. Ajoutez un serveur de type `streamable` avec l'URL :
+`https://ffbb.desimone.fr/mcp`
 
-Si vous utilisez l'extension MCP pour VS Code :
+### Smithery
 
-1. Ouvrez les réglages de l'extension.
-2. Ajoutez un nouveau serveur de type **SSE**.
-3. **URL** : `https://ffbb.desimone.fr/mcp`
+Vous pouvez installer ce serveur pour Claude Desktop directement avec Smithery CLI en utilisant l'URL du repository :
 
-</details>
-
-<details>
-<summary><b>AnythingLLM</b></summary>
-
-Ajoutez un serveur MCP de type `streamable` :
-
-- **URL** : `https://ffbb.desimone.fr/mcp`
-
-</details>
+```bash
+npx -y @smithery/cli@latest install https://github.com/nickdesi/FFBB-MCP-Server --client claude
+```
 
 ---
 
 ## 🛠️ Outils Disponibles
 
 | Catégorie | Outils | Description |
-|-----------|---------|-------------|
+| --------- | -------- | ----------- |
 | **Lives** | `ffbb_get_lives` | Scores en direct de tous les matchs en cours. |
 | **Search** | `ffbb_multi_search` | Recherche globale (clubs, compétitions, salles). |
 | **Club** | `ffbb_calendrier_club` | Matchs à venir pour un club spécifique. |
 | **Stats** | `ffbb_get_classement` | Classement détaillé d'une poule/groupe. |
 
 > [!TIP]
-> Voir la [Référence complète des outils](docs/CLI_REFERENCE.md) pour la liste exhaustive des 15+ outils.
+> Voir la [Référence complète des caractéristiques (Outils & Prompts)](docs/TOOLS_REFERENCE.md) pour la liste exhaustive.
 
 ---
 

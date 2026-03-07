@@ -87,3 +87,50 @@ Série d'outils spécialisés par type :
 - `ffbb_search_tournois`
 - `ffbb_search_terrains`
 - `ffbb_search_pratiques`
+
+---
+
+## 📝 Prompts MCP Prédéfinis
+
+Le serveur expose également des **Prompts MCP**. Ceux-ci permettent d'initialiser rapidement un agent ou de formuler une requête complexe avec un contexte prêt à l'emploi.
+
+### `expert_basket`
+
+Configure le LLM pour agir en tant qu'assistant expert en basketball français.
+
+- **Utilité** : Injecte le System Prompt idéal avec les workflows recommandés (point d'entrée, comportement, vérifications).
+
+### `analyser_match`
+
+Génère un prompt pour analyser un match spécifique.
+
+- **Arguments** : `match_id` (string)
+- **Utilité** : Demander à l'agent de récupérer le contexte, les enjeux et le résultat probable d'une rencontre.
+
+### `trouver_club`
+
+Aide à trouver un club et ses informations détaillées.
+
+- **Arguments** : `club_name` (string), `department` (string, optionnel)
+- **Utilité** : Orchestre la recherche `ffbb_search_organismes` suivie de `ffbb_get_organisme`.
+
+### `prochain_match`
+
+Aide à trouver le prochain match d'une équipe pour un club donné.
+
+- **Arguments** : `club_name` (string), `categorie` (string, optionnel)
+- **Utilité** : Appelle `ffbb_calendrier_club` et filtre intelligemment les matchs à venir.
+
+### `classement_poule`
+
+Aide à consulter le classement complet d'une compétition.
+
+- **Arguments** : `competition_name` (string)
+- **Utilité** : Construit une suite logique de recherche, récupération des poules, puis affichage du classement.
+
+### `bilan_equipe`
+
+Fait le bilan complet d'une équipe sur toute la saison.
+
+- **Arguments** : `club_name` (string), `categorie` (string)
+- **Utilité** : Script un workflow très complet (recherche de club → liste d'équipes → classements pour chaque phase → cumul statistique).
