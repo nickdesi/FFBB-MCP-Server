@@ -59,13 +59,14 @@ def register_prompts(mcp):
         return (
             f"Je veux le bilan complet de l'équipe '{categorie}' du club '{club_name}' "
             "sur la saison actuelle (toutes phases confondues).\n"
-            f"1. Utilise `ffbb_search_organismes` avec « {club_name} » pour trouver l'ID\n"
-            f"2. Utilise `ffbb_equipes_club` pour lister les engagements du club\n"
-            f"3. Filtre les engagements contenant « {categorie} » dans la compétition\n"
-            "4. Pour CHAQUE poule_id trouvé (Phase 1, Phase 2, Phase 3...), "
-            "appelle `ffbb_get_classement` et trouve la ligne de l'équipe\n"
-            "5. Cumule les matchs joués, victoires, défaites sur toutes les phases\n"
-            "6. Présente un tableau par phase + un total cumulé de la saison."
+            f"1. Si l'équipe demandée est ambiguë (ex: manque le genre M/F ou le numéro d'équipe 1/2), DEMANDE une précision au user.\n"
+            f"2. Utilise `ffbb_search_organismes` avec « {club_name} » pour trouver l'ID\n"
+            f"3. Utilise `ffbb_equipes_club` pour lister les engagements du club\n"
+            f"4. Filtre les engagements contenant « {categorie} » dans la compétition\n"
+            "5. Pour CHAQUE poule_id trouvé (Phase 1, Phase 2, Phase 3...), "
+            "appelle `ffbb_get_classement` et trouve la ligne de LA BONNE équipe (croise les adversaires pour être sûr de ne pas sauter d'Équipe 1 à Équipe 2).\n"
+            "6. Cumule les matchs joués, victoires, défaites sur toutes les phases\n"
+            "7. Présente un tableau par phase + un total cumulé de la saison."
         )
 
     @mcp.prompt()
@@ -74,6 +75,10 @@ def register_prompts(mcp):
         return (
             "Tu es un assistant expert en basketball français. Tu as accès au serveur MCP FFBB "
             "(ffbb.desimone.fr) qui te connecte en temps réel aux données officielles de la FFBB.\n\n"
+            "## 🚨 RÈGLES STRICTES DE DÉSAMBIGUÏSATION\n"
+            "1. **Genre** : Si la catégorie (ex: U11) n'a pas de genre précisé (M ou F), tu DOIS demander à l'utilisateur de préciser.\n"
+            "2. **Équipe 1 vs 2** : Si un club a plusieurs équipes dans la même catégorie, tu DOIS demander au user quelle équipe cibler (1 ou 2) avant de répondre.\n"
+            "3. **Phases multiples** : Fais très attention à ne pas mélanger l'équipe 1 et l'équipe 2 lors de suivis sur plusieurs phases. Croise le nom des adversaires pour être sûr de suivre la bonne équipe (les niveaux/poules restent cohérents généralement).\n\n"
             "## Workflow recommandé\n\n"
             "1. Point d'entrée général → `ffbb_multi_search` (cherche dans tous les types à la fois)\n"
             "2. Ciblé par type → `ffbb_search_competitions`, `ffbb_search_organismes`, "
@@ -100,6 +105,10 @@ def expert_basket() -> str:
     return (
         "Tu es un assistant expert en basketball français. Tu as accès au serveur MCP FFBB "
         "(ffbb.desimone.fr) qui te connecte en temps réel aux données officielles de la FFBB.\n\n"
+        "## 🚨 RÈGLES STRICTES DE DÉSAMBIGUÏSATION\n"
+        "1. **Genre** : Si la catégorie (ex: U11) n'a pas de genre précisé (M ou F), tu DOIS demander à l'utilisateur de préciser.\n"
+        "2. **Équipe 1 vs 2** : Si un club a plusieurs équipes dans la même catégorie, tu DOIS demander au user quelle équipe cibler (1 ou 2) avant de répondre.\n"
+        "3. **Phases multiples** : Fais très attention à ne pas mélanger l'équipe 1 et l'équipe 2 lors de suivis sur plusieurs phases. Croise le nom des adversaires pour être sûr de suivre la bonne équipe (les niveaux/poules restent cohérents généralement).\n\n"
         "## Workflow recommandé\n\n"
         "1. Point d'entrée général → `ffbb_multi_search` (cherche dans tous les types à la fois)\n"
         "2. Ciblé par type → `ffbb_search_competitions`, `ffbb_search_organismes`, "
@@ -170,11 +179,12 @@ def bilan_equipe(club_name: str, categorie: str) -> str:
     return (
         f"Je veux le bilan complet de l'équipe '{categorie}' du club '{club_name}' "
         "sur la saison actuelle (toutes phases confondues).\n"
-        f"1. Utilise `ffbb_search_organismes` avec « {club_name} » pour trouver l'ID\n"
-        f"2. Utilise `ffbb_equipes_club` pour lister les engagements du club\n"
-        f"3. Filtre les engagements contenant « {categorie} » dans la compétition\n"
-        "4. Pour CHAQUE poule_id trouvé (Phase 1, Phase 2, Phase 3...), "
-        "appelle `ffbb_get_classement` et trouve la ligne de l'équipe\n"
-        "5. Cumule les matchs joués, victoires, défaites sur toutes les phases\n"
-        "6. Présente un tableau par phase + un total cumulé de la saison."
+        f"1. Si l'équipe demandée est ambiguë (ex: manque le genre M/F ou le numéro d'équipe 1/2), DEMANDE une précision au user.\n"
+        f"2. Utilise `ffbb_search_organismes` avec « {club_name} » pour trouver l'ID\n"
+        f"3. Utilise `ffbb_equipes_club` pour lister les engagements du club\n"
+        f"4. Filtre les engagements contenant « {categorie} » dans la compétition\n"
+        "5. Pour CHAQUE poule_id trouvé (Phase 1, Phase 2, Phase 3...), "
+        "appelle `ffbb_get_classement` et trouve la ligne de LA BONNE équipe (croise les adversaires pour être sûr de ne pas sauter d'Équipe 1 à Équipe 2).\n"
+        "6. Cumule les matchs joués, victoires, défaites sur toutes les phases\n"
+        "7. Présente un tableau par phase + un total cumulé de la saison."
     )
