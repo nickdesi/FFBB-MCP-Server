@@ -37,6 +37,7 @@ async def test_server_tools_importable():
         "ffbb_search_tournois",
         "ffbb_multi_search",
         "ffbb_calendrier_club",
+        "ffbb_version",
     ]
 
     for expected_name in expected:

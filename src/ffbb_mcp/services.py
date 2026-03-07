@@ -2,6 +2,7 @@ import logging
 import traceback
 from typing import Any, TypeVar
 
+from cachetools import TTLCache
 from ffbb_api_client_v3.helpers.multi_search_query_helper import generate_queries
 from mcp.shared.exceptions import McpError
 from mcp.types import INTERNAL_ERROR, ErrorData
@@ -13,6 +14,29 @@ logger = logging.getLogger("ffbb-mcp")
 
 T = TypeVar("T")
 
+# ---------------------------------------------------------------------------
+# Cache service-level (en mémoire, complémentaire au cache SQLite HTTP)
+# ---------------------------------------------------------------------------
+
+_cache_lives = TTLCache(maxsize=1, ttl=30)  # 30 s — scores changent chaque possession
+_cache_search = TTLCache(maxsize=256, ttl=120)  # 2 min — résultats de recherche
+_cache_detail = TTLCache(maxsize=128, ttl=300)  # 5 min — détails compétitions/clubs
+
+
+def _cache_get(cache: TTLCache, key: str) -> Any | None:
+    """Lecture thread-safe du cache."""
+    return cache.get(key)
+
+
+def _cache_set(cache: TTLCache, key: str, value: Any) -> None:
+    """Écriture thread-safe dans le cache."""
+    cache[key] = value
+
+
+# ---------------------------------------------------------------------------
+# Gestion d'erreurs
+# ---------------------------------------------------------------------------
+
 
 def _handle_api_error(e: Exception) -> McpError:
     """Formatage cohérent des erreurs API pour tous les outils."""
@@ -23,10 +47,20 @@ def _handle_api_error(e: Exception) -> McpError:
     logger.error(f"FFBB API Error: {error_msg}")
     logger.error(traceback.format_exc())
 
+    # Distinguer les timeouts des autres erreurs
+    error_type = type(e).__name__
+    if "timeout" in error_type.lower() or "timeout" in error_msg.lower():
+        return McpError(
+            error=ErrorData(
+                code=INTERNAL_ERROR,
+                message=f"Timeout API FFBB. L'API officielle est temporairement lente. Réessayez dans quelques secondes.",
+            )
+        )
+
     return McpError(
         error=ErrorData(
             code=INTERNAL_ERROR,
-            message=f"Erreur API FFBB: {error_msg}",
+            message=f"Erreur API FFBB ({error_type}): {error_msg}",
         )
     )
 
@@ -48,47 +82,78 @@ async def _safe_call(operation_name: str, coro) -> Any:
 
 
 async def get_lives_service() -> list[dict]:
+    cached = _cache_get(_cache_lives, "lives")
+    if cached is not None:
+        logger.debug("Cache hit: lives")
+        return cached
+
     client = await get_client_async()
     lives = await _safe_call("Lives (Matchs en cours)", client.get_lives_async())
-    if not lives:
-        return []
-    return [serialize_model(live) for live in lives]
+    result = [serialize_model(live) for live in lives] if lives else []
+    _cache_set(_cache_lives, "lives", result)
+    return result
 
 
 async def get_saisons_service(active_only: bool = False) -> list[dict]:
+    cache_key = f"saisons:{active_only}"
+    cached = _cache_get(_cache_detail, cache_key)
+    if cached is not None:
+        return cached
+
     client = await get_client_async()
     saisons = await _safe_call(
         "Saisons", client.get_saisons_async(active_only=active_only)
     )
-    if not saisons:
-        return []
-    return [serialize_model(s) for s in saisons]
+    result = [serialize_model(s) for s in saisons] if saisons else []
+    _cache_set(_cache_detail, cache_key, result)
+    return result
 
 
 async def get_competition_service(competition_id: int | str) -> dict:
+    cache_key = f"competition:{competition_id}"
+    cached = _cache_get(_cache_detail, cache_key)
+    if cached is not None:
+        return cached
+
     client = await get_client_async()
     comp = await _safe_call(
         f"Compétition {competition_id}",
         client.get_competition_async(competition_id=int(competition_id)),
     )
-    return serialize_model(comp) or {}
+    result = serialize_model(comp) or {}
+    _cache_set(_cache_detail, cache_key, result)
+    return result
 
 
 async def get_poule_service(poule_id: int | str) -> dict:
+    cache_key = f"poule:{poule_id}"
+    cached = _cache_get(_cache_detail, cache_key)
+    if cached is not None:
+        return cached
+
     client = await get_client_async()
     poule = await _safe_call(
         f"Poule {poule_id}", client.get_poule_async(poule_id=int(poule_id))
     )
-    return serialize_model(poule) or {}
+    result = serialize_model(poule) or {}
+    _cache_set(_cache_detail, cache_key, result)
+    return result
 
 
 async def get_organisme_service(organisme_id: int | str) -> dict:
+    cache_key = f"organisme:{organisme_id}"
+    cached = _cache_get(_cache_detail, cache_key)
+    if cached is not None:
+        return cached
+
     client = await get_client_async()
     org = await _safe_call(
         f"Organisme {organisme_id}",
         client.get_organisme_async(organisme_id=int(organisme_id)),
     )
-    return serialize_model(org) or {}
+    result = serialize_model(org) or {}
+    _cache_set(_cache_detail, cache_key, result)
+    return result
 
 
 async def ffbb_equipes_club_service(
@@ -133,6 +198,11 @@ async def ffbb_equipes_club_service(
 
 
 async def ffbb_get_classement_service(poule_id: int | str) -> list[dict[str, Any]]:
+    cache_key = f"classement:{poule_id}"
+    cached = _cache_get(_cache_detail, cache_key)
+    if cached is not None:
+        return cached
+
     client = await get_client_async()
     poule = await _safe_call(
         f"Classement poule {poule_id}", client.get_poule_async(poule_id=int(poule_id))
@@ -157,53 +227,73 @@ async def ffbb_get_classement_service(poule_id: int | str) -> list[dict[str, Any
                 "difference": c.get("difference"),
             }
         )
+    _cache_set(_cache_detail, cache_key, flat)
     return flat
 
 
-async def _search_generic(operation: str, method_name: str, query: str) -> list[dict]:
+async def _search_generic(
+    operation: str, method_name: str, query: str, limit: int = 20
+) -> list[dict]:
+    cache_key = f"search:{operation}:{query}:{limit}"
+    cached = _cache_get(_cache_search, cache_key)
+    if cached is not None:
+        logger.debug(f"Cache hit: {cache_key}")
+        return cached
+
     client = await get_client_async()
     method = getattr(client, method_name)
     results = await _safe_call(f"Recherche {operation}: {query}", method(query))
     if not results or not results.hits:
+        _cache_set(_cache_search, cache_key, [])
         return []
-    return [serialize_model(hit) for hit in results.hits]
+    result = [serialize_model(hit) for hit in results.hits[:limit]]
+    _cache_set(_cache_search, cache_key, result)
+    return result
 
 
-async def search_competitions_service(nom: str) -> list[dict]:
-    return await _search_generic("competitions", "search_competitions_async", nom)
+async def search_competitions_service(nom: str, limit: int = 20) -> list[dict]:
+    return await _search_generic("competitions", "search_competitions_async", nom, limit)
 
 
-async def search_organismes_service(nom: str) -> list[dict]:
-    return await _search_generic("organismes", "search_organismes_async", nom)
+async def search_organismes_service(nom: str, limit: int = 20) -> list[dict]:
+    return await _search_generic("organismes", "search_organismes_async", nom, limit)
 
 
-async def search_salles_service(nom: str) -> list[dict]:
-    return await _search_generic("salles", "search_salles_async", nom)
+async def search_salles_service(nom: str, limit: int = 20) -> list[dict]:
+    return await _search_generic("salles", "search_salles_async", nom, limit)
 
 
-async def search_rencontres_service(nom: str) -> list[dict]:
-    return await _search_generic("rencontres", "search_rencontres_async", nom)
+async def search_rencontres_service(nom: str, limit: int = 20) -> list[dict]:
+    return await _search_generic("rencontres", "search_rencontres_async", nom, limit)
 
 
-async def search_pratiques_service(nom: str) -> list[dict]:
-    return await _search_generic("pratiques", "search_pratiques_async", nom)
+async def search_pratiques_service(nom: str, limit: int = 20) -> list[dict]:
+    return await _search_generic("pratiques", "search_pratiques_async", nom, limit)
 
 
-async def search_terrains_service(nom: str) -> list[dict]:
-    return await _search_generic("terrains", "search_terrains_async", nom)
+async def search_terrains_service(nom: str, limit: int = 20) -> list[dict]:
+    return await _search_generic("terrains", "search_terrains_async", nom, limit)
 
 
-async def search_tournois_service(nom: str) -> list[dict]:
-    return await _search_generic("tournois", "search_tournois_async", nom)
+async def search_tournois_service(nom: str, limit: int = 20) -> list[dict]:
+    return await _search_generic("tournois", "search_tournois_async", nom, limit)
 
 
-async def multi_search_service(nom: str) -> list[dict[str, Any]]:
+async def multi_search_service(
+    nom: str, limit: int = 20
+) -> list[dict[str, Any]]:
+    cache_key = f"multi:{nom}:{limit}"
+    cached = _cache_get(_cache_search, cache_key)
+    if cached is not None:
+        return cached
+
     client = await get_client_async()
     queries = generate_queries(nom)
     results = await _safe_call(
         f"Recherche multi-types: {nom}", client.multi_search_async(queries=queries)
     )
     if not results or not results.results:
+        _cache_set(_cache_search, cache_key, [])
         return []
 
     output: list[dict[str, Any]] = []
@@ -215,6 +305,8 @@ async def multi_search_service(nom: str) -> list[dict[str, Any]]:
                 # Type helper pour aider l'agent à savoir quel outil utiliser ensuite
                 item["_type"] = category
                 output.append(item)
+    output = output[:limit]
+    _cache_set(_cache_search, cache_key, output)
     return output
 
 

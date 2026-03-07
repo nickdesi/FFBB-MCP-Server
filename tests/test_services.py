@@ -11,7 +11,17 @@ from ffbb_mcp.services import (
     get_competition_service,
     get_organisme_service,
     get_saisons_service,
+    _cache_lives,
+    _cache_search,
+    _cache_detail,
 )
+
+@pytest.fixture(autouse=True)
+def clear_caches():
+    _cache_lives.clear()
+    _cache_search.clear()
+    _cache_detail.clear()
+    yield
 
 # ... (TestHandleApiError and TestGetLivesService remain same)
 
