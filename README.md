@@ -6,6 +6,9 @@
   <b>Le pont entre l'IA et le Basketball français.</b>
   <br />
   <i>Statistiques, calendriers, classements et lives officiels FFBB directement dans vos LLMs.</i>
+  <br />
+  <br />
+  🌐 <b><a href="https://ffbb.desimone.fr">Visiter la Landing Page</a></b>
 </p>
 
 <p align="center">
