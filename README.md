@@ -181,6 +181,11 @@ L'URL officielle recommandée `https://ffbb.desimone.fr/mcp` est une **instance 
 
 - **Fallback local** : Si l'instance distante tombe, repassez sur la commande locale `uvx --from "git+https://github.com/nickdesi/FFBB-MCP-Server.git" ffbb_mcp`.
 - **Self-Hosting (Recommandé)** : Hébergez votre propre instance MCP. Référez-vous à la documentation [docs/COOLIFY_DEPLOYMENT.md](docs/COOLIFY_DEPLOYMENT.md) pour les instructions avec Coolify/Docker.
+  - **Sécurité et Configuration** : Sécurisez votre instance en définissant les variables d'environnement suivantes :
+    - `ALLOWED_HOSTS` : Noms de domaine autorisés (ex: `ffbb.mondomaine.fr`)
+    - `ALLOWED_ORIGINS` : Origines autorisées (ex: `https://ffbb.mondomaine.fr`)
+    - `ENABLE_DNS_PROTECTION` : Mettre à `true` pour activer la protection contre le DNS Rebinding.
+    - `PUBLIC_URL` : URL publique de votre instance MCP (ex: `https://ffbb.mondomaine.fr/mcp`).
 
 ---
 

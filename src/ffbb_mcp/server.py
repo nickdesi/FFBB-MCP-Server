@@ -43,6 +43,10 @@ _READONLY_ANNOTATIONS = {
 # Initialisation FastMCP
 # ---------------------------------------------------------------------------
 
+_allowed_hosts = os.environ.get("ALLOWED_HOSTS", "*").split(",")
+_allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
+_dns_protection = os.environ.get("ENABLE_DNS_PROTECTION", "false").lower() == "true"
+
 mcp = FastMCP(
     "FFBB MCP Server",
     instructions=(
@@ -67,9 +71,9 @@ mcp = FastMCP(
     ),
     dependencies=["mcp", "ffbb-api-client-v3"],
     transport_security=TransportSecuritySettings(
-        enable_dns_rebinding_protection=False,
-        allowed_hosts=["*"],
-        allowed_origins=["*"],
+        enable_dns_rebinding_protection=_dns_protection,
+        allowed_hosts=_allowed_hosts,
+        allowed_origins=_allowed_origins,
     ),
 )
 
@@ -101,7 +105,7 @@ async def ffbb_version() -> dict[str, str]:
     return {
         "version": __version__,
         "server": "FFBB MCP Server",
-        "remote_url": "https://ffbb.desimone.fr/mcp",
+        "remote_url": os.environ.get("PUBLIC_URL", "https://ffbb.desimone.fr/mcp"),
         "cache_ttls": {
             "lives": "30s",
             "searches": "2min",
@@ -126,7 +130,11 @@ async def ffbb_get_lives() -> list[dict[str, Any]]:
     Returns:
         list[dict]: Liste de matchs en direct.
     """
-    return await get_lives_service()
+    try:
+        return await get_lives_service()
+    except Exception as e:
+        logger.error(f"ffbb_get_lives failed: {e}")
+        return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
 # ---------------------------------------------------------------------------
@@ -144,7 +152,11 @@ async def ffbb_get_saisons(active_only: bool = False) -> list[dict[str, Any]]:
     Args:
         active_only: Si True, ne retourne que la saison active.
     """
-    return await get_saisons_service(active_only=active_only)
+    try:
+        return await get_saisons_service(active_only=active_only)
+    except Exception as e:
+        logger.error(f"ffbb_get_saisons failed: {e}")
+        return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
 # ---------------------------------------------------------------------------
@@ -170,7 +182,11 @@ async def ffbb_get_competition(
     Args:
         competition_id: ID numérique de la compétition (ex: 200000).
     """
-    return await get_competition_service(competition_id=competition_id)
+    try:
+        return await get_competition_service(competition_id=competition_id)
+    except Exception as e:
+        logger.error(f"ffbb_get_competition failed: {e}")
+        return {"error": "Service FFBB indisponible", "detail": str(e)}
 
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
@@ -190,7 +206,11 @@ async def ffbb_get_poule(
     Args:
         poule_id: ID numérique de la poule (ex: 200000003030720).
     """
-    return await get_poule_service(poule_id=poule_id)
+    try:
+        return await get_poule_service(poule_id=poule_id)
+    except Exception as e:
+        logger.error(f"ffbb_get_poule failed: {e}")
+        return {"error": "Service FFBB indisponible", "detail": str(e)}
 
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
@@ -210,7 +230,11 @@ async def ffbb_get_organisme(
     Args:
         organisme_id: ID numérique du club/organisme (ex: 4630).
     """
-    return await get_organisme_service(organisme_id=organisme_id)
+    try:
+        return await get_organisme_service(organisme_id=organisme_id)
+    except Exception as e:
+        logger.error(f"ffbb_get_organisme failed: {e}")
+        return {"error": "Service FFBB indisponible", "detail": str(e)}
 
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
@@ -230,7 +254,11 @@ async def ffbb_equipes_club(
         organisme_id: ID du club (obtenu via `ffbb_search_organismes`).
         filtre: Filtre optionnel sur le nom de compétition (ex: "U11", "Senior").
     """
-    return await ffbb_equipes_club_service(organisme_id=organisme_id, filtre=filtre)
+    try:
+        return await ffbb_equipes_club_service(organisme_id=organisme_id, filtre=filtre)
+    except Exception as e:
+        logger.error(f"ffbb_equipes_club failed: {e}")
+        return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
@@ -248,7 +276,11 @@ async def ffbb_get_classement(
     Args:
         poule_id: ID numérique de la poule (ex: 200000003030720).
     """
-    return await ffbb_get_classement_service(poule_id=poule_id)
+    try:
+        return await ffbb_get_classement_service(poule_id=poule_id)
+    except Exception as e:
+        logger.error(f"ffbb_get_classement failed: {e}")
+        return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
 # ---------------------------------------------------------------------------
@@ -259,7 +291,7 @@ async def ffbb_get_classement(
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def ffbb_search_competitions(
     nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))],
-    limit: int = 20,
+    limit: Annotated[int, Field(default=20, ge=1, le=100)] = 20,
 ) -> list[dict[str, Any]]:
     """Recherche des compétitions FFBB par nom.
 
@@ -272,13 +304,17 @@ async def ffbb_search_competitions(
         nom: Texte de recherche (ex: "Nationale 1", "U13F Auvergne").
         limit: Nombre max de résultats (défaut: 20).
     """
-    return await search_competitions_service(nom=nom, limit=limit)
+    try:
+        return await search_competitions_service(nom=nom, limit=limit)
+    except Exception as e:
+        logger.error(f"ffbb_search_competitions failed: {e}")
+        return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def ffbb_search_organismes(
     nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))],
-    limit: int = 20,
+    limit: Annotated[int, Field(default=20, ge=1, le=100)] = 20,
 ) -> list[dict[str, Any]]:
     """Recherche des clubs/organismes FFBB par nom.
 
@@ -291,13 +327,17 @@ async def ffbb_search_organismes(
         nom: Texte de recherche (nom du club ou de la ville).
         limit: Nombre max de résultats (défaut: 20).
     """
-    return await search_organismes_service(nom=nom, limit=limit)
+    try:
+        return await search_organismes_service(nom=nom, limit=limit)
+    except Exception as e:
+        logger.error(f"ffbb_search_organismes failed: {e}")
+        return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def ffbb_search_salles(
     nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))],
-    limit: int = 20,
+    limit: Annotated[int, Field(default=20, ge=1, le=100)] = 20,
 ) -> list[dict[str, Any]]:
     """Recherche des salles de basket par nom/ville.
 
@@ -308,13 +348,17 @@ async def ffbb_search_salles(
         nom: Texte de recherche (nom de la salle ou ville).
         limit: Nombre max de résultats (défaut: 20).
     """
-    return await search_salles_service(nom=nom, limit=limit)
+    try:
+        return await search_salles_service(nom=nom, limit=limit)
+    except Exception as e:
+        logger.error(f"ffbb_search_salles failed: {e}")
+        return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def ffbb_search_rencontres(
     nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))],
-    limit: int = 20,
+    limit: Annotated[int, Field(default=20, ge=1, le=100)] = 20,
 ) -> list[dict[str, Any]]:
     """Recherche des rencontres (matchs) FFBB.
 
@@ -327,13 +371,17 @@ async def ffbb_search_rencontres(
         nom: Texte de recherche (nom d'équipe ou compétition).
         limit: Nombre max de résultats (défaut: 20).
     """
-    return await search_rencontres_service(nom=nom, limit=limit)
+    try:
+        return await search_rencontres_service(nom=nom, limit=limit)
+    except Exception as e:
+        logger.error(f"ffbb_search_rencontres failed: {e}")
+        return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def ffbb_search_pratiques(
     nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))],
-    limit: int = 20,
+    limit: Annotated[int, Field(default=20, ge=1, le=100)] = 20,
 ) -> list[dict[str, Any]]:
     """Recherche des pratiques de basketball.
 
@@ -344,13 +392,17 @@ async def ffbb_search_pratiques(
         nom: Texte de recherche (type de pratique).
         limit: Nombre max de résultats (défaut: 20).
     """
-    return await search_pratiques_service(nom=nom, limit=limit)
+    try:
+        return await search_pratiques_service(nom=nom, limit=limit)
+    except Exception as e:
+        logger.error(f"ffbb_search_pratiques failed: {e}")
+        return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def ffbb_search_terrains(
     nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))],
-    limit: int = 20,
+    limit: Annotated[int, Field(default=20, ge=1, le=100)] = 20,
 ) -> list[dict[str, Any]]:
     """Recherche des terrains de basketball.
 
@@ -361,13 +413,17 @@ async def ffbb_search_terrains(
         nom: Texte de recherche (ville ou nom du terrain).
         limit: Nombre max de résultats (défaut: 20).
     """
-    return await search_terrains_service(nom=nom, limit=limit)
+    try:
+        return await search_terrains_service(nom=nom, limit=limit)
+    except Exception as e:
+        logger.error(f"ffbb_search_terrains failed: {e}")
+        return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def ffbb_search_tournois(
     nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))],
-    limit: int = 20,
+    limit: Annotated[int, Field(default=20, ge=1, le=100)] = 20,
 ) -> list[dict[str, Any]]:
     """Recherche des tournois de basketball.
 
@@ -378,13 +434,17 @@ async def ffbb_search_tournois(
         nom: Texte de recherche (nom du tournoi, catégorie, ville).
         limit: Nombre max de résultats (défaut: 20).
     """
-    return await search_tournois_service(nom=nom, limit=limit)
+    try:
+        return await search_tournois_service(nom=nom, limit=limit)
+    except Exception as e:
+        logger.error(f"ffbb_search_tournois failed: {e}")
+        return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def ffbb_multi_search(
     nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))],
-    limit: int = 20,
+    limit: Annotated[int, Field(default=20, ge=1, le=100)] = 20,
 ) -> list[dict[str, Any]]:
     """Recherche globale FFBB sur tous les types simultanément.
 
@@ -399,7 +459,11 @@ async def ffbb_multi_search(
         nom: Texte de recherche libre (ex: "Vichy", "U11 Auvergne").
         limit: Nombre max de résultats au total (défaut: 20).
     """
-    return await multi_search_service(nom=nom, limit=limit)
+    try:
+        return await multi_search_service(nom=nom, limit=limit)
+    except Exception as e:
+        logger.error(f"ffbb_multi_search failed: {e}")
+        return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
 # ---------------------------------------------------------------------------
@@ -431,9 +495,16 @@ async def ffbb_calendrier_club(
         organisme_id: ID du club (alternative au nom).
         categorie: Filtre catégorie optionnel (ex: "U11", "Senior").
     """
-    return await get_calendrier_club_service(
-        club_name=club_name, organisme_id=organisme_id, categorie=categorie
-    )
+    if not club_name and not organisme_id:
+        return [{"error": "Paramètre manquant : fournir soit club_name soit organisme_id"}]
+    
+    try:
+        return await get_calendrier_club_service(
+            club_name=club_name, organisme_id=organisme_id, categorie=categorie
+        )
+    except Exception as e:
+        logger.error(f"ffbb_calendrier_club failed: {e}")
+        return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
 # ---------------------------------------------------------------------------
@@ -450,6 +521,10 @@ register_resources(mcp)
 
 def main() -> None:
     """Lance le serveur MCP FFBB."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
     mode = os.environ.get("MCP_MODE", "stdio").lower()
 
     if mode == "sse":

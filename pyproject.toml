@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 license = { text = "MIT" }
 dependencies = [
     "mcp[cli]>=1.0.0",
-    "ffbb-api-client-v3 @ git+https://github.com/nickdesi/FFBBApiClientV3.git",
+    "ffbb-api-client-v3 @ git+https://github.com/nickdesi/FFBBApiClientV3.git@master", # TODO: mettre à jour ce tag à chaque release de FFBBApiClientV3
     "anysqlite>=0.0.5",
     "uvicorn",
     "starlette",
