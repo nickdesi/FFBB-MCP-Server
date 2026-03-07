@@ -439,6 +439,7 @@ def main() -> None:
     if mode == "sse":
         import uvicorn
         from fastapi import FastAPI
+        from fastapi.responses import JSONResponse
 
         host = os.environ.get("HOST", "0.0.0.0")
         port = int(os.environ.get("PORT", "9123"))
@@ -447,6 +448,11 @@ def main() -> None:
         # Comme demandé, cela permet d'avoir l'URL : https://ffbb.desimone.fr/mcp
         mcp_app = mcp.streamable_http_app()
         app = FastAPI()
+
+        @app.get("/health")
+        async def health():
+            return JSONResponse({"status": "ok", "service": "ffbb-mcp"})
+
         app.mount("/mcp", mcp_app)
 
         logger.info(
