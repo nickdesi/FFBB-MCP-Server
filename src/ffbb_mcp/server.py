@@ -6,7 +6,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import AliasChoices, Field
 from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
+from starlette.responses import HTMLResponse, JSONResponse, Response
 
 from .prompts import register_prompts
 from .resources import register_resources
@@ -84,12 +84,51 @@ async def health(request: Request) -> Response:
     return JSONResponse({"status": "ok", "service": "ffbb-mcp"})
 
 
+@mcp.custom_route("/", methods=["GET"])
+async def index(request: Request) -> Response:
+    """Landing Page de l'API FFBB."""
+    html_content = """
+    <!DOCTYPE html>
+    <html lang="fr" class="bg-gray-900 text-white">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>FFBB MCP Server</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="flex flex-col items-center justify-center min-h-screen p-4 text-center">
+        <img src="https://raw.githubusercontent.com/nickdesi/FFBB-MCP-Server/main/assets/logo.png" alt="FFBB Logo" class="max-w-xs mb-8 rounded-xl shadow-2xl hover:scale-105 transition-transform duration-300">
+        <h1 class="text-4xl md:text-6xl font-extrabold mb-4 bg-gradient-to-r from-orange-400 to-red-500 text-transparent bg-clip-text">FFBB MCP Server</h1>
+        <p class="text-xl text-gray-300 max-w-2xl mb-8">
+            Le pont officiel entre l'Intelligence Artificielle et le Basketball français.<br/>
+            Connectez vos LLMs aux données en temps réel de la fédération.
+        </p>
+        
+        <div class="flex gap-4">
+            <a href="https://github.com/nickdesi/FFBB-MCP-Server" target="_blank" class="px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-white font-semibold flex items-center gap-2 transition-colors">
+                <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.699-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.464-1.11-1.464-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.379.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.161 22 16.416 22 12c0-5.523-4.477-10-10-10z"></path></svg>
+                GitHub
+            </a>
+            <a href="https://smithery.ai/servers/nickdesi/mcpffbb" target="_blank" class="px-6 py-3 bg-[#e2693e] hover:bg-[#c95d37] rounded-lg text-white font-semibold transition-colors">
+                Available on Smithery
+            </a>
+        </div>
+        
+        <div class="mt-12 text-gray-500 text-sm">
+            Statut du serveur: <span class="text-green-400">En ligne (SSE connecté)</span> &bull; Version 1.26.0
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content, status_code=200)
+
+
 # ---------------------------------------------------------------------------
 # Outils MCP — Méta
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="version", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_version() -> dict[str, str]:
     """Version et informations du serveur MCP FFBB.
 
@@ -119,7 +158,7 @@ async def ffbb_version() -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="get_lives", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_get_lives() -> list[dict[str, Any]]:
     """Matchs en cours (scores live).
 
@@ -142,8 +181,15 @@ async def ffbb_get_lives() -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def ffbb_get_saisons(active_only: bool = False) -> list[dict[str, Any]]:
+@mcp.tool(name="get_saisons", annotations=_READONLY_ANNOTATIONS)
+async def ffbb_get_saisons(
+    active_only: Annotated[
+        bool,
+        Field(
+            description="Si True, ne retourne que la saison active (ex: '2025-2026')."
+        ),
+    ] = False,
+) -> list[dict[str, Any]]:
     """Liste des saisons FFBB (filtre actif possible).
 
     Retourne la liste des saisons sportives FFBB. Utilise `active_only=True`
@@ -164,10 +210,14 @@ async def ffbb_get_saisons(active_only: bool = False) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="get_competition", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_get_competition(
     competition_id: Annotated[
-        int | str, Field(validation_alias=AliasChoices("competition_id", "id"))
+        int | str,
+        Field(
+            validation_alias=AliasChoices("competition_id", "id"),
+            description="ID numérique de la compétition (ex: 200000).",
+        ),
     ],
 ) -> dict[str, Any]:
     """Détails d'une compétition par ID.
@@ -189,10 +239,14 @@ async def ffbb_get_competition(
         return {"error": "Service FFBB indisponible", "detail": str(e)}
 
 
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="get_poule", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_get_poule(
     poule_id: Annotated[
-        int | str, Field(validation_alias=AliasChoices("poule_id", "id"))
+        int | str,
+        Field(
+            validation_alias=AliasChoices("poule_id", "id"),
+            description="ID numérique de la poule (ex: 200000003030720).",
+        ),
     ],
 ) -> dict[str, Any]:
     """Détails d'une poule/groupe par ID (classement, matchs).
@@ -213,10 +267,14 @@ async def ffbb_get_poule(
         return {"error": "Service FFBB indisponible", "detail": str(e)}
 
 
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="get_organisme", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_get_organisme(
     organisme_id: Annotated[
-        int | str, Field(validation_alias=AliasChoices("organisme_id", "id", "club_id"))
+        int | str,
+        Field(
+            validation_alias=AliasChoices("organisme_id", "id", "club_id"),
+            description="ID numérique du club/organisme (ex: 4630 pour le Stade Clermontois).",
+        ),
     ],
 ) -> dict[str, Any]:
     """Informations détaillées d'un club/organisme (adresse, équipes...).
@@ -237,12 +295,21 @@ async def ffbb_get_organisme(
         return {"error": "Service FFBB indisponible", "detail": str(e)}
 
 
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="get_equipes_club", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_equipes_club(
     organisme_id: Annotated[
-        int | str, Field(validation_alias=AliasChoices("organisme_id", "id", "club_id"))
+        int | str,
+        Field(
+            validation_alias=AliasChoices("organisme_id", "id", "club_id"),
+            description="ID du club (obtenu via 'search_organismes' ou autre).",
+        ),
     ],
-    filtre: str | None = None,
+    filtre: Annotated[
+        str | None,
+        Field(
+            description="Filtre optionnel sur le nom de compétition (ex: 'U11', 'Senior')."
+        ),
+    ] = None,
 ) -> list[dict[str, Any]]:
     """Récupère uniquement la liste des équipes engagées par un club/organisme.
 
@@ -261,10 +328,14 @@ async def ffbb_equipes_club(
         return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="get_classement", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_get_classement(
     poule_id: Annotated[
-        int | str, Field(validation_alias=AliasChoices("poule_id", "id"))
+        int | str,
+        Field(
+            validation_alias=AliasChoices("poule_id", "id"),
+            description="ID numérique de la poule (ex: 200000003030720).",
+        ),
     ],
 ) -> list[dict[str, Any]]:
     """Récupère uniquement le classement d'une poule/groupe (sans les matchs).
@@ -288,10 +359,24 @@ async def ffbb_get_classement(
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="search_competitions", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_search_competitions(
-    nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))],
-    limit: Annotated[int, Field(default=20, ge=1, le=100)] = 20,
+    nom: Annotated[
+        str,
+        Field(
+            validation_alias=AliasChoices("nom", "query"),
+            description="Texte de recherche (ex: 'Nationale 1', 'U13F Auvergne').",
+        ),
+    ],
+    limit: Annotated[
+        int,
+        Field(
+            default=20,
+            ge=1,
+            le=100,
+            description="Nombre max de résultats (défaut: 20, max: 100).",
+        ),
+    ] = 20,
 ) -> list[dict[str, Any]]:
     """Recherche des compétitions FFBB par nom.
 
@@ -311,10 +396,18 @@ async def ffbb_search_competitions(
         return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="search_organismes", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_search_organismes(
-    nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))],
-    limit: Annotated[int, Field(default=20, ge=1, le=100)] = 20,
+    nom: Annotated[
+        str,
+        Field(
+            validation_alias=AliasChoices("nom", "query"),
+            description="Nom du club ou de la ville (ex: 'Vichy').",
+        ),
+    ],
+    limit: Annotated[
+        int, Field(default=20, ge=1, le=100, description="Nombre max de résultats.")
+    ] = 20,
 ) -> list[dict[str, Any]]:
     """Recherche des clubs/organismes FFBB par nom.
 
@@ -334,10 +427,18 @@ async def ffbb_search_organismes(
         return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="search_salles", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_search_salles(
-    nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))],
-    limit: Annotated[int, Field(default=20, ge=1, le=100)] = 20,
+    nom: Annotated[
+        str,
+        Field(
+            validation_alias=AliasChoices("nom", "query"),
+            description="Nom de la salle ou ville.",
+        ),
+    ],
+    limit: Annotated[
+        int, Field(default=20, ge=1, le=100, description="Nombre max de résultats.")
+    ] = 20,
 ) -> list[dict[str, Any]]:
     """Recherche des salles de basket par nom/ville.
 
@@ -355,10 +456,18 @@ async def ffbb_search_salles(
         return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="search_rencontres", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_search_rencontres(
-    nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))],
-    limit: Annotated[int, Field(default=20, ge=1, le=100)] = 20,
+    nom: Annotated[
+        str,
+        Field(
+            validation_alias=AliasChoices("nom", "query"),
+            description="Nom d'équipe ou compétition.",
+        ),
+    ],
+    limit: Annotated[
+        int, Field(default=20, ge=1, le=100, description="Nombre max de résultats.")
+    ] = 20,
 ) -> list[dict[str, Any]]:
     """Recherche des rencontres (matchs) FFBB.
 
@@ -378,10 +487,18 @@ async def ffbb_search_rencontres(
         return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="search_pratiques", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_search_pratiques(
-    nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))],
-    limit: Annotated[int, Field(default=20, ge=1, le=100)] = 20,
+    nom: Annotated[
+        str,
+        Field(
+            validation_alias=AliasChoices("nom", "query"),
+            description="Type de pratique ('3x3', etc).",
+        ),
+    ],
+    limit: Annotated[
+        int, Field(default=20, ge=1, le=100, description="Nombre max de résultats.")
+    ] = 20,
 ) -> list[dict[str, Any]]:
     """Recherche des pratiques de basketball.
 
@@ -399,10 +516,18 @@ async def ffbb_search_pratiques(
         return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="search_terrains", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_search_terrains(
-    nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))],
-    limit: Annotated[int, Field(default=20, ge=1, le=100)] = 20,
+    nom: Annotated[
+        str,
+        Field(
+            validation_alias=AliasChoices("nom", "query"),
+            description="Ville ou nom du playground.",
+        ),
+    ],
+    limit: Annotated[
+        int, Field(default=20, ge=1, le=100, description="Nombre max de résultats.")
+    ] = 20,
 ) -> list[dict[str, Any]]:
     """Recherche des terrains de basketball.
 
@@ -420,10 +545,18 @@ async def ffbb_search_terrains(
         return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="search_tournois", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_search_tournois(
-    nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))],
-    limit: Annotated[int, Field(default=20, ge=1, le=100)] = 20,
+    nom: Annotated[
+        str,
+        Field(
+            validation_alias=AliasChoices("nom", "query"),
+            description="Nom du tournoi ou localisation.",
+        ),
+    ],
+    limit: Annotated[
+        int, Field(default=20, ge=1, le=100, description="Nombre max de résultats.")
+    ] = 20,
 ) -> list[dict[str, Any]]:
     """Recherche des tournois de basketball.
 
@@ -441,10 +574,24 @@ async def ffbb_search_tournois(
         return [{"error": "Service FFBB indisponible", "detail": str(e)}]
 
 
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="search_multi", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_multi_search(
-    nom: Annotated[str, Field(validation_alias=AliasChoices("nom", "query"))],
-    limit: Annotated[int, Field(default=20, ge=1, le=100)] = 20,
+    nom: Annotated[
+        str,
+        Field(
+            validation_alias=AliasChoices("nom", "query"),
+            description="Texte de recherche libre (ex: 'Vichy', 'Stade Clermontois').",
+        ),
+    ],
+    limit: Annotated[
+        int,
+        Field(
+            default=20,
+            ge=1,
+            le=100,
+            description="Nombre max de résultats au total (défaut: 20).",
+        ),
+    ] = 20,
 ) -> list[dict[str, Any]]:
     """Recherche globale FFBB sur tous les types simultanément.
 
@@ -471,16 +618,26 @@ async def ffbb_multi_search(
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="get_calendrier_club", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_calendrier_club(
     club_name: Annotated[
-        str | None, Field(validation_alias=AliasChoices("club_name", "nom"))
+        str | None,
+        Field(
+            validation_alias=AliasChoices("club_name", "nom"),
+            description="Nom du club (ex: 'Stade Clermontois').",
+        ),
     ] = None,
     organisme_id: Annotated[
         int | str | None,
-        Field(validation_alias=AliasChoices("organisme_id", "club_id", "id")),
+        Field(
+            validation_alias=AliasChoices("organisme_id", "club_id", "id"),
+            description="ID du club (alternative au nom).",
+        ),
     ] = None,
-    categorie: str | None = None,
+    categorie: Annotated[
+        str | None,
+        Field(description="Filtre catégorie optionnel (ex: 'U11', 'Senior')."),
+    ] = None,
 ) -> list[dict[str, Any]]:
     """Récupère le calendrier (prochains matchs) d'un club.
 

@@ -20,6 +20,10 @@ dependencies = [
     "cachetools>=5.3.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/nickdesi/FFBB-MCP-Server"
+Repository = "https://github.com/nickdesi/FFBB-MCP-Server"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
