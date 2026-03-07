@@ -93,6 +93,7 @@ async def index(request: Request) -> Response:
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="google-site-verification" content="TuCtfpsMfaMi13jU8fbz5LFA1vxzqeLZMHc74ulWRig" />
         <title>FFBB MCP Server</title>
         <script src="https://cdn.tailwindcss.com"></script>
     </head>
