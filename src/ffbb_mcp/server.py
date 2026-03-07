@@ -496,8 +496,10 @@ async def ffbb_calendrier_club(
         categorie: Filtre catégorie optionnel (ex: "U11", "Senior").
     """
     if not club_name and not organisme_id:
-        return [{"error": "Paramètre manquant : fournir soit club_name soit organisme_id"}]
-    
+        return [
+            {"error": "Paramètre manquant : fournir soit club_name soit organisme_id"}
+        ]
+
     try:
         return await get_calendrier_club_service(
             club_name=club_name, organisme_id=organisme_id, categorie=categorie

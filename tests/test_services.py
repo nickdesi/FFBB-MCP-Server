@@ -5,16 +5,17 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ffbb_mcp.services import (
+    _cache_detail,
+    _cache_lives,
+    _cache_search,
     ffbb_equipes_club_service,
     ffbb_get_classement_service,
     get_calendrier_club_service,
     get_competition_service,
     get_organisme_service,
     get_saisons_service,
-    _cache_lives,
-    _cache_search,
-    _cache_detail,
 )
+
 
 @pytest.fixture(autouse=True)
 def clear_caches():
@@ -22,6 +23,7 @@ def clear_caches():
     _cache_search.clear()
     _cache_detail.clear()
     yield
+
 
 # ... (TestHandleApiError and TestGetLivesService remain same)
 

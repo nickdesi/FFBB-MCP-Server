@@ -53,7 +53,7 @@ def _handle_api_error(e: Exception) -> McpError:
         return McpError(
             error=ErrorData(
                 code=INTERNAL_ERROR,
-                message=f"Timeout API FFBB. L'API officielle est temporairement lente. Réessayez dans quelques secondes.",
+                message="Timeout API FFBB. L'API officielle est temporairement lente. Réessayez dans quelques secondes.",
             )
         )
 
@@ -252,7 +252,9 @@ async def _search_generic(
 
 
 async def search_competitions_service(nom: str, limit: int = 20) -> list[dict]:
-    return await _search_generic("competitions", "search_competitions_async", nom, limit)
+    return await _search_generic(
+        "competitions", "search_competitions_async", nom, limit
+    )
 
 
 async def search_organismes_service(nom: str, limit: int = 20) -> list[dict]:
@@ -279,9 +281,7 @@ async def search_tournois_service(nom: str, limit: int = 20) -> list[dict]:
     return await _search_generic("tournois", "search_tournois_async", nom, limit)
 
 
-async def multi_search_service(
-    nom: str, limit: int = 20
-) -> list[dict[str, Any]]:
+async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]]:
     cache_key = f"multi:{nom}:{limit}"
     cached = _cache_get(_cache_search, cache_key)
     if cached is not None:
