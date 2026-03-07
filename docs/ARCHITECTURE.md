@@ -42,7 +42,7 @@ sequenceDiagram
 ## 🌐 Déploiement SSE
 
 En mode `SSE`, le serveur utilise `uvicorn` pour lancer une application FastAPI.
-Nous utilisons `mcp.streamable_http_app()` qui permet d'exposer le serveur sur un endpoint unique (ex: `/mcp`) plutôt que de séparer `/sse` et `/messages`.
+Nous utilisons `mcp.streamable_http_app()` qui permet d'exposer le serveur sur un endpoint unique (ex: `/mcp`) plutôt que de séparer `/sse` et `/messages`. Un endpoint de monitoring `/health` est également exposé par l'application FastAPI indépendamment du router MCP.
 
 ### Sécurité
 

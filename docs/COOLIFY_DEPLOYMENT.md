@@ -34,3 +34,11 @@ Pas besoin de configurer de path particulier dans NPM ou Coolify. Le code Python
 
 Ton endpoint final sera :
 👉 **`https://ffbb.desimone.fr/mcp`**
+
+## 5. Healthchecks (Monitoring)
+
+Tu peux maintenant utiliser l'endpoint de vérification d'état pour monitorer le service dans Coolify :
+
+- **Path** : `/health`
+- **Expected Status Code** : `200`
+- L'endpoint retournera : `{"status": "ok", "service": "ffbb-mcp"}`

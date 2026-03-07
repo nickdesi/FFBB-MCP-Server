@@ -157,11 +157,20 @@ Ajoutez un serveur MCP de type `streamable` :
 
 ---
 
+## 🎭 Prompts Prédéfinis
+
+Le serveur expose également un prompt prédéfini (standard MCP) pour initialiser un agent expert sur ces données :
+
+- `expert_basket` : Configure le LLM pour agir en tant qu'assistant expert en basketball français, incluant les workflows de recherche par défaut et les directives pour l'utilisation des outils. Idéal en tant que *System Prompt* pour l'agent.
+
+---
+
 ## 🔧 Troubleshooting (FAQ)
 
 - **Erreur 404 sur /mcp** : Assurez-vous d'utiliser `https` et non `http`.
 - **Délai de réponse** : L'API FFBB peut parfois être lente, augmentez le timeout de votre client si possible.
 - **WebSocket / SSE** : Sur Nginx Proxy Manager, activez impérativement **"Websockets Support"**.
+- **Monitoring** : Si le serveur semble inactif, vous pouvez vérifier son état via l'endpoint de santé : `https://ffbb.desimone.fr/health`.
 
 ---
 
