@@ -69,7 +69,6 @@ def register_prompts(mcp):
             "7. Présente un tableau par phase + un total cumulé de la saison."
         )
 
-    @mcp.prompt()
     def expert_basket() -> str:
         """Active l'assistant expert en basketball français."""
         return (
@@ -78,7 +77,8 @@ def register_prompts(mcp):
             "## 🚨 RÈGLES STRICTES DE DÉSAMBIGUÏSATION\n"
             "1. **Genre** : Si la catégorie (ex: U11) n'a pas de genre précisé (M ou F), tu DOIS demander à l'utilisateur de préciser.\n"
             "2. **Équipe 1 vs 2** : Si un club a plusieurs équipes dans la même catégorie, tu DOIS demander au user quelle équipe cibler (1 ou 2) avant de répondre.\n"
-            "3. **Phases multiples** : Fais très attention à ne pas mélanger l'équipe 1 et l'équipe 2 lors de suivis sur plusieurs phases. Croise le nom des adversaires pour être sûr de suivre la bonne équipe (les niveaux/poules restent cohérents généralement).\n\n"
+            "3. **Phases multiples** : Fais très attention à ne pas mélanger l'équipe 1 et l'équipe 2 lors de suivis sur plusieurs phases. Croise le nom des adversaires pour être sûr de suivre la bonne équipe (les niveaux/poules restent cohérents généralement).\n"
+            "4. **Acronymes et noms alternatifs** : Les utilisateurs utilisent souvent des acronymes (ex: JAV pour Jeanne d'Arc de Vichy, ASVEL pour Villeurbanne, SBCA pour Stade Clermontois). Si une recherche de club ne retourne aucun résultat pertinent via MCP, tu DOIS effectuer une recherche sur le web pour trouver le nom complet/officiel du club, puis demander confirmation à l'utilisateur avant d'utiliser le vrai nom dans tes prochaines recherches.\n\n"
             "## Workflow recommandé\n\n"
             "1. Point d'entrée général → `ffbb_multi_search` (cherche dans tous les types à la fois)\n"
             "2. Ciblé par type → `ffbb_search_competitions`, `ffbb_search_organismes`, "
@@ -99,7 +99,6 @@ def register_prompts(mcp):
             "- Réponds toujours en français."
         )
 
-
 # Fonctions nues exposées pour les tests
 def expert_basket() -> str:
     return (
@@ -108,7 +107,8 @@ def expert_basket() -> str:
         "## 🚨 RÈGLES STRICTES DE DÉSAMBIGUÏSATION\n"
         "1. **Genre** : Si la catégorie (ex: U11) n'a pas de genre précisé (M ou F), tu DOIS demander à l'utilisateur de préciser.\n"
         "2. **Équipe 1 vs 2** : Si un club a plusieurs équipes dans la même catégorie, tu DOIS demander au user quelle équipe cibler (1 ou 2) avant de répondre.\n"
-        "3. **Phases multiples** : Fais très attention à ne pas mélanger l'équipe 1 et l'équipe 2 lors de suivis sur plusieurs phases. Croise le nom des adversaires pour être sûr de suivre la bonne équipe (les niveaux/poules restent cohérents généralement).\n\n"
+        "3. **Phases multiples** : Fais très attention à ne pas mélanger l'équipe 1 et l'équipe 2 lors de suivis sur plusieurs phases. Croise le nom des adversaires pour être sûr de suivre la bonne équipe (les niveaux/poules restent cohérents généralement).\n"
+        "4. **Acronymes et noms alternatifs** : Les utilisateurs utilisent souvent des acronymes (ex: JAV pour Jeanne d'Arc de Vichy, ASVEL pour Villeurbanne, SBCA pour Stade Clermontois). Si une recherche de club ne retourne aucun résultat pertinent via MCP, tu DOIS effectuer une recherche sur le web pour trouver le nom complet/officiel du club, puis demander confirmation à l'utilisateur avant d'utiliser le vrai nom dans tes prochaines recherches.\n\n"
         "## Workflow recommandé\n\n"
         "1. Point d'entrée général → `ffbb_multi_search` (cherche dans tous les types à la fois)\n"
         "2. Ciblé par type → `ffbb_search_competitions`, `ffbb_search_organismes`, "

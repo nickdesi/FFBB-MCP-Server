@@ -8,6 +8,7 @@ from ffbb_api_client_v3.helpers.multi_search_query_helper import generate_querie
 from mcp.shared.exceptions import McpError
 from mcp.types import INTERNAL_ERROR, ErrorData
 
+from .aliases import normalize_query
 from .client import get_client_async
 from .metrics import record_call
 from .utils import serialize_model
@@ -242,7 +243,8 @@ async def ffbb_get_classement_service(poule_id: int | str) -> list[dict[str, Any
 async def _search_generic(
     operation: str, method_name: str, query: str, limit: int = 20
 ) -> list[dict]:
-    cache_key = f"search:{operation}:{query}:{limit}"
+    normalized_query = normalize_query(query)
+    cache_key = f"search:{operation}:{normalized_query}:{limit}"
     cached = _cache_get(_cache_search, cache_key)
     if cached is not None:
         logger.debug(f"Cache hit: {cache_key}")
@@ -250,7 +252,7 @@ async def _search_generic(
 
     client = await get_client_async()
     method = getattr(client, method_name)
-    results = await _safe_call(f"Recherche {operation}: {query}", method(query))
+    results = await _safe_call(f"Recherche {operation}: {normalized_query}", method(normalized_query))
     if not results or not results.hits:
         _cache_set(_cache_search, cache_key, [])
         return []
@@ -290,15 +292,16 @@ async def search_tournois_service(nom: str, limit: int = 20) -> list[dict]:
 
 
 async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]]:
-    cache_key = f"multi:{nom}:{limit}"
+    normalized_query = normalize_query(nom)
+    cache_key = f"multi:{normalized_query}:{limit}"
     cached = _cache_get(_cache_search, cache_key)
     if cached is not None:
         return cached
 
     client = await get_client_async()
-    queries = generate_queries(nom)
+    queries = generate_queries(normalized_query)
     results = await _safe_call(
-        f"Recherche multi-types: {nom}", client.multi_search_async(queries=queries)
+        f"Recherche multi-types: {normalized_query}", client.multi_search_async(queries=queries)
     )
     if not results or not results.results:
         _cache_set(_cache_search, cache_key, [])
