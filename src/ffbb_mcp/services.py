@@ -279,7 +279,7 @@ async def _search_generic(
 
     client = await get_client_async()
     method = getattr(client, method_name)
-    results = await _safe_call(f"Search {operation}: {query}", method(normalized_query, limit=limit))
+    results = await _safe_call(f"Search {operation}: {query}", method(normalized_query))
     if not results or not results.hits:
         return []
     result = [serialize_model(hit) for hit in results.hits[:limit]]
@@ -317,6 +317,17 @@ async def search_tournois_service(nom: str, limit: int = 20) -> list[dict]:
     return await _search_generic("tournois", "search_tournois_async", nom, limit)
 
 
+from ffbb_api_client_v3.models import MultiSearchQuery
+from ffbb_api_client_v3.config import (
+    MEILISEARCH_INDEX_ORGANISMES,
+    MEILISEARCH_INDEX_COMPETITIONS,
+    MEILISEARCH_INDEX_RENCONTRES,
+    MEILISEARCH_INDEX_SALLES,
+    MEILISEARCH_INDEX_PRATIQUES,
+    MEILISEARCH_INDEX_TERRAINS,
+    MEILISEARCH_INDEX_TOURNOIS,
+)
+
 async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]]:
     normalized_query = normalize_query(nom)
     cache_key = f"multi_search:{normalized_query}:{limit}"
@@ -325,26 +336,35 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
         return cached
 
     client = await get_client_async()
+    queries = [
+        MultiSearchQuery(index_uid=MEILISEARCH_INDEX_ORGANISMES, q=normalized_query, limit=limit),
+        MultiSearchQuery(index_uid=MEILISEARCH_INDEX_COMPETITIONS, q=normalized_query, limit=limit),
+        MultiSearchQuery(index_uid=MEILISEARCH_INDEX_RENCONTRES, q=normalized_query, limit=limit),
+        MultiSearchQuery(index_uid=MEILISEARCH_INDEX_SALLES, q=normalized_query, limit=limit),
+        MultiSearchQuery(index_uid=MEILISEARCH_INDEX_PRATIQUES, q=normalized_query, limit=limit),
+        MultiSearchQuery(index_uid=MEILISEARCH_INDEX_TERRAINS, q=normalized_query, limit=limit),
+        MultiSearchQuery(index_uid=MEILISEARCH_INDEX_TOURNOIS, q=normalized_query, limit=limit),
+    ]
     raw = await _safe_call(
-        f"Multi-search: {nom}", client.get_recherche_multicritere_async(normalized_query)
+        f"Multi-search: {nom}", client.multi_search_async(queries)
     )
 
-    if not raw:
+    if not raw or not hasattr(raw, "results") or not raw.results:
         return []
 
-    data = serialize_model(raw)
     output: list[dict[str, Any]] = []
 
-    for category, results in data.items():
-        if isinstance(results, dict) and "hits" in results:
-            for hit in results["hits"]:
-                item = serialize_model(hit)
-                # Type helper pour aider l'agent à savoir quel outil utiliser ensuite
-                item["_type"] = category
-                output.append(item)
+    for res in raw.results:
+        category = res.index_uid
+        for hit in res.hits:
+            item = serialize_model(hit)
+            item["_type"] = category
+            output.append(item)
+            
     output = output[:limit]
     _cache_set(_cache_search, cache_key, output)
     return output
+
 
 
 async def get_calendrier_club_service(
