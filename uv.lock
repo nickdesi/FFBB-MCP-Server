@@ -402,8 +402,8 @@ wheels = [
 
 [[package]]
 name = "ffbb-api-client-v3"
-version = "0.0.post1.dev99+g0f07ef63f.d20260308"
-source = { directory = "FFBBApiClientV3_Ref" }
+version = "0.0.post1.dev101+g7b8629120"
+source = { git = "https://github.com/nickdesi/FFBBApiClientV3.git#7b86291201b2ae1b99c3d363322475d5810b5e5d" }
 dependencies = [
     { name = "hishel" },
     { name = "httpx" },
@@ -412,25 +412,6 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "readme-renderer" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "coverage", marker = "extra == 'testing'", specifier = ">=7.0.0" },
-    { name = "hishel", specifier = ">=0.0.32" },
-    { name = "httpx", specifier = ">=0.27.0" },
-    { name = "pydantic", specifier = ">=2.0.0" },
-    { name = "pytest", marker = "extra == 'testing'", specifier = ">=9.0.0" },
-    { name = "pytest-asyncio", marker = "extra == 'testing'", specifier = ">=0.23.0" },
-    { name = "pytest-cov", marker = "extra == 'testing'", specifier = ">=7.0.0" },
-    { name = "pytest-xdist", marker = "extra == 'testing'", specifier = ">=3.0.0" },
-    { name = "python-dateutil" },
-    { name = "python-dotenv" },
-    { name = "readme-renderer" },
-    { name = "respx", marker = "extra == 'testing'", specifier = ">=0.21.0" },
-    { name = "setuptools", marker = "extra == 'testing'" },
-    { name = "types-python-dateutil", marker = "extra == 'typing'" },
-]
-provides-extras = ["testing", "typing"]
 
 [[package]]
 name = "ffbb-mcp"
@@ -460,7 +441,7 @@ requires-dist = [
     { name = "anysqlite", specifier = ">=0.0.5" },
     { name = "cachetools", specifier = ">=5.3.0" },
     { name = "fastapi" },
-    { name = "ffbb-api-client-v3", directory = "FFBBApiClientV3_Ref" },
+    { name = "ffbb-api-client-v3", git = "https://github.com/nickdesi/FFBBApiClientV3.git" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.0.0" },
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
