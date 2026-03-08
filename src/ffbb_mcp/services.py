@@ -1,4 +1,5 @@
 import logging
+import time
 import traceback
 from typing import Any, TypeVar
 
@@ -8,6 +9,7 @@ from mcp.shared.exceptions import McpError
 from mcp.types import INTERNAL_ERROR, ErrorData
 
 from .client import get_client_async
+from .metrics import record_call
 from .utils import serialize_model
 
 logger = logging.getLogger("ffbb-mcp")
@@ -68,12 +70,18 @@ def _handle_api_error(e: Exception) -> McpError:
 async def _safe_call(operation_name: str, coro) -> Any:
     """Exécute un appel API avec logging et error handling."""
     logger.info(f"Début exécution: {operation_name}")
+    start_time = time.monotonic()
+    is_error = False
     try:
         result = await coro
         logger.info(f"Succès: {operation_name}")
         return result
     except Exception as e:
+        is_error = True
         raise _handle_api_error(e) from e
+    finally:
+        latency = time.monotonic() - start_time
+        record_call(latency, is_error)
 
 
 # ---------------------------------------------------------------------------

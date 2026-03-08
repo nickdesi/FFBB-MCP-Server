@@ -6,8 +6,9 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import AliasChoices, Field
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, JSONResponse, Response
+from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 
+from .metrics import generate_prometheus_metrics
 from .prompts import register_prompts
 from .resources import register_resources
 from .services import (
@@ -82,6 +83,12 @@ mcp = FastMCP(
 async def health(request: Request) -> Response:
     """Endpoint de santé pour Coolify."""
     return JSONResponse({"status": "ok", "service": "ffbb-mcp"})
+
+
+@mcp.custom_route("/metrics", methods=["GET"])
+async def metrics(request: Request) -> Response:
+    """Endpoint de métriques au format Prometheus pour Coolify."""
+    return PlainTextResponse(generate_prometheus_metrics())
 
 
 @mcp.custom_route("/", methods=["GET"])
