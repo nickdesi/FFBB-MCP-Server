@@ -3,8 +3,8 @@ import re
 CLUB_ALIASES = {
     "jav": "jeanne d'arc vichy",
     "ja vichy": "jeanne d'arc vichy",
-    "sbca": "stade clermontois basket auvergne",
-    "stade clermontois": "stade clermontois basket auvergne",
+    "scba": "stade clermontois basket auvergne",
+    "scbf": "stade clermontois basket feminin",
     "asvel": "lyon villeurbanne",
     "ldlc asvel": "lyon villeurbanne",
     "chorale": "roanne",

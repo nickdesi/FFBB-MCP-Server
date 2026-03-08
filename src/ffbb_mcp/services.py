@@ -188,22 +188,24 @@ async def ffbb_equipes_club_service(
 
         # Filtre optionnel pour gagner du temps agents
         if filtre:
+            import re
             f_low = filtre.lower()
-            corpus = f"{nom_comp} {cat.get('code', '')} {comp.get('sexe', '')}".lower()
-            # Transformation des classiques (ex: Masculin/M, Féminin/F)
-            corpus = corpus.replace("masculin", "m").replace("féminin", "f").replace("feminin", "f")
-            f_norm = f_low.replace("masculin", "m").replace("féminin", "f").replace("feminin", "f")
-            
-            # Simple check
-            if f_norm not in corpus:
-                # Heuristiques pour "u13m" -> "u13" + "m"
-                if len(f_norm) >= 4 and f_norm.startswith("u"):
-                    cat_part = f_norm[:3]
-                    sexe_part = f_norm[3:]
-                    if cat_part not in corpus or sexe_part not in corpus:
-                        continue
-                else:
-                    continue
+            cat_code_low = (cat.get("code") or "").lower()      # ex: "u13"
+            sexe_field = (comp.get("sexe") or "").upper()        # ex: "M" ou "F"
+
+            # 1. Extraction Catégorie (Uxx) du filtre
+            cat_match = re.search(r'(u\d+)', f_low)
+            if cat_match and cat_match.group(1) != cat_code_low:
+                continue
+
+            # 2. Extraction Genre du filtre
+            is_f = bool(re.search(r'(?:\bf\b|u\d+f|féminin|feminin|fille)', f_low))
+            is_m = bool(re.search(r'(?:\bm\b|u\d+m|masculin|garçon|garcon)', f_low))
+
+            if is_f and sexe_field != "F":
+                continue
+            if is_m and sexe_field != "M":
+                continue
 
         flat.append(
             {
@@ -266,7 +268,7 @@ async def _search_generic(
 
     client = await get_client_async()
     method = getattr(client, method_name)
-    results = await _safe_call(f"Search {operation}: {query}", method(normalized_query))
+    results = await _safe_call(f"Search {operation}: {query}", method(normalized_query, limit=limit))
     if not results or not results.hits:
         return []
     result = [serialize_model(hit) for hit in results.hits[:limit]]
@@ -344,21 +346,23 @@ async def get_calendrier_club_service(
     (Recherche Club -> Equipes -> Poules -> Rencontres), afin de contourner
     les limitations d'indexation de Meilisearch sur les rencontres.
     """
-    target_org_id = organisme_id
+    target_org_ids = []
+    
+    if organisme_id:
+        target_org_ids = [organisme_id]
+    elif club_name:
+        orgs = await search_organismes_service(nom=club_name, limit=3)
+        target_org_ids = [org.get("id") for org in orgs if isinstance(org, dict) and org.get("id")]
 
-    # 1. Résoudre le club si on n'a que le nom
-    if not target_org_id and club_name:
-        orgs = await search_organismes_service(nom=club_name, limit=1)
-        if orgs:
-            target_org_id = orgs[0].get("id")
-
-    if not target_org_id:
+    if not target_org_ids:
         return []
 
     # 2. Récupérer les équipes engagées correspondant à la catégorie
-    equipes = await ffbb_equipes_club_service(
-        organisme_id=target_org_id, filtre=categorie
-    )
+    equipes = []
+    for oid in target_org_ids:
+        eqs = await ffbb_equipes_club_service(organisme_id=oid, filtre=categorie)
+        equipes.extend(eqs)
+        
     if not equipes:
         return []
 
@@ -381,6 +385,26 @@ async def get_calendrier_club_service(
                 continue
 
             seen_match_ids.add(match_id)
+
+            # --- Filtrage robuste : engagement_id OU nom_equipe ---
+            eng1 = match.get("idEngagementEquipe1")
+            eng2 = match.get("idEngagementEquipe2")
+            id_eng1 = eng1.get("id") if isinstance(eng1, dict) else eng1
+            id_eng2 = eng2.get("id") if isinstance(eng2, dict) else eng2
+
+            my_eng_id = equipe.get("engagement_id")
+            my_team_name = (equipe.get("nom_equipe") or "").lower().strip()
+
+            # Strategy 1: engagement ID matching (precise)
+            if my_eng_id and id_eng1 and id_eng2:
+                if str(my_eng_id) not in (str(id_eng1), str(id_eng2)):
+                    continue
+            elif my_team_name:
+                # Strategy 2: fall back to team name matching
+                eq1_name = (match.get("nomEquipe1") or match.get("nom_equipe1") or "").lower()
+                eq2_name = (match.get("nomEquipe2") or match.get("nom_equipe2") or "").lower()
+                if my_team_name not in eq1_name and my_team_name not in eq2_name:
+                    continue
 
             # Extraction robuste des champs camelCase (API originelle) ou snake_case
             eq1 = match.get("nomEquipe1", match.get("nom_equipe1", ""))
