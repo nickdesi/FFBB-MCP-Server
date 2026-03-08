@@ -4,7 +4,6 @@ import traceback
 from typing import Any, TypeVar
 
 from cachetools import TTLCache
-from ffbb_api_client_v3.helpers.multi_search_query_helper import generate_queries
 from mcp.shared.exceptions import McpError
 from mcp.types import INTERNAL_ERROR, ErrorData
 
@@ -188,8 +187,23 @@ async def ffbb_equipes_club_service(
         nom_comp = comp.get("nom", "")
 
         # Filtre optionnel pour gagner du temps agents
-        if filtre and filtre.lower() not in nom_comp.lower():
-            continue
+        if filtre:
+            f_low = filtre.lower()
+            corpus = f"{nom_comp} {cat.get('code', '')} {comp.get('sexe', '')}".lower()
+            # Transformation des classiques (ex: Masculin/M, Féminin/F)
+            corpus = corpus.replace("masculin", "m").replace("féminin", "f").replace("feminin", "f")
+            f_norm = f_low.replace("masculin", "m").replace("féminin", "f").replace("feminin", "f")
+            
+            # Simple check
+            if f_norm not in corpus:
+                # Heuristiques pour "u13m" -> "u13" + "m"
+                if len(f_norm) >= 4 and f_norm.startswith("u"):
+                    cat_part = f_norm[:3]
+                    sexe_part = f_norm[3:]
+                    if cat_part not in corpus or sexe_part not in corpus:
+                        continue
+                else:
+                    continue
 
         flat.append(
             {
@@ -252,9 +266,8 @@ async def _search_generic(
 
     client = await get_client_async()
     method = getattr(client, method_name)
-    results = await _safe_call(f"Recherche {operation}: {normalized_query}", method(normalized_query))
+    results = await _safe_call(f"Search {operation}: {query}", method(normalized_query))
     if not results or not results.hits:
-        _cache_set(_cache_search, cache_key, [])
         return []
     result = [serialize_model(hit) for hit in results.hits[:limit]]
     _cache_set(_cache_search, cache_key, result)
@@ -293,25 +306,25 @@ async def search_tournois_service(nom: str, limit: int = 20) -> list[dict]:
 
 async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]]:
     normalized_query = normalize_query(nom)
-    cache_key = f"multi:{normalized_query}:{limit}"
+    cache_key = f"multi_search:{normalized_query}:{limit}"
     cached = _cache_get(_cache_search, cache_key)
     if cached is not None:
         return cached
 
     client = await get_client_async()
-    queries = generate_queries(normalized_query)
-    results = await _safe_call(
-        f"Recherche multi-types: {normalized_query}", client.multi_search_async(queries=queries)
+    raw = await _safe_call(
+        f"Multi-search: {nom}", client.get_recherche_multicritere_async(normalized_query)
     )
-    if not results or not results.results:
-        _cache_set(_cache_search, cache_key, [])
+
+    if not raw:
         return []
 
+    data = serialize_model(raw)
     output: list[dict[str, Any]] = []
-    for res in results.results:
-        if res.hits:
-            category = res.index_uid
-            for hit in res.hits:
+
+    for category, results in data.items():
+        if isinstance(results, dict) and "hits" in results:
+            for hit in results["hits"]:
                 item = serialize_model(hit)
                 # Type helper pour aider l'agent à savoir quel outil utiliser ensuite
                 item["_type"] = category
@@ -326,43 +339,70 @@ async def get_calendrier_club_service(
     organisme_id: int | str | None = None,
     categorie: str | None = None,
 ) -> list[dict]:
-    client = await get_client_async()
+    """
+    Récupère le calendrier et les résultats d'un club en utilisant le workflow infaillible
+    (Recherche Club -> Equipes -> Poules -> Rencontres), afin de contourner
+    les limitations d'indexation de Meilisearch sur les rencontres.
+    """
+    target_org_id = organisme_id
 
-    search_term = club_name or ""
+    # 1. Résoudre le club si on n'a que le nom
+    if not target_org_id and club_name:
+        orgs = await search_organismes_service(nom=club_name, limit=1)
+        if orgs:
+            target_org_id = orgs[0].get("id")
 
-    # Auto-résolution du nom via ID pour une recherche plus précise
-    if organisme_id:
-        org = await _safe_call(
-            f"Résolution club {organisme_id}",
-            client.get_organisme_async(organisme_id=int(organisme_id)),
-        )
-        if org:
-            data = serialize_model(org)
-            search_term = data.get("nom", search_term)
-
-    if not search_term:
+    if not target_org_id:
         return []
 
-    query = search_term
-    if categorie:
-        query += f" {categorie}"
-
-    results = await _safe_call(
-        f"Calendrier club: {query}", client.search_rencontres_async(query)
+    # 2. Récupérer les équipes engagées correspondant à la catégorie
+    equipes = await ffbb_equipes_club_service(
+        organisme_id=target_org_id, filtre=categorie
     )
-    if not results or not results.hits:
+    if not equipes:
         return []
 
-    flat: list[dict[str, Any]] = []
-    for hit in results.hits:
-        raw = serialize_model(hit)
-        flat.append(
-            {
-                "id": raw.get("id"),
-                "date": raw.get("date_rencontre", raw.get("date")),
-                "equipe1": raw.get("nom_equipe1", ""),
-                "equipe2": raw.get("nom_equipe2", ""),
-                "num_journee": raw.get("numero_journee"),
-            }
-        )
-    return flat
+    # 3. Parcourir toutes les poules de ces équipes pour récupérer toutes les rencontres et scores
+    seen_match_ids = set()
+    all_matches = []
+
+    # Concurrency for massive performance improvements (avoids 10x 1s blocking lookups)
+    import asyncio
+    poule_tasks = [get_poule_service(e.get("poule_id")) for e in equipes if e.get("poule_id")]
+    poules_data = await asyncio.gather(*poule_tasks, return_exceptions=True)
+
+    for equipe, poule_data in zip(equipes, poules_data, strict=False):
+        if isinstance(poule_data, Exception) or not poule_data or "rencontres" not in poule_data:
+            continue
+
+        for match in poule_data.get("rencontres", []):
+            match_id = match.get("id")
+            if not match_id or match_id in seen_match_ids:
+                continue
+
+            seen_match_ids.add(match_id)
+
+            # Extraction robuste des champs camelCase (API originelle) ou snake_case
+            eq1 = match.get("nomEquipe1", match.get("nom_equipe1", ""))
+            eq2 = match.get("nomEquipe2", match.get("nom_equipe2", ""))
+            score1 = match.get("resultatEquipe1", match.get("resultat_equipe1"))
+            score2 = match.get("resultatEquipe2", match.get("resultat_equipe2"))
+            date_match = match.get("date_rencontre", match.get("date", ""))
+            journee = match.get("numeroJournee", match.get("numero_journee", ""))
+
+            all_matches.append(
+                {
+                    "id": match_id,
+                    "date": date_match,
+                    "equipe1": eq1,
+                    "equipe2": eq2,
+                    "score_equipe1": score1,
+                    "score_equipe2": score2,
+                    "competition_nom": equipe.get("competition", ""),
+                    "num_journee": journee,
+                }
+            )
+
+    # Tri par date décroissante pour avoir les derniers matchs en premier
+    all_matches.sort(key=lambda x: x.get("date") or "", reverse=True)
+    return all_matches

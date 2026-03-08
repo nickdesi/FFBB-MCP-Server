@@ -647,13 +647,14 @@ async def ffbb_calendrier_club(
         Field(description="Filtre catégorie optionnel (ex: 'U11', 'Senior')."),
     ] = None,
 ) -> list[dict[str, Any]]:
-    """Récupère le calendrier (prochains matchs) d'un club.
+    """Récupère le calendrier COMPLET (passé et à venir avec scores) d'un club.
 
     Fournir soit `club_name` soit `organisme_id` (l'un ou l'autre).
     Si `organisme_id` est fourni, le nom du club est résolu automatiquement.
     Filtre optionnel par catégorie (ex: "U11", "Senior", "U13F").
 
-    Retourne une liste simplifiée : id, date, equipe1, equipe2, num_journee.
+    Retourne une liste : id, date, equipe1, equipe2, score_equipe1, score_equipe2, competition, num_journee.
+    C'est la méthode infaillible recommandée pour pister tous les matchs d'un club sans erreur.
 
     Args:
         club_name: Nom du club (ex: "Stade Clermontois").
