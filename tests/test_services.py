@@ -14,6 +14,7 @@ from ffbb_mcp.services import (
     get_competition_service,
     get_organisme_service,
     get_saisons_service,
+    multi_search_service,
 )
 
 
@@ -125,15 +126,14 @@ class TestEquipesClubService:
     @pytest.mark.asyncio
     async def test_filtre_works(self, patch_get_client, mock_client):
         org_mock = MagicMock()
-        org_mock.model_dump = MagicMock(
-            return_value={
-                "nom": "Club",
-                "engagements": [
-                    {"idCompetition": {"nom": "U11M"}, "idPoule": {"id": "p1"}},
-                    {"idCompetition": {"nom": "U13F"}, "idPoule": {"id": "p2"}},
-                ],
-            }
-        )
+        mock_data = {
+            "nom": "Club",
+            "engagements": [
+                {"idCompetition": {"nom": "U11M", "categorie": {"code": "U11"}}, "idPoule": {"id": "p1"}},
+                {"idCompetition": {"nom": "U13F", "categorie": {"code": "U13"}}, "idPoule": {"id": "p2"}},
+            ],
+        }
+        org_mock.model_dump = MagicMock(return_value=mock_data)
         mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
 
         # Test filtre U11
@@ -162,21 +162,75 @@ class TestGetClassementService:
 
 class TestCalendrierClubService:
     @pytest.mark.asyncio
-    async def test_returns_empty_when_no_results(self, patch_get_client, mock_client):
-        mock_client.search_rencontres_async = AsyncMock(return_value=None)
-        result = await get_calendrier_club_service(club_name="Club Inexistant")
+    async def test_returns_empty_when_no_teams(self, patch_get_client, mock_client):
+        # Mock empty engagements
+        org_mock = MagicMock()
+        org_mock.model_dump = MagicMock(return_value={"nom": "Club", "engagements": []})
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+        
+        result = await get_calendrier_club_service(organisme_id=123)
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_resolves_id_to_name(self, patch_get_client, mock_client):
+    async def test_full_workflow(self, patch_get_client, mock_client):
+        # 1. Mock get_organisme (for teams)
         org_mock = MagicMock()
-        org_mock.model_dump = MagicMock(return_value={"nom": "BASKET CLUB"})
+        mock_org_data = {
+            "nom": "CLERMONT",
+            "engagements": [
+                {
+                    "id": 1001,
+                    "idCompetition": {"id": 101, "nom": "U13F", "categorie": {"code": "U13"}},
+                    "idPoule": {"id": 201},
+                    "numeroEquipe": 1
+                }
+            ]
+        }
+        org_mock.model_dump = MagicMock(return_value=mock_org_data)
         mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
 
-        mock_client.search_rencontres_async = AsyncMock(return_value=None)
+        # 2. Mock get_poule (for matches)
+        poule_mock = MagicMock()
+        poule_mock.model_dump = MagicMock(return_value={
+            "rencontres": [
+                {
+                    "id": "m1",
+                    "date_rencontre": "2024-03-08",
+                    "nomEquipe1": "CLERMONT",
+                    "nomEquipe2": "AUTRE",
+                    "resultatEquipe1": 50,
+                    "resultatEquipe2": 40,
+                    "idEngagementEquipe1": {"id": 1001},
+                    "idEngagementEquipe2": {"id": 1002}
+                }
+            ]
+        })
+        mock_client.get_poule_async = AsyncMock(return_value=poule_mock)
 
-        await get_calendrier_club_service(organisme_id=123)
+        result = await get_calendrier_club_service(organisme_id=123)
+        assert len(result) == 1
+        assert result[0]["equipe1"] == "CLERMONT"
+        assert result[0]["score_equipe1"] == 50
 
-        # Doit avoir appelé get_organisme puis search_rencontres avec le nom résolu
-        mock_client.get_organisme_async.assert_called_with(organisme_id=123)
-        mock_client.search_rencontres_async.assert_called_with("BASKET CLUB")
+# ---------------------------------------------------------------------------
+# Tests — multi_search_service
+# ---------------------------------------------------------------------------
+
+class TestMultiSearchService:
+    @pytest.mark.asyncio
+    async def test_multi_search_success(self, patch_get_client, mock_client):
+        from ffbb_api_client_v3.models.multi_search_results_class import MultiSearchResults
+        from ffbb_api_client_v3.models.multi_search_results import MultiSearchResult
+        
+        mock_res = MagicMock(spec=MultiSearchResults)
+        res1 = MagicMock(spec=MultiSearchResult)
+        res1.index_uid = "organismes"
+        res1.hits = [{"id": 1, "nom": "Club Test"}]
+        mock_res.results = [res1]
+        
+        mock_client.multi_search_async = AsyncMock(return_value=mock_res)
+        
+        result = await multi_search_service("test")
+        assert len(result) == 1
+        assert result[0]["_type"] == "organismes"
+        assert result[0]["nom"] == "Club Test"

@@ -1,9 +1,23 @@
+from __future__ import annotations
+
+import asyncio
 import logging
+import re
 import time
 import traceback
 from typing import Any, TypeVar
 
 from cachetools import TTLCache
+from ffbb_api_client_v3.config import (
+    MEILISEARCH_INDEX_COMPETITIONS,
+    MEILISEARCH_INDEX_ORGANISMES,
+    MEILISEARCH_INDEX_PRATIQUES,
+    MEILISEARCH_INDEX_RENCONTRES,
+    MEILISEARCH_INDEX_SALLES,
+    MEILISEARCH_INDEX_TERRAINS,
+    MEILISEARCH_INDEX_TOURNOIS,
+)
+from ffbb_api_client_v3.models import MultiSearchQuery
 from mcp.shared.exceptions import McpError
 from mcp.types import INTERNAL_ERROR, ErrorData
 
@@ -188,7 +202,6 @@ async def ffbb_equipes_club_service(
 
         # Filtre optionnel pour gagner du temps agents
         if filtre:
-            import re
             f_low = filtre.lower()
             cat_code_low = (cat.get("code") or "").lower()      # ex: "u13"
             sexe_field = (comp.get("sexe") or "").upper()        # ex: "M" ou "F"
@@ -317,17 +330,6 @@ async def search_tournois_service(nom: str, limit: int = 20) -> list[dict]:
     return await _search_generic("tournois", "search_tournois_async", nom, limit)
 
 
-from ffbb_api_client_v3.models import MultiSearchQuery
-from ffbb_api_client_v3.config import (
-    MEILISEARCH_INDEX_ORGANISMES,
-    MEILISEARCH_INDEX_COMPETITIONS,
-    MEILISEARCH_INDEX_RENCONTRES,
-    MEILISEARCH_INDEX_SALLES,
-    MEILISEARCH_INDEX_PRATIQUES,
-    MEILISEARCH_INDEX_TERRAINS,
-    MEILISEARCH_INDEX_TOURNOIS,
-)
-
 async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]]:
     normalized_query = normalize_query(nom)
     cache_key = f"multi_search:{normalized_query}:{limit}"
@@ -364,7 +366,6 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
     output = output[:limit]
     _cache_set(_cache_search, cache_key, output)
     return output
-
 
 
 async def get_calendrier_club_service(
@@ -407,7 +408,6 @@ async def get_calendrier_club_service(
     all_matches = []
 
     # Concurrency for massive performance improvements (avoids 10x 1s blocking lookups)
-    import asyncio
     poule_tasks = [get_poule_service(e.get("poule_id")) for e in equipes if e.get("poule_id")]
     poules_data = await asyncio.gather(*poule_tasks, return_exceptions=True)
 
