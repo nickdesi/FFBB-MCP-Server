@@ -35,7 +35,7 @@ T = TypeVar("T")
 # ---------------------------------------------------------------------------
 
 _cache_lives = TTLCache(maxsize=1, ttl=30)  # 30 s — scores changent chaque possession
-_cache_search = TTLCache(maxsize=256, ttl=600)   # 10 min — résultats de recherche
+_cache_search = TTLCache(maxsize=256, ttl=600)  # 10 min — résultats de recherche
 _cache_detail = TTLCache(maxsize=128, ttl=1200)  # 20 min — détails compétitions/clubs
 
 
@@ -203,28 +203,28 @@ async def ffbb_equipes_club_service(
         # Filtre optionnel pour gagner du temps agents
         if filtre:
             f_low = filtre.lower()
-            cat_code_low = (cat.get("code") or "").lower()      # ex: "u13"
-            sexe_field = (comp.get("sexe") or "").upper()        # ex: "M" ou "F"
+            cat_code_low = (cat.get("code") or "").lower()  # ex: "u13"
+            sexe_field = (comp.get("sexe") or "").upper()  # ex: "M" ou "F"
 
             # 1. Extraction Catégorie (Uxx) du filtre
-            cat_match = re.search(r'(u\d+)', f_low)
+            cat_match = re.search(r"(u\d+)", f_low)
             if cat_match and cat_match.group(1) != cat_code_low:
                 continue
 
             # 2. Extraction Genre du filtre
-            is_f = bool(re.search(r'(?:\bf\b|u\d+f|féminin|feminin|fille)', f_low))
-            is_m = bool(re.search(r'(?:\bm\b|u\d+m|masculin|garçon|garcon)', f_low))
+            is_f = bool(re.search(r"(?:\bf\b|u\d+f|féminin|feminin|fille)", f_low))
+            is_m = bool(re.search(r"(?:\bm\b|u\d+m|masculin|garçon|garcon)", f_low))
 
             if is_f and sexe_field != "F":
                 continue
             if is_m and sexe_field != "M":
                 continue
-            
+
             # 3. Extraction Numéro d'équipe (ex: le 2 dans U13F2 ou U13-2)
             # On cherche un chiffre à la toute fin du filtre, eventuellement précédé d'un espace, tiret, ou lettre
-            num_match = re.search(r'(\d)$', f_low.strip())
+            num_match = re.search(r"(\d)$", f_low.strip())
             # On ignore si c'est juste le chiffre de la catégorie (ex: "U13")
-            if num_match and not re.search(r'u\d+$', f_low.strip()):
+            if num_match and not re.search(r"u\d+$", f_low.strip()):
                 target_num = num_match.group(1)
                 team_num = str(e.get("numeroEquipe", ""))
                 # If team_num is empty, sometimes "1" is implied, but strict matching is safer
@@ -339,17 +339,29 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
 
     client = await get_client_async()
     queries = [
-        MultiSearchQuery(index_uid=MEILISEARCH_INDEX_ORGANISMES, q=normalized_query, limit=limit),
-        MultiSearchQuery(index_uid=MEILISEARCH_INDEX_COMPETITIONS, q=normalized_query, limit=limit),
-        MultiSearchQuery(index_uid=MEILISEARCH_INDEX_RENCONTRES, q=normalized_query, limit=limit),
-        MultiSearchQuery(index_uid=MEILISEARCH_INDEX_SALLES, q=normalized_query, limit=limit),
-        MultiSearchQuery(index_uid=MEILISEARCH_INDEX_PRATIQUES, q=normalized_query, limit=limit),
-        MultiSearchQuery(index_uid=MEILISEARCH_INDEX_TERRAINS, q=normalized_query, limit=limit),
-        MultiSearchQuery(index_uid=MEILISEARCH_INDEX_TOURNOIS, q=normalized_query, limit=limit),
+        MultiSearchQuery(
+            index_uid=MEILISEARCH_INDEX_ORGANISMES, q=normalized_query, limit=limit
+        ),
+        MultiSearchQuery(
+            index_uid=MEILISEARCH_INDEX_COMPETITIONS, q=normalized_query, limit=limit
+        ),
+        MultiSearchQuery(
+            index_uid=MEILISEARCH_INDEX_RENCONTRES, q=normalized_query, limit=limit
+        ),
+        MultiSearchQuery(
+            index_uid=MEILISEARCH_INDEX_SALLES, q=normalized_query, limit=limit
+        ),
+        MultiSearchQuery(
+            index_uid=MEILISEARCH_INDEX_PRATIQUES, q=normalized_query, limit=limit
+        ),
+        MultiSearchQuery(
+            index_uid=MEILISEARCH_INDEX_TERRAINS, q=normalized_query, limit=limit
+        ),
+        MultiSearchQuery(
+            index_uid=MEILISEARCH_INDEX_TOURNOIS, q=normalized_query, limit=limit
+        ),
     ]
-    raw = await _safe_call(
-        f"Multi-search: {nom}", client.multi_search_async(queries)
-    )
+    raw = await _safe_call(f"Multi-search: {nom}", client.multi_search_async(queries))
 
     if not raw or not hasattr(raw, "results") or not raw.results:
         return []
@@ -362,7 +374,7 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
             item = serialize_model(hit)
             item["_type"] = category
             output.append(item)
-            
+
     output = output[:limit]
     _cache_set(_cache_search, cache_key, output)
     return output
@@ -379,27 +391,32 @@ async def get_calendrier_club_service(
     les limitations d'indexation de Meilisearch sur les rencontres.
     """
     target_org_ids = []
-    
+
     if organisme_id:
         target_org_ids = [organisme_id]
     elif club_name:
         orgs = await search_organismes_service(nom=club_name, limit=3)
-        target_org_ids = [org.get("id") for org in orgs if isinstance(org, dict) and org.get("id")]
+        target_org_ids = [
+            org.get("id") for org in orgs if isinstance(org, dict) and org.get("id")
+        ]
 
     if not target_org_ids:
         return []
 
     # 2. Récupérer les équipes engagées correspondant à la catégorie en parallèle
-    eq_tasks = [ffbb_equipes_club_service(organisme_id=oid, filtre=categorie) for oid in target_org_ids]
+    eq_tasks = [
+        ffbb_equipes_club_service(organisme_id=oid, filtre=categorie)
+        for oid in target_org_ids
+    ]
     eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
-    
+
     equipes = []
     for res in eq_results:
         if isinstance(res, list):
             equipes.extend(res)
         elif isinstance(res, Exception):
             logger.error(f"Erreur lors de la récupération des équipes: {res}")
-        
+
     if not equipes:
         return []
 
@@ -408,11 +425,17 @@ async def get_calendrier_club_service(
     all_matches = []
 
     # Concurrency for massive performance improvements (avoids 10x 1s blocking lookups)
-    poule_tasks = [get_poule_service(e.get("poule_id")) for e in equipes if e.get("poule_id")]
+    poule_tasks = [
+        get_poule_service(e.get("poule_id")) for e in equipes if e.get("poule_id")
+    ]
     poules_data = await asyncio.gather(*poule_tasks, return_exceptions=True)
 
     for equipe, poule_data in zip(equipes, poules_data, strict=False):
-        if isinstance(poule_data, Exception) or not poule_data or "rencontres" not in poule_data:
+        if (
+            isinstance(poule_data, Exception)
+            or not poule_data
+            or "rencontres" not in poule_data
+        ):
             continue
 
         for match in poule_data.get("rencontres", []):
@@ -437,8 +460,12 @@ async def get_calendrier_club_service(
                     continue
             elif my_team_name:
                 # Strategy 2: fall back to team name matching
-                eq1_name = (match.get("nomEquipe1") or match.get("nom_equipe1") or "").lower()
-                eq2_name = (match.get("nomEquipe2") or match.get("nom_equipe2") or "").lower()
+                eq1_name = (
+                    match.get("nomEquipe1") or match.get("nom_equipe1") or ""
+                ).lower()
+                eq2_name = (
+                    match.get("nomEquipe2") or match.get("nom_equipe2") or ""
+                ).lower()
                 if my_team_name not in eq1_name and my_team_name not in eq2_name:
                     continue
 
