@@ -21,8 +21,8 @@ T = TypeVar("T")
 # ---------------------------------------------------------------------------
 
 _cache_lives = TTLCache(maxsize=1, ttl=30)  # 30 s — scores changent chaque possession
-_cache_search = TTLCache(maxsize=256, ttl=120)  # 2 min — résultats de recherche
-_cache_detail = TTLCache(maxsize=128, ttl=300)  # 5 min — détails compétitions/clubs
+_cache_search = TTLCache(maxsize=256, ttl=600)   # 10 min — résultats de recherche
+_cache_detail = TTLCache(maxsize=128, ttl=1200)  # 20 min — détails compétitions/clubs
 
 
 def _cache_get(cache: TTLCache, key: str) -> Any | None:
@@ -388,11 +388,16 @@ async def get_calendrier_club_service(
     if not target_org_ids:
         return []
 
-    # 2. Récupérer les équipes engagées correspondant à la catégorie
+    # 2. Récupérer les équipes engagées correspondant à la catégorie en parallèle
+    eq_tasks = [ffbb_equipes_club_service(organisme_id=oid, filtre=categorie) for oid in target_org_ids]
+    eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
+    
     equipes = []
-    for oid in target_org_ids:
-        eqs = await ffbb_equipes_club_service(organisme_id=oid, filtre=categorie)
-        equipes.extend(eqs)
+    for res in eq_results:
+        if isinstance(res, list):
+            equipes.extend(res)
+        elif isinstance(res, Exception):
+            logger.error(f"Erreur lors de la récupération des équipes: {res}")
         
     if not equipes:
         return []
