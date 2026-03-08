@@ -206,6 +206,17 @@ async def ffbb_equipes_club_service(
                 continue
             if is_m and sexe_field != "M":
                 continue
+            
+            # 3. Extraction Numéro d'équipe (ex: le 2 dans U13F2 ou U13-2)
+            # On cherche un chiffre à la toute fin du filtre, eventuellement précédé d'un espace, tiret, ou lettre
+            num_match = re.search(r'(\d)$', f_low.strip())
+            # On ignore si c'est juste le chiffre de la catégorie (ex: "U13")
+            if num_match and not re.search(r'u\d+$', f_low.strip()):
+                target_num = num_match.group(1)
+                team_num = str(e.get("numeroEquipe", ""))
+                # If team_num is empty, sometimes "1" is implied, but strict matching is safer
+                if target_num != team_num and not (target_num == "1" and not team_num):
+                    continue
 
         flat.append(
             {
