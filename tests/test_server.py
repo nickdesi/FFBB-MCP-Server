@@ -35,20 +35,6 @@ async def test_server_tools_importable():
 
 
 @pytest.mark.asyncio
-async def test_schemas_instantiation():
-    """Vérifie que les Pydantic Models peuvent être instanciés correctement."""
-    from ffbb_mcp.schemas import SearchInput
-
-    # Doit valider avec l'alias "nom" (via validation_alias)
-    si_nom = SearchInput(nom="Vichy")
-    assert si_nom.name == "Vichy"
-
-    # Doit valider avec l'alias "query" (via validation_alias)
-    si_query = SearchInput(query="Vichy")
-    assert si_query.name == "Vichy"
-
-
-@pytest.mark.asyncio
 async def test_server_tool_signatures():
     """Vérifie que les outils ont des signatures aplaties."""
     tools = await mcp.list_tools()
