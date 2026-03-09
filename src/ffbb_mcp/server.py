@@ -4,7 +4,7 @@ from typing import Annotated, Any, Literal
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
-from pydantic import AliasChoices, Field
+from pydantic import Field
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 
@@ -69,6 +69,7 @@ mcp = FastMCP(
 # Routes HTTP
 # ---------------------------------------------------------------------------
 
+
 @mcp.custom_route("/health", methods=["GET"])
 async def health(request: Request) -> Response:
     return JSONResponse({"status": "ok", "service": "ffbb-mcp"})
@@ -110,12 +111,24 @@ async def index(request: Request) -> Response:
 # TOOL 1 — Recherche unifiée (remplace 8 tools de search)
 # ---------------------------------------------------------------------------
 
+
 @mcp.tool(name="ffbb_search", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_search(
-    query: Annotated[str, Field(description="Texte libre (ex: 'Vichy', 'U13F Auvergne').")],
+    query: Annotated[
+        str, Field(description="Texte libre (ex: 'Vichy', 'U13F Auvergne').")
+    ],
     type: Annotated[
-        Literal["all", "competitions", "organismes", "rencontres", "salles", "pratiques", "terrains", "tournois"],
-        Field(description="Type de données. 'all' cherche partout (défaut).")
+        Literal[
+            "all",
+            "competitions",
+            "organismes",
+            "rencontres",
+            "salles",
+            "pratiques",
+            "terrains",
+            "tournois",
+        ],
+        Field(description="Type de données. 'all' cherche partout (défaut)."),
     ] = "all",
     limit: Annotated[int, Field(default=20, ge=1, le=100)] = 20,
 ) -> list[dict[str, Any]]:
@@ -148,12 +161,13 @@ async def ffbb_search(
 # TOOL 2 — Détails par ID (remplace get_competition + get_poule + get_organisme)
 # ---------------------------------------------------------------------------
 
+
 @mcp.tool(name="ffbb_get", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_get(
     id: Annotated[int | str, Field(description="ID numérique de l'entité.")],
     type: Annotated[
         Literal["competition", "poule", "organisme"],
-        Field(description="Type : 'competition', 'poule', ou 'organisme' (club).")
+        Field(description="Type : 'competition', 'poule', ou 'organisme' (club)."),
     ],
 ) -> dict[str, Any]:
     """Détails d'une entité FFBB par son ID.
@@ -183,27 +197,28 @@ async def ffbb_get(
 # TOOL 3 — Club unifié (remplace get_equipes_club + get_classement + get_calendrier_club)
 # ---------------------------------------------------------------------------
 
+
 @mcp.tool(name="ffbb_club", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_club(
     action: Annotated[
         Literal["calendrier", "equipes", "classement"],
-        Field(description="'calendrier' → tous les matchs. 'equipes' → liste des équipes engagées. 'classement' → classement d'une poule.")
+        Field(
+            description="'calendrier' → tous les matchs. 'equipes' → liste des équipes engagées. 'classement' → classement d'une poule."
+        ),
     ],
     organisme_id: Annotated[
-        int | str | None,
-        Field(description="ID du club (si connu).")
+        int | str | None, Field(description="ID du club (si connu).")
     ] = None,
     club_name: Annotated[
-        str | None,
-        Field(description="Nom du club (alternative à organisme_id).")
+        str | None, Field(description="Nom du club (alternative à organisme_id).")
     ] = None,
     filtre: Annotated[
         str | None,
-        Field(description="Filtre catégorie/genre (ex: 'U11', 'U13F', 'Senior').")
+        Field(description="Filtre catégorie/genre (ex: 'U11', 'U13F', 'Senior')."),
     ] = None,
     poule_id: Annotated[
         int | str | None,
-        Field(description="ID de la poule (requis pour action='classement').")
+        Field(description="ID de la poule (requis pour action='classement')."),
     ] = None,
 ) -> list[dict[str, Any]]:
     """Actions sur un club FFBB : calendrier, équipes ou classement.
@@ -227,7 +242,9 @@ async def ffbb_club(
         elif action == "equipes":
             if not organisme_id:
                 return [{"error": "organisme_id requis pour action='equipes'"}]
-            return await ffbb_equipes_club_service(organisme_id=organisme_id, filtre=filtre)
+            return await ffbb_equipes_club_service(
+                organisme_id=organisme_id, filtre=filtre
+            )
         elif action == "classement":
             if not poule_id:
                 return [{"error": "poule_id requis pour action='classement'"}]
@@ -241,6 +258,7 @@ async def ffbb_club(
 # ---------------------------------------------------------------------------
 # TOOL 4 — Scores en direct
 # ---------------------------------------------------------------------------
+
 
 @mcp.tool(name="ffbb_lives", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_get_lives() -> list[dict[str, Any]]:
@@ -256,9 +274,12 @@ async def ffbb_get_lives() -> list[dict[str, Any]]:
 # TOOL 5 — Saisons
 # ---------------------------------------------------------------------------
 
+
 @mcp.tool(name="ffbb_saisons", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_get_saisons(
-    active_only: Annotated[bool, Field(description="True = saison active uniquement.")] = False,
+    active_only: Annotated[
+        bool, Field(description="True = saison active uniquement.")
+    ] = False,
 ) -> list[dict[str, Any]]:
     """Liste des saisons FFBB. active_only=True pour la saison en cours uniquement."""
     try:
@@ -279,6 +300,7 @@ register_resources(mcp)
 # ---------------------------------------------------------------------------
 # Point d'entrée
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     logging.basicConfig(

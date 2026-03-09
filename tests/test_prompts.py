@@ -15,13 +15,13 @@ class TestPrompts:
     def test_analyser_match(self):
         result = analyser_match("12345")
         assert "12345" in result
-        assert "ffbb_search_rencontres" in result
+        assert "ffbb_search" in result
 
     def test_trouver_club_sans_departement(self):
         result = trouver_club("ASVEL")
         assert "ASVEL" in result
-        assert "ffbb_search_organismes" in result
-        assert "ffbb_get_organisme" in result
+        assert "ffbb_search" in result
+        assert "ffbb_get" in result
 
     def test_trouver_club_avec_departement(self):
         result = trouver_club("Basket Club", department="Lyon")
@@ -31,7 +31,7 @@ class TestPrompts:
     def test_prochain_match_sans_categorie(self):
         result = prochain_match("Vichy")
         assert "Vichy" in result
-        assert "ffbb_calendrier_club" in result
+        assert "ffbb_club" in result
 
     def test_prochain_match_avec_categorie(self):
         result = prochain_match("Vichy", categorie="U11M")
@@ -41,13 +41,13 @@ class TestPrompts:
     def test_classement_poule(self):
         result = classement_poule("Nationale 1")
         assert "Nationale 1" in result
-        assert "ffbb_search_competitions" in result
-        assert "ffbb_get_classement" in result
+        assert "ffbb_search" in result
+        assert "ffbb_get" in result
 
     def test_bilan_equipe(self):
         result = bilan_equipe("SCBA", "U11M")
         assert "SCBA" in result
         assert "U11M" in result
-        assert "ffbb_equipes_club" in result
-        assert "ffbb_get_classement" in result
+        assert "ffbb_search" in result
+        assert "ffbb_club" in result
         assert "cumule" in result.lower()
