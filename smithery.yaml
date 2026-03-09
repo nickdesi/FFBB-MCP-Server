@@ -1,6 +1,6 @@
 startCommand:
   type: stdio
-  config: uv run python -m ffbb_mcp.server
+  config: uv run ffbb-mcp
 configSchema:
   type: object
   required:
@@ -29,4 +29,4 @@ configSchema:
     MCP_MODE:
       type: string
       description: The execution mode of the MCP server (sse or stdio).
-      default: "sse"
+      default: "stdio"
