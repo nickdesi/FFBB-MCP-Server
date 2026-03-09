@@ -51,9 +51,10 @@ mcp = FastMCP(
     "FFBB MCP Server",
     instructions=(
         "Données FFBB (basketball français). "
-        "Workflow : ffbb_search → ffbb_get ou ffbb_club selon le besoin.\n"
-        "Règles : catégorie sans genre → demander M ou F. "
-        "Plusieurs équipes même catégorie → demander laquelle."
+        "Workflow optimal : ffbb_search → ffbb_get(type='poule') pour classement ET matchs en un appel. "
+        "⚡ Règle clé : si tu as un poule_id, utilise ffbb_get(type='poule') — jamais ffbb_club(action='calendrier'). "
+        "ffbb_club(action='calendrier') = dernier recours si aucun poule_id disponible. "
+        "Règles : catégorie sans genre → demander M ou F. Plusieurs équipes même catégorie → demander laquelle."
     ),
     dependencies=["mcp", "ffbb-api-client-v3"],
     transport_security=TransportSecuritySettings(
@@ -159,6 +160,9 @@ async def ffbb_get(
 
     type='competition' → infos compétition + liste des poules.
     type='poule' → classement + toutes les rencontres de la poule.
+                   ⚡ Si tu as déjà un poule_id, utilise TOUJOURS ce type
+                   pour récupérer les matchs — c'est plus rapide que
+                   ffbb_club(action='calendrier').
     type='organisme' → infos club + engagements saison.
     L'ID vient des résultats de ffbb_search.
     """
@@ -204,9 +208,14 @@ async def ffbb_club(
 ) -> list[dict[str, Any]]:
     """Actions sur un club FFBB : calendrier, équipes ou classement.
 
-    action='calendrier' → tous les matchs passés et futurs d'un club (nécessite organisme_id ou club_name).
-    action='equipes'    → liste des équipes engagées avec poule_id (nécessite organisme_id).
-    action='classement' → classement d'une poule (nécessite poule_id).
+    action='calendrier' → UNIQUEMENT si tu n'as pas de poule_id.
+                          Workflow lourd (recherche → équipes → poules).
+                          Nécessite organisme_id ou club_name.
+                          ⚠️ Si tu as déjà un poule_id, utilise plutôt
+                          ffbb_get(id=poule_id, type='poule') — beaucoup plus rapide.
+    action='equipes'    → liste des équipes engagées + leurs poule_id (nécessite organisme_id).
+                          Utilise ensuite ffbb_get(type='poule') avec le poule_id obtenu.
+    action='classement' → classement simplifié d'une poule (nécessite poule_id).
     """
     try:
         if action == "calendrier":
