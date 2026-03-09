@@ -23,7 +23,7 @@
 
 ## 🌟 Aperçu
 
-Le serveur **FFBB MCP** expose les données de la Fédération Française de Basketball (FFBB). Il permet aux agents IA (comme Claude, Gemini, Cursor) de naviguer intelligemment dans l'écosystème du basket français : des ligues nationales aux championnats départementaux.
+Le serveur **FFBB MCP** est la **première et unique référence mondiale** pour exposer les données officielles du basketball français (FFBB) au protocole MCP. Il permet aux agents IA (comme Claude, Gemini, Cursor) de naviguer intelligemment dans l'écosystème du basket français : des ligues nationales aux championnats départementaux, avec une compréhension métier inégalée.
 
 ### 🏗️ Architecture
 
@@ -147,23 +147,27 @@ npx -y @smithery/cli@latest install @nickdesi/mcpffbb --client claude
 
 ## 🛠️ Outils Disponibles
 
-| Catégorie | Outils | Description |
-| --------- | -------- | ----------- |
-| **Lives** | `ffbb_get_lives` | Scores en direct de tous les matchs en cours. |
-| **Search** | `ffbb_multi_search` | Recherche globale (clubs, compétitions, salles). |
-| **Club** | `ffbb_calendrier_club` | Matchs à venir pour un club spécifique. |
-| **Stats** | `ffbb_get_classement` | Classement détaillé d'une poule/groupe. |
+| Outil | Description | Paramètres Clés |
+| ----- | ----------- | --------------- |
+| `ffbb_search` | Recherche unifiée multi-critères. | `query`, `type` (competition, organisme, salle...), `limit` |
+| `ffbb_get` | Accès direct par ID technique. | `id`, `type` (competition, poule, organisme) |
+| `ffbb_club` | Actions groupées sur un club. | `action` (calendrier, equipes, classement), `club_name` ou `organisme_id` |
+| `ffbb_lives` | Scores en direct (cache 30s). | Aucun |
+| `ffbb_saisons` | Liste des saisons disponibles. | `active_only` |
 
 > [!TIP]
-> Voir la [Référence complète des caractéristiques (Outils & Prompts)](docs/TOOLS_REFERENCE.md) pour la liste exhaustive.
+> Pour une documentation exhaustive des schémas et des exemples d'appels, consultez la [Référence des Outils](docs/TOOLS_REFERENCE.md).
 
 ---
 
-## 🎭 Prompts Prédéfinis
+## 🎭 Prompts Prédéfinis (Intelligence Embarquée)
 
-Le serveur expose également un prompt prédéfini (standard MCP) pour initialiser un agent expert sur ces données :
+Le serveur expose des configurations prêtes à l'emploi pour transformer votre LLM en expert :
 
-- `expert_basket` : Configure le LLM pour agir en tant qu'assistant expert en basketball français, incluant les workflows de recherche par défaut et les directives pour l'utilisation des outils. Idéal en tant que *System Prompt* pour l'agent.
+- `expert_basket` : **Le point d'entrée recommandé.** Configure l'agent avec toutes les règles de désambiguïsation (M/F, Équipe 1/2) et les workflows optimaux pour naviguer dans les données.
+- `analyser_match` : Analyse approfondie d'une rencontre via son ID.
+- `bilan_equipe` : Génère un rapport statistique complet sur la saison d'une équipe spécifique.
+- `trouver_club`, `prochain_match`, `classement_poule` : Raccourcis pour des recherches ciblées.
 
 ---
 

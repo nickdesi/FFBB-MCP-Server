@@ -4,7 +4,7 @@ Merci de l'intérêt que vous portez au projet ! Ce document explique comment co
 
 ## 🛠️ Configuration du Développement
 
-Ce projet utilise `uv` pour la gestion des dépendances.
+Ce projet utilise `uv` pour une gestion ultra-rapide des dépendances.
 
 1. **Cloner le repository** (avec les sous-modules) :
 
@@ -13,22 +13,16 @@ Ce projet utilise `uv` pour la gestion des dépendances.
     cd FFBB-MCP-Server
     ```
 
-2. **Installer les dépendances** :
+2. **Configuration de l'environnement** :
 
     ```bash
+    # Créer et activer l'environnement virtuel
     uv venv
-    source .venv/bin/activate  # Sur macOS/Linux
+    source .venv/bin/activate  # macOS/Linux
+    # .\.venv\Scripts\activate  # Windows
+
+    # Installer en mode éditable avec les outils de dev
     uv pip install -e ".[dev]"
-    ```
-
-3. **Gérer le client API (Submodule)** :
-    Le client `FFBBApiClientV3_Ref` est une dépendance interne. Si vous modifiez ce dossier, n'oubliez pas de commiter à l'intérieur du dossier :
-
-    ```bash
-    cd FFBBApiClientV3_Ref
-    git add . && git commit -m "..."
-    cd ..
-    git add FFBBApiClientV3_Ref
     ```
 
 ## 📏 Standards de Qualité

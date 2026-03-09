@@ -1,136 +1,113 @@
-# 📚 Référence des outils FFBB MCP
+# 📚 Référence Complète des Outils FFBB MCP
 
-Ce document détaille chaque outil exposé par le serveur, ses paramètres et son utilité.
-
----
-
-## 📅 Matchs et Calendrier
-
-### `ffbb_get_lives`
-
-Récupère les matchs de basketball en cours (live). Retourne la liste des rencontres avec les scores actuels, les équipes et le statut du match.
-
-- **Paramètres** : Aucun
-- **Usage recommandé** : Suivre les scores en direct le week-end.
-
-### `ffbb_get_saisons`
-
-Récupère la liste de toutes les saisons disponibles.
-
-- **Paramètres** :
-  - `active_only` (boolean, optionnel) : Si true, ne retourne que la saison active.
-- **Usage recommandé** : Trouver l'année en cours ou l'identifiant pour la saison actuelle.
-
-### `ffbb_calendrier_club`
-
-Recherche les matchs à venir et passés d'un club.
-
-- **Paramètres** :
-  - `club_name` (string) : Nom du club (ex: 'ASVEL').
-  - `categorie` (string, optionnel) : Catégorie d'âge/sexe (ex: 'U11M').
-- **Usage recommandé** : Savoir quand joue une équipe spécifique.
+Ce document fournit une documentation technique exhaustive pour les outils exposés par le serveur FFBB MCP. Il est destiné aux développeurs et aux agents IA pour comprendre les capacités et les schémas de données du serveur.
 
 ---
 
-## 🏆 Compétitions et Poules
+## 🛠️ Outils de Recherche Unifiés
 
-### `ffbb_get_competition`
+Le serveur a été refondu pour proposer des outils polyvalents qui réduisent le nombre d'appels nécessaires.
 
-Détails complets d'une compétition par son ID (nom, type, saisons, poules).
+### 1. `ffbb_search`
 
-- **Paramètres** : `competition_id` (integer)
-- **Note** : Utilisez `ffbb_search_competitions` pour trouver l'ID.
+**Description** : Point d'entrée principal pour trouver n'importe quelle entité dans l'écosystème FFBB. Recherche floue via Meilisearch.
 
-### `ffbb_get_classement`
+- **Arguments** :
+  - `query` (string, requis) : Le texte à rechercher (nom de club, ville, nom de compétition, etc.).
+  - `type` (enum, défaut: `"all"`) : Filtre le type de résultat.
+    - `all` : Cherche partout.
+    - `competitions` : Championnats et coupes.
+    - `organismes` : Clubs, comités, ligues.
+    - `rencontres` : Matchs spécifiques.
+    - `salles` : Gymnases et complexes sportifs.
+    - `pratiques` : Types de jeu (5x5, 3x3).
+    - `terrains` : Terrains extérieurs.
+    - `tournois` : Événements ponctuels.
+  - `limit` (integer, défaut: `20`) : Nombre maximum de résultats (1-100).
 
-Récupère uniquement le classement d'une poule (sans les matchs). Très léger.
+- **Exemple d'appel** :
 
-- **Paramètres** : `poule_id` (integer)
-- **Usage recommandé** : Consulter les positions sans charger tout l'historique des matchs.
+  ```json
+  { "query": "Stade Clermontois", "type": "organismes" }
+  ```
 
----
-
-## 🏠 Clubs et Organismes
-
-### `ffbb_get_organisme`
-
-Informations détaillées d'un club (adresse, type, toutes les équipes).
-
-- **Paramètres** : `organisme_id` (integer)
-
-### `ffbb_equipes_club`
-
-Liste allégée des équipes engagées par un club.
-
-- **Paramètres** : `organisme_id` (integer)
-- **Usage recommandé** : Éviter de télécharger les adresses et détails admin quand on ne cherche que les équipes.
+- **Retour** : Une liste d'objets contenant au minimum un `id` technique et un `nom`.
 
 ---
 
-## 🔍 Recherche (Meilisearch)
+### 2. `ffbb_get`
 
-### `ffbb_multi_search`
+**Description** : Récupère les données brutes complètes d'une entité à partir de son identifiant numérique récupéré via `ffbb_search`.
 
-Recherche globale sur tous les types FFBB en une seule requête.
+- **Arguments** :
+  - `id` (integer|string, requis) : L'ID technique de l'entité.
+  - `type` (enum, requis) : Le type d'entité demandée.
+    - `competition` : Détails, saisons disponibles et liste des poules.
+    - `poule` : **Le plus complet pour un championnat.** Contient le classement ET toutes les rencontres de la saison pour cette poule.
+    - `organisme` : Détails admin du club, adresse, et liste des engagements (équipes).
 
-- **Paramètres** : `name` (string)
-- **Usage recommandé** : Première exploration quand on ne sait pas si le terme désigne un club ou un tournoi.
-
-### `ffbb_search_*`
-
-Série d'outils spécialisés par type :
-
-- `ffbb_search_competitions`
-- `ffbb_search_organismes`
-- `ffbb_search_rencontres`
-- `ffbb_search_salles`
-- `ffbb_search_tournois`
-- `ffbb_search_terrains`
-- `ffbb_search_pratiques`
+- **Note importante** : `ffbb_get(type='poule')` est la méthode la plus rapide pour obtenir à la fois les scores passés et le calendrier futur d'un groupe.
 
 ---
 
-## 📝 Prompts MCP Prédéfinis
+### 3. `ffbb_club`
 
-Le serveur expose également des **Prompts MCP**. Ceux-ci permettent d'initialiser rapidement un agent ou de formuler une requête complexe avec un contexte prêt à l'emploi.
+**Description** : Outil métier dédié aux clubs pour simplifier les workflows courants sans manipuler plusieurs IDs complexes.
 
-### `expert_basket`
+- **Arguments** :
+  - `action` (enum, requis) : L'opération à effectuer.
+    - `calendrier` : Récupère TOUS les matchs (passés et futurs) du club.
+    - `equipes` : Liste les équipes engagées par le club (inclut les `poule_id` nécessaires pour d'autres outils).
+    - `classement` : Récupère le classement d'une poule spécifique.
+  - `organisme_id` (integer, optionnel) : ID du club (préféré pour la précision).
+  - `club_name` (string, optionnel) : Nom du club (utilisé si l'ID est inconnu).
+  - `filtre` (string, optionnel) : Filtre textuel pour la catégorie (ex: "U13", "Senior F", "NM1").
+  - `poule_id` (integer, requis si action=`classement`) : L'identifiant de la poule.
 
-Configure le LLM pour agir en tant qu'assistant expert en basketball français.
+- **Exemple : Récupérer le calendrier des U13 masculins d'un club** :
 
-- **Utilité** : Injecte le System Prompt idéal avec les workflows recommandés (point d'entrée, comportement, vérifications).
+  ```json
+  { "action": "calendrier", "club_name": "JAV", "filtre": "U13M" }
+  ```
 
-### `analyser_match`
+---
 
-Génère un prompt pour analyser un match spécifique.
+## 🕒 Temps réel et Saisons
 
-- **Arguments** : `match_id` (string)
-- **Utilité** : Demander à l'agent de récupérer le contexte, les enjeux et le résultat probable d'une rencontre.
+### `ffbb_lives`
 
-### `trouver_club`
+**Description** : Récupère instantanément tous les matchs en cours (Live Stats). Les scores sont rafraîchis toutes les 30 secondes.
 
-Aide à trouver un club et ses informations détaillées.
+- **Arguments** : Aucun.
 
-- **Arguments** : `club_name` (string), `department` (string, optionnel)
-- **Utilité** : Orchestre la recherche `ffbb_search_organismes` suivie de `ffbb_get_organisme`.
+### `ffbb_saisons`
 
-### `prochain_match`
+**Description** : Liste les saisons sportives disponibles dans la base FFBB.
 
-Aide à trouver le prochain match d'une équipe pour un club donné.
+- **Arguments** :
+  - `active_only` (boolean, défaut: `false`) : Si `true`, ne retourne que la saison en cours (ex: 2024-2025).
 
-- **Arguments** : `club_name` (string), `categorie` (string, optionnel)
-- **Utilité** : Appelle `ffbb_calendrier_club` et filtre intelligemment les matchs à venir.
+---
 
-### `classement_poule`
+## 🎭 Prompts Prédéfinis (Workflows AI)
 
-Aide à consulter le classement complet d'une compétition.
+Le serveur ne se contente pas de données brutes, il guide l'IA via des prompts système :
 
-- **Arguments** : `competition_name` (string)
-- **Utilité** : Construit une suite logique de recherche, récupération des poules, puis affichage du classement.
+1. **`expert_basket`** : Initialise un agent avec les connaissances métiers (règles de désambiguïsation, priorités de recherche).
+2. **`bilan_equipe`** : Enchaîne automatiquement la recherche de club, le listing des équipes et la récupération des classements pour produire un rapport.
 
-### `bilan_equipe`
+---
 
-Fait le bilan complet d'une équipe sur toute la saison.
+## 💡 Conseils d'utilisation (Best Practices)
 
-- **Arguments** : `club_name` (string), `categorie` (string)
-- **Utilité** : Script un workflow très complet (recherche de club → liste d'équipes → classements pour chaque phase → cumul statistique).
+1. **Workflow Optimal** :
+    - `ffbb_search(query='nom', type='organismes')` -> Récupérer l'ID.
+    - `ffbb_club(action='equipes', organisme_id=ID)` -> Trouver l'équipe et son `poule_id`.
+    - `ffbb_get(type='poule', id=POULE_ID)` -> Vision complète (Classement + Matchs).
+
+2. **Désambiguïsation** :
+    - Si l'utilisateur demande "U13", toujours vérifier s'il s'agit de Masculin (M) ou Féminin (F).
+    - Pour les clubs avec plusieurs équipes (ex: U13M-1, U13M-2), l'équipe 1 est toujours celle au niveau le plus haut.
+
+3. **Cache** :
+    - Les résultats de recherche et de détails sont mis en cache côté serveur pour optimiser les performances. Ne pas hésiter à répéter des appels similaires.

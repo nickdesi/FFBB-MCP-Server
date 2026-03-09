@@ -17,26 +17,37 @@ Le serveur supporte deux modes d'exposition :
 
 ### 3. Service Layer (`services.py`)
 
-Cette couche fait le pont entre les outils MCP et le client API FFBB. Elle gère :
+Cette couche fait le pont entre les outils MCP et le client API FFBB. Elle implémente les patterns suivants :
 
-- La transformation des données brutes en JSON structuré.
-- La gestion des erreurs d'API.
-- Le filtrage et le tri des résultats.
+- **Unification des entrées** : Centralise les requêtes disparates vers des points d'entrée uniques pour simplifier l'utilisation par les LLMs.
+- **Normalisation des données** : Transforme les modèles Pydantic complexes de l'API FFBB en structures JSON légères et exploitables.
+- **Gestion du Cache** : Utilise des mécanismes de mise en cache pour réduire la latence sur les requêtes fréquentes (recherche, classements).
+
+## 🏗️ Consolidation des Outils (Refactoring)
+
+Récemment, le serveur a migré de 15 outils atomiques vers **5 outils unifiés**. Cette approche améliore considérablement les performances des agents IA :
+
+1. **Réduction du Context Window** : Moins de définitions d'outils à charger pour le LLM.
+2. **Logique de Dispatch Interne** : Les outils comme `ffbb_search` utilisent une logique de routing interne pour appeler le bon service de recherche selon les paramètres.
+3. **Discovery Facile** : Un point d'entrée unique (`ffbb_search`) permet à l'agent de trouver des IDs sans connaître l'arborescence complète de l'API.
 
 ## 🔄 Flux de Données
 
 ```mermaid
 sequenceDiagram
     participant LLM as Agent IA (Claude/Cursor)
-    participant MCP as FFBB MCP Server
+    participant MCP as FFBB MCP Server (FastMCP)
+    participant Service as Service Layer (services.py)
     participant API as FFBB Official API
 
-    LLM->>MCP: Appel d'outil (JSON-RPC)
-    MCP->>MCP: Validation des paramètres (Pydantic)
-    MCP->>API: Requête HTTPS (Client V3)
-    API-->>MCP: Données brutes (JSON)
-    MCP->>MCP: Transformation & Nettoyage
-    MCP-->>LLM: Résultat structuré
+    LLM->>MCP: Appel d'outil unifié (ex: ffbb_search)
+    MCP->>MCP: Validation Pydantic
+    MCP->>Service: Dispatching selon paramètres
+    Service->>API: Requête HTTPS (Client CLI V3)
+    API-->>Service: Données brutes
+    Service->>Service: Filtrage & Sérialisation
+    Service-->>MCP: Résultat JSON
+    MCP-->>LLM: Réponse finale
 ```
 
 ## 🌐 Déploiement SSE
@@ -44,15 +55,10 @@ sequenceDiagram
 En mode `SSE`, le serveur utilise `uvicorn` pour lancer une application FastAPI.
 Nous utilisons `mcp.streamable_http_app()` qui permet d'exposer le serveur sur un endpoint unique (ex: `/mcp`) plutôt que de séparer `/sse` et `/messages`. Un endpoint de monitoring `/health` est également exposé par l'application FastAPI indépendamment du router MCP.
 
-### Sécurité
-
-La configuration actuelle utilise `allowed_origins=["*"]` pour faciliter l'intégration avec divers clients web, mais peut être restreinte via les variables d'environnement si nécessaire.
-
 ## 🖥️ Clients Supportés
 
-Le serveur **FFBB MCP** est conçu pour être compatible avec les principaux clients du marché :
+Le serveur **FFBB MCP** est compatible avec tout client respectant le protocole MCP :
 
-- **Google Antigravity** : Intégration native via SSE. La configuration se fait dans `mcp_config.json`.
-- **VS Code** : Utilisation recommandée de l'extension **MCP for VS Code** via le transport SSE.
-- **Claude Desktop** : Support complet via Stdio (local) ou SSE (remote).
-- **Cursor / AnythingLLM** : Compatibilité assurée via les protocoles standards MCP.
+- **Google Antigravity** : Intégration native via SSE.
+- **Claude Desktop / Claude Code** : Support via Stdio (local) ou SSE (distant).
+- **Cursor / IDEs** : Compatibilité via le plugin MCP.
