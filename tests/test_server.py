@@ -21,23 +21,11 @@ async def test_server_tools_importable():
     tool_names = [tool.name for tool in tools]
 
     expected = [
-        "get_lives",
-        "get_saisons",
-        "get_competition",
-        "get_poule",
-        "get_organisme",
-        "get_equipes_club",
-        "get_classement",
-        "search_competitions",
-        "search_organismes",
-        "search_salles",
-        "search_rencontres",
-        "search_pratiques",
-        "search_terrains",
-        "search_tournois",
-        "search_multi",
-        "get_calendrier_club",
-        "version",
+        "ffbb_search",
+        "ffbb_get",
+        "ffbb_club",
+        "ffbb_lives",
+        "ffbb_saisons",
     ]
 
     for expected_name in expected:
@@ -66,9 +54,9 @@ async def test_server_tool_signatures():
     tools = await mcp.list_tools()
 
     # Recherche d'un outil spécifique pour inspecter ses arguments
-    tool = next(t for t in tools if t.name == "get_organisme")
+    tool = next(t for t in tools if t.name == "ffbb_get")
 
     # Dans FastMCP, les paramètres sont dans inputSchema
     props = tool.inputSchema.get("properties", {})
-    assert "organisme_id" in props, "organisme_id devrait être un argument direct"
-    assert "params" not in props, "L'argument 'params' ne devrait plus exister"
+    assert "id" in props, "id devrait être un argument direct"
+    assert "type" in props, "type devrait être un argument direct"
