@@ -37,6 +37,7 @@ T = TypeVar("T")
 _cache_lives = TTLCache(maxsize=1, ttl=30)  # 30 s — scores changent chaque possession
 _cache_search = TTLCache(maxsize=256, ttl=600)  # 10 min — résultats de recherche
 _cache_detail = TTLCache(maxsize=128, ttl=1200)  # 20 min — détails compétitions/clubs
+_cache_calendrier = TTLCache(maxsize=64, ttl=300)  # 5 min — calendriers clubs
 
 
 def _cache_get(cache: TTLCache, key: str) -> Any | None:
@@ -181,15 +182,11 @@ async def get_organisme_service(organisme_id: int | str) -> dict:
 async def ffbb_equipes_club_service(
     organisme_id: int | str, filtre: str | None = None
 ) -> list[dict[str, Any]]:
-    client = await get_client_async()
-    org = await _safe_call(
-        f"Equipes club {organisme_id}",
-        client.get_organisme_async(organisme_id=int(organisme_id)),
-    )
-    if not org:
+    # ✅ Utilise get_organisme_service qui a le TTLCache
+    data = await get_organisme_service(organisme_id)
+    if not data:
         return []
 
-    data = serialize_model(org)
     raw = data.get("engagements", []) if isinstance(data, dict) else []
     flat: list[dict[str, Any]] = []
     club_nom = data.get("nom", "")
@@ -387,9 +384,15 @@ async def get_calendrier_club_service(
 ) -> list[dict]:
     """
     Récupère le calendrier et les résultats d'un club en utilisant le workflow infaillible
-    (Recherche Club -> Equipes -> Poules -> Rencontres), afin de contourner
-    les limitations d'indexation de Meilisearch sur les rencontres.
+    (Recherche Club -> Equipes -> Poules -> Rencontres).
     """
+    # Clé de cache stable
+    cache_key = f"calendrier:{organisme_id or ''}:{(club_name or '').lower().strip()}:{categorie or ''}"
+    cached = _cache_get(_cache_calendrier, cache_key)
+    if cached is not None:
+        logger.debug(f"Cache hit: {cache_key}")
+        return cached
+
     target_org_ids = []
 
     if organisme_id:
@@ -492,4 +495,5 @@ async def get_calendrier_club_service(
 
     # Tri par date décroissante pour avoir les derniers matchs en premier
     all_matches.sort(key=lambda x: x.get("date") or "", reverse=True)
+    _cache_set(_cache_calendrier, cache_key, all_matches)
     return all_matches
