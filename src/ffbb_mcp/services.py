@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
 import time
 import traceback
@@ -49,6 +50,24 @@ _cache_calendrier = TTLCache(maxsize=64, ttl=300)  # 5 min — calendriers clubs
 _cache_lock = RLock()
 _inflight_lock: asyncio.Lock = asyncio.Lock()
 _inflight_detail: dict[str, asyncio.Task[Any]] = {}
+_inflight_search: dict[str, asyncio.Task[Any]] = {}
+_inflight_calendrier: dict[str, asyncio.Task[Any]] = {}
+
+
+def _read_positive_int_env(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+        return value if value > 0 else default
+    except (TypeError, ValueError):
+        return default
+
+
+_MAX_POULE_FETCH_CONCURRENCY = _read_positive_int_env(
+    "FFBB_POULE_FETCH_CONCURRENCY", 8
+)
 
 
 def _cache_get(cache: TTLCache, key: str) -> Any | None:
@@ -154,25 +173,42 @@ async def _safe_call(operation_name: str, coro) -> Any:
 
 async def _dedupe_inflight_detail(cache_key: str, make_coro) -> Any:
     """Déduplique les appels concurrents sur la même clé de détail."""
-    cached = _cache_get(_cache_detail, cache_key)
-    if cached is not None:
-        return cached
+    return await _dedupe_inflight(
+        cache=_cache_detail,
+        cache_key=cache_key,
+        inflight_map=_inflight_detail,
+        make_coro=make_coro,
+    )
 
+
+async def _dedupe_inflight(
+    *,
+    cache: TTLCache | None,
+    cache_key: str,
+    inflight_map: dict[str, asyncio.Task[Any]],
+    make_coro,
+) -> Any:
+    """Déduplique les appels concurrents sur une clé et met en cache le résultat."""
+    if cache is not None:
+        cached = _cache_get(cache, cache_key)
+        if cached is not None:
+            return cached
+
+    existing: asyncio.Task[Any] | None = None
     async with _inflight_lock:
-        existing = _inflight_detail.get(cache_key)
-        if existing is not None:
-            return await existing
-
-        task = asyncio.create_task(make_coro())
-        _inflight_detail[cache_key] = task
+        existing = inflight_map.get(cache_key)
+        if existing is None:
+            existing = asyncio.create_task(make_coro())
+            inflight_map[cache_key] = existing
 
     try:
-        result = await task
-        _cache_set(_cache_detail, cache_key, result)
+        result = await existing
+        if cache is not None:
+            _cache_set(cache, cache_key, result)
         return result
     finally:
         async with _inflight_lock:
-            _inflight_detail.pop(cache_key, None)
+            inflight_map.pop(cache_key, None)
 
 
 # ---------------------------------------------------------------------------
@@ -358,19 +394,23 @@ async def _search_generic(
 ) -> list[dict]:
     normalized_query = normalize_query(query)
     cache_key = f"search:{operation}:{normalized_query}:{limit}"
-    cached = _cache_get(_cache_search, cache_key)
-    if cached is not None:
-        logger.debug(f"Cache hit: {cache_key}")
-        return cached
 
-    client = await get_client_async()
-    method = getattr(client, method_name)
-    results = await _safe_call(f"Search {operation}: {query}", method(normalized_query))
-    if not results or not results.hits:
-        return []
-    result = [serialize_model(hit) for hit in results.hits[:limit]]
-    _cache_set(_cache_search, cache_key, result)
-    return result
+    async def _fetch() -> list[dict]:
+        client = await get_client_async()
+        method = getattr(client, method_name)
+        results = await _safe_call(
+            f"Search {operation}: {query}", method(normalized_query)
+        )
+        if not results or not results.hits:
+            return []
+        return [serialize_model(hit) for hit in results.hits[:limit]]
+
+    return await _dedupe_inflight(
+        cache=_cache_search,
+        cache_key=cache_key,
+        inflight_map=_inflight_search,
+        make_coro=_fetch,
+    )
 
 
 async def search_competitions_service(nom: str, limit: int = 20) -> list[dict]:
@@ -406,69 +446,72 @@ async def search_tournois_service(nom: str, limit: int = 20) -> list[dict]:
 async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]]:
     normalized_query = normalize_query(nom)
     cache_key = f"multi_search:{normalized_query}:{limit}"
-    cached = _cache_get(_cache_search, cache_key)
-    if cached is not None:
-        return cached
 
-    client = await get_client_async()
-    primary_limit = min(limit, max(2, (limit + 2) // 3))
-    secondary_limit = min(limit, max(1, (limit + 9) // 10))
-    queries = [
-        MultiSearchQuery(
-            index_uid=MEILISEARCH_INDEX_ORGANISMES,
-            q=normalized_query,
-            limit=primary_limit,
-        ),
-        MultiSearchQuery(
-            index_uid=MEILISEARCH_INDEX_COMPETITIONS,
-            q=normalized_query,
-            limit=primary_limit,
-        ),
-        MultiSearchQuery(
-            index_uid=MEILISEARCH_INDEX_RENCONTRES,
-            q=normalized_query,
-            limit=primary_limit,
-        ),
-        MultiSearchQuery(
-            index_uid=MEILISEARCH_INDEX_SALLES,
-            q=normalized_query,
-            limit=secondary_limit,
-        ),
-        MultiSearchQuery(
-            index_uid=MEILISEARCH_INDEX_PRATIQUES,
-            q=normalized_query,
-            limit=secondary_limit,
-        ),
-        MultiSearchQuery(
-            index_uid=MEILISEARCH_INDEX_TERRAINS,
-            q=normalized_query,
-            limit=secondary_limit,
-        ),
-        MultiSearchQuery(
-            index_uid=MEILISEARCH_INDEX_TOURNOIS,
-            q=normalized_query,
-            limit=secondary_limit,
-        ),
-    ]
-    raw = await _safe_call(f"Multi-search: {nom}", client.multi_search_async(queries))
+    async def _fetch() -> list[dict[str, Any]]:
+        client = await get_client_async()
+        primary_limit = min(limit, max(2, (limit + 2) // 3))
+        secondary_limit = min(limit, max(1, (limit + 9) // 10))
+        queries = [
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_ORGANISMES,
+                q=normalized_query,
+                limit=primary_limit,
+            ),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_COMPETITIONS,
+                q=normalized_query,
+                limit=primary_limit,
+            ),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_RENCONTRES,
+                q=normalized_query,
+                limit=primary_limit,
+            ),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_SALLES,
+                q=normalized_query,
+                limit=secondary_limit,
+            ),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_PRATIQUES,
+                q=normalized_query,
+                limit=secondary_limit,
+            ),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_TERRAINS,
+                q=normalized_query,
+                limit=secondary_limit,
+            ),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_TOURNOIS,
+                q=normalized_query,
+                limit=secondary_limit,
+            ),
+        ]
+        raw = await _safe_call(
+            f"Multi-search: {nom}", client.multi_search_async(queries)
+        )
 
-    if not raw or not hasattr(raw, "results") or not raw.results:
-        return []
+        if not raw or not hasattr(raw, "results") or not raw.results:
+            return []
 
-    output: list[dict[str, Any]] = []
+        output: list[dict[str, Any]] = []
+        for res in raw.results:
+            category = res.index_uid
+            for hit in res.hits:
+                item = serialize_model(hit)
+                item["_type"] = category
+                output.append(item)
+                if len(output) >= limit:
+                    return output
+        return output
 
-    for res in raw.results:
-        category = res.index_uid
-        for hit in res.hits:
-            item = serialize_model(hit)
-            item["_type"] = category
-            output.append(item)
-            if len(output) >= limit:
-                _cache_set(_cache_search, cache_key, output)
-                return output
-
-    _cache_set(_cache_search, cache_key, output)
-    return output
+    return await _dedupe_inflight(
+        cache=_cache_search,
+        cache_key=cache_key,
+        inflight_map=_inflight_search,
+        make_coro=_fetch,
+    )
 
 
 async def get_calendrier_club_service(
@@ -480,141 +523,148 @@ async def get_calendrier_club_service(
     Récupère le calendrier et les résultats d'un club en utilisant le workflow infaillible
     (Recherche Club -> Equipes -> Poules -> Rencontres).
     """
-    # Clé de cache stable
     cache_key = f"calendrier:{organisme_id or ''}:{(club_name or '').lower().strip()}:{categorie or ''}"
-    cached = _cache_get(_cache_calendrier, cache_key)
-    if cached is not None:
-        logger.debug(f"Cache hit: {cache_key}")
-        return cached
 
-    target_org_ids = []
+    async def _fetch() -> list[dict]:
+        target_org_ids = []
 
-    if organisme_id:
-        target_org_ids = [organisme_id]
-    elif club_name:
-        orgs = await search_organismes_service(nom=club_name, limit=3)
-        target_org_ids = [
-            org.get("id") for org in orgs if isinstance(org, dict) and org.get("id")
+        if organisme_id:
+            target_org_ids = [organisme_id]
+        elif club_name:
+            orgs = await search_organismes_service(nom=club_name, limit=3)
+            target_org_ids = [
+                org.get("id") for org in orgs if isinstance(org, dict) and org.get("id")
+            ]
+
+        target_org_ids = list(dict.fromkeys(str(oid) for oid in target_org_ids))
+        if not target_org_ids:
+            return []
+
+        # 2. Récupérer les équipes engagées correspondant à la catégorie en parallèle
+        eq_tasks = [
+            ffbb_equipes_club_service(organisme_id=oid, filtre=categorie)
+            for oid in target_org_ids
         ]
+        eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
 
-    target_org_ids = list(dict.fromkeys(str(oid) for oid in target_org_ids))
+        equipes = []
+        for res in eq_results:
+            if isinstance(res, list):
+                equipes.extend(res)
+            elif isinstance(res, Exception):
+                logger.error(f"Erreur lors de la récupération des équipes: {res}")
 
-    if not target_org_ids:
-        return []
+        if not equipes:
+            return []
 
-    # 2. Récupérer les équipes engagées correspondant à la catégorie en parallèle
-    eq_tasks = [
-        ffbb_equipes_club_service(organisme_id=oid, filtre=categorie)
-        for oid in target_org_ids
-    ]
-    eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
-
-    equipes = []
-    for res in eq_results:
-        if isinstance(res, list):
-            equipes.extend(res)
-        elif isinstance(res, Exception):
-            logger.error(f"Erreur lors de la récupération des équipes: {res}")
-
-    if not equipes:
-        return []
-
-    deduped_equipes: list[dict[str, Any]] = []
-    seen_engagement_ids: set[str] = set()
-    for equipe in equipes:
-        engagement_id = equipe.get("engagement_id")
-        if engagement_id is None:
+        deduped_equipes: list[dict[str, Any]] = []
+        seen_engagement_ids: set[str] = set()
+        for equipe in equipes:
+            engagement_id = equipe.get("engagement_id")
+            if engagement_id is None:
+                deduped_equipes.append(equipe)
+                continue
+            engagement_key = str(engagement_id)
+            if engagement_key in seen_engagement_ids:
+                continue
+            seen_engagement_ids.add(engagement_key)
             deduped_equipes.append(equipe)
-            continue
-        engagement_key = str(engagement_id)
-        if engagement_key in seen_engagement_ids:
-            continue
-        seen_engagement_ids.add(engagement_key)
-        deduped_equipes.append(equipe)
 
-    equipes = deduped_equipes
+        equipes = deduped_equipes
 
-    # 3. Parcourir toutes les poules de ces équipes pour récupérer toutes les rencontres et scores
-    seen_match_ids = set()
-    all_matches = []
+        # 3. Parcourir toutes les poules de ces équipes pour récupérer toutes les rencontres et scores
+        seen_match_ids = set()
+        all_matches = []
 
-    # Concurrency for massive performance improvements (avoids repeated blocking lookups)
-    unique_poule_ids = list(
-        dict.fromkeys(str(e.get("poule_id")) for e in equipes if e.get("poule_id"))
-    )
-    poule_tasks = [get_poule_service(poule_id) for poule_id in unique_poule_ids]
-    poules_data = await asyncio.gather(*poule_tasks, return_exceptions=True)
-    poules_by_id = {
-        poule_id: poule_data
-        for poule_id, poule_data in zip(unique_poule_ids, poules_data, strict=False)
-    }
+        unique_poule_ids = list(
+            dict.fromkeys(str(e.get("poule_id")) for e in equipes if e.get("poule_id"))
+        )
 
-    for equipe in equipes:
-        poule_id = equipe.get("poule_id")
-        if not poule_id:
-            continue
+        semaphore = asyncio.Semaphore(_MAX_POULE_FETCH_CONCURRENCY)
 
-        poule_data = poules_by_id.get(str(poule_id))
-        if (
-            isinstance(poule_data, Exception)
-            or not poule_data
-            or "rencontres" not in poule_data
-        ):
-            continue
+        async def _fetch_poule(poule_id: str) -> dict[str, Any] | Exception:
+            async with semaphore:
+                return await get_poule_service(poule_id)
 
-        for match in poule_data.get("rencontres", []):
-            match_id = match.get("id")
-            if not match_id or match_id in seen_match_ids:
+        poule_tasks = [_fetch_poule(poule_id) for poule_id in unique_poule_ids]
+        poules_data = await asyncio.gather(*poule_tasks, return_exceptions=True)
+        poules_by_id = {
+            poule_id: poule_data
+            for poule_id, poule_data in zip(unique_poule_ids, poules_data, strict=False)
+        }
+
+        for equipe in equipes:
+            poule_id = equipe.get("poule_id")
+            if not poule_id:
                 continue
 
-            # --- Filtrage robuste : engagement_id OU nom_equipe ---
-            eng1 = match.get("idEngagementEquipe1")
-            eng2 = match.get("idEngagementEquipe2")
-            id_eng1 = eng1.get("id") if isinstance(eng1, dict) else eng1
-            id_eng2 = eng2.get("id") if isinstance(eng2, dict) else eng2
+            poule_data = poules_by_id.get(str(poule_id))
+            if (
+                isinstance(poule_data, Exception)
+                or not poule_data
+                or "rencontres" not in poule_data
+            ):
+                continue
 
-            my_eng_id = equipe.get("engagement_id")
-            my_team_name = (equipe.get("nom_equipe") or "").lower().strip()
-
-            # Strategy 1: engagement ID matching (precise)
-            if my_eng_id and id_eng1 and id_eng2:
-                if str(my_eng_id) not in (str(id_eng1), str(id_eng2)):
-                    continue
-            elif my_team_name:
-                # Strategy 2: fall back to team name matching
-                eq1_name = (
-                    match.get("nomEquipe1") or match.get("nom_equipe1") or ""
-                ).lower()
-                eq2_name = (
-                    match.get("nomEquipe2") or match.get("nom_equipe2") or ""
-                ).lower()
-                if my_team_name not in eq1_name and my_team_name not in eq2_name:
+            for match in poule_data.get("rencontres", []):
+                match_id = match.get("id")
+                if not match_id or match_id in seen_match_ids:
                     continue
 
-            seen_match_ids.add(match_id)
+                # --- Filtrage robuste : engagement_id OU nom_equipe ---
+                eng1 = match.get("idEngagementEquipe1")
+                eng2 = match.get("idEngagementEquipe2")
+                id_eng1 = eng1.get("id") if isinstance(eng1, dict) else eng1
+                id_eng2 = eng2.get("id") if isinstance(eng2, dict) else eng2
 
-            # Extraction robuste des champs camelCase (API originelle) ou snake_case
-            eq1 = match.get("nomEquipe1", match.get("nom_equipe1", ""))
-            eq2 = match.get("nomEquipe2", match.get("nom_equipe2", ""))
-            score1 = match.get("resultatEquipe1", match.get("resultat_equipe1"))
-            score2 = match.get("resultatEquipe2", match.get("resultat_equipe2"))
-            date_match = match.get("date_rencontre", match.get("date", ""))
-            journee = match.get("numeroJournee", match.get("numero_journee", ""))
+                my_eng_id = equipe.get("engagement_id")
+                my_team_name = (equipe.get("nom_equipe") or "").lower().strip()
 
-            all_matches.append(
-                {
-                    "id": match_id,
-                    "date": date_match,
-                    "equipe1": eq1,
-                    "equipe2": eq2,
-                    "score_equipe1": score1,
-                    "score_equipe2": score2,
-                    "competition_nom": equipe.get("competition", ""),
-                    "num_journee": journee,
-                }
-            )
+                # Strategy 1: engagement ID matching (precise)
+                if my_eng_id and id_eng1 and id_eng2:
+                    if str(my_eng_id) not in (str(id_eng1), str(id_eng2)):
+                        continue
+                elif my_team_name:
+                    # Strategy 2: fall back to team name matching
+                    eq1_name = (
+                        match.get("nomEquipe1") or match.get("nom_equipe1") or ""
+                    ).lower()
+                    eq2_name = (
+                        match.get("nomEquipe2") or match.get("nom_equipe2") or ""
+                    ).lower()
+                    if my_team_name not in eq1_name and my_team_name not in eq2_name:
+                        continue
 
-    # Tri par date décroissante pour avoir les derniers matchs en premier
-    all_matches.sort(key=lambda x: x.get("date") or "", reverse=True)
-    _cache_set(_cache_calendrier, cache_key, all_matches)
-    return all_matches
+                seen_match_ids.add(match_id)
+
+                # Extraction robuste des champs camelCase (API originelle) ou snake_case
+                eq1 = match.get("nomEquipe1", match.get("nom_equipe1", ""))
+                eq2 = match.get("nomEquipe2", match.get("nom_equipe2", ""))
+                score1 = match.get("resultatEquipe1", match.get("resultat_equipe1"))
+                score2 = match.get("resultatEquipe2", match.get("resultat_equipe2"))
+                date_match = match.get("date_rencontre", match.get("date", ""))
+                journee = match.get("numeroJournee", match.get("numero_journee", ""))
+
+                all_matches.append(
+                    {
+                        "id": match_id,
+                        "date": date_match,
+                        "equipe1": eq1,
+                        "equipe2": eq2,
+                        "score_equipe1": score1,
+                        "score_equipe2": score2,
+                        "competition_nom": equipe.get("competition", ""),
+                        "num_journee": journee,
+                    }
+                )
+
+        # Tri par date décroissante pour avoir les derniers matchs en premier
+        all_matches.sort(key=lambda x: x.get("date") or "", reverse=True)
+        return all_matches
+
+    return await _dedupe_inflight(
+        cache=_cache_calendrier,
+        cache_key=cache_key,
+        inflight_map=_inflight_calendrier,
+        make_coro=_fetch,
+    )

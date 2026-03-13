@@ -13,7 +13,9 @@ from ffbb_mcp.services import (
     _cache_detail,
     _cache_lives,
     _cache_search,
+    _inflight_calendrier,
     _inflight_detail,
+    _inflight_search,
     ffbb_equipes_club_service,
     ffbb_get_classement_service,
     get_calendrier_club_service,
@@ -22,6 +24,7 @@ from ffbb_mcp.services import (
     get_poule_service,
     get_saisons_service,
     multi_search_service,
+    search_organismes_service,
 )
 
 
@@ -32,6 +35,8 @@ def clear_caches():
     _cache_detail.clear()
     _cache_calendrier.clear()
     _inflight_detail.clear()
+    _inflight_search.clear()
+    _inflight_calendrier.clear()
     yield
 
 
@@ -198,6 +203,17 @@ class TestGetClassementService:
 
 
 class TestCalendrierClubService:
+    @pytest.mark.asyncio
+    async def test_caches_empty_when_club_not_found(self, patch_get_client, mock_client):
+        mock_client.search_organismes_async = AsyncMock(return_value=None)
+
+        result_1 = await get_calendrier_club_service(club_name="club fantome")
+        result_2 = await get_calendrier_club_service(club_name="club fantome")
+
+        assert result_1 == []
+        assert result_2 == []
+        mock_client.search_organismes_async.assert_awaited_once()
+
     @pytest.mark.asyncio
     async def test_returns_empty_when_no_teams(self, patch_get_client, mock_client):
         # Mock empty engagements
@@ -416,6 +432,32 @@ class TestMultiSearchService:
         assert queries[4].limit == 2
         assert queries[5].limit == 2
         assert queries[6].limit == 2
+
+    @pytest.mark.asyncio
+    async def test_caches_empty_multi_search_results(self, patch_get_client, mock_client):
+        mock_res = MagicMock(spec=MultiSearchResults)
+        mock_res.results = []
+        mock_client.multi_search_async = AsyncMock(return_value=mock_res)
+
+        result_1 = await multi_search_service("club inconnu", limit=10)
+        result_2 = await multi_search_service("club inconnu", limit=10)
+
+        assert result_1 == []
+        assert result_2 == []
+        mock_client.multi_search_async.assert_awaited_once()
+
+
+class TestSearchCaching:
+    @pytest.mark.asyncio
+    async def test_caches_empty_search_results(self, patch_get_client, mock_client):
+        mock_client.search_organismes_async = AsyncMock(return_value=None)
+
+        result_1 = await search_organismes_service("club inexistant", limit=5)
+        result_2 = await search_organismes_service("club inexistant", limit=5)
+
+        assert result_1 == []
+        assert result_2 == []
+        mock_client.search_organismes_async.assert_awaited_once()
 
 
 class TestGetPouleService:
