@@ -1,7 +1,6 @@
 """Tests unitaires des services FFBB (avec mocks, sans appel réseau)."""
 
 import asyncio
-
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
