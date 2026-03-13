@@ -1,5 +1,7 @@
 """Tests unitaires des services FFBB (avec mocks, sans appel réseau)."""
 
+import asyncio
+
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -12,11 +14,13 @@ from ffbb_mcp.services import (
     _cache_detail,
     _cache_lives,
     _cache_search,
+    _inflight_detail,
     ffbb_equipes_club_service,
     ffbb_get_classement_service,
     get_calendrier_club_service,
     get_competition_service,
     get_organisme_service,
+    get_poule_service,
     get_saisons_service,
     multi_search_service,
 )
@@ -28,6 +32,7 @@ def clear_caches():
     _cache_search.clear()
     _cache_detail.clear()
     _cache_calendrier.clear()
+    _inflight_detail.clear()
     yield
 
 
@@ -251,6 +256,71 @@ class TestCalendrierClubService:
         assert result[0]["equipe1"] == "CLERMONT"
         assert result[0]["score_equipe1"] == 50
 
+    async def test_deduplicates_poule_fetches(self, patch_get_client, mock_client):
+        org_mock = MagicMock()
+        org_mock.model_dump = MagicMock(
+            return_value={
+                "nom": "CLERMONT",
+                "engagements": [
+                    {
+                        "id": 1001,
+                        "idCompetition": {
+                            "id": 101,
+                            "nom": "U11M-1",
+                            "categorie": {"code": "U11"},
+                        },
+                        "idPoule": {"id": 201},
+                        "numeroEquipe": 1,
+                    },
+                    {
+                        "id": 1002,
+                        "idCompetition": {
+                            "id": 102,
+                            "nom": "U11M-2",
+                            "categorie": {"code": "U11"},
+                        },
+                        "idPoule": {"id": 201},
+                        "numeroEquipe": 2,
+                    },
+                ],
+            }
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        poule_mock = MagicMock()
+        poule_mock.model_dump = MagicMock(
+            return_value={
+                "rencontres": [
+                    {
+                        "id": "m1",
+                        "date_rencontre": "2024-03-08",
+                        "nomEquipe1": "CLERMONT - 1",
+                        "nomEquipe2": "AUTRE",
+                        "resultatEquipe1": 50,
+                        "resultatEquipe2": 40,
+                        "idEngagementEquipe1": {"id": 1001},
+                        "idEngagementEquipe2": {"id": 9991},
+                    },
+                    {
+                        "id": "m2",
+                        "date_rencontre": "2024-03-09",
+                        "nomEquipe1": "AUTRE",
+                        "nomEquipe2": "CLERMONT - 2",
+                        "resultatEquipe1": 35,
+                        "resultatEquipe2": 45,
+                        "idEngagementEquipe1": {"id": 9992},
+                        "idEngagementEquipe2": {"id": 1002},
+                    },
+                ]
+            }
+        )
+        mock_client.get_poule_async = AsyncMock(return_value=poule_mock)
+
+        result = await get_calendrier_club_service(organisme_id=123)
+
+        assert len(result) == 2
+        assert mock_client.get_poule_async.await_count == 1
+
     @pytest.mark.asyncio
     async def test_ignores_team_without_poule_and_keeps_alignment(
         self, patch_get_client, mock_client
@@ -305,6 +375,7 @@ class TestCalendrierClubService:
         mock_client.get_poule_async = AsyncMock(return_value=poule_mock)
 
         result = await get_calendrier_club_service(organisme_id=123)
+
         assert len(result) == 1
         assert result[0]["id"] == "m2"
 
@@ -329,3 +400,42 @@ class TestMultiSearchService:
         assert len(result) == 1
         assert result[0]["_type"] == "organismes"
         assert result[0]["nom"] == "Club Test"
+
+    @pytest.mark.asyncio
+    async def test_uses_weighted_index_limits(self, patch_get_client, mock_client):
+        mock_res = MagicMock(spec=MultiSearchResults)
+        mock_res.results = []
+        mock_client.multi_search_async = AsyncMock(return_value=mock_res)
+
+        await multi_search_service("test", limit=20)
+
+        queries = mock_client.multi_search_async.await_args.args[0]
+        assert queries[0].limit == 7
+        assert queries[1].limit == 7
+        assert queries[2].limit == 7
+        assert queries[3].limit == 2
+        assert queries[4].limit == 2
+        assert queries[5].limit == 2
+        assert queries[6].limit == 2
+
+
+class TestGetPouleService:
+    @pytest.mark.asyncio
+    async def test_coalesces_concurrent_requests(self, patch_get_client, mock_client):
+        poule_mock = MagicMock()
+        poule_mock.model_dump = MagicMock(return_value={"id": 123, "rencontres": []})
+
+        async def delayed_poule(*, poule_id):
+            await asyncio.sleep(0)
+            return poule_mock
+
+        mock_client.get_poule_async = AsyncMock(side_effect=delayed_poule)
+
+        result1, result2 = await asyncio.gather(
+            get_poule_service(123),
+            get_poule_service(123),
+        )
+
+        assert result1 == {"id": 123, "rencontres": []}
+        assert result2 == {"id": 123, "rencontres": []}
+        assert mock_client.get_poule_async.await_count == 1

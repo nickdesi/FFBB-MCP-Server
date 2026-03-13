@@ -32,6 +32,12 @@ logger = logging.getLogger("ffbb-mcp")
 
 T = TypeVar("T")
 
+_PRIMARY_MULTI_SEARCH_INDEXES = {
+    MEILISEARCH_INDEX_ORGANISMES,
+    MEILISEARCH_INDEX_COMPETITIONS,
+    MEILISEARCH_INDEX_RENCONTRES,
+}
+
 # ---------------------------------------------------------------------------
 # Cache service-level (en mémoire, complémentaire au cache SQLite HTTP)
 # ---------------------------------------------------------------------------
@@ -405,27 +411,43 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
         return cached
 
     client = await get_client_async()
+    primary_limit = min(limit, max(2, (limit + 2) // 3))
+    secondary_limit = min(limit, max(1, (limit + 9) // 10))
     queries = [
         MultiSearchQuery(
-            index_uid=MEILISEARCH_INDEX_ORGANISMES, q=normalized_query, limit=limit
+            index_uid=MEILISEARCH_INDEX_ORGANISMES,
+            q=normalized_query,
+            limit=primary_limit,
         ),
         MultiSearchQuery(
-            index_uid=MEILISEARCH_INDEX_COMPETITIONS, q=normalized_query, limit=limit
+            index_uid=MEILISEARCH_INDEX_COMPETITIONS,
+            q=normalized_query,
+            limit=primary_limit,
         ),
         MultiSearchQuery(
-            index_uid=MEILISEARCH_INDEX_RENCONTRES, q=normalized_query, limit=limit
+            index_uid=MEILISEARCH_INDEX_RENCONTRES,
+            q=normalized_query,
+            limit=primary_limit,
         ),
         MultiSearchQuery(
-            index_uid=MEILISEARCH_INDEX_SALLES, q=normalized_query, limit=limit
+            index_uid=MEILISEARCH_INDEX_SALLES,
+            q=normalized_query,
+            limit=secondary_limit,
         ),
         MultiSearchQuery(
-            index_uid=MEILISEARCH_INDEX_PRATIQUES, q=normalized_query, limit=limit
+            index_uid=MEILISEARCH_INDEX_PRATIQUES,
+            q=normalized_query,
+            limit=secondary_limit,
         ),
         MultiSearchQuery(
-            index_uid=MEILISEARCH_INDEX_TERRAINS, q=normalized_query, limit=limit
+            index_uid=MEILISEARCH_INDEX_TERRAINS,
+            q=normalized_query,
+            limit=secondary_limit,
         ),
         MultiSearchQuery(
-            index_uid=MEILISEARCH_INDEX_TOURNOIS, q=normalized_query, limit=limit
+            index_uid=MEILISEARCH_INDEX_TOURNOIS,
+            q=normalized_query,
+            limit=secondary_limit,
         ),
     ]
     raw = await _safe_call(f"Multi-search: {nom}", client.multi_search_async(queries))
@@ -441,8 +463,10 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
             item = serialize_model(hit)
             item["_type"] = category
             output.append(item)
+            if len(output) >= limit:
+                _cache_set(_cache_search, cache_key, output)
+                return output
 
-    output = output[:limit]
     _cache_set(_cache_search, cache_key, output)
     return output
 
@@ -473,6 +497,8 @@ async def get_calendrier_club_service(
             org.get("id") for org in orgs if isinstance(org, dict) and org.get("id")
         ]
 
+    target_org_ids = list(dict.fromkeys(str(oid) for oid in target_org_ids))
+
     if not target_org_ids:
         return []
 
@@ -493,16 +519,42 @@ async def get_calendrier_club_service(
     if not equipes:
         return []
 
+    deduped_equipes: list[dict[str, Any]] = []
+    seen_engagement_ids: set[str] = set()
+    for equipe in equipes:
+        engagement_id = equipe.get("engagement_id")
+        if engagement_id is None:
+            deduped_equipes.append(equipe)
+            continue
+        engagement_key = str(engagement_id)
+        if engagement_key in seen_engagement_ids:
+            continue
+        seen_engagement_ids.add(engagement_key)
+        deduped_equipes.append(equipe)
+
+    equipes = deduped_equipes
+
     # 3. Parcourir toutes les poules de ces équipes pour récupérer toutes les rencontres et scores
     seen_match_ids = set()
     all_matches = []
 
-    # Concurrency for massive performance improvements (avoids 10x 1s blocking lookups)
-    equipes_with_poule = [e for e in equipes if e.get("poule_id")]
-    poule_tasks = [get_poule_service(e.get("poule_id")) for e in equipes_with_poule]
+    # Concurrency for massive performance improvements (avoids repeated blocking lookups)
+    unique_poule_ids = list(
+        dict.fromkeys(str(e.get("poule_id")) for e in equipes if e.get("poule_id"))
+    )
+    poule_tasks = [get_poule_service(poule_id) for poule_id in unique_poule_ids]
     poules_data = await asyncio.gather(*poule_tasks, return_exceptions=True)
+    poules_by_id = {
+        poule_id: poule_data
+        for poule_id, poule_data in zip(unique_poule_ids, poules_data, strict=False)
+    }
 
-    for equipe, poule_data in zip(equipes_with_poule, poules_data, strict=False):
+    for equipe in equipes:
+        poule_id = equipe.get("poule_id")
+        if not poule_id:
+            continue
+
+        poule_data = poules_by_id.get(str(poule_id))
         if (
             isinstance(poule_data, Exception)
             or not poule_data
@@ -514,8 +566,6 @@ async def get_calendrier_club_service(
             match_id = match.get("id")
             if not match_id or match_id in seen_match_ids:
                 continue
-
-            seen_match_ids.add(match_id)
 
             # --- Filtrage robuste : engagement_id OU nom_equipe ---
             eng1 = match.get("idEngagementEquipe1")
@@ -540,6 +590,8 @@ async def get_calendrier_club_service(
                 ).lower()
                 if my_team_name not in eq1_name and my_team_name not in eq2_name:
                     continue
+
+            seen_match_ids.add(match_id)
 
             # Extraction robuste des champs camelCase (API originelle) ou snake_case
             eq1 = match.get("nomEquipe1", match.get("nom_equipe1", ""))
