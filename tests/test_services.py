@@ -5,8 +5,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from ffbb_api_client_v3.models.multi_search_results import MultiSearchResult
 from ffbb_api_client_v3.models.multi_search_results_class import MultiSearchResults
+from mcp.shared.exceptions import McpError
 
 from ffbb_mcp.services import (
+    _cache_calendrier,
     _cache_detail,
     _cache_lives,
     _cache_search,
@@ -25,6 +27,7 @@ def clear_caches():
     _cache_lives.clear()
     _cache_search.clear()
     _cache_detail.clear()
+    _cache_calendrier.clear()
     yield
 
 
@@ -75,6 +78,28 @@ class TestGetCompetitionService:
         mock_client.get_competition_async = AsyncMock(return_value=None)
         result = await get_competition_service(competition_id=99999)
         assert result == {}
+
+    @pytest.mark.asyncio
+    async def test_raises_mcp_error_when_competition_id_not_numeric(
+        self, patch_get_client, mock_client
+    ):
+        with pytest.raises(McpError):
+            await get_competition_service(competition_id="abc")
+
+    @pytest.mark.asyncio
+    async def test_cache_key_is_canonical_for_numeric_ids(
+        self, patch_get_client, mock_client
+    ):
+        comp_mock = MagicMock()
+        comp_mock.model_dump = MagicMock(return_value={"id": "123", "nom": "Comp"})
+        mock_client.get_competition_async = AsyncMock(return_value=comp_mock)
+
+        result1 = await get_competition_service(competition_id="123")
+        result2 = await get_competition_service(competition_id=123)
+
+        assert result1["id"] == "123"
+        assert result2["id"] == "123"
+        mock_client.get_competition_async.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------------
@@ -225,6 +250,63 @@ class TestCalendrierClubService:
         assert len(result) == 1
         assert result[0]["equipe1"] == "CLERMONT"
         assert result[0]["score_equipe1"] == 50
+
+    @pytest.mark.asyncio
+    async def test_ignores_team_without_poule_and_keeps_alignment(
+        self, patch_get_client, mock_client
+    ):
+        org_mock = MagicMock()
+        org_mock.model_dump = MagicMock(
+            return_value={
+                "nom": "CLERMONT",
+                "engagements": [
+                    {
+                        "id": 1001,
+                        "idCompetition": {
+                            "id": 101,
+                            "nom": "U13F",
+                            "categorie": {"code": "U13"},
+                        },
+                        "idPoule": {},
+                        "numeroEquipe": 1,
+                    },
+                    {
+                        "id": 1002,
+                        "idCompetition": {
+                            "id": 102,
+                            "nom": "U13F",
+                            "categorie": {"code": "U13"},
+                        },
+                        "idPoule": {"id": 201},
+                        "numeroEquipe": 2,
+                    },
+                ],
+            }
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        poule_mock = MagicMock()
+        poule_mock.model_dump = MagicMock(
+            return_value={
+                "rencontres": [
+                    {
+                        "id": "m2",
+                        "date_rencontre": "2024-03-09",
+                        "nomEquipe1": "CLERMONT",
+                        "nomEquipe2": "AUTRE",
+                        "resultatEquipe1": 60,
+                        "resultatEquipe2": 55,
+                        "idEngagementEquipe1": {"id": 1002},
+                        "idEngagementEquipe2": {"id": 2002},
+                    }
+                ]
+            }
+        )
+        mock_client.get_poule_async = AsyncMock(return_value=poule_mock)
+
+        result = await get_calendrier_club_service(organisme_id=123)
+        assert len(result) == 1
+        assert result[0]["id"] == "m2"
 
 
 # ---------------------------------------------------------------------------

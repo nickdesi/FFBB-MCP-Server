@@ -5,6 +5,7 @@ import logging
 import re
 import time
 import traceback
+from threading import RLock
 from typing import Any, TypeVar
 
 from cachetools import TTLCache
@@ -18,6 +19,7 @@ from ffbb_api_client_v3.config import (
     MEILISEARCH_INDEX_TOURNOIS,
 )
 from ffbb_api_client_v3.models import MultiSearchQuery
+from httpx import HTTPStatusError
 from mcp.shared.exceptions import McpError
 from mcp.types import INTERNAL_ERROR, ErrorData
 
@@ -38,16 +40,37 @@ _cache_lives = TTLCache(maxsize=1, ttl=30)  # 30 s — scores changent chaque po
 _cache_search = TTLCache(maxsize=256, ttl=600)  # 10 min — résultats de recherche
 _cache_detail = TTLCache(maxsize=128, ttl=1200)  # 20 min — détails compétitions/clubs
 _cache_calendrier = TTLCache(maxsize=64, ttl=300)  # 5 min — calendriers clubs
+_cache_lock = RLock()
+_inflight_lock: asyncio.Lock = asyncio.Lock()
+_inflight_detail: dict[str, asyncio.Task[Any]] = {}
 
 
 def _cache_get(cache: TTLCache, key: str) -> Any | None:
     """Lecture thread-safe du cache."""
-    return cache.get(key)
+    with _cache_lock:
+        return cache.get(key)
 
 
 def _cache_set(cache: TTLCache, key: str, value: Any) -> None:
     """Écriture thread-safe dans le cache."""
-    cache[key] = value
+    with _cache_lock:
+        cache[key] = value
+
+
+def _coerce_numeric_id(value: int | str, label: str) -> int:
+    """Convertit un identifiant en entier avec message d'erreur explicite."""
+    try:
+        return int(value)
+    except (TypeError, ValueError) as e:
+        raise McpError(
+            error=ErrorData(
+                code=INTERNAL_ERROR,
+                message=(
+                    f"{label} invalide: '{value}'. "
+                    "Un identifiant numérique est requis."
+                ),
+            )
+        ) from e
 
 
 # ---------------------------------------------------------------------------
@@ -63,6 +86,30 @@ def _handle_api_error(e: Exception) -> McpError:
     error_msg = str(e)
     logger.error(f"FFBB API Error: {error_msg}")
     logger.error(traceback.format_exc())
+
+    if isinstance(e, HTTPStatusError):
+        status = e.response.status_code
+        if status == 404:
+            return McpError(
+                error=ErrorData(
+                    code=INTERNAL_ERROR,
+                    message="Ressource FFBB introuvable (404). Vérifiez l'identifiant.",
+                )
+            )
+        if status in (401, 403):
+            return McpError(
+                error=ErrorData(
+                    code=INTERNAL_ERROR,
+                    message="Accès FFBB refusé (401/403). Les tokens sont peut-être expirés.",
+                )
+            )
+        if status == 429:
+            return McpError(
+                error=ErrorData(
+                    code=INTERNAL_ERROR,
+                    message="Rate-limit FFBB atteint (429). Réessayez dans quelques secondes.",
+                )
+            )
 
     # Distinguer les timeouts des autres erreurs
     error_type = type(e).__name__
@@ -99,6 +146,29 @@ async def _safe_call(operation_name: str, coro) -> Any:
         record_call(latency, is_error)
 
 
+async def _dedupe_inflight_detail(cache_key: str, make_coro) -> Any:
+    """Déduplique les appels concurrents sur la même clé de détail."""
+    cached = _cache_get(_cache_detail, cache_key)
+    if cached is not None:
+        return cached
+
+    async with _inflight_lock:
+        existing = _inflight_detail.get(cache_key)
+        if existing is not None:
+            return await existing
+
+        task = asyncio.create_task(make_coro())
+        _inflight_detail[cache_key] = task
+
+    try:
+        result = await task
+        _cache_set(_cache_detail, cache_key, result)
+        return result
+    finally:
+        async with _inflight_lock:
+            _inflight_detail.pop(cache_key, None)
+
+
 # ---------------------------------------------------------------------------
 # Services -- Données en direct
 # ---------------------------------------------------------------------------
@@ -133,50 +203,48 @@ async def get_saisons_service(active_only: bool = False) -> list[dict]:
 
 
 async def get_competition_service(competition_id: int | str) -> dict:
-    cache_key = f"competition:{competition_id}"
-    cached = _cache_get(_cache_detail, cache_key)
-    if cached is not None:
-        return cached
+    competition_id_int = _coerce_numeric_id(competition_id, "competition_id")
+    cache_key = f"competition:{competition_id_int}"
 
-    client = await get_client_async()
-    comp = await _safe_call(
-        f"Compétition {competition_id}",
-        client.get_competition_async(competition_id=int(competition_id)),
-    )
-    result = serialize_model(comp) or {}
-    _cache_set(_cache_detail, cache_key, result)
-    return result
+    async def _fetch() -> dict:
+        client = await get_client_async()
+        comp = await _safe_call(
+            f"Compétition {competition_id_int}",
+            client.get_competition_async(competition_id=competition_id_int),
+        )
+        return serialize_model(comp) or {}
+
+    return await _dedupe_inflight_detail(cache_key, _fetch)
 
 
 async def get_poule_service(poule_id: int | str) -> dict:
-    cache_key = f"poule:{poule_id}"
-    cached = _cache_get(_cache_detail, cache_key)
-    if cached is not None:
-        return cached
+    poule_id_int = _coerce_numeric_id(poule_id, "poule_id")
+    cache_key = f"poule:{poule_id_int}"
 
-    client = await get_client_async()
-    poule = await _safe_call(
-        f"Poule {poule_id}", client.get_poule_async(poule_id=int(poule_id))
-    )
-    result = serialize_model(poule) or {}
-    _cache_set(_cache_detail, cache_key, result)
-    return result
+    async def _fetch() -> dict:
+        client = await get_client_async()
+        poule = await _safe_call(
+            f"Poule {poule_id_int}",
+            client.get_poule_async(poule_id=poule_id_int),
+        )
+        return serialize_model(poule) or {}
+
+    return await _dedupe_inflight_detail(cache_key, _fetch)
 
 
 async def get_organisme_service(organisme_id: int | str) -> dict:
-    cache_key = f"organisme:{organisme_id}"
-    cached = _cache_get(_cache_detail, cache_key)
-    if cached is not None:
-        return cached
+    organisme_id_int = _coerce_numeric_id(organisme_id, "organisme_id")
+    cache_key = f"organisme:{organisme_id_int}"
 
-    client = await get_client_async()
-    org = await _safe_call(
-        f"Organisme {organisme_id}",
-        client.get_organisme_async(organisme_id=int(organisme_id)),
-    )
-    result = serialize_model(org) or {}
-    _cache_set(_cache_detail, cache_key, result)
-    return result
+    async def _fetch() -> dict:
+        client = await get_client_async()
+        org = await _safe_call(
+            f"Organisme {organisme_id_int}",
+            client.get_organisme_async(organisme_id=organisme_id_int),
+        )
+        return serialize_model(org) or {}
+
+    return await _dedupe_inflight_detail(cache_key, _fetch)
 
 
 async def ffbb_equipes_club_service(
@@ -244,14 +312,16 @@ async def ffbb_equipes_club_service(
 
 
 async def ffbb_get_classement_service(poule_id: int | str) -> list[dict[str, Any]]:
-    cache_key = f"classement:{poule_id}"
+    poule_id_int = _coerce_numeric_id(poule_id, "poule_id")
+    cache_key = f"classement:{poule_id_int}"
     cached = _cache_get(_cache_detail, cache_key)
     if cached is not None:
         return cached
 
     client = await get_client_async()
     poule = await _safe_call(
-        f"Classement poule {poule_id}", client.get_poule_async(poule_id=int(poule_id))
+        f"Classement poule {poule_id_int}",
+        client.get_poule_async(poule_id=poule_id_int),
     )
     if not poule:
         return []
@@ -428,12 +498,11 @@ async def get_calendrier_club_service(
     all_matches = []
 
     # Concurrency for massive performance improvements (avoids 10x 1s blocking lookups)
-    poule_tasks = [
-        get_poule_service(e.get("poule_id")) for e in equipes if e.get("poule_id")
-    ]
+    equipes_with_poule = [e for e in equipes if e.get("poule_id")]
+    poule_tasks = [get_poule_service(e.get("poule_id")) for e in equipes_with_poule]
     poules_data = await asyncio.gather(*poule_tasks, return_exceptions=True)
 
-    for equipe, poule_data in zip(equipes, poules_data, strict=False):
+    for equipe, poule_data in zip(equipes_with_poule, poules_data, strict=False):
         if (
             isinstance(poule_data, Exception)
             or not poule_data
