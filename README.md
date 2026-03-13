@@ -1,7 +1,7 @@
 # 🏀 FFBB MCP Server
 
 <p align="center">
-  <img src="./assets/logo.png" width="250" alt="FFBB MCP Logo" />
+  <img src="./assets/logo.webp" width="250" alt="FFBB MCP Logo" />
   <br />
   <b>Le pont entre l'IA et le Basketball français.</b>
   <br />

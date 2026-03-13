@@ -42,9 +42,9 @@ logger = logging.getLogger("ffbb-mcp")
 
 _DEFAULT_PUBLIC_URL = "https://ffbb.desimone.fr"
 _REMOTE_LOGO_URL = (
-    "https://raw.githubusercontent.com/nickdesi/FFBB-MCP-Server/main/assets/logo.png"
+    "https://raw.githubusercontent.com/nickdesi/FFBB-MCP-Server/main/assets/logo.webp"
 )
-_LOGO_PATH = Path(__file__).resolve().parents[2] / "assets" / "logo.png"
+_LOGO_PATH = Path(__file__).resolve().parents[2] / "assets" / "logo.webp"
 
 _READONLY_ANNOTATIONS = {
     "readOnlyHint": True,
@@ -95,7 +95,7 @@ def _get_public_base_url() -> str:
 
 
 def _get_logo_url() -> str:
-    return f"{_get_public_base_url()}/logo.png"
+    return f"{_get_public_base_url()}/logo.webp"
 
 
 def _build_index_html() -> str:
@@ -118,7 +118,7 @@ def _build_index_html() -> str:
         <meta name=\"theme-color\" content=\"#111827\">
         <meta name=\"application-name\" content=\"FFBB MCP Server\">
         <link rel=\"canonical\" href=\"{canonical_url}\">
-        <link rel=\"icon\" type=\"image/png\" href=\"{logo_url}\">
+        <link rel=\"icon\" type=\"image/webp\" href=\"{logo_url}\">
         <link rel=\"apple-touch-icon\" href=\"{logo_url}\">
         <meta property=\"og:locale\" content=\"fr_FR\">
         <meta property=\"og:type\" content=\"website\">
@@ -187,7 +187,7 @@ def _build_sitemap_xml() -> str:
 
 def _logo_response() -> Response:
     if _LOGO_PATH.exists():
-        return FileResponse(_LOGO_PATH, media_type="image/png")
+        return FileResponse(_LOGO_PATH, media_type="image/webp")
     return RedirectResponse(_REMOTE_LOGO_URL)
 
 
@@ -201,7 +201,7 @@ async def metrics(request: Request) -> Response:
     return PlainTextResponse(generate_prometheus_metrics())
 
 
-@mcp.custom_route("/logo.png", methods=["GET"])
+@mcp.custom_route("/logo.webp", methods=["GET"])
 async def logo(request: Request) -> Response:
     return _logo_response()
 
