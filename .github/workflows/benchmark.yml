@@ -9,6 +9,8 @@ on:
 jobs:
   benchmark:
     runs-on: ubuntu-latest
+    env:
+      ACTIONS_ALLOW_UNSECURE_NODE_VERSION: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,10 +20,11 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
+      - name: Install dependencies (robust)
         run: |
-          python -m pip install --upgrade pip
-          pip install -e .[dev]
+          python -m pip install --upgrade pip setuptools wheel
+          # retry once on transient network failures when installing editable package
+          python -m pip install -e .[dev] || python -m pip install -e .[dev]
 
       - name: Run tests
         run: python -m pytest -q
