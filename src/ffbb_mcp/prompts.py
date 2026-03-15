@@ -49,7 +49,8 @@ def expert_basket() -> str:
         "2. `ffbb_club(action='equipes', organisme_id=...)` → `poule_id`\n"
         "3. `ffbb_get(type='poule', id=<poule_id>)` → classement + matchs\n\n"
         "### 🏆 Pour le CALENDRIER seul (matchs à venir)\n"
-        "Utilise `ffbb_club(action='calendrier')` uniquement si tu n'as pas de `poule_id`.\n\n"
+        "Utilise `ffbb_get(type='poule', id=<poule_id>)` si tu as déjà un `poule_id`.\n"
+        "Sinon utilise `ffbb_club(action='calendrier')` comme dernier recours.\n\n"
         "### Autres outils\n"
         "- Recherche générale → `ffbb_search(type='all')` (clubs, compétitions, salles, etc.)\n"
         "- Détails compétition → `ffbb_get(type='competition', id=...)` → liste les poules\n"
@@ -92,10 +93,14 @@ def prochain_match(club_name: str, categorie: str = "") -> str:
         query += f" {categorie}"
     return (
         f"Je cherche le prochain match de '{query}'.\n"
-        f"1. Utilise `ffbb_club(action='calendrier', club_name='{club_name}'"
+        # FIX: on privilégie ffbb_get(type='poule') si un poule_id est disponible —
+        # plus rapide que le workflow calendrier complet.
+        "1. Si tu as déjà un `poule_id`, utilise directement "
+        "`ffbb_get(type='poule', id=<poule_id>)` et filtre les matchs à venir.\n"
+        f"   Sinon, utilise `ffbb_club(action='calendrier', club_name='{club_name}'"
         + (f", filtre='{categorie}'" if categorie else "")
-        + ")\n"
-        "2. Filtre les résultats pour ne garder que les matchs à venir\n"
+        + ")` comme alternative.\n"
+        "2. Filtre les résultats pour ne garder que les matchs à venir (score absent ou nul).\n"
         "3. Donne la date, l'heure, l'adversaire et le lieu du prochain match."
     )
 
@@ -113,19 +118,18 @@ def classement_poule(competition_name: str) -> str:
 
 def bilan_equipe(club_name: str, categorie: str) -> str:
     """Aide à faire le bilan complet d'une équipe sur toute la saison."""
+    # FIX: réécrit pour utiliser ffbb_bilan (1 seul appel) au lieu de
+    # l'ancien workflow manuel (4-5 appels), cohérent avec expert_basket.
     return (
         f"Je veux le bilan complet de l'équipe '{categorie}' du club '{club_name}' "
         "sur la saison actuelle (toutes phases confondues).\n"
-        f"1. Si l'équipe demandée est ambiguë (ex: manque le genre M/F ou le numéro d'équipe 1/2), "
-        "DEMANDE une précision au user.\n"
-        f"2. Utilise `ffbb_search(type='organismes', query='{club_name}')` pour trouver l'ID\n"
-        f"3. Utilise `ffbb_club(action='equipes', organisme_id=...)` pour lister les engagements du club\n"
-        f"4. Filtre les engagements contenant « {categorie} » dans la compétition\n"
-        "5. Pour CHAQUE poule_id trouvé (Phase 1, Phase 2, Phase 3...), appelle "
-        "`ffbb_club(action='classement', poule_id=...)` et trouve la ligne de LA BONNE équipe (croise les adversaires "
-        "pour être sûr de ne pas sauter d'Équipe 1 à Équipe 2).\n"
-        "6. Cumule les matchs joués, victoires, défaites sur toutes les phases\n"
-        "7. Présente un tableau par phase + un total cumulé de la saison."
+        "1. Si le genre (M/F) ou le numéro d'équipe manque, DEMANDE une précision à l'utilisateur.\n"
+        f"2. Utilise `ffbb_bilan(club_name='{club_name}', categorie='{categorie}')` — "
+        "UN seul appel suffit, il agrège automatiquement toutes les phases en interne.\n"
+        "3. Présente le résultat sous deux parties :\n"
+        "   - **Bilan total saison** : matchs joués, victoires, défaites, nuls, "
+        "paniers marqués/encaissés, différence\n"
+        "   - **Détail par phase** : tableau avec position, V/D/N et paniers pour chaque compétition."
     )
 
 

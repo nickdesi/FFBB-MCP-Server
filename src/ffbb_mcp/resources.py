@@ -2,40 +2,51 @@
 
 import json
 
-from .client import get_client_async
-from .utils import serialize_model
-
 
 def register_resources(mcp):
     """Enregistre les ressources sur l'instance FastMCP."""
 
+    # FIX: toutes les resources passent désormais par le service layer
+    # au lieu d'appeler le client directement.
+    # Bénéfices : cache TTL partagé avec les tools, metrics enregistrées,
+    # déduplication inflight, error handling cohérent.
+
     @mcp.resource("ffbb://saisons")
     async def resource_saisons() -> str:
         """Liste des saisons FFBB au format JSON."""
-        client = await get_client_async()
-        saisons = await client.get_saisons_async()
-        return json.dumps(
-            [serialize_model(s) for s in saisons] if saisons else [],
-            default=str,
-        )
+        from .services import get_saisons_service
+        try:
+            data = await get_saisons_service()
+            return json.dumps(data, default=str)
+        except Exception as e:
+            return json.dumps({"error": str(e)}, default=str)
 
     @mcp.resource("ffbb://competition/{competition_id}")
     async def resource_competition(competition_id: int) -> str:
         """Détails d'une compétition au format JSON."""
-        client = await get_client_async()
-        comp = await client.get_competition_async(competition_id)
-        return json.dumps(serialize_model(comp) or {}, default=str)
+        from .services import get_competition_service
+        try:
+            data = await get_competition_service(competition_id)
+            return json.dumps(data, default=str)
+        except Exception as e:
+            return json.dumps({"error": str(e)}, default=str)
 
     @mcp.resource("ffbb://poule/{poule_id}")
     async def resource_poule(poule_id: int) -> str:
         """Détails d'une poule au format JSON."""
-        client = await get_client_async()
-        poule = await client.get_poule_async(poule_id)
-        return json.dumps(serialize_model(poule) or {}, default=str)
+        from .services import get_poule_service
+        try:
+            data = await get_poule_service(poule_id)
+            return json.dumps(data, default=str)
+        except Exception as e:
+            return json.dumps({"error": str(e)}, default=str)
 
     @mcp.resource("ffbb://organisme/{organisme_id}")
     async def resource_organisme(organisme_id: int) -> str:
         """Détails d'un organisme/club au format JSON."""
-        client = await get_client_async()
-        org = await client.get_organisme_async(organisme_id)
-        return json.dumps(serialize_model(org) or {}, default=str)
+        from .services import get_organisme_service
+        try:
+            data = await get_organisme_service(organisme_id)
+            return json.dumps(data, default=str)
+        except Exception as e:
+            return json.dumps({"error": str(e)}, default=str)

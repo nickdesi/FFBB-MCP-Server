@@ -29,7 +29,10 @@ class FFBBClientFactory:
 
     _instance: FFBBAPIClientV3 | None = None
     _token_created_at: float = 0.0
-    _init_lock: asyncio.Lock = asyncio.Lock()
+    # FIX: Lock initialisé à None et créé lazily au premier appel async
+    # pour éviter les DeprecationWarning sur Python < 3.10 (Lock lié
+    # à la running loop, pas à la loop au moment de la définition de classe).
+    _init_lock: asyncio.Lock | None = None
 
     @classmethod
     def _is_token_expired(cls) -> bool:
@@ -43,8 +46,9 @@ class FFBBClientFactory:
     def _create_client(cls) -> FFBBAPIClientV3:
         """Crée une nouvelle instance du client avec des tokens frais. Synchrone."""
         logger.info("Initialisation du client FFBB...")
-        cwd = os.getcwd()
-        logger.info(f"CWD: {cwd}")
+        # FIX: logger.debug au lieu de logger.info — ce log se déclenche
+        # toutes les 25 min en prod lors du refresh de token, c'est du niveau debug.
+        logger.debug(f"CWD: {os.getcwd()}")
 
         # On force use_cache=True pour le token manager
         tokens = TokenManager.get_tokens(use_cache=True)
@@ -71,8 +75,12 @@ class FFBBClientFactory:
         if not cls._is_token_expired():
             return cls._instance
 
+        # FIX: création lazy du Lock dans la running loop courante
+        if cls._init_lock is None:
+            cls._init_lock = asyncio.Lock()
+
         async with cls._init_lock:
-            # Deuxième vérification avec le lock (au cas où un autre appel l'a déjà rafraîchi)
+            # Deuxième vérification avec le lock (double-check locking)
             if cls._is_token_expired():
                 if cls._instance is not None:
                     logger.info("Token FFBB expiré, rafraîchissement en cours...")
@@ -93,6 +101,7 @@ class FFBBClientFactory:
         """Force la réinitialisation du client (utile pour les tests)."""
         cls._instance = None
         cls._token_created_at = 0.0
+        cls._init_lock = None
 
 
 async def get_client_async() -> FFBBAPIClientV3:

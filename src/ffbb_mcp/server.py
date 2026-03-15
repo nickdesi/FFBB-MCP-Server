@@ -362,7 +362,7 @@ async def ffbb_get(
 
 
 # ---------------------------------------------------------------------------
-# TOOL 3 — Club unifié (remplace get_equipes_club + get_classement + get_calendrier_club)
+# TOOL 4 — Club unifié (remplace get_equipes_club + get_classement + get_calendrier_club)
 # ---------------------------------------------------------------------------
 
 
@@ -424,7 +424,7 @@ async def ffbb_club(
 
 
 # ---------------------------------------------------------------------------
-# TOOL 4 — Scores en direct
+# TOOL 5 — Scores en direct
 # ---------------------------------------------------------------------------
 
 
@@ -439,7 +439,7 @@ async def ffbb_get_lives() -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
-# TOOL 5 — Saisons
+# TOOL 6 — Saisons
 # ---------------------------------------------------------------------------
 
 

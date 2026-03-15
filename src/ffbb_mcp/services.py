@@ -518,15 +518,17 @@ async def ffbb_bilan_service(
         target_org_ids: list[str] = []
         club_nom = club_name or ""
 
+        # FIX: org_data initialisé à None avant le try pour éviter un NameError
+        # si get_organisme_service lève une exception.
+        org_data: dict | None = None
+
         if organisme_id:
             target_org_ids = [str(organisme_id)]
-            # Récupérer le nom officiel du club si disponible
             try:
                 org_data = await get_organisme_service(organisme_id)
                 if isinstance(org_data, dict) and org_data.get("nom"):
                     club_nom = org_data.get("nom")
             except Exception:
-                # Si l'appel échoue, on continue avec le club_name fourni
                 pass
         elif club_name:
             orgs = await search_organismes_service(nom=club_name, limit=5)
@@ -539,11 +541,9 @@ async def ffbb_bilan_service(
         if not target_org_ids:
             return {"error": f"Club '{club_name}' introuvable"}
 
-        # 2. Récupérer les équipes filtrées (catégorie + numéro équipe) en parallèle
+        # 2. Récupérer les équipes filtrées en parallèle
         eq_tasks = []
         for oid in target_org_ids:
-            # If we already have the org_data for this organisme, pass it to
-            # ffbb_equipes_club_service to avoid a duplicate fetch.
             if organisme_id and str(oid) == str(organisme_id) and isinstance(org_data, dict):
                 eq_tasks.append(ffbb_equipes_club_service(organisme_id=oid, filtre=categorie, org_data=org_data))
             else:
@@ -572,8 +572,9 @@ async def ffbb_bilan_service(
         unique_poule_ids = list(
             dict.fromkeys(str(e["poule_id"]) for e in equipes if e.get("poule_id"))
         )
-        print(f"ffbb_bilan: club_nom={club_nom} cible_orgs={target_org_ids}")
-        print(f"ffbb_bilan: equipes_count={len(equipes)} unique_poules={unique_poule_ids}")
+        # FIX: print() → logger.debug() (les print polluaient stdout/Coolify en prod)
+        logger.debug(f"ffbb_bilan: club_nom={club_nom} cible_orgs={target_org_ids}")
+        logger.debug(f"ffbb_bilan: equipes_count={len(equipes)} unique_poules={unique_poule_ids}")
 
         semaphore = asyncio.Semaphore(_MAX_POULE_FETCH_CONCURRENCY)
 
@@ -582,10 +583,6 @@ async def ffbb_bilan_service(
                 try:
                     return await get_poule_service(pid)
                 except McpError:
-                    # Some tests and APIs may provide non-numeric poule ids (eg 'p1').
-                    # If coercion fails in `get_poule_service`, fall back to a
-                    # direct client call using the raw id so mocked non-numeric
-                    # ids are supported.
                     try:
                         client = await get_client_async()
                         poule = await _safe_call(f"Poule {pid}", client.get_poule_async(poule_id=pid))
@@ -700,14 +697,8 @@ async def get_calendrier_club_service(
 
         target_org_ids = []
 
-        org_data = None
         if organisme_id:
             target_org_ids = [organisme_id]
-            # Try to fetch the organisme once and reuse it for equipe extraction
-            try:
-                org_data = await get_organisme_service(organisme_id)
-            except Exception:
-                org_data = None
         elif club_name:
             orgs = await search_organismes_service(nom=club_name, limit=3)
             target_org_ids = [
@@ -719,6 +710,7 @@ async def get_calendrier_club_service(
             return []
 
         # 2. Récupérer les équipes engagées correspondant à la catégorie en parallèle
+        # FIX: org_data supprimée (fetché mais jamais utilisée — appel API gaspillé)
         eq_tasks = [
             ffbb_equipes_club_service(organisme_id=oid, filtre=categorie)
             for oid in target_org_ids
@@ -815,7 +807,6 @@ async def get_calendrier_club_service(
 
                 seen_match_ids.add(match_id)
 
-                # Extraction robuste des champs camelCase (API originelle) ou snake_case
                 eq1 = match.get("nomEquipe1", match.get("nom_equipe1", ""))
                 eq2 = match.get("nomEquipe2", match.get("nom_equipe2", ""))
                 score1 = match.get("resultatEquipe1", match.get("resultat_equipe1"))
