@@ -10,6 +10,7 @@ from threading import RLock
 from typing import Any, TypeVar
 
 from cachetools import TTLCache
+
 # NOTE: importing ffbb_api_client_v3 at module import time is relatively
 # expensive (triggers meilisearch client initialization). We perform
 # local/lazy imports in the functions that actually need these symbols
@@ -400,7 +401,6 @@ async def _search_generic(
     async def _fetch() -> list[dict]:
         # Lazy import to avoid heavy ffbb_api_client_v3 initialization at
         # module import time.
-        from ffbb_api_client_v3 import config as _ffbb_config
 
         client = await get_client_async()
         method = getattr(client, method_name)
@@ -454,7 +454,6 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
     async def _fetch() -> list[dict[str, Any]]:
         # Lazy imports to avoid heavy ffbb_api_client_v3 initialization at
         # module import time.
-        from ffbb_api_client_v3.models import MultiSearchQuery
         from ffbb_api_client_v3.config import (
             MEILISEARCH_INDEX_COMPETITIONS,
             MEILISEARCH_INDEX_ORGANISMES,
@@ -464,6 +463,7 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
             MEILISEARCH_INDEX_TERRAINS,
             MEILISEARCH_INDEX_TOURNOIS,
         )
+        from ffbb_api_client_v3.models import MultiSearchQuery
 
         client = await get_client_async()
         primary_limit = min(limit, max(2, (limit + 2) // 3))

@@ -87,7 +87,7 @@ async def measure(iterations: int = 100):
     bilan_times = []
     calendrier_times = []
 
-    for i in range(iterations):
+    for _i in range(iterations):
         t0 = time.perf_counter()
         await ffbb_bilan_service(organisme_id=9326, categorie="U11M1")
         t1 = time.perf_counter()
