@@ -111,3 +111,5 @@ Le serveur ne se contente pas de données brutes, il guide l'IA via des prompts 
 
 3. **Cache** :
     - Les résultats de recherche et de détails sont mis en cache côté serveur pour optimiser les performances. Ne pas hésiter à répéter des appels similaires.
+
+- **Performance notes** : Une courte note sur les optimisations récentes et comment mesurer les performances a été ajoutée. Voir aussi [Performance guide](PERFORMANCE.md) pour les détails et le petit benchmark inclus dans `tools/measure_services.py`.

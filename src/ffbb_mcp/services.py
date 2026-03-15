@@ -10,16 +10,10 @@ from threading import RLock
 from typing import Any, TypeVar
 
 from cachetools import TTLCache
-from ffbb_api_client_v3.config import (
-    MEILISEARCH_INDEX_COMPETITIONS,
-    MEILISEARCH_INDEX_ORGANISMES,
-    MEILISEARCH_INDEX_PRATIQUES,
-    MEILISEARCH_INDEX_RENCONTRES,
-    MEILISEARCH_INDEX_SALLES,
-    MEILISEARCH_INDEX_TERRAINS,
-    MEILISEARCH_INDEX_TOURNOIS,
-)
-from ffbb_api_client_v3.models import MultiSearchQuery
+# NOTE: importing ffbb_api_client_v3 at module import time is relatively
+# expensive (triggers meilisearch client initialization). We perform
+# local/lazy imports in the functions that actually need these symbols
+# to reduce cold-start/import overhead.
 from httpx import HTTPStatusError
 from mcp.shared.exceptions import McpError
 from mcp.types import INTERNAL_ERROR, ErrorData
@@ -33,11 +27,12 @@ logger = logging.getLogger("ffbb-mcp")
 
 T = TypeVar("T")
 
-_PRIMARY_MULTI_SEARCH_INDEXES = {
-    MEILISEARCH_INDEX_ORGANISMES,
-    MEILISEARCH_INDEX_COMPETITIONS,
-    MEILISEARCH_INDEX_RENCONTRES,
-}
+# Precompile regex used heavily in `ffbb_equipes_club_service` to avoid
+# recompiling on every call.
+_RE_CAT = re.compile(r"(u\d+)")
+_RE_IS_F = re.compile(r"(?:\bf\b|u\d+f|féminin|feminin|fille)")
+_RE_IS_M = re.compile(r"(?:\bm\b|u\d+m|masculin|garçon|garcon)")
+_RE_NUM_END = re.compile(r"(\d)$")
 
 # ---------------------------------------------------------------------------
 # Cache service-level (en mémoire, complémentaire au cache SQLite HTTP)
@@ -47,11 +42,13 @@ _cache_lives = TTLCache(maxsize=1, ttl=30)  # 30 s — scores changent chaque po
 _cache_search = TTLCache(maxsize=256, ttl=600)  # 10 min — résultats de recherche
 _cache_detail = TTLCache(maxsize=128, ttl=1200)  # 20 min — détails compétitions/clubs
 _cache_calendrier = TTLCache(maxsize=64, ttl=300)  # 5 min — calendriers clubs
+_cache_bilan = TTLCache(maxsize=64, ttl=300)  # 5 min — bilans toutes phases
 _cache_lock = RLock()
 _inflight_lock: asyncio.Lock = asyncio.Lock()
 _inflight_detail: dict[str, asyncio.Task[Any]] = {}
 _inflight_search: dict[str, asyncio.Task[Any]] = {}
 _inflight_calendrier: dict[str, asyncio.Task[Any]] = {}
+_inflight_bilan: dict[str, asyncio.Task[Any]] = {}
 
 
 def _read_positive_int_env(name: str, default: int) -> int:
@@ -290,10 +287,18 @@ async def get_organisme_service(organisme_id: int | str) -> dict:
 
 
 async def ffbb_equipes_club_service(
-    organisme_id: int | str, filtre: str | None = None
+    organisme_id: int | str | None = None,
+    filtre: str | None = None,
+    org_data: dict | None = None,
 ) -> list[dict[str, Any]]:
-    # ✅ Utilise get_organisme_service qui a le TTLCache
-    data = await get_organisme_service(organisme_id)
+    """
+    Retourne les équipes engagées pour un club.
+
+    Paramètre `org_data` optionnel : si fourni, évite un appel supplémentaire
+    à `get_organisme_service` (utile quand l'appelant a déjà chargé l'organisme).
+    """
+    # Réutilise org_data si fourni, sinon récupère via get_organisme_service
+    data = org_data if org_data is not None else await get_organisme_service(organisme_id)
     if not data:
         return []
 
@@ -310,17 +315,17 @@ async def ffbb_equipes_club_service(
         # Filtre optionnel pour gagner du temps agents
         if filtre:
             f_low = filtre.lower()
-            cat_code_low = (cat.get("code") or "").lower()  # ex: "u13"
-            sexe_field = (comp.get("sexe") or "").upper()  # ex: "M" ou "F"
+            cat_code_low = (cat.get("code") or "").lower()
+            sexe_field = (comp.get("sexe") or "").upper()
 
             # 1. Extraction Catégorie (Uxx) du filtre
-            cat_match = re.search(r"(u\d+)", f_low)
+            cat_match = _RE_CAT.search(f_low)
             if cat_match and cat_match.group(1) != cat_code_low:
                 continue
 
-            # 2. Extraction Genre du filtre
-            is_f = bool(re.search(r"(?:\bf\b|u\d+f|féminin|feminin|fille)", f_low))
-            is_m = bool(re.search(r"(?:\bm\b|u\d+m|masculin|garçon|garcon)", f_low))
+            # 2. Extraction Genre du filtre (précompilé)
+            is_f = bool(_RE_IS_F.search(f_low))
+            is_m = bool(_RE_IS_M.search(f_low))
 
             if is_f and sexe_field != "F":
                 continue
@@ -328,13 +333,10 @@ async def ffbb_equipes_club_service(
                 continue
 
             # 3. Extraction Numéro d'équipe (ex: le 2 dans U13F2 ou U13-2)
-            # On cherche un chiffre à la toute fin du filtre, eventuellement précédé d'un espace, tiret, ou lettre
-            num_match = re.search(r"(\d)$", f_low.strip())
-            # On ignore si c'est juste le chiffre de la catégorie (ex: "U13")
+            num_match = _RE_NUM_END.search(f_low.strip())
             if num_match and not re.search(r"u\d+$", f_low.strip()):
                 target_num = num_match.group(1)
                 team_num = str(e.get("numeroEquipe", ""))
-                # If team_num is empty, sometimes "1" is implied, but strict matching is safer
                 if target_num != team_num and not (target_num == "1" and not team_num):
                     continue
 
@@ -396,11 +398,13 @@ async def _search_generic(
     cache_key = f"search:{operation}:{normalized_query}:{limit}"
 
     async def _fetch() -> list[dict]:
+        # Lazy import to avoid heavy ffbb_api_client_v3 initialization at
+        # module import time.
+        from ffbb_api_client_v3 import config as _ffbb_config
+
         client = await get_client_async()
         method = getattr(client, method_name)
-        results = await _safe_call(
-            f"Search {operation}: {query}", method(normalized_query)
-        )
+        results = await _safe_call(f"Search {operation}: {query}", method(normalized_query))
         if not results or not results.hits:
             return []
         return [serialize_model(hit) for hit in results.hits[:limit]]
@@ -448,49 +452,33 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
     cache_key = f"multi_search:{normalized_query}:{limit}"
 
     async def _fetch() -> list[dict[str, Any]]:
+        # Lazy imports to avoid heavy ffbb_api_client_v3 initialization at
+        # module import time.
+        from ffbb_api_client_v3.models import MultiSearchQuery
+        from ffbb_api_client_v3.config import (
+            MEILISEARCH_INDEX_COMPETITIONS,
+            MEILISEARCH_INDEX_ORGANISMES,
+            MEILISEARCH_INDEX_PRATIQUES,
+            MEILISEARCH_INDEX_RENCONTRES,
+            MEILISEARCH_INDEX_SALLES,
+            MEILISEARCH_INDEX_TERRAINS,
+            MEILISEARCH_INDEX_TOURNOIS,
+        )
+
         client = await get_client_async()
         primary_limit = min(limit, max(2, (limit + 2) // 3))
         secondary_limit = min(limit, max(1, (limit + 9) // 10))
         queries = [
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_ORGANISMES,
-                q=normalized_query,
-                limit=primary_limit,
-            ),
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_COMPETITIONS,
-                q=normalized_query,
-                limit=primary_limit,
-            ),
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_RENCONTRES,
-                q=normalized_query,
-                limit=primary_limit,
-            ),
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_SALLES,
-                q=normalized_query,
-                limit=secondary_limit,
-            ),
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_PRATIQUES,
-                q=normalized_query,
-                limit=secondary_limit,
-            ),
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_TERRAINS,
-                q=normalized_query,
-                limit=secondary_limit,
-            ),
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_TOURNOIS,
-                q=normalized_query,
-                limit=secondary_limit,
-            ),
+            MultiSearchQuery(index_uid=MEILISEARCH_INDEX_ORGANISMES, q=normalized_query, limit=primary_limit),
+            MultiSearchQuery(index_uid=MEILISEARCH_INDEX_COMPETITIONS, q=normalized_query, limit=primary_limit),
+            MultiSearchQuery(index_uid=MEILISEARCH_INDEX_RENCONTRES, q=normalized_query, limit=primary_limit),
+            MultiSearchQuery(index_uid=MEILISEARCH_INDEX_SALLES, q=normalized_query, limit=secondary_limit),
+            MultiSearchQuery(index_uid=MEILISEARCH_INDEX_PRATIQUES, q=normalized_query, limit=secondary_limit),
+            MultiSearchQuery(index_uid=MEILISEARCH_INDEX_TERRAINS, q=normalized_query, limit=secondary_limit),
+            MultiSearchQuery(index_uid=MEILISEARCH_INDEX_TOURNOIS, q=normalized_query, limit=secondary_limit),
         ]
-        raw = await _safe_call(
-            f"Multi-search: {nom}", client.multi_search_async(queries)
-        )
+
+        raw = await _safe_call(f"Multi-search: {nom}", client.multi_search_async(queries))
 
         if not raw or not hasattr(raw, "results") or not raw.results:
             return []
@@ -514,6 +502,189 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
     )
 
 
+async def ffbb_bilan_service(
+    club_name: str | None = None,
+    organisme_id: int | str | None = None,
+    categorie: str | None = None,
+) -> dict[str, Any]:
+    """
+    Bilan complet d'une équipe toutes phases confondues en un seul appel.
+    Workflow interne : search → equipes → poules (parallèle) → agrégation V/D/N + paniers.
+    """
+    cache_key = f"bilan:{organisme_id or ''}:{(club_name or '').lower().strip()}:{categorie or ''}"
+
+    async def _fetch() -> dict[str, Any]:
+        # 1. Résoudre l'organisme_id
+        target_org_ids: list[str] = []
+        club_nom = club_name or ""
+
+        if organisme_id:
+            target_org_ids = [str(organisme_id)]
+            # Récupérer le nom officiel du club si disponible
+            try:
+                org_data = await get_organisme_service(organisme_id)
+                if isinstance(org_data, dict) and org_data.get("nom"):
+                    club_nom = org_data.get("nom")
+            except Exception:
+                # Si l'appel échoue, on continue avec le club_name fourni
+                pass
+        elif club_name:
+            orgs = await search_organismes_service(nom=club_name, limit=5)
+            target_org_ids = [
+                str(org["id"]) for org in orgs if isinstance(org, dict) and org.get("id")
+            ]
+            if orgs and isinstance(orgs[0], dict):
+                club_nom = orgs[0].get("nom", club_name) or club_name or ""
+
+        if not target_org_ids:
+            return {"error": f"Club '{club_name}' introuvable"}
+
+        # 2. Récupérer les équipes filtrées (catégorie + numéro équipe) en parallèle
+        eq_tasks = []
+        for oid in target_org_ids:
+            # If we already have the org_data for this organisme, pass it to
+            # ffbb_equipes_club_service to avoid a duplicate fetch.
+            if organisme_id and str(oid) == str(organisme_id) and isinstance(org_data, dict):
+                eq_tasks.append(ffbb_equipes_club_service(organisme_id=oid, filtre=categorie, org_data=org_data))
+            else:
+                eq_tasks.append(ffbb_equipes_club_service(organisme_id=oid, filtre=categorie))
+        eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
+
+        equipes: list[dict[str, Any]] = []
+        for res in eq_results:
+            if isinstance(res, list):
+                equipes.extend(res)
+
+        if not equipes:
+            return {"error": f"Aucune équipe trouvée pour la catégorie '{categorie}'"}
+
+        # Dédupliquer par engagement_id
+        seen_eng: set[str] = set()
+        deduped: list[dict[str, Any]] = []
+        for e in equipes:
+            key = str(e.get("engagement_id", ""))
+            if key not in seen_eng:
+                seen_eng.add(key)
+                deduped.append(e)
+        equipes = deduped
+
+        # 3. Récupérer toutes les poules en parallèle
+        unique_poule_ids = list(
+            dict.fromkeys(str(e["poule_id"]) for e in equipes if e.get("poule_id"))
+        )
+        print(f"ffbb_bilan: club_nom={club_nom} cible_orgs={target_org_ids}")
+        print(f"ffbb_bilan: equipes_count={len(equipes)} unique_poules={unique_poule_ids}")
+
+        semaphore = asyncio.Semaphore(_MAX_POULE_FETCH_CONCURRENCY)
+
+        async def _fetch_poule_bilan(pid: str) -> dict[str, Any] | Exception:
+            async with semaphore:
+                try:
+                    return await get_poule_service(pid)
+                except McpError:
+                    # Some tests and APIs may provide non-numeric poule ids (eg 'p1').
+                    # If coercion fails in `get_poule_service`, fall back to a
+                    # direct client call using the raw id so mocked non-numeric
+                    # ids are supported.
+                    try:
+                        client = await get_client_async()
+                        poule = await _safe_call(f"Poule {pid}", client.get_poule_async(poule_id=pid))
+                        return serialize_model(poule) or {}
+                    except Exception as e:
+                        return e
+
+        poules_raw = await asyncio.gather(
+            *[_fetch_poule_bilan(pid) for pid in unique_poule_ids],
+            return_exceptions=True,
+        )
+        logger.debug("ffbb_bilan: poules_raw=%s", poules_raw)
+        poules_map: dict[str, dict[str, Any]] = {
+            pid: pd
+            for pid, pd in zip(unique_poule_ids, poules_raw, strict=False)
+            if not isinstance(pd, Exception) and pd
+        }
+        logger.debug("ffbb_bilan: poules_map_keys=%s", list(poules_map.keys()))
+
+        # Map poule_id → engagement_ids du club + nom compétition
+        poule_to_eng: dict[str, set[str]] = {}
+        poule_to_comp: dict[str, str] = {}
+        org_ids_str = set(target_org_ids)
+        for e in equipes:
+            pid = str(e.get("poule_id", ""))
+            eid = str(e.get("engagement_id", ""))
+            if pid and eid:
+                poule_to_eng.setdefault(pid, set()).add(eid)
+            if pid and e.get("competition"):
+                poule_to_comp[pid] = e["competition"]
+
+        # 4. Agréger par phase
+        phases: list[dict[str, Any]] = []
+        totaux: dict[str, int] = {
+            "match_joues": 0,
+            "gagnes": 0,
+            "perdus": 0,
+            "nuls": 0,
+            "paniers_marques": 0,
+            "paniers_encaisses": 0,
+            "difference": 0,
+        }
+
+        for pid, poule_data in poules_map.items():
+            eng_ids_here = poule_to_eng.get(pid, set())
+            for entry in poule_data.get("classements", []):
+                eng = entry.get("id_engagement", {}) or {}
+                entry_eng_id = str(eng.get("id", ""))
+                entry_org_id = str(entry.get("organisme_id", ""))
+
+                if entry_eng_id not in eng_ids_here and entry_org_id not in org_ids_str:
+                    continue
+
+                mj = int(entry.get("match_joues") or 0)
+                g = int(entry.get("gagnes") or 0)
+                d = int(entry.get("perdus") or 0)
+                n = int(entry.get("nuls") or 0)
+                pm = int(entry.get("paniers_marques") or 0)
+                pe = int(entry.get("paniers_encaisses") or 0)
+                diff = int(entry.get("difference") or 0)
+
+                phases.append({
+                    "competition": poule_to_comp.get(pid, ""),
+                    "poule_id": pid,
+                    "position": entry.get("position"),
+                    "match_joues": mj,
+                    "gagnes": g,
+                    "perdus": d,
+                    "nuls": n,
+                    "paniers_marques": pm,
+                    "paniers_encaisses": pe,
+                    "difference": diff,
+                })
+
+                totaux["match_joues"] += mj
+                totaux["gagnes"] += g
+                totaux["perdus"] += d
+                totaux["nuls"] += n
+                totaux["paniers_marques"] += pm
+                totaux["paniers_encaisses"] += pe
+                totaux["difference"] += diff
+
+        phases.sort(key=lambda x: x["competition"])
+
+        return {
+            "club": club_nom,
+            "categorie": categorie or "",
+            "bilan_total": totaux,
+            "phases": phases,
+        }
+
+    return await _dedupe_inflight(
+        cache=_cache_bilan,
+        cache_key=cache_key,
+        inflight_map=_inflight_bilan,
+        make_coro=_fetch,
+    )
+
+
 async def get_calendrier_club_service(
     club_name: str | None = None,
     organisme_id: int | str | None = None,
@@ -526,10 +697,17 @@ async def get_calendrier_club_service(
     cache_key = f"calendrier:{organisme_id or ''}:{(club_name or '').lower().strip()}:{categorie or ''}"
 
     async def _fetch() -> list[dict]:
+
         target_org_ids = []
 
+        org_data = None
         if organisme_id:
             target_org_ids = [organisme_id]
+            # Try to fetch the organisme once and reuse it for equipe extraction
+            try:
+                org_data = await get_organisme_service(organisme_id)
+            except Exception:
+                org_data = None
         elif club_name:
             orgs = await search_organismes_service(nom=club_name, limit=3)
             target_org_ids = [

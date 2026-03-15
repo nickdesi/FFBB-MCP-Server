@@ -20,6 +20,7 @@ from .metrics import generate_prometheus_metrics
 from .prompts import register_prompts
 from .resources import register_resources
 from .services import (
+    ffbb_bilan_service,
     ffbb_equipes_club_service,
     ffbb_get_classement_service,
     get_calendrier_club_service,
@@ -65,9 +66,12 @@ mcp = FastMCP(
     "FFBB MCP Server",
     instructions=(
         "Données FFBB (basketball français). "
-        "Workflow optimal : ffbb_search → ffbb_get(type='poule') pour classement ET matchs en un appel. "
-        "⚡ Règle clé : si tu as un poule_id, utilise ffbb_get(type='poule') — jamais ffbb_club(action='calendrier'). "
-        "ffbb_club(action='calendrier') = dernier recours si aucun poule_id disponible. "
+        "⚡ OUTIL PRIORITAIRE pour tout bilan/résultats/classement : ffbb_bilan(club_name=..., categorie=...) "
+        "→ 1 seul appel, retourne tout (toutes phases agrégées). "
+        "⚠️ Les données FFBB sont TOUJOURS live — ne jamais chercher en mémoire/cache avant d'appeler l'API. "
+        "Autres outils : ffbb_search → trouver un club/compétition. "
+        "ffbb_get(type='poule') → classement + matchs d'une poule précise. "
+        "ffbb_club(action='calendrier') → dernier recours si aucun poule_id disponible. "
         "Règles : catégorie sans genre → demander M ou F. Plusieurs équipes même catégorie → demander laquelle."
     ),
     dependencies=["mcp", "ffbb-api-client-v3"],
@@ -277,7 +281,52 @@ async def ffbb_search(
 
 
 # ---------------------------------------------------------------------------
-# TOOL 2 — Détails par ID (remplace get_competition + get_poule + get_organisme)
+# TOOL 2 — Bilan complet toutes phases (1 appel = tout le workflow)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(name="ffbb_bilan", annotations=_READONLY_ANNOTATIONS)
+async def ffbb_bilan(
+    club_name: Annotated[
+        str | None,
+        Field(description="Nom du club (ex: 'Stade Clermontois', 'ASVEL')."),
+    ] = None,
+    organisme_id: Annotated[
+        int | str | None,
+        Field(description="ID FFBB du club (alternative plus rapide à club_name)."),
+    ] = None,
+    categorie: Annotated[
+        str | None,
+        Field(
+            description="Catégorie + genre + numéro équipe (ex: 'U11M1', 'U13F2', 'U15M', 'Senior')."
+        ),
+    ] = None,
+) -> dict[str, Any]:
+    """Bilan complet d'une équipe toutes phases confondues en UN seul appel.
+
+    ⚡ C'est l'outil à utiliser en priorité pour toute question de type
+    "quel est le bilan de X cette saison ?" ou "résultats de U11M1".
+
+    Encapsule en interne : recherche club → équipes → classements de toutes
+    les phases en parallèle → agrégation V/D/N et paniers marqués/encaissés.
+
+    Retourne :
+    - bilan_total : total V/D/N, paniers marqués/encaissés, différence
+    - phases : détail par compétition/phase (position, V/D/N, paniers)
+    """
+    try:
+        return await ffbb_bilan_service(
+            club_name=club_name,
+            organisme_id=organisme_id,
+            categorie=categorie,
+        )
+    except Exception as e:
+        logger.error(f"ffbb_bilan failed: {e}")
+        return {"error": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# TOOL 3 — Détails par ID (remplace get_competition + get_poule + get_organisme)
 # ---------------------------------------------------------------------------
 
 

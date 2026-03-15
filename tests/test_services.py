@@ -9,13 +9,16 @@ from ffbb_api_client_v3.models.multi_search_results_class import MultiSearchResu
 from mcp.shared.exceptions import McpError
 
 from ffbb_mcp.services import (
+    _cache_bilan,
     _cache_calendrier,
     _cache_detail,
     _cache_lives,
     _cache_search,
+    _inflight_bilan,
     _inflight_calendrier,
     _inflight_detail,
     _inflight_search,
+    ffbb_bilan_service,
     ffbb_equipes_club_service,
     ffbb_get_classement_service,
     get_calendrier_club_service,
@@ -34,9 +37,11 @@ def clear_caches():
     _cache_search.clear()
     _cache_detail.clear()
     _cache_calendrier.clear()
+    _cache_bilan.clear()
     _inflight_detail.clear()
     _inflight_search.clear()
     _inflight_calendrier.clear()
+    _inflight_bilan.clear()
     yield
 
 
@@ -195,6 +200,137 @@ class TestGetClassementService:
         mock_client.get_poule_async = AsyncMock(return_value=None)
         result = await ffbb_get_classement_service(poule_id=123)
         assert result == []
+
+
+# ---------------------------------------------------------------------------
+# Tests — ffbb_bilan_service
+# ---------------------------------------------------------------------------
+
+
+class TestBilanService:
+    def _make_org_mock(self, org_id="9326", nom="SCBA", engagements=None):
+        m = MagicMock()
+        m.model_dump = MagicMock(
+            return_value={"id": org_id, "nom": nom, "engagements": engagements or []}
+        )
+        return m
+
+    def _make_poule_mock(self, poule_id, engagement_id, org_id, gagnes, perdus, pm, pe):
+        m = MagicMock()
+        m.model_dump = MagicMock(
+            return_value={
+                "id": poule_id,
+                "rencontres": [],
+                "classements": [
+                    {
+                        "id_engagement": {"id": engagement_id, "numero_equipe": "1"},
+                        "organisme_id": org_id,
+                        "position": 1,
+                        "match_joues": gagnes + perdus,
+                        "gagnes": gagnes,
+                        "perdus": perdus,
+                        "nuls": 0,
+                        "paniers_marques": pm,
+                        "paniers_encaisses": pe,
+                        "difference": pm - pe,
+                    }
+                ],
+            }
+        )
+        return m
+
+    @pytest.mark.asyncio
+    async def test_error_when_club_not_found(self, patch_get_client, mock_client):
+        mock_client.search_organismes_async = AsyncMock(return_value=MagicMock(hits=[]))
+        result = await ffbb_bilan_service(club_name="Inconnu", categorie="U11M1")
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_error_when_no_equipes(self, patch_get_client, mock_client):
+        org_mock = self._make_org_mock(engagements=[])
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+        result = await ffbb_bilan_service(organisme_id=9326, categorie="U17F1")
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_aggregates_two_phases(self, patch_get_client, mock_client):
+        """Bilan sur 2 poules : 3V+6V = 9V, paniers agrégés."""
+        org_mock = self._make_org_mock(
+            org_id="9326",
+            nom="SCBA",
+            engagements=[
+                {
+                    "id": "eng1",
+                    "numeroEquipe": "1",
+                    "idCompetition": {
+                        "nom": "Dépt U11M Phase 1",
+                        "id": "c1",
+                        "sexe": "M",
+                        "categorie": {"code": "u11"},
+                        "competition_origine_niveau": 1,
+                    },
+                    "idPoule": {"id": "p1"},
+                },
+                {
+                    "id": "eng2",
+                    "numeroEquipe": "1",
+                    "idCompetition": {
+                        "nom": "Dépt U11M Phase 2",
+                        "id": "c2",
+                        "sexe": "M",
+                        "categorie": {"code": "u11"},
+                        "competition_origine_niveau": 2,
+                    },
+                    "idPoule": {"id": "p2"},
+                },
+            ],
+        )
+        poule1 = self._make_poule_mock("p1", "eng1", "9326", gagnes=3, perdus=0, pm=150, pe=40)
+        poule2 = self._make_poule_mock("p2", "eng2", "9326", gagnes=6, perdus=0, pm=300, pe=100)
+
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+        mock_client.get_poule_async = AsyncMock(side_effect=[poule1, poule2])
+
+        result = await ffbb_bilan_service(organisme_id=9326, categorie="U11M1")
+
+        assert result["club"] == "SCBA"
+        assert result["bilan_total"]["gagnes"] == 9
+        assert result["bilan_total"]["perdus"] == 0
+        assert result["bilan_total"]["match_joues"] == 9
+        assert result["bilan_total"]["paniers_marques"] == 450
+        assert result["bilan_total"]["paniers_encaisses"] == 140
+        assert result["bilan_total"]["difference"] == 310
+        assert len(result["phases"]) == 2
+
+    @pytest.mark.asyncio
+    async def test_uses_cache_on_second_call(self, patch_get_client, mock_client):
+        """Le deuxième appel identique ne doit pas rappeler l'API."""
+        org_mock = self._make_org_mock(
+            org_id="9326",
+            engagements=[
+                {
+                    "id": "eng1",
+                    "numeroEquipe": "1",
+                    "idCompetition": {
+                        "nom": "Dépt U11M",
+                        "id": "c1",
+                        "sexe": "M",
+                        "categorie": {"code": "u11"},
+                        "competition_origine_niveau": 1,
+                    },
+                    "idPoule": {"id": "p1"},
+                }
+            ],
+        )
+        poule1 = self._make_poule_mock("p1", "eng1", "9326", gagnes=3, perdus=0, pm=100, pe=30)
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+        mock_client.get_poule_async = AsyncMock(return_value=poule1)
+
+        await ffbb_bilan_service(organisme_id=9326, categorie="U11M1")
+        await ffbb_bilan_service(organisme_id=9326, categorie="U11M1")
+
+        # L'organisme n'est appelé qu'une fois grâce au cache bilan
+        mock_client.get_organisme_async.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------------
