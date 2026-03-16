@@ -11,37 +11,63 @@ from ffbb_mcp.services import ffbb_bilan_service, get_calendrier_club_service
 
 def make_org_mock():
     m = MagicMock()
-    m.model_dump = MagicMock(return_value={
-        "id": "9326",
-        "nom": "SCBA",
-        "engagements": [
-            {"id": "eng1", "numeroEquipe": "1", "idCompetition": {"nom": "Dépt U11M Phase 1", "id": "c1", "sexe": "M", "categorie": {"code": "u11"}, "competition_origine_niveau": 1}, "idPoule": {"id": "p1"}},
-            {"id": "eng2", "numeroEquipe": "1", "idCompetition": {"nom": "Dépt U11M Phase 2", "id": "c2", "sexe": "M", "categorie": {"code": "u11"}, "competition_origine_niveau": 2}, "idPoule": {"id": "p2"}},
-        ],
-    })
+    m.model_dump = MagicMock(
+        return_value={
+            "id": "9326",
+            "nom": "SCBA",
+            "engagements": [
+                {
+                    "id": "eng1",
+                    "numeroEquipe": "1",
+                    "idCompetition": {
+                        "nom": "Dépt U11M Phase 1",
+                        "id": "c1",
+                        "sexe": "M",
+                        "categorie": {"code": "u11"},
+                        "competition_origine_niveau": 1,
+                    },
+                    "idPoule": {"id": "p1"},
+                },
+                {
+                    "id": "eng2",
+                    "numeroEquipe": "1",
+                    "idCompetition": {
+                        "nom": "Dépt U11M Phase 2",
+                        "id": "c2",
+                        "sexe": "M",
+                        "categorie": {"code": "u11"},
+                        "competition_origine_niveau": 2,
+                    },
+                    "idPoule": {"id": "p2"},
+                },
+            ],
+        }
+    )
     return m
 
 
 def make_poule_mock(poule_id, engagement_id, gagnes, perdus, pm, pe):
     m = MagicMock()
-    m.model_dump = MagicMock(return_value={
-        "id": poule_id,
-        "rencontres": [],
-        "classements": [
-            {
-                "id_engagement": {"id": engagement_id, "numero_equipe": "1"},
-                "organisme_id": "9326",
-                "position": 1,
-                "match_joues": gagnes + perdus,
-                "gagnes": gagnes,
-                "perdus": perdus,
-                "nuls": 0,
-                "paniers_marques": pm,
-                "paniers_encaisses": pe,
-                "difference": pm - pe,
-            }
-        ],
-    })
+    m.model_dump = MagicMock(
+        return_value={
+            "id": poule_id,
+            "rencontres": [],
+            "classements": [
+                {
+                    "id_engagement": {"id": engagement_id, "numero_equipe": "1"},
+                    "organisme_id": "9326",
+                    "position": 1,
+                    "match_joues": gagnes + perdus,
+                    "gagnes": gagnes,
+                    "perdus": perdus,
+                    "nuls": 0,
+                    "paniers_marques": pm,
+                    "paniers_encaisses": pe,
+                    "difference": pm - pe,
+                }
+            ],
+        }
+    )
     return m
 
 
@@ -99,7 +125,9 @@ async def measure(iterations: int = 100):
     def stats(name, data):
         s = sorted(data)
         p95 = s[int(len(s) * 0.95) - 1] if len(s) >= 1 else 0
-        print(f"{name}: n={len(s)} mean={mean(s):.6f}s median={median(s):.6f}s p95={p95:.6f}s min={s[0]:.6f}s max={s[-1]:.6f}s")
+        print(
+            f"{name}: n={len(s)} mean={mean(s):.6f}s median={median(s):.6f}s p95={p95:.6f}s min={s[0]:.6f}s max={s[-1]:.6f}s"
+        )
 
     stats("ffbb_bilan_service", bilan_times)
     stats("get_calendrier_club_service", calendrier_times)
@@ -117,10 +145,14 @@ async def measure(iterations: int = 100):
 
     exit_code = 0
     if p95_bilan_thr > 0 and p95(bilan_times) > p95_bilan_thr:
-        print(f"ERROR: ffbb_bilan_service p95 {p95(bilan_times):.3f}s > threshold {p95_bilan_thr:.3f}s")
+        print(
+            f"ERROR: ffbb_bilan_service p95 {p95(bilan_times):.3f}s > threshold {p95_bilan_thr:.3f}s"
+        )
         exit_code = 1
     if p95_cal_thr > 0 and p95(calendrier_times) > p95_cal_thr:
-        print(f"ERROR: get_calendrier_club_service p95 {p95(calendrier_times):.3f}s > threshold {p95_cal_thr:.3f}s")
+        print(
+            f"ERROR: get_calendrier_club_service p95 {p95(calendrier_times):.3f}s > threshold {p95_cal_thr:.3f}s"
+        )
         exit_code = 1
 
     if exit_code:

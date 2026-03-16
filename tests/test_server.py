@@ -65,7 +65,9 @@ def test_index_html_contains_seo_metadata(monkeypatch):
 
     html = _build_index_html()
 
-    assert 'rel="icon" type="image/webp" href="https://ffbb.desimone.fr/logo.webp"' in html
+    assert (
+        'rel="icon" type="image/webp" href="https://ffbb.desimone.fr/logo.webp"' in html
+    )
     assert 'meta name="description"' in html
     assert 'property="og:image" content="https://ffbb.desimone.fr/logo.webp"' in html
     assert 'link rel="canonical" href="https://ffbb.desimone.fr/"' in html
@@ -86,5 +88,5 @@ def test_sitemap_xml_uses_canonical_root(monkeypatch):
 
     sitemap = _build_sitemap_xml()
 
-    assert '<loc>https://ffbb.desimone.fr/</loc>' in sitemap
+    assert "<loc>https://ffbb.desimone.fr/</loc>" in sitemap
     assert "<changefreq>weekly</changefreq>" in sitemap

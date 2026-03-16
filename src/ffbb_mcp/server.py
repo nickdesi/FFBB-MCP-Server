@@ -169,11 +169,7 @@ def _build_index_html() -> str:
 
 def _build_robots_txt() -> str:
     base_url = _get_public_base_url()
-    return (
-        "User-agent: *\n"
-        "Allow: /\n"
-        f"Sitemap: {base_url}/sitemap.xml\n"
-    )
+    return f"User-agent: *\nAllow: /\nSitemap: {base_url}/sitemap.xml\n"
 
 
 def _build_sitemap_xml() -> str:

@@ -41,7 +41,7 @@ def expert_basket() -> str:
         "### ⚡ Pour le BILAN / CLASSEMENT / RÉSULTATS d'une équipe (toutes phases)\n"
         "**Utilise `ffbb_bilan` — c'est UN seul appel qui fait tout en interne.**\n"
         "```\n"
-        "ffbb_bilan(club_name=\"Stade Clermontois\", categorie=\"U11M1\")\n"
+        'ffbb_bilan(club_name="Stade Clermontois", categorie="U11M1")\n'
         "```\n"
         "Retourne : bilan global (V/D/N, paniers) + détail par phase. Rien d'autre à faire.\n\n"
         "### 🏆 Pour le CLASSEMENT ou les MATCHS d'une poule précise\n"

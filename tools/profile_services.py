@@ -7,49 +7,66 @@ from ffbb_mcp.services import ffbb_bilan_service, get_calendrier_club_service
 
 # Build reusable mocks similar to tests
 
+
 def make_org_mock():
     m = MagicMock()
-    m.model_dump = MagicMock(return_value={
-        "id": "9326",
-        "nom": "SCBA",
-        "engagements": [
-            {
-                "id": "eng1",
-                "numeroEquipe": "1",
-                "idCompetition": {"nom": "Dépt U11M Phase 1", "id": "c1", "sexe": "M", "categorie": {"code": "u11"}, "competition_origine_niveau": 1},
-                "idPoule": {"id": "p1"},
-            },
-            {
-                "id": "eng2",
-                "numeroEquipe": "1",
-                "idCompetition": {"nom": "Dépt U11M Phase 2", "id": "c2", "sexe": "M", "categorie": {"code": "u11"}, "competition_origine_niveau": 2},
-                "idPoule": {"id": "p2"},
-            },
-        ],
-    })
+    m.model_dump = MagicMock(
+        return_value={
+            "id": "9326",
+            "nom": "SCBA",
+            "engagements": [
+                {
+                    "id": "eng1",
+                    "numeroEquipe": "1",
+                    "idCompetition": {
+                        "nom": "Dépt U11M Phase 1",
+                        "id": "c1",
+                        "sexe": "M",
+                        "categorie": {"code": "u11"},
+                        "competition_origine_niveau": 1,
+                    },
+                    "idPoule": {"id": "p1"},
+                },
+                {
+                    "id": "eng2",
+                    "numeroEquipe": "1",
+                    "idCompetition": {
+                        "nom": "Dépt U11M Phase 2",
+                        "id": "c2",
+                        "sexe": "M",
+                        "categorie": {"code": "u11"},
+                        "competition_origine_niveau": 2,
+                    },
+                    "idPoule": {"id": "p2"},
+                },
+            ],
+        }
+    )
     return m
 
 
 def make_poule_mock(poule_id, engagement_id, gagnes, perdus, pm, pe):
     m = MagicMock()
-    m.model_dump = MagicMock(return_value={
-        "id": poule_id,
-        "rencontres": [],
-        "classements": [
-            {
-                "id_engagement": {"id": engagement_id, "numero_equipe": "1"},
-                "organisme_id": "9326",
-                "position": 1,
-                "match_joues": gagnes + perdus,
-                "gagnes": gagnes,
-                "perdus": perdus,
-                "nuls": 0,
-                "paniers_marques": pm,
-                "paniers_encaisses": pe,
-                "difference": pm - pe,
-            }
-        ],
-    })
+    m.model_dump = MagicMock(
+        return_value={
+            "id": poule_id,
+            "rencontres": [],
+            "classements": [
+                {
+                    "id_engagement": {"id": engagement_id, "numero_equipe": "1"},
+                    "organisme_id": "9326",
+                    "position": 1,
+                    "match_joues": gagnes + perdus,
+                    "gagnes": gagnes,
+                    "perdus": perdus,
+                    "nuls": 0,
+                    "paniers_marques": pm,
+                    "paniers_encaisses": pe,
+                    "difference": pm - pe,
+                }
+            ],
+        }
+    )
     return m
 
 
@@ -95,7 +112,9 @@ async def workload(iterations: int = 20):
         await ffbb_bilan_service(organisme_id=9326, categorie="U11M1")
         await get_calendrier_club_service(organisme_id=9326, categorie="U11M1")
     end = time.perf_counter()
-    print(f"Workload completed: {iterations} iterations, total={end-start:.3f}s, avg per iteration={(end-start)/iterations:.4f}s")
+    print(
+        f"Workload completed: {iterations} iterations, total={end - start:.3f}s, avg per iteration={(end - start) / iterations:.4f}s"
+    )
 
 
 if __name__ == "__main__":

@@ -63,9 +63,7 @@ def _read_positive_int_env(name: str, default: int) -> int:
         return default
 
 
-_MAX_POULE_FETCH_CONCURRENCY = _read_positive_int_env(
-    "FFBB_POULE_FETCH_CONCURRENCY", 8
-)
+_MAX_POULE_FETCH_CONCURRENCY = _read_positive_int_env("FFBB_POULE_FETCH_CONCURRENCY", 8)
 
 
 def _cache_get(cache: TTLCache, key: str) -> Any | None:
@@ -89,8 +87,7 @@ def _coerce_numeric_id(value: int | str, label: str) -> int:
             error=ErrorData(
                 code=INTERNAL_ERROR,
                 message=(
-                    f"{label} invalide: '{value}'. "
-                    "Un identifiant numérique est requis."
+                    f"{label} invalide: '{value}'. Un identifiant numérique est requis."
                 ),
             )
         ) from e
@@ -299,7 +296,9 @@ async def ffbb_equipes_club_service(
     à `get_organisme_service` (utile quand l'appelant a déjà chargé l'organisme).
     """
     # Réutilise org_data si fourni, sinon récupère via get_organisme_service
-    data = org_data if org_data is not None else await get_organisme_service(organisme_id)
+    data = (
+        org_data if org_data is not None else await get_organisme_service(organisme_id)
+    )
     if not data:
         return []
 
@@ -404,7 +403,9 @@ async def _search_generic(
 
         client = await get_client_async()
         method = getattr(client, method_name)
-        results = await _safe_call(f"Search {operation}: {query}", method(normalized_query))
+        results = await _safe_call(
+            f"Search {operation}: {query}", method(normalized_query)
+        )
         if not results or not results.hits:
             return []
         return [serialize_model(hit) for hit in results.hits[:limit]]
@@ -469,16 +470,46 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
         primary_limit = min(limit, max(2, (limit + 2) // 3))
         secondary_limit = min(limit, max(1, (limit + 9) // 10))
         queries = [
-            MultiSearchQuery(index_uid=MEILISEARCH_INDEX_ORGANISMES, q=normalized_query, limit=primary_limit),
-            MultiSearchQuery(index_uid=MEILISEARCH_INDEX_COMPETITIONS, q=normalized_query, limit=primary_limit),
-            MultiSearchQuery(index_uid=MEILISEARCH_INDEX_RENCONTRES, q=normalized_query, limit=primary_limit),
-            MultiSearchQuery(index_uid=MEILISEARCH_INDEX_SALLES, q=normalized_query, limit=secondary_limit),
-            MultiSearchQuery(index_uid=MEILISEARCH_INDEX_PRATIQUES, q=normalized_query, limit=secondary_limit),
-            MultiSearchQuery(index_uid=MEILISEARCH_INDEX_TERRAINS, q=normalized_query, limit=secondary_limit),
-            MultiSearchQuery(index_uid=MEILISEARCH_INDEX_TOURNOIS, q=normalized_query, limit=secondary_limit),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_ORGANISMES,
+                q=normalized_query,
+                limit=primary_limit,
+            ),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_COMPETITIONS,
+                q=normalized_query,
+                limit=primary_limit,
+            ),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_RENCONTRES,
+                q=normalized_query,
+                limit=primary_limit,
+            ),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_SALLES,
+                q=normalized_query,
+                limit=secondary_limit,
+            ),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_PRATIQUES,
+                q=normalized_query,
+                limit=secondary_limit,
+            ),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_TERRAINS,
+                q=normalized_query,
+                limit=secondary_limit,
+            ),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_TOURNOIS,
+                q=normalized_query,
+                limit=secondary_limit,
+            ),
         ]
 
-        raw = await _safe_call(f"Multi-search: {nom}", client.multi_search_async(queries))
+        raw = await _safe_call(
+            f"Multi-search: {nom}", client.multi_search_async(queries)
+        )
 
         if not raw or not hasattr(raw, "results") or not raw.results:
             return []
@@ -533,7 +564,9 @@ async def ffbb_bilan_service(
         elif club_name:
             orgs = await search_organismes_service(nom=club_name, limit=5)
             target_org_ids = [
-                str(org["id"]) for org in orgs if isinstance(org, dict) and org.get("id")
+                str(org["id"])
+                for org in orgs
+                if isinstance(org, dict) and org.get("id")
             ]
             if orgs and isinstance(orgs[0], dict):
                 club_nom = orgs[0].get("nom", club_name) or club_name or ""
@@ -544,10 +577,20 @@ async def ffbb_bilan_service(
         # 2. Récupérer les équipes filtrées en parallèle
         eq_tasks = []
         for oid in target_org_ids:
-            if organisme_id and str(oid) == str(organisme_id) and isinstance(org_data, dict):
-                eq_tasks.append(ffbb_equipes_club_service(organisme_id=oid, filtre=categorie, org_data=org_data))
+            if (
+                organisme_id
+                and str(oid) == str(organisme_id)
+                and isinstance(org_data, dict)
+            ):
+                eq_tasks.append(
+                    ffbb_equipes_club_service(
+                        organisme_id=oid, filtre=categorie, org_data=org_data
+                    )
+                )
             else:
-                eq_tasks.append(ffbb_equipes_club_service(organisme_id=oid, filtre=categorie))
+                eq_tasks.append(
+                    ffbb_equipes_club_service(organisme_id=oid, filtre=categorie)
+                )
         eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
 
         equipes: list[dict[str, Any]] = []
@@ -574,7 +617,9 @@ async def ffbb_bilan_service(
         )
         # FIX: print() → logger.debug() (les print polluaient stdout/Coolify en prod)
         logger.debug(f"ffbb_bilan: club_nom={club_nom} cible_orgs={target_org_ids}")
-        logger.debug(f"ffbb_bilan: equipes_count={len(equipes)} unique_poules={unique_poule_ids}")
+        logger.debug(
+            f"ffbb_bilan: equipes_count={len(equipes)} unique_poules={unique_poule_ids}"
+        )
 
         semaphore = asyncio.Semaphore(_MAX_POULE_FETCH_CONCURRENCY)
 
@@ -585,7 +630,9 @@ async def ffbb_bilan_service(
                 except McpError:
                     try:
                         client = await get_client_async()
-                        poule = await _safe_call(f"Poule {pid}", client.get_poule_async(poule_id=pid))
+                        poule = await _safe_call(
+                            f"Poule {pid}", client.get_poule_async(poule_id=pid)
+                        )
                         return serialize_model(poule) or {}
                     except Exception as e:
                         return e
@@ -644,18 +691,20 @@ async def ffbb_bilan_service(
                 pe = int(entry.get("paniers_encaisses") or 0)
                 diff = int(entry.get("difference") or 0)
 
-                phases.append({
-                    "competition": poule_to_comp.get(pid, ""),
-                    "poule_id": pid,
-                    "position": entry.get("position"),
-                    "match_joues": mj,
-                    "gagnes": g,
-                    "perdus": d,
-                    "nuls": n,
-                    "paniers_marques": pm,
-                    "paniers_encaisses": pe,
-                    "difference": diff,
-                })
+                phases.append(
+                    {
+                        "competition": poule_to_comp.get(pid, ""),
+                        "poule_id": pid,
+                        "position": entry.get("position"),
+                        "match_joues": mj,
+                        "gagnes": g,
+                        "perdus": d,
+                        "nuls": n,
+                        "paniers_marques": pm,
+                        "paniers_encaisses": pe,
+                        "difference": diff,
+                    }
+                )
 
                 totaux["match_joues"] += mj
                 totaux["gagnes"] += g

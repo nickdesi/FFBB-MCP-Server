@@ -285,8 +285,12 @@ class TestBilanService:
                 },
             ],
         )
-        poule1 = self._make_poule_mock("p1", "eng1", "9326", gagnes=3, perdus=0, pm=150, pe=40)
-        poule2 = self._make_poule_mock("p2", "eng2", "9326", gagnes=6, perdus=0, pm=300, pe=100)
+        poule1 = self._make_poule_mock(
+            "p1", "eng1", "9326", gagnes=3, perdus=0, pm=150, pe=40
+        )
+        poule2 = self._make_poule_mock(
+            "p2", "eng2", "9326", gagnes=6, perdus=0, pm=300, pe=100
+        )
 
         mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
         mock_client.get_poule_async = AsyncMock(side_effect=[poule1, poule2])
@@ -322,7 +326,9 @@ class TestBilanService:
                 }
             ],
         )
-        poule1 = self._make_poule_mock("p1", "eng1", "9326", gagnes=3, perdus=0, pm=100, pe=30)
+        poule1 = self._make_poule_mock(
+            "p1", "eng1", "9326", gagnes=3, perdus=0, pm=100, pe=30
+        )
         mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
         mock_client.get_poule_async = AsyncMock(return_value=poule1)
 
@@ -340,7 +346,9 @@ class TestBilanService:
 
 class TestCalendrierClubService:
     @pytest.mark.asyncio
-    async def test_caches_empty_when_club_not_found(self, patch_get_client, mock_client):
+    async def test_caches_empty_when_club_not_found(
+        self, patch_get_client, mock_client
+    ):
         mock_client.search_organismes_async = AsyncMock(return_value=None)
 
         result_1 = await get_calendrier_club_service(club_name="club fantome")
@@ -570,7 +578,9 @@ class TestMultiSearchService:
         assert queries[6].limit == 2
 
     @pytest.mark.asyncio
-    async def test_caches_empty_multi_search_results(self, patch_get_client, mock_client):
+    async def test_caches_empty_multi_search_results(
+        self, patch_get_client, mock_client
+    ):
         mock_res = MagicMock(spec=MultiSearchResults)
         mock_res.results = []
         mock_client.multi_search_async = AsyncMock(return_value=mock_res)
