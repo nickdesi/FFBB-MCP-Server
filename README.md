@@ -25,40 +25,89 @@
 
 Le serveur **FFBB MCP** est la **première et unique référence mondiale** pour exposer les données officielles du basketball français (FFBB) au protocole MCP. Il permet aux agents IA (comme Claude, Gemini, Cursor) de naviguer intelligemment dans l'écosystème du basket français : des ligues nationales aux championnats départementaux, avec une compréhension métier inégalée.
 
+L'instance publique hébergée à https://ffbb.desimone.fr/mcp est l'instance canonique à utiliser ; les clients doivent pointer vers cette URL pour accéder aux données et outils fournis.
+
 ### 🏗️ Architecture
 
 ```mermaid
 flowchart TD
-    subgraph Clients ["Clients IA & IDEs"]
-        direction TB
-        A1["Google Antigravity"]
-        A2["VS Code (MCP Extension)"]
-        A3["Claude Desktop"]
-        A4["Cursor / AnythingLLM"]
-    end
+  subgraph Clients ["Clients IA & IDEs"]
+    direction TB
+    A1["Google Antigravity"]
+    A2["VS Code (MCP Extension)"]
+    A3["Claude Desktop"]
+    A4["Cursor / AnythingLLM"]
+  end
 
-    subgraph Server ["MCP Server (ffbb_mcp)"]
-        direction TB
-        B["Transport (Stdio / SSE)"]
-        C["Core Logic (FastMCP)"]
-        D["FFBB API Client"]
-    end
+  subgraph Hosted ["Hosted MCP Instance (https://ffbb.desimone.fr/mcp)"]
+    direction TB
+    B["Transport (SSE / HTTP)"]
+    C["Core Logic (FastMCP)"]
+    D["FFBB API Client"]
+  end
 
-    subgraph Remote ["External Services"]
-        E["Official FFBB API"]
-    end
+  subgraph Remote ["Official FFBB API"]
+    E["Official FFBB API"]
+  end
 
-    Clients <-->|JSON-RPC| B
-    B <--> C
-    C <--> D
-    D <-->|HTTPS| E
+  Clients -->|SSE / HTTP| Hosted
+  Hosted <--> Remote
 ```
 
-## 🌐 Accès au service
+**Note:** Use the hosted instance at `https://ffbb.desimone.fr/mcp` — c'est l'instance canonique et supportée.
 
-Le serveur FFBB MCP est exposé publiquement et géré par l'équipe propriétaire — utilisez l'instance centrale : https://ffbb.desimone.fr/mcp
+## 🌐 Connecter votre assistant IA (Clients)
 
-Toutes les instructions de déploiement ou de self-hosting ont été retirées de cette documentation publique : l'instance hébergée est l'option supportée et recommandée.
+L'instance publique du serveur FFBB MCP est accessible ici : https://ffbb.desimone.fr/mcp
+
+Voici des exemples de configuration pour les clients et environnements courants — remplacez l'URL par `https://ffbb.desimone.fr/mcp` si elle n'est pas déjà renseignée.
+
+### Claude Desktop
+Ajoutez ou mettez à jour la configuration utilisateur pour pointer vers l'instance distante :
+
+```json
+{
+  "mcpServers": {
+    "ffbb": {
+      "httpUrl": "https://ffbb.desimone.fr/mcp"
+    }
+  }
+}
+```
+
+### Claude Code
+Ajoutez le serveur distant via la CLI :
+
+```bash
+claude mcp add --transport http ffbb https://ffbb.desimone.fr/mcp
+```
+
+### Gemini CLI
+Ajoutez l'URL dans `~/.gemini/settings.json` :
+
+```json
+{
+  "mcpServers": {
+    "ffbb": { "httpUrl": "https://ffbb.desimone.fr/mcp" }
+  }
+}
+```
+
+### Cursor / AnythingLLM / VS Code MCP Extension
+Dans les clients qui supportent MCP via HTTP/SSE, ajoutez un nouveau serveur de type `streamable` (ou `http`) et renseignez l'URL : `https://ffbb.desimone.fr/mcp`.
+
+### Smithery / intégrations (exemple)
+Installer ou configurer un client qui se connecte à un MCP via l'URL publique :
+
+```bash
+npx -y @smithery/cli@latest install @nickdesi/mcpffbb --client claude --mcp-url https://ffbb.desimone.fr/mcp
+```
+
+### Remarques générales
+- Transport recommandé : SSE (Streamable HTTP) — l'URL `https://ffbb.desimone.fr/mcp` expose le transport SSE.
+- Health check : `/health` (GET) — utile pour vérifier la disponibilité depuis un UI de gestion ou un load balancer.
+- Si un client signale une erreur CORS/Origins, vérifiez que l'UI locale (ex : `http://localhost:8000` de l'inspector) est autorisée par l'instance si tu testes depuis ton poste.
+
 ---
 
 ## 🛠️ Outils Disponibles
@@ -98,7 +147,7 @@ Le serveur expose des configurations prêtes à l'emploi pour transformer votre 
 
 ## ⚠️ Remarque sur l'accès
 
-L'instance publique `https://ffbb.desimone.fr/mcp` est l'instance officielle à utiliser pour accéder aux données FFBB via MCP. Les instructions de self-hosting et les commandes locales ont été supprimées de cette documentation publique.
+L'instance publique `https://ffbb.desimone.fr/mcp` est l'instance officielle à utiliser pour accéder aux données FFBB via MCP.
 ---
 
 ## 👨‍💻 Développement
