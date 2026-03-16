@@ -17,3 +17,4 @@ http_cache.db
 .agent/
 FFBBApiClientV3_Ref/
 external/antigravity-awesome-skills/
+tools/skill_router/
