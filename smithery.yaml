@@ -1,13 +1,12 @@
 startCommand:
   type: stdio
-  config: uv run ffbb-mcp
+  config: ffbb-mcp
 configSchema:
   type: object
   required:
     - ALLOWED_HOSTS
     - ALLOWED_ORIGINS
     - ENABLE_DNS_PROTECTION
-    - PUBLIC_URL
     - MCP_MODE
   properties:
     ALLOWED_HOSTS:
@@ -17,7 +16,7 @@ configSchema:
     ALLOWED_ORIGINS:
       type: string
       description: Comma-separated list of allowed origins for CORS.
-      default: "http://localhost:5173,https://ffbb.desimone.fr"
+      default: "http://localhost:5173,http://localhost:8000,https://ffbb.desimone.fr"
     ENABLE_DNS_PROTECTION:
       type: boolean
       description: Enable DNS rebinding protection. Set to true for production.
@@ -29,4 +28,4 @@ configSchema:
     MCP_MODE:
       type: string
       description: The execution mode of the MCP server (sse or stdio).
-      default: "stdio"
+      default: "sse"
