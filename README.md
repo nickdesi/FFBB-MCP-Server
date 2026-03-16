@@ -54,8 +54,6 @@ flowchart TD
   Hosted <--> Remote
 ```
 
-**Note:** Use the hosted instance at `https://ffbb.desimone.fr/mcp` — c'est l'instance canonique et supportée.
-
 ## 🌐 Connecter votre assistant IA (Clients)
 
 L'instance publique du serveur FFBB MCP est accessible ici : https://ffbb.desimone.fr/mcp

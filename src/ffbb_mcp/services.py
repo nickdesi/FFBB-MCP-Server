@@ -3,9 +3,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import re
-import time
 import random
+import re
 import traceback
 from threading import RLock
 from typing import Any, TypeVar
@@ -22,7 +21,6 @@ from mcp.types import INTERNAL_ERROR, ErrorData
 
 from .aliases import normalize_query
 from .client import get_client_async
-from .metrics import record_call
 from .utils import serialize_model
 
 logger = logging.getLogger("ffbb-mcp")
@@ -157,8 +155,6 @@ async def _safe_call(operation_name: str, coro, *, retries: int = 3, base_delay:
     zéro-argument qui retourne une nouvelle coroutine (réessayable).
     """
     logger.info(f"Début exécution: {operation_name}")
-    start_time = time.monotonic()
-    is_error = False
 
     # If a factory is provided, use it to create fresh coroutines per attempt.
     make_coro = None
@@ -181,7 +177,6 @@ async def _safe_call(operation_name: str, coro, *, retries: int = 3, base_delay:
             logger.info(f"Succès: {operation_name} (attempt {attempt})")
             return result
         except Exception as e:
-            is_error = True
             last_exc = e
 
             # Decide if error is retriable

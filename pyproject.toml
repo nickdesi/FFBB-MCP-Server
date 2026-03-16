@@ -53,6 +53,8 @@ exclude = [
     ".mypy_cache",
     ".ruff_cache",
     "FFBBApiClientV3_Ref",
+    "external",
+    "external/**",
 ]
 
 [tool.ruff.lint]

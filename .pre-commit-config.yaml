@@ -1,4 +1,18 @@
 repos:
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: main
+    hooks:
+      - id: ruff
+        name: ruff-format
+        args: ["--fix"]
+        stages: [commit]
+        pass_filenames: false
+      - id: ruff
+        name: ruff-check
+        args: ["check", "."]
+        stages: [push]
+        pass_filenames: false
+repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.9.10
     hooks:

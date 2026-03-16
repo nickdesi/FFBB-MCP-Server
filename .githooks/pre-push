@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Run ruff check on the repository before pushing. Prefer venv binary if present.
+if [ -x ".venv/bin/ruff" ]; then
+  .venv/bin/ruff check .
+elif command -v ruff >/dev/null 2>&1; then
+  ruff check .
+else
+  echo "ruff not found; skipping check. Install ruff in .venv or globally." >&2
+  exit 0
+fi
