@@ -10,20 +10,20 @@ ENV HOST=0.0.0.0
 
 WORKDIR /app
 
-# Installation de Git (requis car ffbb-api-client-v3 est tapé via url locale/git)
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+# Installer Git (nécessaire pour installer la dépendance git referenced in pyproject)
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 
-# Installer UV, rapide et léger
-RUN pip install --no-cache-dir uv
-
+# Copier sources
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
 COPY assets/ ./assets/
 
-# Lier et l'installer
-RUN uv pip install --system -e .
+# Mettre à jour pip puis installer le package et ses dépendances
+RUN python -m pip install --upgrade pip setuptools wheel && \
+	python -m pip install --no-cache-dir -e .
 
+# Exposer le port configuré
 EXPOSE 9123
 
-# Lancement
+# Commande de lancement (utilise l'entry-point défini dans pyproject.toml)
 CMD ["ffbb-mcp"]

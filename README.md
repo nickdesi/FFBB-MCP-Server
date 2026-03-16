@@ -54,95 +54,11 @@ flowchart TD
     D <-->|HTTPS| E
 ```
 
-## 🌐 Connecter votre assistant IA (Clients)
+## 🌐 Accès au service
 
-Le serveur gère nativement le transport **SSE (Streamable HTTP)** sur `https://ffbb.desimone.fr/mcp` et le transport **Stdio** en local via `uvx`.
+Le serveur FFBB MCP est exposé publiquement et géré par l'équipe propriétaire — utilisez l'instance centrale : https://ffbb.desimone.fr/mcp
 
-Trouvez la configuration correspondant à votre outil préféré ci-dessous :
-
-### Claude Desktop
-
-Ajoutez ce bloc dans votre configuration (souvent `~/.config/Claude/claude_desktop_config.json` ou `%APPDATA%\Claude\claude_desktop_config.json`) pour utiliser la version distante :
-
-```json
-{
-  "mcpServers": {
-    "ffbb": {
-      "command": "uvx",
-      "args": [
-        "--from",
-        "git+https://github.com/nickdesi/FFBB-MCP-Server.git",
-        "ffbb_mcp"
-      ]
-    }
-  }
-}
-```
-
-### Claude Code
-
-Ajoutez le serveur distant avec la commande CLI native :
-
-```shell
-claude mcp add --transport http ffbb https://ffbb.desimone.fr/mcp
-```
-
-*Alternative locale via uvx :*
-
-```shell
-claude mcp add ffbb uvx --from "git+https://github.com/nickdesi/FFBB-MCP-Server.git" ffbb_mcp
-```
-
-### Cursor
-
-1. Allez dans **Settings** > **Features** > **MCP Servers**.
-2. Cliquez sur **+ Add New MCP Server**.
-3. Configurez selon votre préférence :
-   - **Mode Remote (Rapide)** : Type `sse`, URL `https://ffbb.desimone.fr/mcp`
-   - **Mode Local** : Type `command`, Command `uvx --from git+https://github.com/nickdesi/FFBB-MCP-Server.git ffbb_mcp`
-
-### Gemini CLI
-
-Ajoutez le serveur dans `~/.gemini/settings.json` :
-
-```json
-{
-  "mcpServers": {
-    "ffbb": {
-      "httpUrl": "https://ffbb.desimone.fr/mcp"
-    }
-  }
-}
-```
-
-### Google Antigravity
-
-Ajoutez simplement l'URL dans le fichier de configuration de l'espace de travail (`mcp_config.json`) :
-
-```json
-{
-  "mcpServers": {
-    "ffbb_mcp": {
-      "serverUrl": "https://ffbb.desimone.fr/mcp"
-    }
-  }
-}
-```
-
-### AnythingLLM
-
-1. Allez dans les paramètres et locatez les MCP Servers.
-2. Ajoutez un serveur de type `streamable` avec l'URL :
-`https://ffbb.desimone.fr/mcp`
-
-### Smithery
-
-Vous pouvez installer ce serveur pour Claude Desktop directement avec Smithery CLI en utilisant l'URL du repository :
-
-```bash
-npx -y @smithery/cli@latest install @nickdesi/mcpffbb --client claude
-```
-
+Toutes les instructions de déploiement ou de self-hosting ont été retirées de cette documentation publique : l'instance hébergée est l'option supportée et recommandée.
 ---
 
 ## 🛠️ Outils Disponibles
@@ -180,27 +96,14 @@ Le serveur expose des configurations prêtes à l'emploi pour transformer votre 
 
 ---
 
-## ⚠️ Continuité & Self-Hosting
+## ⚠️ Remarque sur l'accès
 
-L'URL officielle recommandée `https://ffbb.desimone.fr/mcp` est une **instance communautaire hébergée gracieusement**, sans *Service Level Agreement* (SLA) ni garantie de disponibilité à 100%. Bien que configurée pour être robuste, elle peut subir des interruptions liées à l'hébergement ou à l'API FFBB elle-même.
-
-**Si vous dépendez de cet outil pour des workflows critiques :**
-
-- **Fallback local** : Si l'instance distante tombe, repassez sur la commande locale `uvx --from "git+https://github.com/nickdesi/FFBB-MCP-Server.git" ffbb_mcp`.
-- **Self-Hosting (Recommandé)** : Hébergez votre propre instance MCP. Référez-vous à la documentation [docs/COOLIFY_DEPLOYMENT.md](docs/COOLIFY_DEPLOYMENT.md) pour les instructions avec Coolify/Docker.
-  - **Sécurité et Configuration** : Sécurisez votre instance en définissant les variables d'environnement suivantes :
-    - `ALLOWED_HOSTS` : Noms de domaine autorisés (ex: `ffbb.mondomaine.fr`)
-    - `ALLOWED_ORIGINS` : Origines autorisées (ex: `https://ffbb.mondomaine.fr`)
-    - `ENABLE_DNS_PROTECTION` : Mettre à `true` pour activer la protection contre le DNS Rebinding.
-    - `PUBLIC_URL` : URL publique de votre instance MCP (ex: `https://ffbb.mondomaine.fr/mcp`).
-
+L'instance publique `https://ffbb.desimone.fr/mcp` est l'instance officielle à utiliser pour accéder aux données FFBB via MCP. Les instructions de self-hosting et les commandes locales ont été supprimées de cette documentation publique.
 ---
 
 ## 👨‍💻 Développement
 
 Consultez le guide [CONTRIBUTING.md](CONTRIBUTING.md) pour installer l'environnement de développement et soumettre des PRs.
-
-Pour le déploiement sur votre propre serveur, voir [docs/COOLIFY_DEPLOYMENT.md](docs/COOLIFY_DEPLOYMENT.md).
 
 ## 📄 Licence
 

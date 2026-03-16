@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import time
+import random
 import traceback
 from threading import RLock
 from typing import Any, TypeVar
@@ -149,21 +150,75 @@ def _handle_api_error(e: Exception) -> McpError:
     )
 
 
-async def _safe_call(operation_name: str, coro) -> Any:
-    """Exécute un appel API avec logging et error handling."""
+async def _safe_call(operation_name: str, coro, *, retries: int = 3, base_delay: float = 0.5, max_delay: float = 10.0) -> Any:
+    """Exécute un appel API avec logging, error handling et retry/backoff.
+
+    `coro` peut être soit une coroutine (non-réessayable), soit un "callable"
+    zéro-argument qui retourne une nouvelle coroutine (réessayable).
+    """
     logger.info(f"Début exécution: {operation_name}")
     start_time = time.monotonic()
     is_error = False
-    try:
-        result = await coro
-        logger.info(f"Succès: {operation_name}")
-        return result
-    except Exception as e:
-        is_error = True
-        raise _handle_api_error(e) from e
-    finally:
-        latency = time.monotonic() - start_time
-        record_call(latency, is_error)
+
+    # If a factory is provided, use it to create fresh coroutines per attempt.
+    make_coro = None
+    if callable(coro):
+        make_coro = coro
+    else:
+        # single-use coroutine passed; wrap into a factory that returns it once
+        single = coro
+        def _once():
+            return single
+        make_coro = _once
+
+    attempt = 0
+    last_exc: Exception | None = None
+    while attempt < max(1, retries):
+        attempt += 1
+        try:
+            current_coro = make_coro()
+            result = await current_coro
+            logger.info(f"Succès: {operation_name} (attempt {attempt})")
+            return result
+        except Exception as e:
+            is_error = True
+            last_exc = e
+
+            # Decide if error is retriable
+            retriable = False
+            if isinstance(e, HTTPStatusError):
+                status = getattr(e.response, "status_code", None)
+                if status == 429:
+                    retriable = True
+            errname = type(e).__name__.lower()
+            msg = str(e).lower()
+            if "timeout" in errname or "timeout" in msg or "connection" in msg:
+                retriable = True
+
+            if attempt >= retries or not retriable:
+                # no more retries or not retriable: raise handled error
+                raise _handle_api_error(e) from e
+
+            # exponential backoff with jitter
+            delay = min(max_delay, base_delay * (2 ** (attempt - 1)))
+            jitter = random.random() * (delay * 0.1)
+            sleep_for = delay + jitter
+            logger.warning(
+                "%s failed (attempt %d/%d) — retrying in %.2fs: %s",
+                operation_name,
+                attempt,
+                retries,
+                sleep_for,
+                e,
+            )
+            try:
+                await asyncio.sleep(sleep_for)
+            except asyncio.CancelledError:
+                raise
+    # If we exit loop without returning, raise last exception formatted
+    if last_exc is not None:
+        raise _handle_api_error(last_exc) from last_exc
+    return None
 
 
 async def _dedupe_inflight_detail(cache_key: str, make_coro) -> Any:
@@ -218,7 +273,7 @@ async def get_lives_service() -> list[dict]:
         return cached
 
     client = await get_client_async()
-    lives = await _safe_call("Lives (Matchs en cours)", client.get_lives_async())
+    lives = await _safe_call("Lives (Matchs en cours)", lambda: client.get_lives_async())
     result = [serialize_model(live) for live in lives] if lives else []
     _cache_set(_cache_lives, "lives", result)
     return result
@@ -232,7 +287,7 @@ async def get_saisons_service(active_only: bool = False) -> list[dict]:
 
     client = await get_client_async()
     saisons = await _safe_call(
-        "Saisons", client.get_saisons_async(active_only=active_only)
+        "Saisons", lambda: client.get_saisons_async(active_only=active_only)
     )
     result = [serialize_model(s) for s in saisons] if saisons else []
     _cache_set(_cache_detail, cache_key, result)
@@ -247,7 +302,7 @@ async def get_competition_service(competition_id: int | str) -> dict:
         client = await get_client_async()
         comp = await _safe_call(
             f"Compétition {competition_id_int}",
-            client.get_competition_async(competition_id=competition_id_int),
+            lambda: client.get_competition_async(competition_id=competition_id_int),
         )
         return serialize_model(comp) or {}
 
@@ -262,7 +317,7 @@ async def get_poule_service(poule_id: int | str) -> dict:
         client = await get_client_async()
         poule = await _safe_call(
             f"Poule {poule_id_int}",
-            client.get_poule_async(poule_id=poule_id_int),
+            lambda: client.get_poule_async(poule_id=poule_id_int),
         )
         return serialize_model(poule) or {}
 
@@ -277,7 +332,7 @@ async def get_organisme_service(organisme_id: int | str) -> dict:
         client = await get_client_async()
         org = await _safe_call(
             f"Organisme {organisme_id_int}",
-            client.get_organisme_async(organisme_id=organisme_id_int),
+            lambda: client.get_organisme_async(organisme_id=organisme_id_int),
         )
         return serialize_model(org) or {}
 
@@ -365,7 +420,7 @@ async def ffbb_get_classement_service(poule_id: int | str) -> list[dict[str, Any
     client = await get_client_async()
     poule = await _safe_call(
         f"Classement poule {poule_id_int}",
-        client.get_poule_async(poule_id=poule_id_int),
+        lambda: client.get_poule_async(poule_id=poule_id_int),
     )
     if not poule:
         return []
@@ -404,7 +459,7 @@ async def _search_generic(
         client = await get_client_async()
         method = getattr(client, method_name)
         results = await _safe_call(
-            f"Search {operation}: {query}", method(normalized_query)
+            f"Search {operation}: {query}", lambda: method(normalized_query)
         )
         if not results or not results.hits:
             return []
@@ -508,7 +563,7 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
         ]
 
         raw = await _safe_call(
-            f"Multi-search: {nom}", client.multi_search_async(queries)
+            f"Multi-search: {nom}", lambda: client.multi_search_async(queries)
         )
 
         if not raw or not hasattr(raw, "results") or not raw.results:
@@ -631,7 +686,7 @@ async def ffbb_bilan_service(
                     try:
                         client = await get_client_async()
                         poule = await _safe_call(
-                            f"Poule {pid}", client.get_poule_async(poule_id=pid)
+                            f"Poule {pid}", lambda: client.get_poule_async(poule_id=pid)
                         )
                         return serialize_model(poule) or {}
                     except Exception as e:
