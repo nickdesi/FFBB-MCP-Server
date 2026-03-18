@@ -135,8 +135,7 @@ def _cache_get(cache: TTLCache, key: Any, cache_name: str) -> Any | None:
 
 def _cache_set(cache: TTLCache, key: Any, value: Any, cache_name: str) -> None:
     cache[key] = value
-    # On considère l'écriture comme un miss (il a fallu faire l'appel réel)
-    _notify_cache_miss(cache_name)
+    # Le miss correspondant a déjà été enregistré dans _cache_get.
 
 
 def _coerce_numeric_id(value: int | str, label: str) -> int:
