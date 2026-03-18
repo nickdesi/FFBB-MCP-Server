@@ -143,6 +143,20 @@ Le serveur expose des configurations prêtes à l'emploi pour transformer votre 
 
 ---
 
+## 📚 Documentation MCP, tools & performances
+
+Pour les détails complets sur les tools MCP exposés par ce serveur (paramètres,
+exemples d'appels, bonnes pratiques agents), voir :
+
+- `docs/TOOLS_REFERENCE.md`
+
+Pour la partie performance (benchmarks, mesures P95, intégration possible en CI),
+voir :
+
+- `docs/PERFORMANCE.md`
+
+---
+
 ## ⚠️ Remarque sur l'accès
 
 L'instance publique `https://ffbb.desimone.fr/mcp` est l'instance officielle à utiliser pour accéder aux données FFBB via MCP.

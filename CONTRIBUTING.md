@@ -32,15 +32,24 @@ Pour maintenir une base de code propre :
 - **Linting/Formatting** : Utilisez `ruff` (déjà configuré).
 
     ```bash
-    ruff format .
-    ruff check .
+    uv run ruff format .
+    uv run ruff check .
     ```
 
 - **Tests** : Lancez les tests avant chaque commit.
 
     ```bash
-    pytest tests/
+    uv run pytest
     ```
+
+### ✅ Checklist avant commit
+
+Avant de pousser vos changements :
+
+- [ ] Code formaté : `uv run ruff format .`
+- [ ] Lint OK : `uv run ruff check .`
+- [ ] Tests unitaires OK : `uv run pytest`
+- [ ] (Optionnel) Performance critique modifiée : `uv run python tools/measure_services.py`
 
 - **Commits** : Nous suivons les [Conventional Commits](https://www.conventionalcommits.org/).
 

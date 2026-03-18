@@ -16,8 +16,8 @@ from cachetools import TTLCache
 # local/lazy imports in the functions that actually need these symbols
 # to reduce cold-start/import overhead.
 from httpx import HTTPStatusError
-from mcp.shared.exceptions import McpError
-from mcp.types import INTERNAL_ERROR, ErrorData
+from mcp.shared.exceptions import ErrorData, McpError
+from mcp.types import INTERNAL_ERROR
 
 from .aliases import normalize_query
 from .client import get_client_async
@@ -786,46 +786,50 @@ async def get_calendrier_club_service(
     organisme_id: int | str | None = None,
     categorie: str | None = None,
 ) -> list[dict]:
-    """
-    Récupère le calendrier et les résultats d'un club en utilisant le workflow infaillible
-    (Recherche Club -> Equipes -> Poules -> Rencontres).
+    """Récupère le calendrier et les résultats d'un club.
+
+    Workflow :
+    - Recherche du club si seul le nom est fourni
+    - Récupération des équipes via ffbb_equipes_club_service
+    - Récupération de toutes les poules concernées
+    - Agrégation des rencontres
+    - Troncature éventuelle si trop de matchs (FFBB_MAX_CALENDAR_MATCHES)
     """
     cache_key = f"calendrier:{organisme_id or ''}:{(club_name or '').lower().strip()}:{categorie or ''}"
 
     async def _fetch() -> list[dict]:
-
-        target_org_ids = []
+        # 1. Résoudre les organismes cibles
+        target_org_ids: list[str] = []
 
         if organisme_id:
-            target_org_ids = [organisme_id]
+            target_org_ids = [str(organisme_id)]
         elif club_name:
             orgs = await search_organismes_service(nom=club_name, limit=3)
-            target_org_ids = [
-                org.get("id") for org in orgs if isinstance(org, dict) and org.get("id")
-            ]
+            target_org_ids = [str(org.get("id")) for org in orgs if isinstance(org, dict) and org.get("id")]
 
-        target_org_ids = list(dict.fromkeys(str(oid) for oid in target_org_ids))
+        # Dédupliquer / nettoyer
+        target_org_ids = list(dict.fromkeys(oid for oid in target_org_ids if oid))
         if not target_org_ids:
             return []
 
         # 2. Récupérer les équipes engagées correspondant à la catégorie en parallèle
-        # FIX: org_data supprimée (fetché mais jamais utilisée — appel API gaspillé)
         eq_tasks = [
             ffbb_equipes_club_service(organisme_id=oid, filtre=categorie)
             for oid in target_org_ids
         ]
         eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
 
-        equipes = []
+        equipes: list[dict[str, Any]] = []
         for res in eq_results:
             if isinstance(res, list):
                 equipes.extend(res)
             elif isinstance(res, Exception):
-                logger.error(f"Erreur lors de la récupération des équipes: {res}")
+                logger.error("Erreur lors de la récupération des équipes: %s", res)
 
         if not equipes:
             return []
 
+        # Dédupliquer les équipes par engagement_id pour éviter les doublons de matchs
         deduped_equipes: list[dict[str, Any]] = []
         seen_engagement_ids: set[str] = set()
         for equipe in equipes:
@@ -842,8 +846,8 @@ async def get_calendrier_club_service(
         equipes = deduped_equipes
 
         # 3. Parcourir toutes les poules de ces équipes pour récupérer toutes les rencontres et scores
-        seen_match_ids = set()
-        all_matches = []
+        seen_match_ids: set[Any] = set()
+        all_matches: list[dict[str, Any]] = []
 
         unique_poule_ids = list(
             dict.fromkeys(str(e.get("poule_id")) for e in equipes if e.get("poule_id"))
@@ -928,6 +932,26 @@ async def get_calendrier_club_service(
 
         # Tri par date décroissante pour avoir les derniers matchs en premier
         all_matches.sort(key=lambda x: x.get("date") or "", reverse=True)
+
+        # Troncature si trop de matchs
+        try:
+            max_matches = int(os.getenv("FFBB_MAX_CALENDAR_MATCHES", "300"))
+        except ValueError:
+            max_matches = 300
+
+        if len(all_matches) > max_matches:
+            truncated = all_matches[:max_matches]
+            warning = {
+                "warning": (
+                    "Résultat tronqué côté MCP: trop de matchs pour ce club/catégorie. "
+                    "Affichage limité pour protéger les performances. "
+                    "Affinez votre requête (catégorie précise, équipe 1/2, phase, etc.)."
+                ),
+                "total_initial": len(all_matches),
+                "limite_appliquee": max_matches,
+            }
+            return truncated + [warning]
+
         return all_matches
 
     return await _dedupe_inflight(
@@ -936,3 +960,63 @@ async def get_calendrier_club_service(
         inflight_map=_inflight_calendrier,
         make_coro=_fetch,
     )
+
+
+async def _resolve_poule_ids_for_categorie(org_data: dict, categorie: str) -> list[int]:
+    """Résout les poule_id pertinents pour une catégorie donnée.
+
+    - org_data : dict issu de get_organisme_service (model_dump())
+    - categorie : ex. "U11M", "U13F1" etc.
+
+    """
+    from mcp.shared.exceptions import ErrorData, McpError
+
+    engagements = org_data.get("engagements") or []
+    if not engagements:
+        raise McpError(
+            ErrorData(
+                code=400,
+                message="Aucune équipe engagée trouvée pour ce club.",
+            )
+        )
+
+    # On dérive un code de catégorie simple: on garde la partie UXX de la chaîne
+    cat_upper = (categorie or "").upper()
+    code = None
+    for part in cat_upper.split():
+        if part.startswith("U") and part[1:3].isdigit():
+            code = part[:3]  # U11, U13, U15…
+            break
+    if code is None and len(cat_upper) >= 3 and cat_upper[0] == "U" and cat_upper[1:3].isdigit():
+        code = cat_upper[:3]
+
+    matched_poule_ids: list[int] = []
+    for eng in engagements:
+        comp = eng.get("idCompetition") or {}
+        cat_info = comp.get("categorie") or {}
+        comp_code = (cat_info.get("code") or "").upper()
+
+        if code and comp_code and comp_code != code:
+            continue
+
+        poule = eng.get("idPoule") or {}
+        poule_id = poule.get("id")
+        if poule_id is None:
+            continue
+        try:
+            matched_poule_ids.append(int(poule_id))
+        except (TypeError, ValueError):
+            continue
+
+    if not matched_poule_ids:
+        raise McpError(
+            ErrorData(
+                code=404,
+                message=(
+                    f"Aucune poule trouvée pour la catégorie {categorie!r} "
+                    "dans les engagements de ce club."
+                ),
+            )
+        )
+
+    return matched_poule_ids

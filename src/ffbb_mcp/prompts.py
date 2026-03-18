@@ -36,21 +36,23 @@ def expert_basket() -> str:
         "sont disponibles.\n\n"
         "## ⚠️ Règle fondamentale\n"
         "Les données FFBB sont **toujours live**. Ne jamais consulter la mémoire ou un cache "
-        "avant d'appeler l'API — ces données n'y seront jamais.\n\n"
+        "avant d'appeler l'API — ces données n'y seront jamais. Le serveur MCP gère déjà un cache "
+        "interne optimisé, le LLM n'a pas à s'en préoccuper.\n\n"
         "## Workflow recommandé\n\n"
         "### ⚡ Pour le BILAN / CLASSEMENT / RÉSULTATS d'une équipe (toutes phases)\n"
-        "**Utilise `ffbb_bilan` — c'est UN seul appel qui fait tout en interne.**\n"
+        "**Utilise EN PRIORITÉ `ffbb_bilan(club_name=..., categorie=...)` — c'est UN seul appel qui fait tout en interne.**\n"
         "```\n"
         'ffbb_bilan(club_name="Stade Clermontois", categorie="U11M1")\n'
         "```\n"
-        "Retourne : bilan global (V/D/N, paniers) + détail par phase. Rien d'autre à faire.\n\n"
+        "Retourne : bilan global (V/D/N, paniers) + détail par phase. Ne reconstruis PAS le bilan "
+        "à la main à partir de `ffbb_get` ou `ffbb_club` si `ffbb_bilan` est disponible.\n\n"
         "### 🏆 Pour le CLASSEMENT ou les MATCHS d'une poule précise\n"
         "1. `ffbb_search(type='organismes', query=<club>)` → `organisme_id`\n"
-        "2. `ffbb_club(action='equipes', organisme_id=...)` → `poule_id`\n"
+        "2. `ffbb_club(action='equipes', organisme_id=...)` → équipes et `poule_id`\n"
         "3. `ffbb_get(type='poule', id=<poule_id>)` → classement + matchs\n\n"
         "### 🏆 Pour le CALENDRIER seul (matchs à venir)\n"
-        "Utilise `ffbb_get(type='poule', id=<poule_id>)` si tu as déjà un `poule_id`.\n"
-        "Sinon utilise `ffbb_club(action='calendrier')` comme dernier recours.\n\n"
+        "- Si tu as déjà un `poule_id`, utilise **d'abord** `ffbb_get(type='poule', id=<poule_id>)` et filtre les matchs à venir.\n"
+        "- Sinon, utilise `ffbb_club(action='calendrier')` **uniquement en dernier recours**, lorsque aucun `poule_id` exploitable n'est disponible.\n\n"
         "### Autres outils\n"
         "- Recherche générale → `ffbb_search(type='all')` (clubs, compétitions, salles, etc.)\n"
         "- Détails compétition → `ffbb_get(type='competition', id=...)` → liste les poules\n"
@@ -59,6 +61,8 @@ def expert_basket() -> str:
         "- Appelle TOUJOURS un outil MCP avant de répondre à toute question sur le basket français.\n"
         "- Si une recherche retourne plusieurs clubs/compétitions, liste les résultats et "
         "demande à l'utilisateur de confirmer lequel.\n"
+        "- Si la catégorie est ambiguë (ex: 'U13' sans M/F ni numéro d'équipe), demande toujours "
+        "des précisions avant d'appeler un outil.\n"
         "- Réponds toujours en français."
     )
 
@@ -118,21 +122,22 @@ def classement_poule(competition_name: str) -> str:
 
 def bilan_equipe(club_name: str, categorie: str) -> str:
     """Aide à faire le bilan complet d'une équipe sur toute la saison."""
-    # FIX: réécrit pour utiliser ffbb_bilan (1 seul appel) au lieu de
-    # l'ancien workflow manuel (4-5 appels), cohérent avec expert_basket.
     return (
         f"Je veux le bilan complet de l'équipe '{categorie}' du club '{club_name}' "
         "sur la saison actuelle (toutes phases confondues).\n"
-        "1. Si le genre (M/F) ou le numéro d'équipe manque, DEMANDE une précision à l'utilisateur.\n"
-        f"2. Utilise `ffbb_bilan(club_name='{club_name}', categorie='{categorie}')` — "
+        "1. Si le genre (M/F) ou le numéro d'équipe manque, DEMANDE une précision à l'utilisateur avant d'appeler un outil.\n"
+        f"2. Utilise EN PRIORITÉ `ffbb_bilan(club_name='{club_name}', categorie='{categorie}')` — "
         "UN seul appel suffit et cumule toutes les phases en interne.\n"
-        "   Si `ffbb_bilan` ne retourne pas assez d'informations, en dernier recours :\n"
-        "   a) `ffbb_search(type='organismes', query=...)` pour résoudre l'ID du club\n"
-        "   b) `ffbb_club(action='equipes', organisme_id=...)` pour lister les poules\n"
-        "3. Présente le résultat sous deux parties :\n"
-        "   - **Bilan total saison** : matchs joués, victoires, défaites, nuls, "
-        "paniers marqués/encaissés, différence\n"
-        "   - **Détail par phase** : tableau avec position, V/D/N et paniers pour chaque compétition."
+        "   - Ne reconstruis PAS le bilan à la main à partir de `ffbb_get` ou `ffbb_club` si `ffbb_bilan` est disponible.\n"
+        "3. Si `ffbb_bilan` ne retourne pas assez d'informations, en DERNIER RECOURS seulement :\n"
+        "   a) `ffbb_search(type='organismes', query=...)` pour résoudre l'ID du club.\n"
+        "   b) `ffbb_club(action='equipes', organisme_id=...)` pour lister les équipes et leurs `poule_id`.\n"
+        "   c) `ffbb_get(type='poule', id=POULE_ID)` pour récupérer classement + tous les matchs de la poule.\n"
+        "   d) `ffbb_club(action='calendrier')` UNIQUEMENT si aucun `poule_id` exploitable n'est disponible.\n"
+        "4. Les données FFBB sont toujours LIVE : ne suppose jamais un cache côté LLM, ne PAS inventer de résultats.\n"
+        "5. Présente le résultat sous deux parties :\n"
+        "   - **Bilan total saison** : matchs joués, victoires, défaites, nuls, paniers marqués/encaissés, différence.\n"
+        "   - **Détail par phase** : tableau avec position, V/D/N et paniers pour chaque compétition/poule."
     )
 
 

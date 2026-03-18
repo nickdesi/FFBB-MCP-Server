@@ -100,16 +100,106 @@ Le serveur ne se contente pas de données brutes, il guide l'IA via des prompts 
 
 ## 💡 Conseils d'utilisation (Best Practices)
 
-1. **Workflow Optimal** :
-    - `ffbb_search(query='nom', type='organismes')` -> Récupérer l'ID.
-    - `ffbb_club(action='equipes', organisme_id=ID)` -> Trouver l'équipe et son `poule_id`.
-    - `ffbb_get(type='poule', id=POULE_ID)` -> Vision complète (Classement + Matchs).
+1. **Outil prioritaire pour bilans/classements**
+   - Pour tout ce qui concerne le **bilan complet d’une équipe**, ses **résultats** ou son **classement** sur la saison, utilise en priorité :
+     - `ffbb_bilan(club_name=..., categorie=...)` → **un seul appel** agrège toutes les phases en interne.
+   - Ne reconstruis pas le bilan "à la main" à partir de `ffbb_get` ou `ffbb_club` si `ffbb_bilan` est disponible.
 
-2. **Désambiguïsation** :
-    - Si l'utilisateur demande "U13", toujours vérifier s'il s'agit de Masculin (M) ou Féminin (F).
-    - Pour les clubs avec plusieurs équipes (ex: U13M-1, U13M-2), l'équipe 1 est toujours celle au niveau le plus haut.
+2. **Workflow club → équipe → poule**
+   - Pour naviguer d’un club vers la bonne poule :
+     - `ffbb_search(type='organismes', query='nom')` → récupérer l’`organisme_id`.
+     - `ffbb_club(action='equipes', organisme_id=ID)` → lister les équipes, catégories et `poule_id`.
+     - `ffbb_get(type='poule', id=POULE_ID)` → vision complète de la poule (**classement + tous les matchs**).
 
-3. **Cache** :
-    - Les résultats de recherche et de détails sont mis en cache côté serveur pour optimiser les performances. Ne pas hésiter à répéter des appels similaires.
+3. **Anti‑pattern à éviter (calendrier)**
+   - Si tu connais déjà un `poule_id`,
+     - **utilise toujours** `ffbb_get(type='poule', id=POULE_ID)` pour récupérer classement + rencontres.
+     - N’utilise `ffbb_club(action='calendrier')` **qu’en dernier recours**, lorsque tu n’as réellement aucun `poule_id` exploitable.
 
-- **Performance notes** : Une courte note sur les optimisations récentes et comment mesurer les performances a été ajoutée. Voir aussi [Performance guide](PERFORMANCE.md) pour les détails et le petit benchmark inclus dans `tools/measure_services.py`.
+4. **Données live et cache**
+   - Les données FFBB sont **toujours live** côté API officielle.
+   - Ne suppose jamais l’existence d’un cache côté LLM ou côté utilisateur :
+     - pour connaître un résultat, un classement ou un calendrier à jour, tu dois **appeler les outils**.
+   - Le serveur MCP gère déjà un cache interne optimisé ; le LLM n’a pas à se préoccuper de la couche cache.
+
+5. **Désambiguïsation des catégories**
+   - Si l’utilisateur donne une catégorie ambiguë (ex. `"U13"` sans préciser Masculin/Féminin ni le numéro d’équipe), demande toujours des précisions :
+     - Genre : `M` ou `F` (ex. `U13M`, `U13F`).
+     - Numéro d’équipe lorsqu’il y en a plusieurs (`U13M-1`, `U13M-2`, etc.).
+   - Ne sélectionne pas arbitrairement une équipe en cas d’ambiguïté : priorise la demande d’informations supplémentaires.
+
+6. **Répétition d’appels**
+   - Répéter un même appel d’outil avec les mêmes paramètres est acceptable :
+     - les résultats de recherche, bilans et détails sont mis en cache côté serveur MCP pour optimiser les performances.
+   - Inutile d’essayer d’optimiser les appels côté LLM en réutilisant "de mémoire" des résultats potentiellement obsolètes.
+
+---
+
+## 🧪 Benchmarks & seuils P95 (CI)
+
+Pour vérifier que les services restent performants dans le temps, le dépôt fournit
+un petit utilitaire de benchmark : `tools/measure_services.py`.
+
+- Il exécute en boucle (mocks FFBB, caches vidés) :
+  - `ffbb_bilan_service(organisme_id=9326, categorie="U11M1")`
+  - `get_calendrier_club_service(organisme_id=9326, categorie="U11M1")`
+- Il calcule pour chaque service :
+  - `mean`, `median`, `p95`, `min`, `max`.
+- Il peut **casser le build** en CI si les P95 dépassent un seuil.
+
+### Lancer le benchmark en local
+
+```bash
+uv run python tools/measure_services.py
+```
+
+Variables d'environnement utiles :
+
+- `SIMULATE_LATENCY_MS` : ajoute une latence artificielle (ms) sur `get_poule_async`
+  pour simuler des réseaux plus lents.
+- `THRESHOLD_P95_BILAN` : si > 0, le script retourne un code de sortie non nul
+  si le P95 de `ffbb_bilan_service` dépasse ce seuil (en secondes).
+- `THRESHOLD_P95_CAL` : même principe pour `get_calendrier_club_service`.
+
+Exemple d'usage en CI (pseudo-code) :
+
+```bash
+THRESHOLD_P95_BILAN=0.300 \
+THRESHOLD_P95_CAL=0.350 \
+uv run python tools/measure_services.py
+```
+
+Si l'un des P95 dépasse le seuil, le script affiche un message d'erreur explicite
+et sort avec `exit 1`, ce qui permet de faire échouer le job CI.
+
+
+## 🔐 Sécurité, validation & garde-fous
+
+Plusieurs garde-fous sont mis en place au niveau des tools et services pour
+protéger l'API FFBB et éviter des réponses inutilisables pour les LLM :
+
+- **Validation des paramètres** au niveau des tools MCP :
+  - limites sur `limit` pour `ffbb_search` (via `FFBB_MAX_RESULTS_LIMIT`),
+  - erreurs explicites quand des combinaisons de paramètres sont incohérentes
+    (par ex. catégorie manquante ou ambiguë).
+- **Garde-fous de taille** (voir aussi la section « Limites & garde-fous de taille ») :
+  - troncature des gros calendriers via `FFBB_MAX_CALENDAR_MATCHES` avec ajout
+    d'un objet `{"warning": "Résultat tronqué ..."}` en fin de liste,
+  - limites sur le nombre de résultats `search` pour éviter les payloads énormes.
+- **Erreurs explicites de haut niveau** (McpError) :
+  - messages orientés assistant (FR) pour guider la reformulation
+    (ajouter le genre, préciser le numéro d'équipe, etc.),
+  - codes d'erreur stables (`INTERNAL_ERROR`, `BAD_REQUEST`, ...).
+- **Logs de performance structurés** via `_log_timing` :
+  - chaque service critique logue `event`, `duration_s` et quelques champs clés
+    (ex. `categorie`, `matches_count`, `truncated`),
+  - permet de suivre les dérives de latence sans exposer de détails sensibles.
+
+Pour ajouter un nouveau tool ou service, il est recommandé :
+
+1. D'ajouter une validation stricte des paramètres en entrée (types, bornes,
+   valeurs autorisées) avec un message d'erreur utile pour l'agent.
+2. D'appliquer le même type de garde-fous de taille si la réponse peut devenir
+   volumineuse (limite, troncature, warning clair pour le LLM).
+3. D'instrumenter `_log_timing` si le service risque d'être appelé fréquemment
+   ou de manière coûteuse.

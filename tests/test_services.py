@@ -18,6 +18,7 @@ from ffbb_mcp.services import (
     _inflight_calendrier,
     _inflight_detail,
     _inflight_search,
+    _resolve_poule_ids_for_categorie,
     ffbb_bilan_service,
     ffbb_equipes_club_service,
     ffbb_get_classement_service,
@@ -339,6 +340,31 @@ class TestBilanService:
         mock_client.get_organisme_async.assert_awaited_once()
 
 
+class TestResolvePouleIdsForCategorie:
+    @pytest.mark.asyncio
+    async def test_raises_error_when_no_engagements(self):
+        with pytest.raises(McpError) as exc:
+            await _resolve_poule_ids_for_categorie(org_data={"engagements": []}, categorie="U11M")
+        assert "Aucune équipe engagée" in str(exc.value)
+
+    @pytest.mark.asyncio
+    async def test_returns_poule_ids_matching_categorie(self):
+        org_data = {
+            "engagements": [
+                {
+                    "idCompetition": {"nom": "U11M Région", "categorie": {"code": "U11"}},
+                    "idPoule": {"id": "101"},
+                },
+                {
+                    "idCompetition": {"nom": "U13F", "categorie": {"code": "U13"}},
+                    "idPoule": {"id": "202"},
+                },
+            ]
+        }
+        poule_ids = await _resolve_poule_ids_for_categorie(org_data=org_data, categorie="U11M")
+        assert poule_ids == [101]
+
+
 # ---------------------------------------------------------------------------
 # Tests — get_calendrier_club_service
 # ---------------------------------------------------------------------------
@@ -537,6 +563,67 @@ class TestCalendrierClubService:
 
         assert len(result) == 1
         assert result[0]["id"] == "m2"
+
+    @pytest.mark.asyncio
+    async def test_truncates_when_too_many_matches(
+        self, patch_get_client, mock_client, monkeypatch
+    ):
+        # Force une petite limite pour le test
+        monkeypatch.setenv("FFBB_MAX_CALENDAR_MATCHES", "3")
+
+        # 1. Mock ffbb_equipes_club_service pour renvoyer une equipe valable
+        async def _fake_equipes_club_service(organisme_id: int | str, filtre: str | None = None):
+            return [
+                {
+                    "engagement_id": 1001,
+                    "poule_id": 201,
+                    "nom_equipe": "CLERMONT",
+                    "competition": "U13F",
+                }
+            ]
+
+        monkeypatch.setattr(
+            "ffbb_mcp.services.ffbb_equipes_club_service",
+            _fake_equipes_club_service,
+        )
+
+        # 2. Mock get_poule avec beaucoup de rencontres
+        poule_mock = MagicMock()
+        rencontres = []
+        for i in range(10):
+            rencontres.append(
+                {
+                    "id": i,
+                    "date_rencontre": f"2024-01-{i+1:02d}",
+                    "nomEquipe1": "CLERMONT",
+                    "nomEquipe2": "AUTRE",
+                    "resultatEquipe1": 50 + i,
+                    "resultatEquipe2": 40 + i,
+                }
+            )
+        poule_mock.model_dump = MagicMock(
+            return_value={
+                "id": 201,
+                "rencontres": rencontres,
+                "classements": [],
+            }
+        )
+        mock_client.get_poule_async = AsyncMock(return_value=poule_mock)
+
+        result = await get_calendrier_club_service(organisme_id=123, categorie="U13F")
+
+        # On doit avoir 3 matchs + 1 warning
+        assert len(result) == 4
+        matches = result[:-1]
+        warning = result[-1]
+
+        # Vérifie que seuls les 3 plus récents (dates les plus grandes) sont présents
+        dates = [m["date"] for m in matches]
+        assert dates == sorted(dates, reverse=True)
+        assert len(matches) == 3
+
+        assert "warning" in warning
+        assert "Résultat tronqué" in warning["warning"]
 
 
 # ---------------------------------------------------------------------------
