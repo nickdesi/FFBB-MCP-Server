@@ -105,10 +105,15 @@ def _get_logo_url() -> str:
 def _build_index_html() -> str:
     canonical_url = f"{_get_public_base_url()}/"
     logo_url = _get_logo_url()
-    title = "FFBB MCP Server | Donnees FFBB pour Claude, Cursor et les agents IA"
+    # Titre et description orientés MCP, couvrant toutes les fonctionnalités (bilan, recherches, lives, etc.)
+    title = (
+        "FFBB MCP Server – Serveur MCP pour les données FFBB "
+        "(bilans, recherches clubs/salles, calendriers, résultats, classements, lives)"
+    )
     description = (
-        "Connectez Claude, Cursor, VS Code, Gemini et vos agents IA aux donnees "
-        "officielles FFBB: clubs, calendriers, classements, poules et scores live."
+        "FFBB MCP Server est un serveur MCP pour accéder aux données FFBB : recherche de clubs, "
+        "compétitions, salles et terrains, bilans d’équipes, calendriers, résultats, classements "
+        "et scores live. Connectez vos agents IA au basket français."
     )
 
     return f"""<!DOCTYPE html>
@@ -122,8 +127,10 @@ def _build_index_html() -> str:
         <meta name=\"theme-color\" content=\"#111827\">
         <meta name=\"application-name\" content=\"FFBB MCP Server\">
         <link rel=\"canonical\" href=\"{canonical_url}\">
+        <!-- Favicon basé sur le logo -->
         <link rel=\"icon\" type=\"image/webp\" href=\"{logo_url}\">
         <link rel=\"apple-touch-icon\" href=\"{logo_url}\">
+        <!-- Open Graph / Twitter -->
         <meta property=\"og:locale\" content=\"fr_FR\">
         <meta property=\"og:type\" content=\"website\">
         <meta property=\"og:site_name\" content=\"FFBB MCP Server\">
@@ -135,6 +142,7 @@ def _build_index_html() -> str:
         <meta name=\"twitter:title\" content=\"{title}\">
         <meta name=\"twitter:description\" content=\"{description}\">
         <meta name=\"twitter:image\" content=\"{logo_url}\">
+        <!-- Données structurées SoftwareApplication -->
         <script type=\"application/ld+json\">{{
             \"@context\": \"https://schema.org\",
             \"@type\": \"SoftwareApplication\",
@@ -152,17 +160,18 @@ def _build_index_html() -> str:
         <script src=\"https://cdn.tailwindcss.com\"></script>
     </head>
     <body class=\"flex flex-col items-center justify-center min-h-screen p-4 text-center\">
-        <img src=\"{logo_url}\" alt=\"FFBB Logo\" class=\"max-w-xs mb-8 rounded-xl shadow-2xl hover:scale-105 transition-transform duration-300\">
+        <img src=\"{logo_url}\" alt=\"FFBB MCP Server logo\" class=\"max-w-xs mb-8 rounded-xl shadow-2xl hover:scale-105 transition-transform duration-300\">
         <h1 class=\"text-4xl md:text-6xl font-extrabold mb-4 bg-gradient-to-r from-orange-400 to-red-500 text-transparent bg-clip-text\">FFBB MCP Server</h1>
         <p class=\"text-xl text-gray-300 max-w-2xl mb-8\">
-            Le pont officiel entre l'Intelligence Artificielle et le Basketball francais.<br/>
-            Connectez vos LLMs aux donnees en temps reel de la federation.
+            FFBB MCP Server est un serveur MCP dédié aux données de la Fédération Française de BasketBall (FFBB).<br/>
+            Recherchez clubs, compétitions, salles et terrains, générez des bilans d’équipes,
+            explorez calendriers, résultats, classements et scores live du basket français directement depuis vos agents IA.
         </p>
-        <div class=\"flex gap-4\">
+        <div class=\"flex flex-wrap justify-center gap-4\">
             <a href=\"https://github.com/nickdesi/FFBB-MCP-Server\" target=\"_blank\" rel=\"noreferrer\" class=\"px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-white font-semibold transition-colors\">GitHub</a>
-            <a href=\"https://smithery.ai/servers/nickdesi/mcpffbb\" target=\"_blank\" rel=\"noreferrer\" class=\"px-6 py-3 bg-[#e2693e] hover:bg-[#c95d37] rounded-lg text-white font-semibold transition-colors\">Available on Smithery</a>
+            <a href=\"https://smithery.ai/servers/nickdesi/mcpffbb\" target=\"_blank\" rel=\"noreferrer\" class=\"px-6 py-3 bg-[#e2693e] hover:bg-[#c95d37] rounded-lg text-white font-semibold transition-colors\">Disponible sur Smithery</a>
         </div>
-        <div class=\"mt-12 text-gray-500 text-sm\">Statut: <span class=\"text-green-400\">En ligne</span></div>
+        <div class=\"mt-12 text-gray-500 text-sm\">Statut : <span class=\"text-green-400\">En ligne</span></div>
     </body>
     </html>"""
 
