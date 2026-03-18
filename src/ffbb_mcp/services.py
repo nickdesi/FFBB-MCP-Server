@@ -21,11 +21,53 @@ from mcp.types import INTERNAL_ERROR
 
 from .aliases import normalize_query
 from .client import get_client_async
+from .metrics import dec_inflight, inc_inflight, record_cache_hit, record_cache_miss
 from .utils import serialize_model
 
 logger = logging.getLogger("ffbb-mcp")
 
 T = TypeVar("T")
+
+# Limiter globalement le nombre d'appels concurrents vers l'API FFBB.
+# Valeur par défaut prudente, surchargable via l'env MAX_CONCURRENT_FFBB.
+_MAX_CONCURRENT_FFBB = int(os.getenv("MAX_CONCURRENT_FFBB", "8"))
+_ffbb_semaphore = asyncio.Semaphore(_MAX_CONCURRENT_FFBB)
+
+# Hooks simples pour les metrics de cache. Ils sont no-op par défaut et peuvent
+# être surchargés depuis metrics.py via une fonction d'initialisation.
+_cache_hit_hook: callable | None = record_cache_hit
+_cache_miss_hook: callable | None = record_cache_miss
+
+
+def set_cache_metrics_hooks(
+    *, on_hit: callable | None, on_miss: callable | None
+) -> None:
+    """Configure les callbacks utilisés pour tracer hits/miss des caches.
+
+    Cette fonction reste exposée pour compatibilité, mais par défaut on utilise
+    record_cache_hit/record_cache_miss de metrics.py.
+    """
+
+    global _cache_hit_hook, _cache_miss_hook
+    _cache_hit_hook = on_hit or record_cache_hit
+    _cache_miss_hook = on_miss or record_cache_miss
+
+
+def _notify_cache_hit(cache_name: str) -> None:
+    if _cache_hit_hook is not None:
+        try:
+            _cache_hit_hook(cache_name)
+        except Exception:  # sécurité: jamais d'exception dans un hook de métriques
+            logger.debug("cache hit hook failed", exc_info=True)
+
+
+def _notify_cache_miss(cache_name: str) -> None:
+    if _cache_miss_hook is not None:
+        try:
+            _cache_miss_hook(cache_name)
+        except Exception:  # idem
+            logger.debug("cache miss hook failed", exc_info=True)
+
 
 # Precompile regex used heavily in `ffbb_equipes_club_service` to avoid
 # recompiling on every call.
@@ -65,16 +107,36 @@ def _read_positive_int_env(name: str, default: int) -> int:
 _MAX_POULE_FETCH_CONCURRENCY = _read_positive_int_env("FFBB_POULE_FETCH_CONCURRENCY", 8)
 
 
-def _cache_get(cache: TTLCache, key: str) -> Any | None:
-    """Lecture thread-safe du cache."""
-    with _cache_lock:
-        return cache.get(key)
+async def _with_ffbb_semaphore(coro):
+    """Helper pour exécuter un appel réseau FFBB sous le sémaphore global.
+
+    Cela encapsule la contrainte de concurrence en un seul endroit, ce qui rend
+    plus simple l'utilisation dans les différents services.
+    """
+
+    async with _ffbb_semaphore:
+        return await coro
 
 
-def _cache_set(cache: TTLCache, key: str, value: Any) -> None:
-    """Écriture thread-safe dans le cache."""
-    with _cache_lock:
-        cache[key] = value
+def _cache_get(cache: TTLCache, key: Any, cache_name: str) -> Any | None:
+    """Wrapper centralisé pour lire un cache avec metrics hit/miss.
+
+    Ce helper évite de dupliquer la logique de notification et permet de
+    garder une sémantique uniforme sur tous les caches du module.
+    """
+
+    value = cache.get(key)
+    if value is not None:
+        _notify_cache_hit(cache_name)
+    else:
+        _notify_cache_miss(cache_name)
+    return value
+
+
+def _cache_set(cache: TTLCache, key: Any, value: Any, cache_name: str) -> None:
+    cache[key] = value
+    # On considère l'écriture comme un miss (il a fallu faire l'appel réel)
+    _notify_cache_miss(cache_name)
 
 
 def _coerce_numeric_id(value: int | str, label: str) -> int:
@@ -148,7 +210,14 @@ def _handle_api_error(e: Exception) -> McpError:
     )
 
 
-async def _safe_call(operation_name: str, coro, *, retries: int = 3, base_delay: float = 0.5, max_delay: float = 10.0) -> Any:
+async def _safe_call(
+    operation_name: str,
+    coro,
+    *,
+    retries: int = 3,
+    base_delay: float = 0.5,
+    max_delay: float = 10.0,
+) -> Any:
     """Exécute un appel API avec logging, error handling et retry/backoff.
 
     `coro` peut être soit une coroutine (non-réessayable), soit un "callable"
@@ -163,8 +232,10 @@ async def _safe_call(operation_name: str, coro, *, retries: int = 3, base_delay:
     else:
         # single-use coroutine passed; wrap into a factory that returns it once
         single = coro
+
         def _once():
             return single
+
         make_coro = _once
 
     attempt = 0
@@ -216,6 +287,32 @@ async def _safe_call(operation_name: str, coro, *, retries: int = 3, base_delay:
     return None
 
 
+async def _safe_call_with_inflight(
+    operation_name: str,
+    coro_factory,
+    *,
+    retries: int = 3,
+    base_delay: float = 0.5,
+    max_delay: float = 10.0,
+) -> Any:
+    """Wrapper autour de _safe_call qui incrémente/décrémente le compteur inflight.
+
+    Utilisé pour exposer une métrique ffbb_api_inflight_requests.
+    """
+
+    inc_inflight()
+    try:
+        return await _safe_call(
+            operation_name,
+            coro_factory,
+            retries=retries,
+            base_delay=base_delay,
+            max_delay=max_delay,
+        )
+    finally:
+        dec_inflight()
+
+
 async def _dedupe_inflight_detail(cache_key: str, make_coro) -> Any:
     """Déduplique les appels concurrents sur la même clé de détail."""
     return await _dedupe_inflight(
@@ -235,7 +332,7 @@ async def _dedupe_inflight(
 ) -> Any:
     """Déduplique les appels concurrents sur une clé et met en cache le résultat."""
     if cache is not None:
-        cached = _cache_get(cache, cache_key)
+        cached = _cache_get(cache, cache_key, "detail")
         if cached is not None:
             return cached
 
@@ -249,7 +346,7 @@ async def _dedupe_inflight(
     try:
         result = await existing
         if cache is not None:
-            _cache_set(cache, cache_key, result)
+            _cache_set(cache, cache_key, result, "detail")
         return result
     finally:
         async with _inflight_lock:
@@ -262,30 +359,36 @@ async def _dedupe_inflight(
 
 
 async def get_lives_service() -> list[dict]:
-    cached = _cache_get(_cache_lives, "lives")
+    cached = _cache_get(_cache_lives, "lives", "lives")
     if cached is not None:
         logger.debug("Cache hit: lives")
         return cached
 
     client = await get_client_async()
-    lives = await _safe_call("Lives (Matchs en cours)", lambda: client.get_lives_async())
+    lives = await _with_ffbb_semaphore(
+        _safe_call_with_inflight(
+            "Lives (Matchs en cours)", lambda: client.get_lives_async()
+        )
+    )
     result = [serialize_model(live) for live in lives] if lives else []
-    _cache_set(_cache_lives, "lives", result)
+    _cache_set(_cache_lives, "lives", result, "lives")
     return result
 
 
 async def get_saisons_service(active_only: bool = False) -> list[dict]:
     cache_key = f"saisons:{active_only}"
-    cached = _cache_get(_cache_detail, cache_key)
+    cached = _cache_get(_cache_detail, cache_key, "saisons")
     if cached is not None:
         return cached
 
     client = await get_client_async()
-    saisons = await _safe_call(
-        "Saisons", lambda: client.get_saisons_async(active_only=active_only)
+    saisons = await _with_ffbb_semaphore(
+        _safe_call_with_inflight(
+            "Saisons", lambda: client.get_saisons_async(active_only=active_only)
+        )
     )
     result = [serialize_model(s) for s in saisons] if saisons else []
-    _cache_set(_cache_detail, cache_key, result)
+    _cache_set(_cache_detail, cache_key, result, "saisons")
     return result
 
 
@@ -295,9 +398,11 @@ async def get_competition_service(competition_id: int | str) -> dict:
 
     async def _fetch() -> dict:
         client = await get_client_async()
-        comp = await _safe_call(
-            f"Compétition {competition_id_int}",
-            lambda: client.get_competition_async(competition_id=competition_id_int),
+        comp = await _with_ffbb_semaphore(
+            _safe_call_with_inflight(
+                f"Competition {competition_id_int}",
+                lambda: client.get_competition_async(competition_id=competition_id_int),
+            ),
         )
         return serialize_model(comp) or {}
 
@@ -310,9 +415,11 @@ async def get_poule_service(poule_id: int | str) -> dict:
 
     async def _fetch() -> dict:
         client = await get_client_async()
-        poule = await _safe_call(
-            f"Poule {poule_id_int}",
-            lambda: client.get_poule_async(poule_id=poule_id_int),
+        poule = await _with_ffbb_semaphore(
+            _safe_call_with_inflight(
+                f"Poule {poule_id_int}",
+                lambda: client.get_poule_async(poule_id=poule_id_int),
+            ),
         )
         return serialize_model(poule) or {}
 
@@ -325,13 +432,169 @@ async def get_organisme_service(organisme_id: int | str) -> dict:
 
     async def _fetch() -> dict:
         client = await get_client_async()
-        org = await _safe_call(
-            f"Organisme {organisme_id_int}",
-            lambda: client.get_organisme_async(organisme_id=organisme_id_int),
+        org = await _with_ffbb_semaphore(
+            _safe_call_with_inflight(
+                f"Organisme {organisme_id_int}",
+                lambda: client.get_organisme_async(organisme_id=organisme_id_int),
+            ),
         )
         return serialize_model(org) or {}
 
     return await _dedupe_inflight_detail(cache_key, _fetch)
+
+
+async def ffbb_get_classement_service(poule_id: int | str) -> list[dict[str, Any]]:
+    poule_id_int = _coerce_numeric_id(poule_id, "poule_id")
+    cache_key = f"classement:{poule_id_int}"
+    cached = _cache_get(_cache_detail, cache_key, "classement")
+    if cached is not None:
+        return cached
+
+    client = await get_client_async()
+    poule = await _with_ffbb_semaphore(
+        _safe_call(
+            f"Classement poule {poule_id_int}",
+            lambda: client.get_poule_async(poule_id=poule_id_int),
+        )
+    )
+    if not poule:
+        return []
+    data = serialize_model(poule)
+    raw = data.get("classements", data.get("classement", []))
+    if not isinstance(raw, list):
+        raw = []
+    flat: list[dict[str, Any]] = []
+    for c in raw:
+        eng = c.get("id_engagement", {}) or {}
+        flat.append(
+            {
+                "position": c.get("position"),
+                "equipe": eng.get("nom", ""),
+                "points": c.get("points"),
+                "match_joues": c.get("match_joues"),
+                "gagnes": c.get("gagnes"),
+                "perdus": c.get("perdus"),
+                "difference": c.get("difference"),
+            }
+        )
+    _cache_set(_cache_detail, cache_key, flat, "classement")
+    return flat
+
+
+async def _search_generic(
+    operation: str, method_name: str, query: str, limit: int = 20
+) -> list[dict]:
+    normalized_query = normalize_query(query)
+    cache_key = f"search:{operation}:{normalized_query}:{limit}"
+
+    async def _fetch() -> list[dict]:
+        # Lazy import to avoid heavy ffbb_api_client_v3 initialization at
+        # module import time.
+
+        client = await get_client_async()
+        method = getattr(client, method_name)
+        results = await _with_ffbb_semaphore(
+            _safe_call_with_inflight(
+                f"Search {operation}: {query}", lambda: method(normalized_query)
+            )
+        )
+        if not results or not results.hits:
+            return []
+        return [serialize_model(hit) for hit in results.hits[:limit]]
+
+    return await _dedupe_inflight(
+        cache=_cache_search,
+        cache_key=cache_key,
+        inflight_map=_inflight_search,
+        make_coro=_fetch,
+    )
+
+
+async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]]:
+    normalized_query = normalize_query(nom)
+    cache_key = f"multi_search:{normalized_query}:{limit}"
+
+    async def _fetch() -> list[dict[str, Any]]:
+        # Lazy imports to avoid heavy ffbb_api_client_v3 initialization at
+        # module import time.
+        from ffbb_api_client_v3.config import (
+            MEILISEARCH_INDEX_COMPETITIONS,
+            MEILISEARCH_INDEX_ORGANISMES,
+            MEILISEARCH_INDEX_PRATIQUES,
+            MEILISEARCH_INDEX_RENCONTRES,
+            MEILISEARCH_INDEX_SALLES,
+            MEILISEARCH_INDEX_TERRAINS,
+            MEILISEARCH_INDEX_TOURNOIS,
+        )
+        from ffbb_api_client_v3.models import MultiSearchQuery
+
+        client = await get_client_async()
+        primary_limit = min(limit, max(2, (limit + 2) // 3))
+        secondary_limit = min(limit, max(1, (limit + 9) // 10))
+        queries = [
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_ORGANISMES,
+                q=normalized_query,
+                limit=primary_limit,
+            ),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_COMPETITIONS,
+                q=normalized_query,
+                limit=primary_limit,
+            ),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_RENCONTRES,
+                q=normalized_query,
+                limit=primary_limit,
+            ),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_SALLES,
+                q=normalized_query,
+                limit=secondary_limit,
+            ),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_PRATIQUES,
+                q=normalized_query,
+                limit=secondary_limit,
+            ),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_TERRAINS,
+                q=normalized_query,
+                limit=secondary_limit,
+            ),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_TOURNOIS,
+                q=normalized_query,
+                limit=secondary_limit,
+            ),
+        ]
+
+        raw = await _with_ffbb_semaphore(
+            _safe_call_with_inflight(
+                f"Multi-search: {nom}", lambda: client.multi_search_async(queries)
+            )
+        )
+
+        if not raw or not hasattr(raw, "results") or not raw.results:
+            return []
+
+        output: list[dict[str, Any]] = []
+        for res in raw.results:
+            category = res.index_uid
+            for hit in res.hits:
+                item = serialize_model(hit)
+                item["_type"] = category
+                output.append(item)
+                if len(output) >= limit:
+                    return output
+        return output
+
+    return await _dedupe_inflight(
+        cache=_cache_search,
+        cache_key=cache_key,
+        inflight_map=_inflight_search,
+        make_coro=_fetch,
+    )
 
 
 async def ffbb_equipes_club_service(
@@ -339,8 +602,7 @@ async def ffbb_equipes_club_service(
     filtre: str | None = None,
     org_data: dict | None = None,
 ) -> list[dict[str, Any]]:
-    """
-    Retourne les équipes engagées pour un club.
+    """Retourne les équipes engagées pour un club.
 
     Paramètre `org_data` optionnel : si fourni, évite un appel supplémentaire
     à `get_organisme_service` (utile quand l'appelant a déjà chargé l'organisme).
@@ -405,184 +667,28 @@ async def ffbb_equipes_club_service(
     return flat
 
 
-async def ffbb_get_classement_service(poule_id: int | str) -> list[dict[str, Any]]:
-    poule_id_int = _coerce_numeric_id(poule_id, "poule_id")
-    cache_key = f"classement:{poule_id_int}"
-    cached = _cache_get(_cache_detail, cache_key)
-    if cached is not None:
-        return cached
-
-    client = await get_client_async()
-    poule = await _safe_call(
-        f"Classement poule {poule_id_int}",
-        lambda: client.get_poule_async(poule_id=poule_id_int),
-    )
-    if not poule:
-        return []
-    data = serialize_model(poule)
-    raw = data.get("classements", data.get("classement", []))
-    if not isinstance(raw, list):
-        raw = []
-    flat: list[dict[str, Any]] = []
-    for c in raw:
-        eng = c.get("id_engagement", {}) or {}
-        flat.append(
-            {
-                "position": c.get("position"),
-                "equipe": eng.get("nom", ""),
-                "points": c.get("points"),
-                "match_joues": c.get("match_joues"),
-                "gagnes": c.get("gagnes"),
-                "perdus": c.get("perdus"),
-                "difference": c.get("difference"),
-            }
-        )
-    _cache_set(_cache_detail, cache_key, flat)
-    return flat
+# Dans ffbb_bilan_service, on garde _safe_call encapsulé mais on limite les appels
+# directs supplémentaires dans _fetch_poule_bilan :
+#
+# async def _fetch_poule_bilan(pid: str) -> dict[str, Any] | Exception:
+#     async with semaphore:
+#         try:
+#             return await get_poule_service(pid)
+#         except McpError:
+#             try:
+#                 client = await get_client_async()
+#                 poule = await _with_ffbb_semaphore(
+#                     _safe_call(
+#                         f"Poule {pid}", lambda: client.get_poule_async(poule_id=pid)
+#                     )
+#                 )
+#                 return serialize_model(poule) or {}
+#             except Exception as e:
+#                 return e
 
 
-async def _search_generic(
-    operation: str, method_name: str, query: str, limit: int = 20
-) -> list[dict]:
-    normalized_query = normalize_query(query)
-    cache_key = f"search:{operation}:{normalized_query}:{limit}"
-
-    async def _fetch() -> list[dict]:
-        # Lazy import to avoid heavy ffbb_api_client_v3 initialization at
-        # module import time.
-
-        client = await get_client_async()
-        method = getattr(client, method_name)
-        results = await _safe_call(
-            f"Search {operation}: {query}", lambda: method(normalized_query)
-        )
-        if not results or not results.hits:
-            return []
-        return [serialize_model(hit) for hit in results.hits[:limit]]
-
-    return await _dedupe_inflight(
-        cache=_cache_search,
-        cache_key=cache_key,
-        inflight_map=_inflight_search,
-        make_coro=_fetch,
-    )
-
-
-async def search_competitions_service(nom: str, limit: int = 20) -> list[dict]:
-    return await _search_generic(
-        "competitions", "search_competitions_async", nom, limit
-    )
-
-
-async def search_organismes_service(nom: str, limit: int = 20) -> list[dict]:
-    return await _search_generic("organismes", "search_organismes_async", nom, limit)
-
-
-async def search_salles_service(nom: str, limit: int = 20) -> list[dict]:
-    return await _search_generic("salles", "search_salles_async", nom, limit)
-
-
-async def search_rencontres_service(nom: str, limit: int = 20) -> list[dict]:
-    return await _search_generic("rencontres", "search_rencontres_async", nom, limit)
-
-
-async def search_pratiques_service(nom: str, limit: int = 20) -> list[dict]:
-    return await _search_generic("pratiques", "search_pratiques_async", nom, limit)
-
-
-async def search_terrains_service(nom: str, limit: int = 20) -> list[dict]:
-    return await _search_generic("terrains", "search_terrains_async", nom, limit)
-
-
-async def search_tournois_service(nom: str, limit: int = 20) -> list[dict]:
-    return await _search_generic("tournois", "search_tournois_async", nom, limit)
-
-
-async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]]:
-    normalized_query = normalize_query(nom)
-    cache_key = f"multi_search:{normalized_query}:{limit}"
-
-    async def _fetch() -> list[dict[str, Any]]:
-        # Lazy imports to avoid heavy ffbb_api_client_v3 initialization at
-        # module import time.
-        from ffbb_api_client_v3.config import (
-            MEILISEARCH_INDEX_COMPETITIONS,
-            MEILISEARCH_INDEX_ORGANISMES,
-            MEILISEARCH_INDEX_PRATIQUES,
-            MEILISEARCH_INDEX_RENCONTRES,
-            MEILISEARCH_INDEX_SALLES,
-            MEILISEARCH_INDEX_TERRAINS,
-            MEILISEARCH_INDEX_TOURNOIS,
-        )
-        from ffbb_api_client_v3.models import MultiSearchQuery
-
-        client = await get_client_async()
-        primary_limit = min(limit, max(2, (limit + 2) // 3))
-        secondary_limit = min(limit, max(1, (limit + 9) // 10))
-        queries = [
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_ORGANISMES,
-                q=normalized_query,
-                limit=primary_limit,
-            ),
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_COMPETITIONS,
-                q=normalized_query,
-                limit=primary_limit,
-            ),
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_RENCONTRES,
-                q=normalized_query,
-                limit=primary_limit,
-            ),
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_SALLES,
-                q=normalized_query,
-                limit=secondary_limit,
-            ),
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_PRATIQUES,
-                q=normalized_query,
-                limit=secondary_limit,
-            ),
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_TERRAINS,
-                q=normalized_query,
-                limit=secondary_limit,
-            ),
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_TOURNOIS,
-                q=normalized_query,
-                limit=secondary_limit,
-            ),
-        ]
-
-        raw = await _safe_call(
-            f"Multi-search: {nom}", lambda: client.multi_search_async(queries)
-        )
-
-        if not raw or not hasattr(raw, "results") or not raw.results:
-            return []
-
-        output: list[dict[str, Any]] = []
-        for res in raw.results:
-            category = res.index_uid
-            for hit in res.hits:
-                item = serialize_model(hit)
-                item["_type"] = category
-                output.append(item)
-                if len(output) >= limit:
-                    return output
-        return output
-
-    return await _dedupe_inflight(
-        cache=_cache_search,
-        cache_key=cache_key,
-        inflight_map=_inflight_search,
-        make_coro=_fetch,
-    )
-
-
+# De même, get_calendrier_club_service utilise déjà get_poule_service qui
+# bénéficie désormais du sémaphore global.
 async def ffbb_bilan_service(
     club_name: str | None = None,
     organisme_id: int | str | None = None,
@@ -680,8 +786,11 @@ async def ffbb_bilan_service(
                 except McpError:
                     try:
                         client = await get_client_async()
-                        poule = await _safe_call(
-                            f"Poule {pid}", lambda: client.get_poule_async(poule_id=pid)
+                        poule = await _with_ffbb_semaphore(
+                            _safe_call_with_inflight(
+                                f"Poule {pid}",
+                                lambda: client.get_poule_async(poule_id=pid),
+                            )
                         )
                         return serialize_model(poule) or {}
                     except Exception as e:
@@ -805,7 +914,11 @@ async def get_calendrier_club_service(
             target_org_ids = [str(organisme_id)]
         elif club_name:
             orgs = await search_organismes_service(nom=club_name, limit=3)
-            target_org_ids = [str(org.get("id")) for org in orgs if isinstance(org, dict) and org.get("id")]
+            target_org_ids = [
+                str(org.get("id"))
+                for org in orgs
+                if isinstance(org, dict) and org.get("id")
+            ]
 
         # Dédupliquer / nettoyer
         target_org_ids = list(dict.fromkeys(oid for oid in target_org_ids if oid))
@@ -987,7 +1100,12 @@ async def _resolve_poule_ids_for_categorie(org_data: dict, categorie: str) -> li
         if part.startswith("U") and part[1:3].isdigit():
             code = part[:3]  # U11, U13, U15…
             break
-    if code is None and len(cat_upper) >= 3 and cat_upper[0] == "U" and cat_upper[1:3].isdigit():
+    if (
+        code is None
+        and len(cat_upper) >= 3
+        and cat_upper[0] == "U"
+        and cat_upper[1:3].isdigit()
+    ):
         code = cat_upper[:3]
 
     matched_poule_ids: list[int] = []
@@ -1020,3 +1138,33 @@ async def _resolve_poule_ids_for_categorie(org_data: dict, categorie: str) -> li
         )
 
     return matched_poule_ids
+
+
+async def search_competitions_service(nom: str, limit: int = 20) -> list[dict]:
+    return await _search_generic(
+        "competitions", "search_competitions_async", nom, limit
+    )
+
+
+async def search_organismes_service(nom: str, limit: int = 20) -> list[dict]:
+    return await _search_generic("organismes", "search_organismes_async", nom, limit)
+
+
+async def search_salles_service(nom: str, limit: int = 20) -> list[dict]:
+    return await _search_generic("salles", "search_salles_async", nom, limit)
+
+
+async def search_rencontres_service(nom: str, limit: int = 20) -> list[dict]:
+    return await _search_generic("rencontres", "search_rencontres_async", nom, limit)
+
+
+async def search_pratiques_service(nom: str, limit: int = 20) -> list[dict]:
+    return await _search_generic("pratiques", "search_pratiques_async", nom, limit)
+
+
+async def search_terrains_service(nom: str, limit: int = 20) -> list[dict]:
+    return await _search_generic("terrains", "search_terrains_async", nom, limit)
+
+
+async def search_tournois_service(nom: str, limit: int = 20) -> list[dict]:
+    return await _search_generic("tournois", "search_tournois_async", nom, limit)
