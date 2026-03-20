@@ -1,5 +1,7 @@
 """Tests d'intégration pour le serveur MCP FFBB refactoré."""
 
+import numbers
+
 import pytest
 from mcp.server.fastmcp import FastMCP
 
@@ -8,6 +10,7 @@ from ffbb_mcp.server import (
     _build_robots_txt,
     _build_sitemap_xml,
     _get_public_base_url,
+    ffbb_version,
     mcp,
 )
 
@@ -27,17 +30,43 @@ async def test_server_tools_importable():
     tool_names = [tool.name for tool in tools]
 
     expected = [
+        "ffbb_version",
         "ffbb_search",
+        "ffbb_bilan",
+        "ffbb_team_summary",
         "ffbb_get",
         "ffbb_club",
         "ffbb_lives",
         "ffbb_saisons",
+        "ffbb_resolve_team",
     ]
 
     for expected_name in expected:
         assert expected_name in tool_names, (
             f"L'outil '{expected_name}' est manquant dans l'enregistrement mcp."
         )
+
+
+@pytest.mark.asyncio
+async def test_ffbb_version_contract():
+    """Vérifie le contrat de sortie de ffbb_version (dont cache_ttls)."""
+    data = await ffbb_version()
+
+    # Champs de base
+    assert isinstance(data.get("package_version"), str) and data["package_version"], (
+        "package_version doit être une chaîne non vide",
+    )
+    assert isinstance(data.get("python_version"), str) and data["python_version"], (
+        "python_version doit être une chaîne non vide",
+    )
+
+    # cache_ttls doit être un dict avec des valeurs numériques
+    cache_ttls = data.get("cache_ttls")
+    assert isinstance(cache_ttls, dict), "cache_ttls doit être un dictionnaire"
+    for key, value in cache_ttls.items():
+        assert isinstance(
+            value, numbers.Number
+        ), f"cache_ttls['{key}'] doit être numérique (secondes)"
 
 
 @pytest.mark.asyncio

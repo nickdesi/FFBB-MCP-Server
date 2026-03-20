@@ -22,6 +22,7 @@ from ffbb_mcp.services import (
     ffbb_bilan_service,
     ffbb_equipes_club_service,
     ffbb_get_classement_service,
+    ffbb_resolve_team_service,
     get_calendrier_club_service,
     get_competition_service,
     get_organisme_service,
@@ -713,3 +714,109 @@ class TestGetPouleService:
         assert result1 == {"id": 123, "rencontres": []}
         assert result2 == {"id": 123, "rencontres": []}
         assert mock_client.get_poule_async.await_count == 1
+
+
+# ---------------------------------------------------------------------------
+# Tests — ffbb_resolve_team_service
+# ---------------------------------------------------------------------------
+
+
+class TestResolveTeamService:
+    @pytest.mark.asyncio
+    async def test_resolved_single_team(self, patch_get_client, mock_client):
+        """Une seule équipe correspondante -> status resolved et team non nul."""
+
+        org_mock = MagicMock()
+        org_mock.model_dump = MagicMock(
+            return_value={
+                "nom": "Club Test",
+                "engagements": [
+                    {
+                        "id": "eng1",
+                        "idCompetition": {
+                            "nom": "U11M",
+                            "categorie": {"code": "U11"},
+                        },
+                        "idPoule": {"id": "p1"},
+                    }
+                ],
+            }
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        result = await ffbb_resolve_team_service(
+            organisme_id=123,
+            club_name=None,
+            categorie="U11M1",
+        )
+
+        assert result.get("status") == "resolved"
+        assert result.get("team") is not None
+        assert result.get("candidates")
+
+    @pytest.mark.asyncio
+    async def test_ambiguous_multiple_teams(self, patch_get_client, mock_client):
+        """Plusieurs équipes candidates -> status ambiguous et candidates non vides."""
+
+        org_mock = MagicMock()
+        org_mock.model_dump = MagicMock(
+            return_value={
+                "nom": "Club Test",
+                "engagements": [
+                    {
+                        "id": "eng1",
+                        "idCompetition": {
+                            "nom": "U11M1",
+                            "categorie": {"code": "U11"},
+                        },
+                        "idPoule": {"id": "p1"},
+                    },
+                    {
+                        "id": "eng2",
+                        "idCompetition": {
+                            "nom": "U11M2",
+                            "categorie": {"code": "U11"},
+                        },
+                        "idPoule": {"id": "p2"},
+                    },
+                ],
+            }
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        result = await ffbb_resolve_team_service(
+            organisme_id=123,
+            club_name=None,
+            categorie="U11M",
+        )
+
+        assert result.get("status") == "ambiguous"
+        assert result.get("team") is None or result.get("team") == {}
+        assert result.get("candidates")
+        assert isinstance(result.get("candidates"), list)
+
+    @pytest.mark.asyncio
+    async def test_not_found_when_no_matching_team(
+        self, patch_get_client, mock_client
+    ):
+        """Aucune équipe ne matche -> status not_found et message explicite."""
+
+        org_mock = MagicMock()
+        org_mock.model_dump = MagicMock(
+            return_value={
+                "nom": "Club Test",
+                "engagements": [],
+            }
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        result = await ffbb_resolve_team_service(
+            organisme_id=123,
+            club_name=None,
+            categorie="U11M1",
+        )
+
+        assert result.get("status") == "not_found"
+        assert result.get("team") is None or result.get("team") == {}
+        assert not result.get("candidates")
+        assert "message" in result or "ambiguity" in result

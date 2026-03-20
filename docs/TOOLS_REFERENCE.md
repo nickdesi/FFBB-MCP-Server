@@ -180,6 +180,53 @@ la logique de désambiguïsation (U11M1, U13F-2, etc.).
 
 ---
 
+## 🧩 Outil de Résumé d'Équipe
+
+### `ffbb_team_summary`
+
+**Description** : Fournit en **un seul appel** un résumé complet et agent-friendly pour une équipe de club :
+
+- bilan global (toutes phases confondues),
+- phase courante et son classement,
+- dernier match joué,
+- prochain match à venir.
+
+**Arguments** :
+
+- `club_name` (string, optionnel) : Nom du club (ex: `"Stade Clermontois"`).
+- `organisme_id` (integer|string, optionnel) : ID FFBB du club (plus fiable que `club_name`).
+- `categorie` (string, optionnel mais fortement recommandé) : Catégorie + genre + numéro d'équipe (ex: `"U11M1"`, `"U13F2"`, `"U15M"`, `"Senior"`).
+
+> Au moins l'un de `club_name` ou `organisme_id` doit être fourni.
+
+**Retour** : un objet JSON structuré :
+
+- `team` : métadonnées sur l'équipe (label, poule(s), niveau, sexe, etc.).
+- `phase_courante` : phase considérée comme actuelle, avec son classement.
+- `last_match` : dernier match joué (ou `null` s'il n'y en a pas).
+- `next_match` : prochain match à venir (ou `null` s'il n'y en a pas).
+- `summary` : bilan global (toutes phases) tel que calculé par `ffbb_bilan`.
+- `raw` : réponse brute complète de `ffbb_bilan_service` (pour débogage ou cas avancés).
+
+**Exemple d'appel** :
+
+```json
+{ "club_name": "Stade Clermontois", "categorie": "U11M1" }
+```
+
+**Exemple d'usage agent** :
+
+1. Appeler directement `ffbb_team_summary` pour répondre à :
+   - "Quel est le bilan du Stade Clermontois U11M1 ?",
+   - "Quel est leur prochain match ?",
+   - "Quel a été leur dernier résultat ?".
+2. Lire :
+   - `summary` pour le bilan global (V/D/N, points marqués/encaissés, etc.),
+   - `phase_courante` pour le classement pertinent,
+   - `last_match` et `next_match` pour construire la réponse en langage naturel.
+
+---
+
 ## 🕒 Temps réel et Saisons
 
 ### `ffbb_lives`

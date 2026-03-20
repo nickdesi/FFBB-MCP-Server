@@ -523,6 +523,63 @@ async def ffbb_resolve_team(
 
 
 # ---------------------------------------------------------------------------
+# TOOL 8 — Résumé d'équipe (bilan + prochain/dernier match)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(name="ffbb_team_summary", annotations=_READONLY_ANNOTATIONS)
+async def ffbb_team_summary(
+    club_name: Annotated[
+        str | None,
+        Field(description="Nom du club (ex: 'Stade Clermontois', 'ASVEL')."),
+    ] = None,
+    organisme_id: Annotated[
+        int | str | None,
+        Field(description="ID FFBB du club (alternative plus rapide à club_name)."),
+    ] = None,
+    categorie: Annotated[
+        str | None,
+        Field(
+            description="Catégorie + genre + numéro d'équipe (ex: 'U11M1', 'U13F2', 'U15M', 'Senior').",
+        ),
+    ] = None,
+) -> dict[str, Any]:
+    """Résumé complet et agent-friendly pour une équipe.
+
+    Combine en UN seul appel :
+      - bilan global (toutes phases)
+      - phase courante et son classement
+      - dernier match joué
+      - prochain match à venir
+
+    Recommandé pour répondre à des questions du type :
+      - "Quel est le bilan de X cette saison ?"
+      - "Quel est le prochain match de X ?"
+      - "Quel a été le dernier résultat de X ?".
+    """
+    try:
+        bilan = await ffbb_bilan_service(
+            club_name=club_name,
+            organisme_id=organisme_id,
+            categorie=categorie,
+        )
+
+        # On laisse ffbb_bilan_service définir la structure détaillée et on
+        # se contente ici de renvoyer une vue standardisée attendue par les agents.
+        return {
+            "team": bilan.get("team"),
+            "phase_courante": bilan.get("phase_courante"),
+            "last_match": bilan.get("last_match"),
+            "next_match": bilan.get("next_match"),
+            "summary": bilan.get("bilan_total"),
+            "raw": bilan,
+        }
+    except Exception as e:
+        logger.error(f"ffbb_team_summary failed: {e}")
+        return {"error": str(e)}
+
+
+# ---------------------------------------------------------------------------
 # Injections
 # ---------------------------------------------------------------------------
 

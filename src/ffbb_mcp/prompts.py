@@ -40,16 +40,18 @@ def expert_basket() -> str:
         "interne optimisé, le LLM n'a pas à s'en préoccuper.\n\n"
         "## Workflow recommandé\n\n"
         "### ⚡ Pour le BILAN / CLASSEMENT / RÉSULTATS d'une équipe (toutes phases)\n"
-        "**Utilise EN PRIORITÉ `ffbb_bilan(club_name=..., categorie=...)` — c'est UN seul appel qui fait tout en interne.**\n"
+        "**Utilise EN PRIORITÉ :**\n"
+        "- `ffbb_team_summary(club_name=..., categorie=...)` si disponible, pour obtenir en UN appel :\n"
+        "  - bilan global, phase courante, dernier et prochain match.\n"
+        "- Sinon, `ffbb_bilan(club_name=..., categorie=...)` pour le bilan détaillé toutes phases.\n"
         "```\n"
-        'ffbb_bilan(club_name="Stade Clermontois", categorie="U11M1")\n'
+        'ffbb_team_summary(club_name="Stade Clermontois", categorie="U11M1")\n'
         "```\n"
-        "Retourne : bilan global (V/D/N, paniers) + détail par phase. Ne reconstruis PAS le bilan "
-        "à la main à partir de `ffbb_get` ou `ffbb_club` si `ffbb_bilan` est disponible.\n\n"
+        "Ne reconstruis PAS le bilan à la main à partir de `ffbb_get` ou `ffbb_club` si `ffbb_team_summary` ou `ffbb_bilan` sont disponibles.\n\n"
         "### 🏆 Pour le CLASSEMENT ou les MATCHS d'une poule précise\n"
         "1. `ffbb_search(type='organismes', query=<club>)` → `organisme_id`\n"
         "2. `ffbb_club(action='equipes', organisme_id=...)` → équipes et `poule_id`\n"
-        "3. `ffbb_get(type='poule', id=<poule_id>)` → classement + matchs\n\n"
+        "3. **Si un `poule_id` est connu, tu DOIS utiliser** `ffbb_get(type='poule', id=<poule_id>)` pour classement + matchs.\n\n"
         "### 🏆 Pour le CALENDRIER seul (matchs à venir)\n"
         "- Si tu as déjà un `poule_id`, utilise **d'abord** `ffbb_get(type='poule', id=<poule_id>)` et filtre les matchs à venir.\n"
         "- Sinon, utilise `ffbb_club(action='calendrier')` **uniquement en dernier recours**, lorsque aucun `poule_id` exploitable n'est disponible.\n\n"
@@ -91,21 +93,23 @@ def trouver_club(club_name: str, department: str = "") -> str:
 
 
 def prochain_match(club_name: str, categorie: str = "") -> str:
-    """Aide à trouver le prochain match d'un club."""
+    """Aide à trouver le prochain match d'un club/équipe."""
     query = club_name
     if categorie:
         query += f" {categorie}"
     return (
         f"Je cherche le prochain match de '{query}'.\n"
-        # FIX: on privilégie ffbb_get(type='poule') si un poule_id est disponible —
-        # plus rapide que le workflow calendrier complet.
-        "1. Si tu as déjà un `poule_id`, utilise directement "
-        "`ffbb_get(type='poule', id=<poule_id>)` et filtre les matchs à venir.\n"
-        f"   Sinon, utilise `ffbb_club(action='calendrier', club_name='{club_name}'"
+        "1. Si possible, utilise `ffbb_team_summary(club_name=..., categorie=...)` pour récupérer directement `next_match`.\n"
+        f"   Exemple : ffbb_team_summary(club_name='{club_name}', categorie='{categorie or 'U11M1'}').\n"
+        "2. Si `ffbb_team_summary` n'est pas disponible ou insuffisant :\n"
+        "   a) Résous le club avec `ffbb_search(type='organismes', query=...)` → `organisme_id`.\n"
+        "   b) Résous l'équipe avec `ffbb_resolve_team(organisme_id=..., categorie=...)` → `poule_id`.\n"
+        "   c) Si tu as un `poule_id`, utilise **TOUJOURS** `ffbb_get(type='poule', id=<poule_id>)` et filtre les matchs à venir.\n"
+        f"   d) Sinon, utilise `ffbb_club(action='calendrier', club_name='{club_name}'"
         + (f", filtre='{categorie}'" if categorie else "")
-        + ")` comme alternative.\n"
-        "2. Filtre les résultats pour ne garder que les matchs à venir (score absent ou nul).\n"
-        "3. Donne la date, l'heure, l'adversaire et le lieu du prochain match."
+        + ")` comme dernier recours.\n"
+        "3. Filtre les résultats pour ne garder que les matchs à venir (score absent ou date future).\n"
+        "4. Donne la date, l'heure, l'adversaire et le lieu du prochain match."
     )
 
 
@@ -126,16 +130,18 @@ def bilan_equipe(club_name: str, categorie: str) -> str:
         f"Je veux le bilan complet de l'équipe '{categorie}' du club '{club_name}' "
         "sur la saison actuelle (toutes phases confondues).\n"
         "1. Si le genre (M/F) ou le numéro d'équipe manque, DEMANDE une précision à l'utilisateur avant d'appeler un outil.\n"
-        f"2. Utilise EN PRIORITÉ `ffbb_bilan(club_name='{club_name}', categorie='{categorie}')` — "
-        "UN seul appel suffit et cumule toutes les phases en interne.\n"
+        f"2. Utilise EN PRIORITÉ `ffbb_team_summary(club_name='{club_name}', categorie='{categorie}')` "
+        "pour obtenir : bilan global, phase courante, dernier et prochain match en un seul appel.\n"
+        f"3. Si `ffbb_team_summary` n'est pas disponible, utilise `ffbb_bilan(club_name='{club_name}', categorie='{categorie}')` "
+        "pour le détail toutes phases.\n"
         "   - Ne reconstruis PAS le bilan à la main à partir de `ffbb_get` ou `ffbb_club` si `ffbb_bilan` est disponible.\n"
-        "3. Si `ffbb_bilan` ne retourne pas assez d'informations, en DERNIER RECOURS seulement :\n"
+        "4. Si `ffbb_bilan` ne retourne pas assez d'informations, en DERNIER RECOURS seulement :\n"
         "   a) `ffbb_search(type='organismes', query=...)` pour résoudre l'ID du club.\n"
         "   b) `ffbb_club(action='equipes', organisme_id=...)` pour lister les équipes et leurs `poule_id`.\n"
         "   c) `ffbb_get(type='poule', id=POULE_ID)` pour récupérer classement + tous les matchs de la poule.\n"
         "   d) `ffbb_club(action='calendrier')` UNIQUEMENT si aucun `poule_id` exploitable n'est disponible.\n"
-        "4. Les données FFBB sont toujours LIVE : ne suppose jamais un cache côté LLM, ne PAS inventer de résultats.\n"
-        "5. Présente le résultat sous deux parties :\n"
+        "5. Les données FFBB sont toujours LIVE : ne suppose jamais un cache côté LLM, ne PAS inventer de résultats.\n"
+        "6. Présente le résultat sous deux parties :\n"
         "   - **Bilan total saison** : matchs joués, victoires, défaites, nuls, paniers marqués/encaissés, différence.\n"
         "   - **Détail par phase** : tableau avec position, V/D/N et paniers pour chaque compétition/poule."
     )
