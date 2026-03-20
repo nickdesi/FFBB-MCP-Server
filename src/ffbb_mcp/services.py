@@ -6,15 +6,12 @@ import os
 import random
 import re
 import traceback
+from datetime import datetime
 from threading import RLock
 from typing import Any, TypeVar
+from zoneinfo import ZoneInfo
 
 from cachetools import TTLCache
-
-# NOTE: importing ffbb_api_client_v3 at module import time is relatively
-# expensive (triggers meilisearch client initialization). We perform
-# local/lazy imports in the functions that actually need these symbols
-# to reduce cold-start/import overhead.
 from httpx import HTTPStatusError
 from mcp.shared.exceptions import ErrorData, McpError
 from mcp.types import INTERNAL_ERROR
@@ -22,7 +19,7 @@ from mcp.types import INTERNAL_ERROR
 from .aliases import normalize_query
 from .client import get_client_async
 from .metrics import dec_inflight, inc_inflight, record_cache_hit, record_cache_miss
-from .utils import serialize_model
+from .utils import ParsedCategorie, parse_categorie, serialize_model
 
 logger = logging.getLogger("ffbb-mcp")
 
@@ -91,6 +88,22 @@ _inflight_detail: dict[str, asyncio.Task[Any]] = {}
 _inflight_search: dict[str, asyncio.Task[Any]] = {}
 _inflight_calendrier: dict[str, asyncio.Task[Any]] = {}
 _inflight_bilan: dict[str, asyncio.Task[Any]] = {}
+
+
+def get_cache_ttls() -> dict[str, int]:
+    """Retourne les TTL (en secondes) pour chaque cache service-level.
+
+    Cette fonction fournit une vue compacte et strictement typée des TTL,
+    utilisable par un outil de version/status sans exposer les objets TTLCache.
+    """
+
+    return {
+        "lives": int(_cache_lives.ttl),
+        "search": int(_cache_search.ttl),
+        "detail": int(_cache_detail.ttl),
+        "calendrier": int(_cache_calendrier.ttl),
+        "bilan": int(_cache_bilan.ttl),
+    }
 
 
 def _read_positive_int_env(name: str, default: int) -> int:
@@ -605,6 +618,8 @@ async def ffbb_equipes_club_service(
 
     Paramètre `org_data` optionnel : si fourni, évite un appel supplémentaire
     à `get_organisme_service` (utile quand l'appelant a déjà chargé l'organisme).
+    Chaque entrée est enrichie avec un identifiant stable `team_id`, un
+    `numero_equipe` (si disponible) et un `team_label` prêt à l'emploi.
     """
     # Réutilise org_data si fourni, sinon récupère via get_organisme_service
     data = (
@@ -617,49 +632,84 @@ async def ffbb_equipes_club_service(
     flat: list[dict[str, Any]] = []
     club_nom = data.get("nom", "")
 
+    parsed_filter: ParsedCategorie | None = parse_categorie(filtre) if filtre else None
+
     for e in raw:
         comp = e.get("idCompetition", {}) or {}
         poule = e.get("idPoule", {}) or {}
         cat = comp.get("categorie", {}) or {}
         nom_comp = comp.get("nom", "")
+        sexe_field = (comp.get("sexe") or "").upper()
 
         # Filtre optionnel pour gagner du temps agents
-        if filtre:
-            f_low = filtre.lower()
-            cat_code_low = (cat.get("code") or "").lower()
-            sexe_field = (comp.get("sexe") or "").upper()
-
-            # 1. Extraction Catégorie (Uxx) du filtre
-            cat_match = _RE_CAT.search(f_low)
-            if cat_match and cat_match.group(1) != cat_code_low:
+        if parsed_filter is not None:
+            cat_code = (cat.get("code") or "").upper()
+            if parsed_filter.categorie and cat_code != parsed_filter.categorie:
                 continue
 
-            # 2. Extraction Genre du filtre (précompilé)
-            is_f = bool(_RE_IS_F.search(f_low))
-            is_m = bool(_RE_IS_M.search(f_low))
-
-            if is_f and sexe_field != "F":
+            if parsed_filter.sexe == "F" and sexe_field != "F":
                 continue
-            if is_m and sexe_field != "M":
+            if parsed_filter.sexe == "M" and sexe_field != "M":
                 continue
 
-            # 3. Extraction Numéro d'équipe (ex: le 2 dans U13F2 ou U13-2)
-            num_match = _RE_NUM_END.search(f_low.strip())
-            if num_match and not re.search(r"u\d+$", f_low.strip()):
-                target_num = num_match.group(1)
-                team_num = str(e.get("numeroEquipe", ""))
-                if target_num != team_num and not (target_num == "1" and not team_num):
-                    continue
+            if parsed_filter.numero_equipe is not None:
+                team_num_raw = e.get("numeroEquipe")
+                team_num: int | None
+                try:
+                    team_num = int(team_num_raw) if team_num_raw is not None else None
+                except (TypeError, ValueError):
+                    team_num = None
+
+                # Convention : si filtre=1 et pas de numeroEquipe côté FFBB,
+                # on considère que c'est l'équipe 1 par défaut.
+                if team_num is not None:
+                    if team_num != parsed_filter.numero_equipe:
+                        continue
+                else:
+                    if parsed_filter.numero_equipe != 1:
+                        continue
+
+        # Enrichissement des champs dérivés
+        numero_equipe = e.get("numeroEquipe")
+        if numero_equipe is not None:
+            try:
+                # Normalise en str simple ("1", "2", ...)
+                numero_equipe = str(int(numero_equipe))
+            except (TypeError, ValueError):
+                numero_equipe = str(numero_equipe)
+
+        categorie_code = cat.get("code", "") or ""
+        # Suffixe de genre compact pour le label ("M"/"F" ou "")
+        sexe_suffix = ""
+        if sexe_field == "M":
+            sexe_suffix = "M"
+        elif sexe_field == "F":
+            sexe_suffix = "F"
+
+        # Construction d'un label prêt pour les agents, ex: "Stade Clermontois U11M1"
+        base_cat = f"{categorie_code}{sexe_suffix}".strip()
+        num_suffix = numero_equipe or ""
+        cat_label = f"{base_cat}{num_suffix}" if base_cat or num_suffix else ""
+        team_label = f"{club_nom} {cat_label}".strip()
+
+        # Phase/label si disponible dans la structure d'engagement
+        phase_label = e.get("phase") or e.get("libellePhase") or None
+
+        team_id = e.get("id")
 
         flat.append(
             {
+                "team_id": team_id,
                 "engagement_id": e.get("id"),
+                "numero_equipe": numero_equipe,
+                "team_label": team_label,
+                "phase_label": phase_label,
                 "nom_equipe": club_nom,
                 "competition": nom_comp,
                 "competition_id": comp.get("id"),
                 "poule_id": poule.get("id"),
                 "sexe": comp.get("sexe", ""),
-                "categorie": cat.get("code", ""),
+                "categorie": categorie_code,
                 "niveau": comp.get("competition_origine_niveau"),
             }
         )
@@ -1042,17 +1092,76 @@ async def get_calendrier_club_service(
                     }
                 )
 
-        # Tri par date décroissante pour avoir les derniers matchs en premier
-        all_matches.sort(key=lambda x: x.get("date") or "", reverse=True)
+        # --- Tri robuste par date + flags temporels ---
+        tz = ZoneInfo("Europe/Paris")
+        now = datetime.now(tz)
 
-        # Troncature si trop de matchs
+        def _parse_match_datetime(raw: str | None) -> datetime | None:
+            if not raw:
+                return None
+            # La plupart des dates FFBB sont au format ISO, on reste défensif.
+            try:
+                dt = datetime.fromisoformat(raw)
+            except Exception:
+                # Fallback: essayer sans timezone ou avec espace au lieu de T
+                for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+                    try:
+                        dt = datetime.strptime(raw, fmt)
+                        break
+                    except Exception:
+                        dt = None
+            if dt is None:
+                return None
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=tz)
+            return dt.astimezone(tz)
+
+        # Attacher un datetime parsé temporaire pour le tri
+        for m in all_matches:
+            m["_dt"] = _parse_match_datetime(m.get("date"))
+
+        # Tri croissant: du plus ancien au plus récent. Si la date manque, on met en fin.
+        all_matches.sort(key=lambda x: (x["_dt"] is None, x["_dt"] or now))
+
+        # Déterminer played / futur
+        played_indices: list[int] = []
+        future_indices: list[int] = []
+
+        for idx, m in enumerate(all_matches):
+            dt = m.get("_dt")
+            score1 = m.get("score_equipe1")
+            score2 = m.get("score_equipe2")
+
+            has_score = score1 not in (None, "") or score2 not in (None, "")
+            is_past = dt <= now if dt is not None else has_score
+
+            played = bool(has_score or is_past)
+            m["played"] = played
+
+            if played:
+                played_indices.append(idx)
+            else:
+                future_indices.append(idx)
+
+        last_played_idx = played_indices[-1] if played_indices else None
+        next_future_idx = future_indices[0] if future_indices else None
+
+        for idx, m in enumerate(all_matches):
+            m["is_last_match"] = last_played_idx is not None and idx == last_played_idx
+            m["is_next_match"] = next_future_idx is not None and idx == next_future_idx
+            # Retirer le champ interne de travail
+            m.pop("_dt", None)
+
+        # Troncature si trop de matchs (après tri + flags)
         try:
             max_matches = int(os.getenv("FFBB_MAX_CALENDAR_MATCHES", "300"))
         except ValueError:
             max_matches = 300
 
-        if len(all_matches) > max_matches:
-            truncated = all_matches[:max_matches]
+        effective = all_matches
+
+        if len(effective) > max_matches:
+            truncated = effective[:max_matches]
             warning = {
                 "warning": (
                     "Résultat tronqué côté MCP: trop de matchs pour ce club/catégorie. "
@@ -1064,7 +1173,7 @@ async def get_calendrier_club_service(
             }
             return truncated + [warning]
 
-        return all_matches
+        return effective
 
     return await _dedupe_inflight(
         cache=_cache_calendrier,
@@ -1092,20 +1201,8 @@ async def _resolve_poule_ids_for_categorie(org_data: dict, categorie: str) -> li
             )
         )
 
-    # On dérive un code de catégorie simple: on garde la partie UXX de la chaîne
-    cat_upper = (categorie or "").upper()
-    code = None
-    for part in cat_upper.split():
-        if part.startswith("U") and part[1:3].isdigit():
-            code = part[:3]  # U11, U13, U15…
-            break
-    if (
-        code is None
-        and len(cat_upper) >= 3
-        and cat_upper[0] == "U"
-        and cat_upper[1:3].isdigit()
-    ):
-        code = cat_upper[:3]
+    parsed = parse_categorie(categorie)
+    code = parsed.categorie
 
     matched_poule_ids: list[int] = []
     for eng in engagements:
@@ -1167,3 +1264,94 @@ async def search_terrains_service(nom: str, limit: int = 20) -> list[dict]:
 
 async def search_tournois_service(nom: str, limit: int = 20) -> list[dict]:
     return await _search_generic("tournois", "search_tournois_async", nom, limit)
+
+
+async def ffbb_resolve_team_service(
+    *,
+    club_name: str | None = None,
+    organisme_id: int | str | None = None,
+    categorie: str | None = None,
+) -> dict[str, Any]:
+    """Résout une équipe unique d'un club pour une catégorie donnée.
+
+    Utilise la même logique de parsing que ffbb_bilan_service / ffbb_equipes_club_service
+    pour interpréter des entrées comme "U11M1", "U13F-2", etc.
+
+    Retourne :
+      - `team` : l'équipe résolue (team_id, engagement_id, poule_id, team_label, ...)
+      - `candidates` : liste complète des équipes candidates (même structure que ffbb_equipes_club_service)
+      - `ambiguity` : message explicite si plusieurs équipes correspondent.
+    """
+    if not club_name and not organisme_id:
+        raise McpError("Fournir club_name ou organisme_id", status=400)
+
+    if not categorie:
+        raise McpError(
+            "Paramètre 'categorie' requis (ex: 'U11M1', 'U13F2').", status=400
+        )
+
+    # 1) Résoudre l'organisme si besoin
+    target_org_ids: list[str] = []
+
+    if organisme_id is not None:
+        target_org_ids = [str(organisme_id)]
+    elif club_name:
+        orgs = await search_organismes_service(nom=club_name, limit=5)
+        target_org_ids = [
+            str(org.get("id"))
+            for org in orgs
+            if isinstance(org, dict) and org.get("id")
+        ]
+
+    target_org_ids = list(dict.fromkeys(oid for oid in target_org_ids if oid))
+    if not target_org_ids:
+        raise McpError(
+            f"Club '{club_name}' introuvable" if club_name else "Organisme introuvable",
+            status=404,
+        )
+
+    # 2) Récupérer toutes les équipes candidates pour cette catégorie
+    eq_tasks = [
+        ffbb_equipes_club_service(organisme_id=oid, filtre=categorie)
+        for oid in target_org_ids
+    ]
+    eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
+
+    candidates: list[dict[str, Any]] = []
+    for res in eq_results:
+        if isinstance(res, list):
+            candidates.extend(res)
+        elif isinstance(res, Exception):
+            logger.error("Erreur lors de la récupération des équipes: %s", res)
+
+    if not candidates:
+        raise McpError(
+            f"Aucune équipe trouvée pour la catégorie '{categorie}'",
+            status=404,
+        )
+
+    # 3) Si une seule équipe correspond, retour direct
+    if len(candidates) == 1:
+        return {"team": candidates[0], "candidates": candidates, "ambiguity": None}
+
+    # 4) Heuristique : tenter de choisir l'équipe n°1 si le filtre ne précise pas le numéro
+    parsed = parse_categorie(categorie)
+    if parsed.numero_equipe is None:
+        # On privilégie numero_equipe == "1" ou None (équipe unique)
+        primary: list[dict[str, Any]] = []
+        for e in candidates:
+            num = e.get("numero_equipe")
+            if num in ("1", 1, None):
+                primary.append(e)
+        primary = primary or candidates
+        if len(primary) == 1:
+            return {"team": primary[0], "candidates": candidates, "ambiguity": None}
+
+    # 5) Ambiguïté : renvoyer toutes les candidates et un message explicite
+    ambiguity_msg = (
+        "Plusieurs équipes correspondent à cette catégorie. "
+        "Demande à l'utilisateur de préciser le numéro d'équipe (1, 2, ...) "
+        "ou la phase si nécessaire."
+    )
+
+    return {"team": None, "candidates": candidates, "ambiguity": ambiguity_msg}

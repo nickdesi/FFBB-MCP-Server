@@ -16,6 +16,7 @@ from starlette.responses import (
     Response,
 )
 
+from . import __version__ as _PACKAGE_VERSION
 from .metrics import generate_prometheus_metrics
 from .prompts import register_prompts
 from .resources import register_resources
@@ -23,6 +24,8 @@ from .services import (
     ffbb_bilan_service,
     ffbb_equipes_club_service,
     ffbb_get_classement_service,
+    ffbb_resolve_team_service,
+    get_cache_ttls,
     get_calendrier_club_service,
     get_competition_service,
     get_lives_service,
@@ -233,6 +236,23 @@ async def sitemap_xml(request: Request) -> Response:
 @mcp.custom_route("/", methods=["GET"])
 async def index(request: Request) -> Response:
     return HTMLResponse(content=_build_index_html(), status_code=200)
+
+
+@mcp.tool(name="ffbb_version", annotations=_READONLY_ANNOTATIONS)
+async def ffbb_version() -> dict[str, Any]:
+    """Informations de version et configuration runtime du serveur FFBB MCP.
+
+    Retourne une structure compacte et strictement typée, pratique pour les
+    agents et les outils de supervision.
+    """
+
+    import platform
+
+    return {
+        "package_version": _PACKAGE_VERSION,
+        "python_version": platform.python_version(),
+        "cache_ttls": get_cache_ttls(),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -460,6 +480,46 @@ async def ffbb_get_saisons(
     except Exception as e:
         logger.error(f"ffbb_saisons failed: {e}")
         return [{"error": str(e)}]
+
+
+# ---------------------------------------------------------------------------
+# TOOL 7 — Résolution d'équipe
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(name="ffbb_resolve_team", annotations=_READONLY_ANNOTATIONS)
+async def ffbb_resolve_team(
+    club_name: Annotated[
+        str | None,
+        Field(description="Nom du club (ex: 'Stade Clermontois', 'ASVEL')."),
+    ] = None,
+    organisme_id: Annotated[
+        int | str | None,
+        Field(description="ID FFBB du club (alternative plus rapide à club_name)."),
+    ] = None,
+    categorie: Annotated[
+        str,
+        Field(
+            description=(
+                "Catégorie + genre + numéro d'équipe (ex: 'U11M1', 'U13F2', 'U15M'). "
+                "Utilise les mêmes conventions que ffbb_bilan."
+            ),
+        ),
+    ] = "U11M1",
+) -> dict[str, Any]:
+    """Résout une équipe unique pour un club et une catégorie.
+
+    Utilise ffbb_equipes_club_service et le parseur de catégorie commun pour
+    interpréter des entrées comme "U11M1", "U13F-2", etc.
+
+    Retourne :
+      - `team` : l'équipe résolue (ou null en cas d'ambiguïté)
+      - `candidates` : toutes les équipes candidates
+      - `ambiguity` : message explicite à relayer à l'utilisateur si nécessaire.
+    """
+    return await ffbb_resolve_team_service(
+        club_name=club_name, organisme_id=organisme_id, categorie=categorie
+    )
 
 
 # ---------------------------------------------------------------------------

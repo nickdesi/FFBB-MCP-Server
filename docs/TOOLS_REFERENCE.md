@@ -64,11 +64,119 @@ Le serveur a été refondu pour proposer des outils polyvalents qui réduisent l
   - `filtre` (string, optionnel) : Filtre textuel pour la catégorie (ex: "U13", "Senior F", "NM1").
   - `poule_id` (integer, requis si action=`classement`) : L'identifiant de la poule.
 
+- **Sortie pour `action="equipes"`** : tableau d'objets avec, pour chaque équipe engagée :
+  - `team_id` : identifiant stable de l'engagement (alias d'`engagement_id`).
+  - `engagement_id` : identifiant FFBB brut de l'engagement.
+  - `numero_equipe` : numéro d'équipe dans la catégorie ("1", "2", ...), si disponible.
+  - `team_label` : label prêt à l'emploi pour les agents, ex: `"Stade Clermontois U11M1"`.
+  - `phase_label` : libellé de phase si disponible (ex: `"Phase 1"`).
+  - `nom_equipe` : nom du club.
+  - `competition` / `competition_id` : libellé et ID de la compétition.
+  - `poule_id` : poule associée à cette équipe (utilisable avec `ffbb_get(type='poule')`).
+  - `sexe` : "M", "F" ou vide.
+  - `categorie` : code de catégorie (ex: "U11").
+  - `niveau` : niveau de la compétition (si fourni par l'API FFBB).
+
 - **Exemple : Récupérer le calendrier des U13 masculins d'un club** :
 
   ```json
   { "action": "calendrier", "club_name": "JAV", "filtre": "U13M" }
   ```
+
+### action="calendrier" — calendrier d’un club
+
+Le calendrier club s’appuie sur `get_calendrier_club_service` et renvoie une liste de matchs simplifiés pour un club et une catégorie donnés.
+
+**Contrat de données garanti** :
+
+- Les matchs sont **triés par date croissante** (du plus ancien au plus récent).
+- La zone horaire utilisée pour l’interprétation des dates est **Europe/Paris**.
+- Pour chaque match, les champs suivants existent au minimum :
+  - `id`: identifiant FFBB de la rencontre.
+  - `date`: date (et éventuellement heure) brute telle que renvoyée par l’API FFBB.
+  - `equipe1`, `equipe2`: noms des deux équipes.
+  - `score_equipe1`, `score_equipe2`: scores si disponibles (sinon `null`/vide).
+  - `competition_nom`: libellé de la compétition.
+  - `num_journee`: numéro de journée si disponible.
+  - `played` (`bool`):
+    - `true` si le match est considéré comme joué (score présent ou date passée),
+    - `false` si le match est à venir.
+  - `is_last_match` (`bool`):
+    - `true` pour **au plus un** match : le **dernier match joué** dans la liste retournée ;
+    - `false` pour tous les autres.
+  - `is_next_match` (`bool`):
+    - `true` pour **au plus un** match : le **prochain match à venir** dans la liste retournée ;
+    - `false` pour tous les autres.
+
+> Remarque : `played`, `is_last_match` et `is_next_match` sont calculés **sur la liste effectivement renvoyée** après tri et éventuelle troncature.
+
+**Troncature et performances** :
+
+- Pour protéger les performances, un plafond global `FFBB_MAX_CALENDAR_MATCHES` (par défaut `300`) est appliqué.
+- Si le nombre de matchs dépasse cette limite, la liste est tronquée après tri et flags.
+- Dans ce cas, un dernier élément supplémentaire est ajouté à la fin du résultat :
+
+  ```jsonc
+  {
+    "warning": "Résultat tronqué côté MCP: trop de matchs pour ce club/catégorie. Affichage limité pour protéger les performances. Affinez votre requête (catégorie précise, équipe 1/2, phase, etc.).",
+    "total_initial": <nombre_total_de_matchs_avant_troncature>,
+    "limite_appliquee": <valeur_effective_de_FFBB_MAX_CALENDAR_MATCHES>
+  }
+  ```
+
+Cela permet aux agents de :
+
+- Obtenir le **dernier résultat** (`is_last_match == true`).
+- Obtenir le **prochain match** (`is_next_match == true`).
+- Parcourir le calendrier dans l’ordre chronologique sans avoir à refaire un tri ou une classification temporelle côté LLM.
+
+---
+
+### 4. `ffbb_resolve_team`
+
+**Description** : Résout une **équipe unique** d'un club pour une catégorie donnée, en encapsulant
+la logique de désambiguïsation (U11M1, U13F-2, etc.).
+
+- **Arguments** :
+  - `club_name` (string, optionnel) : Nom du club (ex: `"Stade Clermontois"`).
+  - `organisme_id` (integer|string, optionnel) : ID FFBB du club (plus fiable que `club_name`).
+  - `categorie` (string, requis) : Catégorie + genre + numéro d'équipe (ex: `"U11M1"`, `"U13F2"`, `"U15M"`).
+
+  > Au moins l'un de `club_name` ou `organisme_id` doit être fourni.
+
+- **Retour** : un objet JSON structuré :
+
+  - `team` : l'équipe résolue (ou `null` en cas d'ambiguïté), avec la même structure que
+    les entrées de `ffbb_club(action="equipes")` :
+    - `team_id`, `engagement_id`, `numero_equipe`, `team_label`, `phase_label`,
+      `nom_equipe`, `competition`, `competition_id`, `poule_id`, `sexe`, `categorie`, `niveau`.
+  - `candidates` : tableau de toutes les équipes candidates correspondant à la catégorie,
+    même structure que ci-dessus.
+  - `ambiguity` : message textuel expliquant l'ambiguïté si plusieurs équipes
+    correspondent et qu'aucune sélection automatique n'est possible.
+
+**Règles de désambiguïsation** :
+
+1. Si une seule équipe correspond à la catégorie filtrée, `team` contient cette équipe et
+   `ambiguity` vaut `null`.
+2. Si la catégorie ne précise **pas** le numéro d'équipe (ex: `"U11M"`) et que plusieurs
+   équipes existent, le service tente de privilégier l'équipe n°1 (`numero_equipe == "1"`)
+   ou les engagements sans `numero_equipe`.
+3. Si malgré tout plusieurs équipes restent candidates, `team` vaut `null` et
+   `ambiguity` explique qu'il faut demander à l'utilisateur de préciser le numéro
+   d'équipe (1, 2, ...) ou la phase.
+
+**Exemple d'appel** :
+
+```json
+{ "club_name": "Stade Clermontois", "categorie": "U11M1" }
+```
+
+**Exemple d'usage agent** :
+
+1. Appeler `ffbb_resolve_team` pour identifier précisément `U11M1` d'un club.
+2. Lire `team.poule_id` et utiliser `ffbb_get(type="poule", id=team.poule_id)` pour
+   obtenir le calendrier complet + classement.
 
 ---
 
