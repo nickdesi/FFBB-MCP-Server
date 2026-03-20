@@ -229,13 +229,21 @@ async def _safe_call(
     if callable(coro):
         make_coro = coro
     else:
-        # single-use coroutine passed; wrap into a factory that returns it once
+        # single-use coroutine passed; wrap into a factory that returns it une seule fois
         single = coro
 
         def _once():
             return single
 
         make_coro = _once
+
+        # Garde-fou : si on demande plusieurs retries avec une coroutine brute,
+        # on lève explicitement une erreur pour éviter RuntimeError "already awaited".
+        if retries > 1:
+            raise TypeError(
+                "_safe_call: lorsque 'coro' est une coroutine, retries doit être à 1. "
+                "Passez plutôt une factory (lambda: client.xxx_async(...)) pour autoriser les retries."
+            )
 
     attempt = 0
     last_exc: Exception | None = None
@@ -316,6 +324,7 @@ async def _dedupe_inflight_detail(cache_key: str, make_coro) -> Any:
     """Déduplique les appels concurrents sur la même clé de détail."""
     return await _dedupe_inflight(
         cache=_cache_detail,
+        cache_name="detail",
         cache_key=cache_key,
         inflight_map=_inflight_detail,
         make_coro=make_coro,
@@ -325,13 +334,14 @@ async def _dedupe_inflight_detail(cache_key: str, make_coro) -> Any:
 async def _dedupe_inflight(
     *,
     cache: TTLCache | None,
+    cache_name: str,
     cache_key: str,
     inflight_map: dict[str, asyncio.Task[Any]],
     make_coro,
 ) -> Any:
     """Déduplique les appels concurrents sur une clé et met en cache le résultat."""
     if cache is not None:
-        cached = _cache_get(cache, cache_key, "detail")
+        cached = _cache_get(cache, cache_key, cache_name)
         if cached is not None:
             return cached
 
@@ -345,7 +355,7 @@ async def _dedupe_inflight(
     try:
         result = await existing
         if cache is not None:
-            _cache_set(cache, cache_key, result, "detail")
+            _cache_set(cache, cache_key, result, cache_name)
         return result
     finally:
         async with _inflight_lock:
@@ -503,6 +513,7 @@ async def _search_generic(
 
     return await _dedupe_inflight(
         cache=_cache_search,
+        cache_name="search",
         cache_key=cache_key,
         inflight_map=_inflight_search,
         make_coro=_fetch,
@@ -590,6 +601,7 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
 
     return await _dedupe_inflight(
         cache=_cache_search,
+        cache_name="search",
         cache_key=cache_key,
         inflight_map=_inflight_search,
         make_coro=_fetch,
@@ -666,26 +678,6 @@ async def ffbb_equipes_club_service(
     return flat
 
 
-# Dans ffbb_bilan_service, on garde _safe_call encapsulé mais on limite les appels
-# directs supplémentaires dans _fetch_poule_bilan :
-#
-# async def _fetch_poule_bilan(pid: str) -> dict[str, Any] | Exception:
-#     async with semaphore:
-#         try:
-#             return await get_poule_service(pid)
-#         except McpError:
-#             try:
-#                 client = await get_client_async()
-#                 poule = await _with_ffbb_semaphore(
-#                     _safe_call(
-#                         f"Poule {pid}", lambda: client.get_poule_async(poule_id=pid)
-#                     )
-#                 )
-#                 return serialize_model(poule) or {}
-#             except Exception as e:
-#                 return e
-
-
 # De même, get_calendrier_club_service utilise déjà get_poule_service qui
 # bénéficie désormais du sémaphore global.
 async def ffbb_bilan_service(
@@ -693,9 +685,11 @@ async def ffbb_bilan_service(
     organisme_id: int | str | None = None,
     categorie: str | None = None,
 ) -> dict[str, Any]:
-    """
-    Bilan complet d'une équipe toutes phases confondues en un seul appel.
-    Workflow interne : search → equipes → poules (parallèle) → agrégation V/D/N + paniers.
+    """Bilan complet d'une équipe toutes phases confondues.
+
+    Utilise en interne : recherche organismes → équipes → poules (parallèle)
+    → agrégation V/D/N + paniers. Point d'entrée unique pour les bilans
+    d'équipe côté MCP/LLM.
     """
     cache_key = f"bilan:{organisme_id or ''}:{(club_name or '').lower().strip()}:{categorie or ''}"
 
@@ -773,7 +767,9 @@ async def ffbb_bilan_service(
         # FIX: print() → logger.debug() (les print polluaient stdout/Coolify en prod)
         logger.debug(f"ffbb_bilan: club_nom={club_nom} cible_orgs={target_org_ids}")
         logger.debug(
-            f"ffbb_bilan: equipes_count={len(equipes)} unique_poules={unique_poule_ids}"
+            "ffbb_bilan: equipes_count=%d unique_poules=%s",
+            len(equipes),
+            unique_poule_ids,
         )
 
         semaphore = asyncio.Semaphore(_MAX_POULE_FETCH_CONCURRENCY)
@@ -883,6 +879,7 @@ async def ffbb_bilan_service(
 
     return await _dedupe_inflight(
         cache=_cache_bilan,
+        cache_name="bilan",
         cache_key=cache_key,
         inflight_map=_inflight_bilan,
         make_coro=_fetch,
@@ -1068,6 +1065,7 @@ async def get_calendrier_club_service(
 
     return await _dedupe_inflight(
         cache=_cache_calendrier,
+        cache_name="calendrier",
         cache_key=cache_key,
         inflight_map=_inflight_calendrier,
         make_coro=_fetch,
@@ -1075,11 +1073,10 @@ async def get_calendrier_club_service(
 
 
 async def _resolve_poule_ids_for_categorie(org_data: dict, categorie: str) -> list[int]:
-    """Résout les poule_id pertinents pour une catégorie donnée.
+    """Résout les poule_id pertinents pour une catégorie.
 
-    - org_data : dict issu de get_organisme_service (model_dump())
-    - categorie : ex. "U11M", "U13F1" etc.
-
+    Helper interne utilisé par les tests pour vérifier la logique de
+    filtrage des engagements par catégorie (U11, U13F, etc.).
     """
     from mcp.shared.exceptions import ErrorData, McpError
 
