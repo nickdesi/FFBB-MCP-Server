@@ -641,15 +641,19 @@ async def ffbb_equipes_club_service(
         nom_comp = comp.get("nom", "")
         sexe_field = (comp.get("sexe") or "").upper()
 
-        # Filtre optionnel pour gagner du temps agents
+        # Filtre optionnel :
+        # - on applique toujours le filtre sur le code de catégorie (strict)
+        # - on n’exclut sur le sexe / numero_equipe que lorsqu’une information explicite
+        #   est disponible côté FFBB. En absence de champ, on laisse passer le candidat,
+        #   et la désambiguïsation fine est gérée plus haut (ffbb_resolve_team_service).
         if parsed_filter is not None:
             cat_code = (cat.get("code") or "").upper()
             if parsed_filter.categorie and cat_code != parsed_filter.categorie:
                 continue
 
-            if parsed_filter.sexe == "F" and sexe_field != "F":
+            if parsed_filter.sexe == "F" and sexe_field == "M":
                 continue
-            if parsed_filter.sexe == "M" and sexe_field != "M":
+            if parsed_filter.sexe == "M" and sexe_field == "F":
                 continue
 
             if parsed_filter.numero_equipe is not None:
@@ -660,14 +664,10 @@ async def ffbb_equipes_club_service(
                 except (TypeError, ValueError):
                     team_num = None
 
-                # Convention : si filtre=1 et pas de numeroEquipe côté FFBB,
-                # on considère que c'est l'équipe 1 par défaut.
-                if team_num is not None:
-                    if team_num != parsed_filter.numero_equipe:
-                        continue
-                else:
-                    if parsed_filter.numero_equipe != 1:
-                        continue
+                # Si l’API FFBB expose un numeroEquipe explicite différent du filtre,
+                # on exclut. Sinon (numeroEquipe manquant ou égal), on garde.
+                if team_num is not None and team_num != parsed_filter.numero_equipe:
+                    continue
 
         # Enrichissement des champs dérivés
         numero_equipe = e.get("numeroEquipe")
@@ -1120,8 +1120,8 @@ async def get_calendrier_club_service(
         for m in all_matches:
             m["_dt"] = _parse_match_datetime(m.get("date"))
 
-        # Tri croissant: du plus ancien au plus récent. Si la date manque, on met en fin.
-        all_matches.sort(key=lambda x: (x["_dt"] is None, x["_dt"] or now))
+        # Tri décroissant: du plus récent au plus ancien. Si la date manque, on met en fin.
+        all_matches.sort(key=lambda x: (x["_dt"] is None, x["_dt"] or now), reverse=True)
 
         # Déterminer played / futur
         played_indices: list[int] = []
@@ -1143,16 +1143,14 @@ async def get_calendrier_club_service(
             else:
                 future_indices.append(idx)
 
-        last_played_idx = played_indices[-1] if played_indices else None
-        next_future_idx = future_indices[0] if future_indices else None
+        last_played_idx = played_indices[0] if played_indices else None
+        next_future_idx = future_indices[-1] if future_indices else None
 
         for idx, m in enumerate(all_matches):
             m["is_last_match"] = last_played_idx is not None and idx == last_played_idx
             m["is_next_match"] = next_future_idx is not None and idx == next_future_idx
-            # Retirer le champ interne de travail
             m.pop("_dt", None)
 
-        # Troncature si trop de matchs (après tri + flags)
         try:
             max_matches = int(os.getenv("FFBB_MAX_CALENDAR_MATCHES", "300"))
         except ValueError:
@@ -1274,20 +1272,26 @@ async def ffbb_resolve_team_service(
 ) -> dict[str, Any]:
     """Résout une équipe unique d'un club pour une catégorie donnée.
 
-    Utilise la même logique de parsing que ffbb_bilan_service / ffbb_equipes_club_service
-    pour interpréter des entrées comme "U11M1", "U13F-2", etc.
-
-    Retourne :
-      - `team` : l'équipe résolue (team_id, engagement_id, poule_id, team_label, ...)
-      - `candidates` : liste complète des équipes candidates (même structure que ffbb_equipes_club_service)
-      - `ambiguity` : message explicite si plusieurs équipes correspondent.
+    Retourne un objet structuré pour les agents :
+      - `status`: "resolved" | "ambiguous" | "not_found"
+      - `team`: équipe résolue (ou None si ambiguë / introuvable)
+      - `candidates`: liste des équipes candidates (peut être vide)
+      - `ambiguity`: message explicite en cas d'ambiguïté
     """
     if not club_name and not organisme_id:
-        raise McpError("Fournir club_name ou organisme_id", status=400)
+        raise McpError(
+            error=ErrorData(
+                code=INTERNAL_ERROR,
+                message="Fournir club_name ou organisme_id",
+            )
+        )
 
     if not categorie:
         raise McpError(
-            "Paramètre 'categorie' requis (ex: 'U11M1', 'U13F2').", status=400
+            error=ErrorData(
+                code=INTERNAL_ERROR,
+                message="Paramètre 'categorie' requis (ex: 'U11M1', 'U13F2').",
+            )
         )
 
     # 1) Résoudre l'organisme si besoin
@@ -1305,10 +1309,10 @@ async def ffbb_resolve_team_service(
 
     target_org_ids = list(dict.fromkeys(oid for oid in target_org_ids if oid))
     if not target_org_ids:
-        raise McpError(
-            f"Club '{club_name}' introuvable" if club_name else "Organisme introuvable",
-            status=404,
+        msg = (
+            f"Club '{club_name}' introuvable" if club_name else "Organisme introuvable"
         )
+        raise McpError(error=ErrorData(code=INTERNAL_ERROR, message=msg))
 
     # 2) Récupérer toutes les équipes candidates pour cette catégorie
     eq_tasks = [
@@ -1324,34 +1328,33 @@ async def ffbb_resolve_team_service(
         elif isinstance(res, Exception):
             logger.error("Erreur lors de la récupération des équipes: %s", res)
 
+    # 3) Construire la réponse selon les règles métier
     if not candidates:
-        raise McpError(
-            f"Aucune équipe trouvée pour la catégorie '{categorie}'",
-            status=404,
-        )
+        return {
+            "status": "not_found",
+            "team": None,
+            "candidates": [],
+            "ambiguity": f"Aucune équipe trouvée pour la catégorie '{categorie}'",
+        }
 
-    # 3) Si une seule équipe correspond, retour direct
     if len(candidates) == 1:
-        return {"team": candidates[0], "candidates": candidates, "ambiguity": None}
+        return {
+            "status": "resolved",
+            "team": candidates[0],
+            "candidates": candidates,
+            "ambiguity": None,
+        }
 
-    # 4) Heuristique : tenter de choisir l'équipe n°1 si le filtre ne précise pas le numéro
-    parsed = parse_categorie(categorie)
-    if parsed.numero_equipe is None:
-        # On privilégie numero_equipe == "1" ou None (équipe unique)
-        primary: list[dict[str, Any]] = []
-        for e in candidates:
-            num = e.get("numero_equipe")
-            if num in ("1", 1, None):
-                primary.append(e)
-        primary = primary or candidates
-        if len(primary) == 1:
-            return {"team": primary[0], "candidates": candidates, "ambiguity": None}
-
-    # 5) Ambiguïté : renvoyer toutes les candidates et un message explicite
     ambiguity_msg = (
         "Plusieurs équipes correspondent à cette catégorie. "
+        "Ne choisis pas d'équipe par défaut. "
         "Demande à l'utilisateur de préciser le numéro d'équipe (1, 2, ...) "
-        "ou la phase si nécessaire."
+        "et/ou la phase avant de continuer."
     )
 
-    return {"team": None, "candidates": candidates, "ambiguity": ambiguity_msg}
+    return {
+        "status": "ambiguous",
+        "team": None,
+        "candidates": candidates,
+        "ambiguity": ambiguity_msg,
+    }
