@@ -25,6 +25,18 @@ logger = logging.getLogger("ffbb-mcp")
 
 T = TypeVar("T")
 
+
+def _read_positive_int_env(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+        return value if value > 0 else default
+    except (TypeError, ValueError):
+        return default
+
+
 # Limiter globalement le nombre d'appels concurrents vers l'API FFBB.
 # Valeur par défaut prudente, surchargable via l'env MAX_CONCURRENT_FFBB.
 _MAX_CONCURRENT_FFBB = int(os.getenv("MAX_CONCURRENT_FFBB", "8"))
@@ -77,11 +89,23 @@ _RE_NUM_END = re.compile(r"(\d)$")
 # Cache service-level (en mémoire, complémentaire au cache SQLite HTTP)
 # ---------------------------------------------------------------------------
 
-_cache_lives = TTLCache(maxsize=1, ttl=30)  # 30 s — scores changent chaque possession
-_cache_search = TTLCache(maxsize=256, ttl=600)  # 10 min — résultats de recherche
-_cache_detail = TTLCache(maxsize=128, ttl=1200)  # 20 min — détails compétitions/clubs
-_cache_calendrier = TTLCache(maxsize=64, ttl=300)  # 5 min — calendriers clubs
-_cache_bilan = TTLCache(maxsize=64, ttl=300)  # 5 min — bilans toutes phases
+# TTL configurables via variables d'environnement pour affiner par type de données.
+# Données très dynamiques (poules/classements/calendriers) doivent être rafraîchies
+# très fréquemment, surtout les jours de match.
+_LIVES_TTL = _read_positive_int_env("FFBB_CACHE_TTL_LIVES", 30)
+_SEARCH_TTL = _read_positive_int_env("FFBB_CACHE_TTL_SEARCH", 600)
+_DETAIL_TTL = _read_positive_int_env("FFBB_CACHE_TTL_DETAIL", 43200)  # 12h par défaut
+_CALENDRIER_TTL = _read_positive_int_env("FFBB_CACHE_TTL_CALENDRIER", 120)
+_BILAN_TTL = _read_positive_int_env("FFBB_CACHE_TTL_BILAN", 300)
+# TTL spécifique ultra-court pour les poules (scores + rencontres).
+_POULE_TTL = _read_positive_int_env("FFBB_CACHE_TTL_POULE", 120)
+
+_cache_lives = TTLCache(maxsize=1, ttl=_LIVES_TTL)
+_cache_search = TTLCache(maxsize=256, ttl=_SEARCH_TTL)
+# Cache de détail générique (organismes, saisons, compétitions, poules/classements si non surchargés)
+_cache_detail = TTLCache(maxsize=128, ttl=_DETAIL_TTL)
+_cache_calendrier = TTLCache(maxsize=64, ttl=_CALENDRIER_TTL)
+_cache_bilan = TTLCache(maxsize=64, ttl=_BILAN_TTL)
 _cache_lock = RLock()
 _inflight_lock: asyncio.Lock = asyncio.Lock()
 _inflight_detail: dict[str, asyncio.Task[Any]] = {}
@@ -103,18 +127,8 @@ def get_cache_ttls() -> dict[str, int]:
         "detail": int(_cache_detail.ttl),
         "calendrier": int(_cache_calendrier.ttl),
         "bilan": int(_cache_bilan.ttl),
+        "poule": _POULE_TTL,
     }
-
-
-def _read_positive_int_env(name: str, default: int) -> int:
-    raw = os.environ.get(name)
-    if raw is None:
-        return default
-    try:
-        value = int(raw)
-        return value if value > 0 else default
-    except (TypeError, ValueError):
-        return default
 
 
 _MAX_POULE_FETCH_CONCURRENCY = _read_positive_int_env("FFBB_POULE_FETCH_CONCURRENCY", 8)
@@ -421,7 +435,7 @@ async def get_competition_service(competition_id: int | str) -> dict:
     return await _dedupe_inflight_detail(cache_key, _fetch)
 
 
-async def get_poule_service(poule_id: int | str) -> dict:
+async def get_poule_service(poule_id: int | str, *, force_refresh: bool = False) -> dict:
     poule_id_int = _coerce_numeric_id(poule_id, "poule_id")
     cache_key = f"poule:{poule_id_int}"
 
@@ -433,8 +447,22 @@ async def get_poule_service(poule_id: int | str) -> dict:
                 lambda: client.get_poule_async(poule_id=poule_id_int),
             ),
         )
-        return serialize_model(poule) or {}
+        data = serialize_model(poule) or {}
+        # On met à jour explicitement un cache dédié très court pour les poules.
+        _cache_set(_cache_detail, cache_key, data, "poule")
+        return data
 
+    # force_refresh=True contourne le cache et écrase la valeur précédente.
+    if force_refresh:
+        return await _fetch()
+
+    # Lecture du cache avant de dédupliquer les appels concurrents.
+    cached = _cache_get(_cache_detail, cache_key, "poule")
+    if cached is not None:
+        return cached
+
+    # On utilise toujours le mécanisme de déduplication pour éviter de frapper
+    # l'API FFBB plusieurs fois pour la même poule en parallèle.
     return await _dedupe_inflight_detail(cache_key, _fetch)
 
 
@@ -455,12 +483,18 @@ async def get_organisme_service(organisme_id: int | str) -> dict:
     return await _dedupe_inflight_detail(cache_key, _fetch)
 
 
-async def ffbb_get_classement_service(poule_id: int | str) -> list[dict[str, Any]]:
+async def ffbb_get_classement_service(
+    poule_id: int | str,
+    *,
+    force_refresh: bool = False,
+) -> list[dict[str, Any]]:
     poule_id_int = _coerce_numeric_id(poule_id, "poule_id")
     cache_key = f"classement:{poule_id_int}"
-    cached = _cache_get(_cache_detail, cache_key, "classement")
-    if cached is not None:
-        return cached
+
+    if not force_refresh:
+        cached = _cache_get(_cache_detail, cache_key, "classement")
+        if cached is not None:
+            return cached
 
     client = await get_client_async()
     poule = await _with_ffbb_semaphore(
@@ -1243,6 +1277,8 @@ async def get_calendrier_club_service(
     club_name: str | None = None,
     organisme_id: int | str | None = None,
     categorie: str | None = None,
+    *,
+    force_refresh: bool = False,
 ) -> list[dict]:
     """Récupère le calendrier et les résultats d'un club.
 
@@ -1472,6 +1508,11 @@ async def get_calendrier_club_service(
             return truncated + [warning]
 
         return effective
+
+    # force_refresh contourne le cache de calendrier, mais continue de bénéficier
+    # de la déduplication inflight.
+    if force_refresh:
+        return await _fetch()
 
     return await _dedupe_inflight(
         cache=_cache_calendrier,

@@ -366,6 +366,15 @@ async def ffbb_get(
         Literal["competition", "poule", "organisme"],
         Field(description="Type : 'competition', 'poule', ou 'organisme' (club)."),
     ],
+    force_refresh: Annotated[
+        bool,
+        Field(
+            description=(
+                "Si true et type='poule', contourne le cache service-level pour recharger "
+                "les rencontres et scores en temps réel (utile les jours de match)."
+            )
+        ),
+    ] = False,
 ) -> dict[str, Any]:
     """Détails d'une entité FFBB par son ID.
 
@@ -376,12 +385,17 @@ async def ffbb_get(
                    ffbb_club(action='calendrier').
     type='organisme' → infos club + engagements saison.
     L'ID vient des résultats de ffbb_search.
+
+    Paramètre `force_refresh` :
+    - uniquement pris en compte pour type='poule'
+    - si true, force un appel direct à l'API FFBB pour rafraîchir les scores
+      et mettre à jour le cache interne.
     """
     try:
         if type == "competition":
             return await get_competition_service(competition_id=id)
         elif type == "poule":
-            return await get_poule_service(poule_id=id)
+            return await get_poule_service(id, force_refresh=force_refresh)
         elif type == "organisme":
             return await get_organisme_service(organisme_id=id)
         return {"error": f"Type inconnu: {type}"}
@@ -400,7 +414,7 @@ async def ffbb_club(
     action: Annotated[
         Literal["calendrier", "equipes", "classement"],
         Field(
-            description="'calendrier' → tous les matchs. 'equipes' → liste des équipes engagées. 'classement' → classement d'une poule."
+            description="'calendrier' → tous les matchs. 'equipes' → liste des équipes engagées. 'classement' → classement d'une poule.",
         ),
     ],
     organisme_id: Annotated[
@@ -417,6 +431,15 @@ async def ffbb_club(
         int | str | None,
         Field(description="ID de la poule (requis pour action='classement')."),
     ] = None,
+    force_refresh: Annotated[
+        bool,
+        Field(
+            description=(
+                "Si true, contourne les caches service-level pour le calendrier ou le "
+                "classement, en rechargeant les données en temps réel (match day)."
+            ),
+        ),
+    ] = False,
 ) -> list[dict[str, Any]]:
     """Actions sur un club FFBB : calendrier, équipes ou classement.
 
@@ -428,13 +451,21 @@ async def ffbb_club(
     action='equipes'    → liste des équipes engagées + leurs poule_id (nécessite organisme_id).
                           Utilise ensuite ffbb_get(type='poule') avec le poule_id obtenu.
     action='classement' → classement simplifié d'une poule (nécessite poule_id).
+
+    Paramètre `force_refresh` :
+    - pour action='calendrier', force un recalcul complet du calendrier club
+      sans réutiliser le cache.
+    - pour action='classement', force un rafraîchissement du classement de la poule.
     """
     try:
         if action == "calendrier":
             if not organisme_id and not club_name:
                 return [{"error": "Fournir organisme_id ou club_name"}]
             return await get_calendrier_club_service(
-                club_name=club_name, organisme_id=organisme_id, categorie=filtre
+                club_name=club_name,
+                organisme_id=organisme_id,
+                categorie=filtre,
+                force_refresh=force_refresh,
             )
         elif action == "equipes":
             if not organisme_id:
@@ -445,7 +476,10 @@ async def ffbb_club(
         elif action == "classement":
             if not poule_id:
                 return [{"error": "poule_id requis pour action='classement'"}]
-            return await ffbb_get_classement_service(poule_id=poule_id)
+            return await ffbb_get_classement_service(
+                poule_id=poule_id,
+                force_refresh=force_refresh,
+            )
         return [{"error": f"Action inconnue: {action}"}]
     except Exception as e:
         logger.error(f"ffbb_club failed: {e}")
