@@ -24,7 +24,9 @@ from .services import (
     ffbb_bilan_service,
     ffbb_equipes_club_service,
     ffbb_get_classement_service,
+    ffbb_next_match_service,
     ffbb_resolve_team_service,
+    ffbb_saison_bilan_service,
     get_cache_ttls,
     get_calendrier_club_service,
     get_competition_service,
@@ -71,6 +73,8 @@ mcp = FastMCP(
         "Données FFBB (basketball français). "
         "⚡ OUTIL PRIORITAIRE pour tout bilan/résultats/classement : ffbb_bilan(club_name=..., categorie=...) "
         "→ 1 seul appel, retourne tout (toutes phases agrégées). "
+        "Pour le bilan détaillé d'une équipe précise (U11M1, etc.), utiliser ffbb_bilan_saison(organisme_id=..., categorie=..., numero_equipe=...). "
+        "Pour le prochain match d'une équipe précise, utiliser ffbb_next_match(organisme_id=..., categorie=..., numero_equipe=...). "
         "⚠️ Les données FFBB sont TOUJOURS live — ne jamais chercher en mémoire/cache avant d'appeler l'API. "
         "Autres outils : ffbb_search → trouver un club/compétition. "
         "ffbb_get(type='poule') → classement + matchs d'une poule précise. "
@@ -576,6 +580,120 @@ async def ffbb_team_summary(
         }
     except Exception as e:
         logger.error(f"ffbb_team_summary failed: {e}")
+        return {"error": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# TOOL 9 — Prochain match
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(name="ffbb_next_match", annotations=_READONLY_ANNOTATIONS)
+async def ffbb_next_match(
+    organisme_id: Annotated[
+        int | str,
+        Field(description="ID FFBB du club (organisme) concerné."),
+    ],
+    categorie: Annotated[
+        str,
+        Field(
+            description=(
+                "Catégorie cible (ex: 'U11M', 'U11', 'U13F'). "
+                "Le genre peut être omis ('U11') : l'agent devra alors être prudent en cas d'ambiguïté."
+            ),
+        ),
+    ],
+    numero_equipe: Annotated[
+        int | None,
+        Field(
+            default=None,
+            description=(
+                "Numéro d'équipe au sein du club (1, 2, ...). "
+                "Permet de désambiguïser en cas de plusieurs équipes dans la même catégorie."
+            ),
+        ),
+    ] = None,
+) -> dict[str, Any]:
+    """Retourne le tout premier match à venir pour une équipe donnée.
+
+    Usage typique : répondre à des questions du type
+    "Quel est le prochain match des U11M1 ?" ou "Où jouent les U13F ce week-end ?".
+
+    Stratégie interne :
+    - utilise ffbb_equipes_club_service pour lister les engagements du club
+      dans la catégorie demandée (et le numéro d'équipe si fourni),
+    - identifie l'engagement actif et récupère la poule correspondante via get_poule_service,
+    - filtre les rencontres pour ne garder que celles non jouées,
+    - retourne uniquement la prochaine rencontre (date, adversaire, salle/ville, métadonnées poule).
+
+    Si plusieurs engagements correspondent (ambiguïté), l'outil retourne
+    un message structuré avec `status='ambiguous'` et des candidats à départager.
+    """
+    try:
+        return await ffbb_next_match_service(
+            organisme_id=organisme_id,
+            categorie=categorie,
+            numero_equipe=numero_equipe,
+        )
+    except Exception as e:
+        logger.error("ffbb_next_match failed: %s", e)
+        return {"error": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# TOOL 10 — Bilan de saison
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(name="ffbb_bilan_saison", annotations=_READONLY_ANNOTATIONS)
+async def ffbb_bilan_saison(
+    organisme_id: Annotated[
+        int | str,
+        Field(description="ID FFBB du club (organisme) concerné."),
+    ],
+    categorie: Annotated[
+        str,
+        Field(
+            description=(
+                "Catégorie + genre (ex: 'U11M', 'U13F', 'SeniorM'). "
+                "Cette valeur sert à filtrer les engagements et les poules."
+            ),
+        ),
+    ],
+    numero_equipe: Annotated[
+        int,
+        Field(
+            description=(
+                "Numéro d'équipe (1, 2, ...) pour identifier l'équipe précise dans la catégorie."
+            )
+        ),
+    ],
+) -> dict[str, Any]:
+    """Bilan détaillé de la saison pour une équipe précise (toutes phases).
+
+    Cet outil est optimisé pour les questions du type
+    "Quel est le bilan de la saison des U11M1 ?".
+
+    Il agrège toutes les phases (toutes poules) de la saison FFBB pour
+    l'équipe identifiée par (organisme_id, categorie, numero_equipe).
+
+    Pour chaque phase, il retourne :
+      - competition
+      - poule_id
+      - position
+      - match_joues, gagnes, perdus, nuls
+      - paniers_marques, paniers_encaisses, difference
+
+    Et fournit également un champ `bilan_total` qui cumule toutes les phases.
+    """
+    try:
+        return await ffbb_saison_bilan_service(
+            organisme_id=organisme_id,
+            categorie=categorie,
+            numero_equipe=numero_equipe,
+        )
+    except Exception as e:
+        logger.error("ffbb_bilan_saison failed: %s", e)
         return {"error": str(e)}
 
 

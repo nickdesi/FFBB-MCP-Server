@@ -618,8 +618,14 @@ async def ffbb_equipes_club_service(
 
     Paramètre `org_data` optionnel : si fourni, évite un appel supplémentaire
     à `get_organisme_service` (utile quand l'appelant a déjà chargé l'organisme).
-    Chaque entrée est enrichie avec un identifiant stable `team_id`, un
-    `numero_equipe` (si disponible) et un `team_label` prêt à l'emploi.
+
+    Cette version expose explicitement :
+      - `numero_equipe` : numéro d'équipe dans la catégorie ("1", "2", ...),
+      - `team_id` / `engagement_id` : identifiant stable de l'engagement,
+      - `team_label` : libellé directement exploitable par un agent (ex: "U11M1").
+
+    Ces champs permettent aux agents IA de désambiguïser rapidement les équipes
+    sans devoir inspecter les poules une par une.
     """
     # Réutilise org_data si fourni, sinon récupère via get_organisme_service
     data = (
@@ -700,9 +706,9 @@ async def ffbb_equipes_club_service(
         flat.append(
             {
                 "team_id": team_id,
-                "engagement_id": e.get("id"),
+                "engagement_id": team_id,
                 "numero_equipe": numero_equipe,
-                "team_label": team_label,
+                "team_label": cat_label or team_label,
                 "phase_label": phase_label,
                 "nom_equipe": club_nom,
                 "competition": nom_comp,
@@ -714,6 +720,300 @@ async def ffbb_equipes_club_service(
             }
         )
     return flat
+
+
+async def ffbb_next_match_service(
+    *, organisme_id: int | str, categorie: str, numero_equipe: int | None = None
+) -> dict[str, Any]:
+    """Service interne pour ffbb_next_match.
+
+    - sélectionne l'engagement correspondant à (organisme_id, categorie, numero_equipe)
+    - charge la poule courante
+    - retourne la prochaine rencontre non jouée.
+    """
+    org_id_int = _coerce_numeric_id(organisme_id, "organisme_id")
+    # On filtre d'abord par catégorie (avec éventuelle info de genre)
+    equipes = await ffbb_equipes_club_service(
+        organisme_id=org_id_int,
+        filtre=categorie,
+    )
+
+    if not equipes:
+        return {
+            "status": "not_found",
+            "message": f"Aucune équipe trouvée pour la catégorie '{categorie}'.",
+        }
+
+    # Si numero_equipe est fourni, on garde seulement celles qui correspondent
+    if numero_equipe is not None:
+        want = str(numero_equipe)
+        equipes = [
+            e for e in equipes if (e.get("numero_equipe") or "").strip() == want
+        ]
+        if not equipes:
+            return {
+                "status": "not_found",
+                "message": (
+                    "Aucune équipe ne correspond à cette combinaison "
+                    f"categorie={categorie!r}, numero_equipe={numero_equipe}."
+                ),
+            }
+
+    # S'il reste plusieurs engagements, on ne choisit pas au hasard
+    if len(equipes) > 1:
+        return {
+            "status": "ambiguous",
+            "message": (
+                "Plusieurs engagements correspondent à cette catégorie. "
+                "Demandez à l'utilisateur de préciser la phase ou le numéro d'équipe.")
+            ,
+            "candidates": equipes,
+        }
+
+    team = equipes[0]
+    poule_id = team.get("poule_id")
+    if not poule_id:
+        return {
+            "status": "not_found",
+            "message": "Aucune poule active trouvée pour cette équipe.",
+        }
+
+    poule = await get_poule_service(poule_id)
+    rencontres = poule.get("rencontres") or []
+    if not rencontres:
+        return {
+            "status": "not_found",
+            "message": "Aucune rencontre trouvée dans la poule.",
+        }
+
+    tz = ZoneInfo("Europe/Paris")
+    now = datetime.now(tz)
+
+    def _parse_dt(raw: str | None) -> datetime | None:
+        if not raw:
+            return None
+        try:
+            dt = datetime.fromisoformat(raw)
+        except Exception:
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+                try:
+                    dt = datetime.strptime(raw, fmt)
+                    break
+                except Exception:
+                    dt = None
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=tz)
+        return dt.astimezone(tz)
+
+    upcoming: list[tuple[datetime, dict[str, Any]]] = []
+    for m in rencontres:
+        joue = m.get("joue")
+        res1 = m.get("resultatEquipe1", m.get("resultat_equipe1"))
+        res2 = m.get("resultatEquipe2", m.get("resultat_equipe2"))
+
+        # Match considéré non joué si flag joue == 0
+        # ou si les scores sont absents/"None".
+        if joue not in (0, "0", None):
+            # joue == 1 → match joué
+            continue
+        if res1 not in (None, "", "None") or res2 not in (None, "", "None"):
+            # des scores sont présents → on considère joué
+            continue
+
+        dt = _parse_dt(m.get("date_rencontre", m.get("date")))
+        if dt is None:
+            # On garde quand même, mais avec une date minimale pour le tri
+            dt = datetime.max.replace(tzinfo=tz)
+        if dt < now:
+            # match déjà passé mais non marqué joué → on ignore
+            continue
+        upcoming.append((dt, m))
+
+    if not upcoming:
+        return {
+            "status": "no_upcoming_match",
+            "message": "Aucun match à venir trouvé pour cette équipe.",
+        }
+
+    upcoming.sort(key=lambda x: x[0])
+    next_dt, next_match = upcoming[0]
+
+    # Déterminer l'adversaire : si l'engagement 1/2 correspond à notre équipe.
+    eng1 = next_match.get("idEngagementEquipe1")
+    eng2 = next_match.get("idEngagementEquipe2")
+    id_eng1 = eng1.get("id") if isinstance(eng1, dict) else eng1
+    id_eng2 = eng2.get("id") if isinstance(eng2, dict) else eng2
+    my_eng = team.get("engagement_id")
+
+    eq1_name = next_match.get("nomEquipe1", next_match.get("nom_equipe1", ""))
+    eq2_name = next_match.get("nomEquipe2", next_match.get("nom_equipe2", ""))
+
+    if my_eng and id_eng1 and str(my_eng) == str(id_eng1):
+        adversaire = eq2_name
+        domicile = True
+    elif my_eng and id_eng2 and str(my_eng) == str(id_eng2):
+        adversaire = eq1_name
+        domicile = False
+    else:
+        # Fallback sur les noms
+        club_nom = (team.get("nom_equipe") or "").lower()
+        if club_nom and club_nom in (eq1_name or "").lower():
+            adversaire = eq2_name
+            domicile = True
+        elif club_nom and club_nom in (eq2_name or "").lower():
+            adversaire = eq1_name
+            domicile = False
+        else:
+            adversaire = eq2_name or eq1_name
+            domicile = None
+
+    lieu = next_match.get("nomSalle") or next_match.get("nom_salle") or ""
+    ville = next_match.get("villeSalle") or next_match.get("ville_salle") or ""
+
+    return {
+        "status": "ok",
+        "team": team,
+        "match": {
+            "poule_id": poule_id,
+            "match_id": next_match.get("id"),
+            "date": next_dt.isoformat(),
+            "adversaire": adversaire,
+            "domicile": domicile,
+            "equipe1": eq1_name,
+            "equipe2": eq2_name,
+            "salle": lieu,
+            "ville": ville,
+        },
+    }
+
+
+async def ffbb_saison_bilan_service(
+    *, organisme_id: int | str, categorie: str, numero_equipe: int
+) -> dict[str, Any]:
+    """Service interne pour ffbb_bilan_saison.
+
+    Agrège le bilan de TOUTES les phases de la saison pour une équipe précise.
+
+    Contrairement à ffbb_bilan_service (qui part d'un club_name ou d'une
+    catégorie globale), cette fonction travaille à partir d'une équipe
+    identifiée sans ambiguïté.
+    """
+    org_id_int = _coerce_numeric_id(organisme_id, "organisme_id")
+    equipes = await ffbb_equipes_club_service(
+        organisme_id=org_id_int,
+        filtre=categorie,
+    )
+    if not equipes:
+        return {
+            "status": "not_found",
+            "message": f"Aucune équipe trouvée pour la catégorie '{categorie}'.",
+        }
+
+    want_num = str(numero_equipe)
+    equipes = [
+        e for e in equipes if (e.get("numero_equipe") or "").strip() == want_num
+    ]
+    if not equipes:
+        return {
+            "status": "not_found",
+            "message": (
+                "Aucune équipe ne correspond à cette combinaison "
+                f"categorie={categorie!r}, numero_equipe={numero_equipe}."
+            ),
+        }
+
+    # Plusieurs phases possibles pour la même équipe : on les garde toutes.
+    poule_ids = list(
+        dict.fromkeys(str(e.get("poule_id")) for e in equipes if e.get("poule_id"))
+    )
+    if not poule_ids:
+        return {
+            "status": "not_found",
+            "message": "Aucune poule associée à cette équipe.",
+        }
+
+    semaphore = asyncio.Semaphore(_MAX_POULE_FETCH_CONCURRENCY)
+
+    async def _fetch_poule(pid: str) -> dict[str, Any] | Exception:
+        async with semaphore:
+            try:
+                return await get_poule_service(pid)
+            except Exception as e:  # déjà normalisé par get_poule_service
+                return e
+
+    poules_raw = await asyncio.gather(
+        *[_fetch_poule(pid) for pid in poule_ids], return_exceptions=True
+    )
+    poules_map: dict[str, dict[str, Any]] = {
+        pid: pd
+        for pid, pd in zip(poule_ids, poules_raw, strict=False)
+        if not isinstance(pd, Exception) and pd
+    }
+
+    # Agrégation par phase
+    phases: list[dict[str, Any]] = []
+    totaux = {
+        "match_joues": 0,
+        "gagnes": 0,
+        "perdus": 0,
+        "nuls": 0,
+        "paniers_marques": 0,
+        "paniers_encaisses": 0,
+        "difference": 0,
+    }
+
+    club_nom = equipes[0].get("nom_equipe", "")
+
+    for pid, poule_data in poules_map.items():
+        classements = poule_data.get("classements", []) or []
+        for entry in classements:
+            eng = entry.get("id_engagement", {}) or {}
+            entry_eng_id = str(eng.get("id", ""))
+            if entry_eng_id not in {str(e["engagement_id"]) for e in equipes}:
+                continue
+
+            mj = int(entry.get("match_joues") or 0)
+            g = int(entry.get("gagnes") or 0)
+            d = int(entry.get("perdus") or 0)
+            n = int(entry.get("nuls") or 0)
+            pm = int(entry.get("paniers_marques") or 0)
+            pe = int(entry.get("paniers_encaisses") or 0)
+            diff = int(entry.get("difference") or 0)
+
+            phase = {
+                "competition": poule_data.get("nom", ""),
+                "poule_id": pid,
+                "position": entry.get("position"),
+                "match_joues": mj,
+                "gagnes": g,
+                "perdus": d,
+                "nuls": n,
+                "paniers_marques": pm,
+                "paniers_encaisses": pe,
+                "difference": diff,
+            }
+            phases.append(phase)
+
+            totaux["match_joues"] += mj
+            totaux["gagnes"] += g
+            totaux["perdus"] += d
+            totaux["nuls"] += n
+            totaux["paniers_marques"] += pm
+            totaux["paniers_encaisses"] += pe
+            totaux["difference"] += diff
+
+    phases.sort(key=lambda x: x["competition"])
+
+    return {
+        "status": "ok",
+        "club": club_nom,
+        "categorie": categorie,
+        "numero_equipe": numero_equipe,
+        "bilan_total": totaux,
+        "phases": phases,
+    }
 
 
 # Dans ffbb_bilan_service, on garde _safe_call encapsulé mais on limite les appels
