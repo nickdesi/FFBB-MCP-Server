@@ -1044,7 +1044,6 @@ async def ffbb_saison_bilan_service(
         "status": "ok",
         "club": club_nom,
         "categorie": categorie,
-        "numero_equipe": numero_equipe,
         "bilan_total": totaux,
         "phases": phases,
     }
@@ -1698,4 +1697,221 @@ async def ffbb_resolve_team_service(
         "team": None,
         "candidates": candidates,
         "ambiguity": ambiguity_msg,
+    }
+
+
+# --- Helpers d'identification d'equipe --------------------------------------
+
+
+def _normalize_name(value: str) -> str:
+    """Normalise un nom (strip, upper, supprime les accents)."""
+    import unicodedata
+
+    if not value:
+        return ""
+    s = value.strip().upper()
+    s = unicodedata.normalize("NFD", s)
+    return "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+
+
+def _match_team_name(nom_equipe_rencontre: str, organisme_nom: str, numero_equipe: int) -> bool:
+    """Retourne True si nom_equipe_rencontre correspond a l'equipe du club.
+
+    Regles :
+      - on normalise les chaines (strip, upper, sans accents),
+      - on verifie que le nom du club est contenu,
+      - si numero_equipe > 1, on exige un suffixe "- {numero_equipe}",
+      - si numero_equipe == 1, on accepte un suffixe absent ou "- 1".
+    """
+
+    nom_norm = _normalize_name(nom_equipe_rencontre)
+    club_norm = _normalize_name(organisme_nom)
+    if not nom_norm or not club_norm:
+        return False
+    if club_norm not in nom_norm:
+        return False
+
+    suffix = f"- {numero_equipe}"
+    suffix_norm = _normalize_name(suffix)
+
+    if numero_equipe == 1:
+        # Equipe unique : suffixe optionnel.
+        has_digit = any(ch.isdigit() for ch in nom_norm)
+        return nom_norm.endswith(suffix_norm) or not has_digit
+
+    return nom_norm.endswith(suffix_norm)
+
+
+async def ffbb_last_result_service(
+    *,
+    club_name: str | None = None,
+    organisme_id: int | str | None = None,
+    categorie: str,
+    numero_equipe: int = 1,
+    force_refresh: bool = False,
+) -> dict[str, Any]:
+    """Retourne le dernier match joue pour une equipe precise."""
+
+    if club_name is None and organisme_id is None:
+        raise ValueError("club_name ou organisme_id est requis")
+
+    from .services import ffbb_resolve_team_service  # pour eviter un cycle direct
+
+    team = await ffbb_resolve_team_service(
+        club_name=club_name,
+        organisme_id=organisme_id,
+        categorie=categorie,
+        numero_equipe=numero_equipe,
+    )
+    if not team or "poule_id" not in team:
+        return {
+            "status": "no_result",
+            "message": "Aucune poule trouvee pour cette equipe.",
+        }
+
+    org_nom = team.get("nom_organisme") or team.get("club_nom") or ""
+    poule_id = team["poule_id"]
+
+    poule = await get_poule_service(poule_id, force_refresh=force_refresh)
+    rencontres = poule.get("rencontres", []) if isinstance(poule, dict) else []
+    if not isinstance(rencontres, list):
+        rencontres = []
+
+    candidats: list[dict[str, Any]] = []
+    for r in rencontres:
+        if not isinstance(r, dict):
+            continue
+        if r.get("joue") != 1:
+            continue
+        if r.get("resultatEquipe1") is None:
+            continue
+        nom1 = r.get("nomEquipe1") or ""
+        nom2 = r.get("nomEquipe2") or ""
+        if not (
+            _match_team_name(nom1, org_nom, numero_equipe)
+            or _match_team_name(nom2, org_nom, numero_equipe)
+        ):
+            continue
+        candidats.append(r)
+
+    if not candidats:
+        return {
+            "status": "no_result",
+            "message": "Aucun match joue trouve pour cette equipe.",
+        }
+
+    def _parse_dt(r: dict) -> datetime:
+        raw = r.get("date_rencontre") or ""
+        try:
+            return datetime.fromisoformat(raw)
+        except Exception:
+            return datetime.min
+
+    candidats.sort(key=_parse_dt, reverse=True)
+    last = candidats[0]
+
+    nom1 = last.get("nomEquipe1") or ""
+    nom2 = last.get("nomEquipe2") or ""
+    score1 = last.get("resultatEquipe1")
+    score2 = last.get("resultatEquipe2")
+
+    equipe_domicile = _match_team_name(nom1, org_nom, numero_equipe)
+
+    victoire = None
+    if isinstance(score1, int) and isinstance(score2, int):
+        victoire = score1 > score2 if equipe_domicile else score2 > score1
+
+    return {
+        "date": last.get("date_rencontre"),
+        "domicile": nom1,
+        "score_domicile": score1,
+        "exterieur": nom2,
+        "score_exterieur": score2,
+        "victoire": victoire,
+        "journee": last.get("journee"),
+    }
+
+
+async def ffbb_next_match_compact_service(
+    *,
+    club_name: str | None = None,
+    organisme_id: int | str | None = None,
+    categorie: str,
+    numero_equipe: int = 1,
+    force_refresh: bool = False,
+) -> dict[str, Any]:
+    """Retourne le prochain match a jouer pour une equipe precise."""
+
+    if club_name is None and organisme_id is None:
+        raise ValueError("club_name ou organisme_id est requis")
+
+    from .services import ffbb_resolve_team_service
+
+    team = await ffbb_resolve_team_service(
+        club_name=club_name,
+        organisme_id=organisme_id,
+        categorie=categorie,
+        numero_equipe=numero_equipe,
+    )
+    if not team or "poule_id" not in team:
+        return {
+            "status": "no_result",
+            "message": "Aucune poule trouvee pour cette equipe.",
+        }
+
+    org_nom = team.get("nom_organisme") or team.get("club_nom") or ""
+    poule_id = team["poule_id"]
+
+    poule = await get_poule_service(poule_id, force_refresh=force_refresh)
+    rencontres = poule.get("rencontres", []) if isinstance(poule, dict) else []
+    if not isinstance(rencontres, list):
+        rencontres = []
+
+    now = datetime.now(tz=ZoneInfo("Europe/Paris"))
+
+    futurs: list[dict[str, Any]] = []
+    for r in rencontres:
+        if not isinstance(r, dict):
+            continue
+        if r.get("joue") != 0:
+            continue
+        nom1 = r.get("nomEquipe1") or ""
+        nom2 = r.get("nomEquipe2") or ""
+        if not (
+            _match_team_name(nom1, org_nom, numero_equipe)
+            or _match_team_name(nom2, org_nom, numero_equipe)
+        ):
+            continue
+        raw_date = r.get("date_rencontre") or ""
+        try:
+            dt = datetime.fromisoformat(raw_date)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=ZoneInfo("Europe/Paris"))
+        except Exception:
+            continue
+        if dt <= now:
+            continue
+        r_copy = dict(r)
+        r_copy["_dt_obj"] = dt
+        futurs.append(r_copy)
+
+    if not futurs:
+        return {
+            "status": "no_result",
+            "message": "Aucun prochain match trouve pour cette equipe.",
+        }
+
+    futurs.sort(key=lambda r: r["_dt_obj"])  # type: ignore[index]
+    nxt = futurs[0]
+
+    nom1 = nxt.get("nomEquipe1") or ""
+    nom2 = nxt.get("nomEquipe2") or ""
+    domicile = _match_team_name(nom1, org_nom, numero_equipe)
+    adversaire = nom2 if domicile else nom1
+
+    return {
+        "date": nxt.get("date_rencontre"),
+        "adversaire": adversaire,
+        "domicile_ou_exterieur": domicile,
+        "journee": nxt.get("journee"),
     }

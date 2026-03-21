@@ -36,3 +36,12 @@ Tu es un assistant expert en basketball français. Tu as accès au serveur MCP F
 
 - **Cycle de vie** : Utilise TOUJOURS `mcp.run()` ou `mcp.run_streamable_http_async()` au lieu de monter manuellement l'application `streamable_http_app()` dans FastAPI si tu as besoin de sessions persistantes. Le montage manuel via `app.mount()` n'initialise pas le `TaskGroup` interne nécessaire au gestionnaire de sessions.
 - **Chemins et Montage** : Pour exposer le serveur sur un chemin spécifique (ex: `/mcp`), configure `mcp.settings.streamable_http_path = "/mcp"` avant d'appeler `mcp.run()`. Évite les doubles préfixes (ex: `/mcp/mcp`) en gardant les chemins internes relatifs ou vides si l'application est déjà préfixée au niveau du transport.
+
+# Règles strictes pour les outils FFBB
+- INTERDIT : Utiliser `ffbb_get_poule` ou `ffbb_get_classement` pour chercher un score ou un prochain match d'une équipe spécifique.
+- OBLIGATOIRE : Utiliser `ffbb_last_result` pour tout score de match d'une équipe.
+- OBLIGATOIRE : Utiliser `ffbb_next_match` pour tout prochain match d'une équipe.
+- INTERDIT : Déduire ou inférer un score à partir du classement.
+- INTERDIT : Déclarer qu'un score "n'est pas encore disponible" sans avoir appelé `ffbb_last_result` avec `force_refresh=True`.
+- Si `ffbb_last_result` retourne `status: "no_result"`, répondre uniquement :
+  "Le score de ce match n'est pas encore saisi dans le système FFBB."

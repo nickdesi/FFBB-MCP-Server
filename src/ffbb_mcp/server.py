@@ -24,7 +24,7 @@ from .services import (
     ffbb_bilan_service,
     ffbb_equipes_club_service,
     ffbb_get_classement_service,
-    ffbb_next_match_service,
+    ffbb_next_match_compact_service,
     ffbb_resolve_team_service,
     ffbb_saison_bilan_service,
     get_cache_ttls,
@@ -361,35 +361,35 @@ async def ffbb_bilan(
 
 @mcp.tool(name="ffbb_get", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_get(
-    id: Annotated[int | str, Field(description="ID numérique de l'entité.")],
+    id: Annotated[
+        int, Field(description="Identifiant numerique de la ressource FFBB.")
+    ],
     type: Annotated[
-        Literal["competition", "poule", "organisme"],
-        Field(description="Type : 'competition', 'poule', ou 'organisme' (club)."),
+        Literal[
+            "competition",
+            "poule",
+            "organisme",
+        ],
+        Field(description="Type de ressource a charger."),
     ],
     force_refresh: Annotated[
         bool,
         Field(
             description=(
-                "Si true et type='poule', contourne le cache service-level pour recharger "
-                "les rencontres et scores en temps réel (utile les jours de match)."
+                "Si True et type='poule', contourne le cache pour recuperer la poule "
+                "en temps reel (scores live)."
             )
         ),
     ] = False,
 ) -> dict[str, Any]:
-    """Détails d'une entité FFBB par son ID.
+    """Recupere une ressource FFBB par identifiant.
 
-    type='competition' → infos compétition + liste des poules.
-    type='poule' → classement + toutes les rencontres de la poule.
-                   ⚡ Si tu as déjà un poule_id, utilise TOUJOURS ce type
-                   pour récupérer les matchs — c'est plus rapide que
-                   ffbb_club(action='calendrier').
-    type='organisme' → infos club + engagements saison.
-    L'ID vient des résultats de ffbb_search.
+    - `type="competition"` equivaut a `get_competition`.
+    - `type="poule"` charge la poule (classements + rencontres) via l'API FFBB.
+    - `type="organisme"` charge les details d'un club.
 
-    Paramètre `force_refresh` :
-    - uniquement pris en compte pour type='poule'
-    - si true, force un appel direct à l'API FFBB pour rafraîchir les scores
-      et mettre à jour le cache interne.
+    Avertissement: ne pas utiliser pour obtenir un score ou un prochain match.
+    Utiliser `ffbb_last_result` et `ffbb_next_match` a la place.
     """
     try:
         if type == "competition":
@@ -412,50 +412,63 @@ async def ffbb_get(
 @mcp.tool(name="ffbb_club", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_club(
     action: Annotated[
-        Literal["calendrier", "equipes", "classement"],
-        Field(
-            description="'calendrier' → tous les matchs. 'equipes' → liste des équipes engagées. 'classement' → classement d'une poule.",
-        ),
+        Literal[
+            "calendrier",
+            "equipes",
+            "classement",
+        ],
+        Field(description="Action a effectuer pour le club."),
     ],
-    organisme_id: Annotated[
-        int | str | None, Field(description="ID du club (si connu).")
-    ] = None,
     club_name: Annotated[
-        str | None, Field(description="Nom du club (alternative à organisme_id).")
+        str | None,
+        Field(
+            description=(
+                "Nom du club (recommande, ex: 'Stade Clermontois'). Si absent, "
+                "`organisme_id` doit etre fourni."
+            )
+        ),
+    ] = None,
+    organisme_id: Annotated[
+        int | None,
+        Field(
+            description=(
+                "Identifiant FFBB du club. Si absent, `club_name` est utilise pour "
+                "effectuer une recherche."
+            )
+        ),
     ] = None,
     filtre: Annotated[
         str | None,
-        Field(description="Filtre catégorie/genre (ex: 'U11', 'U13F', 'Senior')."),
+        Field(
+            description=(
+                "Filtre facultatif de categorie/genre (ex: 'U11', 'U11M', 'U11F'). "
+                "Utilise pour restreindre les equipes et poules."
+            )
+        ),
     ] = None,
     poule_id: Annotated[
-        int | str | None,
-        Field(description="ID de la poule (requis pour action='classement')."),
+        int | None,
+        Field(
+            description=(
+                "Identifiant de la poule (obligatoire pour action='classement' si "
+                "aucun filtre ne permet de determiner la poule)."
+            )
+        ),
     ] = None,
     force_refresh: Annotated[
         bool,
         Field(
             description=(
-                "Si true, contourne les caches service-level pour le calendrier ou le "
-                "classement, en rechargeant les données en temps réel (match day)."
-            ),
+                "Si True, contourne le cache pour les donnees de calendrier ou "
+                "de classement (utile les jours de match)."
+            )
         ),
     ] = False,
-) -> list[dict[str, Any]]:
-    """Actions sur un club FFBB : calendrier, équipes ou classement.
+) -> dict[str, Any]:
+    """Outils agreges autour d'un club (calendrier, equipes, classement).
 
-    action='calendrier' → UNIQUEMENT si tu n'as pas de poule_id.
-                          Workflow lourd (recherche → équipes → poules).
-                          Nécessite organisme_id ou club_name.
-                          ⚠️ Si tu as déjà un poule_id, utilise plutôt
-                          ffbb_get(id=poule_id, type='poule') — beaucoup plus rapide.
-    action='equipes'    → liste des équipes engagées + leurs poule_id (nécessite organisme_id).
-                          Utilise ensuite ffbb_get(type='poule') avec le poule_id obtenu.
-    action='classement' → classement simplifié d'une poule (nécessite poule_id).
-
-    Paramètre `force_refresh` :
-    - pour action='calendrier', force un recalcul complet du calendrier club
-      sans réutiliser le cache.
-    - pour action='classement', force un rafraîchissement du classement de la poule.
+    Avertissement: ne pas utiliser pour obtenir un score ou un prochain match
+    d'une equipe specifique. Utiliser `ffbb_last_result` et `ffbb_next_match` a la place.
     """
     try:
         if action == "calendrier":
@@ -624,54 +637,42 @@ async def ffbb_team_summary(
 
 @mcp.tool(name="ffbb_next_match", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_next_match(
-    organisme_id: Annotated[
-        int | str,
-        Field(description="ID FFBB du club (organisme) concerné."),
-    ],
     categorie: Annotated[
-        str,
-        Field(
-            description=(
-                "Catégorie cible (ex: 'U11M', 'U11', 'U13F'). "
-                "Le genre peut être omis ('U11') : l'agent devra alors être prudent en cas d'ambiguïté."
-            ),
-        ),
+        str, Field(description="Catégorie de l'équipe (ex: 'U11', 'U11M', 'U11F')")
     ],
-    numero_equipe: Annotated[
-        int | None,
-        Field(
-            default=None,
-            description=(
-                "Numéro d'équipe au sein du club (1, 2, ...). "
-                "Permet de désambiguïser en cas de plusieurs équipes dans la même catégorie."
-            ),
-        ),
+    club_name: Annotated[
+        str | None, Field(description="Nom du club (ex: 'Stade Clermontois')")
     ] = None,
+    organisme_id: Annotated[
+        int | None, Field(description="Identifiant FFBB du club (organisme_id)")
+    ] = None,
+    numero_equipe: Annotated[
+        int, Field(description="Numéro d'equipe dans la categorie (1 par defaut)")
+    ] = 1,
+    force_refresh: Annotated[
+        bool,
+        Field(description="Si True, force un rafraichissement des donnees de poule"),
+    ] = False,
 ) -> dict[str, Any]:
-    """Retourne le tout premier match à venir pour une équipe donnée.
+    """Prochain match à jouer pour une équipe précise.
 
-    Usage typique : répondre à des questions du type
-    "Quel est le prochain match des U11M1 ?" ou "Où jouent les U13F ce week-end ?".
+    Utiliser ce tool pour obtenir le prochain match d'une équipe donnée.
+    Il résout automatiquement la bonne poule et sélectionne la prochaine
+    rencontre non jouée.
 
-    Stratégie interne :
-    - utilise ffbb_equipes_club_service pour lister les engagements du club
-      dans la catégorie demandée (et le numéro d'équipe si fourni),
-    - identifie l'engagement actif et récupère la poule correspondante via get_poule_service,
-    - filtre les rencontres pour ne garder que celles non jouées,
-    - retourne uniquement la prochaine rencontre (date, adversaire, salle/ville, métadonnées poule).
-
-    Si plusieurs engagements correspondent (ambiguïté), l'outil retourne
-    un message structuré avec `status='ambiguous'` et des candidats à départager.
+    Si aucun prochain match n'est trouvé, retourne un objet avec `status: "no_result"`.
     """
-    try:
-        return await ffbb_next_match_service(
-            organisme_id=organisme_id,
-            categorie=categorie,
-            numero_equipe=numero_equipe,
-        )
-    except Exception as e:
-        logger.error("ffbb_next_match failed: %s", e)
-        return {"error": str(e)}
+
+    if club_name is None and organisme_id is None:
+        raise ValueError("club_name ou organisme_id doit être fourni")
+
+    return await ffbb_next_match_compact_service(
+        club_name=club_name,
+        organisme_id=organisme_id,
+        categorie=categorie,
+        numero_equipe=numero_equipe,
+        force_refresh=force_refresh,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -716,7 +717,7 @@ async def ffbb_bilan_saison(
       - poule_id
       - position
       - match_joues, gagnes, perdus, nuls
-      - paniers_marques, paniers_encaisses, difference
+      - paniers_marques, paniers_encaissés, difference
 
     Et fournit également un champ `bilan_total` qui cumule toutes les phases.
     """
