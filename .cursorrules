@@ -39,9 +39,30 @@ Tu es un assistant expert en basketball français. Tu as accès au serveur MCP F
 
 # Règles strictes pour les outils FFBB
 - INTERDIT : Utiliser `ffbb_get_poule` ou `ffbb_get_classement` pour chercher un score ou un prochain match d'une équipe spécifique.
-- OBLIGATOIRE : Utiliser `ffbb_last_result` pour tout score de match d'une équipe.
-- OBLIGATOIRE : Utiliser `ffbb_next_match` pour tout prochain match d'une équipe.
 - INTERDIT : Déduire ou inférer un score à partir du classement.
-- INTERDIT : Déclarer qu'un score "n'est pas encore disponible" sans avoir appelé `ffbb_last_result` avec `force_refresh=True`.
-- Si `ffbb_last_result` retourne `status: "no_result"`, répondre uniquement :
-  "Le score de ce match n'est pas encore saisi dans le système FFBB."
+- INTERDIT : Déclarer qu'un score "n'est pas encore disponible" sans avoir vérifié les données de poule à jour.
+- Quand l'agent présente les résultats d'un match ou d'une journée, il DOIT systématiquement appeler `ffbb_get_classement` en parallèle pour fournir le classement complet à jour (avec `paniers_marques` et `paniers_encaisses`). Ne jamais présenter un résultat de match sans le classement complet associé.
+  - ffbb_get(type='poule') ne retourne QUE les rencontres.
+    Pour le classement complet (avec paniers), utiliser ffbb_get_classement.
+
+---
+
+# Règles de développement FFBB MCP
+
+## Principe de modification minimale
+- Ne modifier qu'une fonction à la fois, uniquement si un test ou un usage échoue à cause d'elle.
+- Toute nouvelle fonction doit d'abord avoir un test manuel validé avant exposition MCP.
+
+## Nommage
+- Services    : ffbb_<nom>_service (dans services.py)
+- Tools MCP   : ffbb_<nom>          (dans server.py, @mcp.tool())
+- Pas de suffixe "_compact_" ni "_impl_" exposé publiquement.
+
+## Commandes
+- pytest : toujours `.venv/bin/python -m pytest -q`
+- jamais `pytest` seul (venv non activé dans VS Code terminal)
+
+## Workflow obligatoire avant merge
+1. pytest -q → 0 failed
+2. Test manuel du service : status='ok' avec données réelles
+3. grep "compact\|fantôme" src/ffbb_mcp/*.py → 0 résultat

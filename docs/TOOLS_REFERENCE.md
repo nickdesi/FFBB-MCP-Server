@@ -346,7 +346,7 @@ protéger l'API FFBB et éviter des réponses inutilisables pour les LLM :
     (ajouter le genre, préciser le numéro d'équipe, etc.),
   - codes d'erreur stables (`INTERNAL_ERROR`, `BAD_REQUEST`, ...).
 - **Logs de performance structurés** via `_log_timing` :
-  - chaque service critique logue `event`, `duration_s` et quelques champs clés
+  - chaque service critique logge `event`, `duration_s` et quelques champs clés
     (ex. `categorie`, `matches_count`, `truncated`),
   - permet de suivre les dérives de latence sans exposer de détails sensibles.
 
@@ -358,3 +358,72 @@ Pour ajouter un nouveau tool ou service, il est recommandé :
    volumineuse (limite, troncature, warning clair pour le LLM).
 3. D'instrumenter `_log_timing` si le service risque d'être appelé fréquemment
    ou de manière coûteuse.
+
+---
+
+## 🔄 Outils de Matchs : `ffbb_last_result` et `ffbb_next_match`
+
+Deux nouveaux outils sont disponibles pour interroger facilement les résultats et matchs à venir d'une équipe :
+
+---
+
+## `ffbb_last_result`
+
+**Description** : Dernier résultat joué d'une équipe d'un club.
+
+Permet d'obtenir en un seul appel :
+- la date et la journée du dernier match joué,
+- les équipes domicile / extérieur,
+- les scores,
+- un indicateur de victoire/défaite pour l'équipe suivie.
+
+- **Arguments** :
+  - `organisme_id` (integer, requis) : ID FFBB du club (ex: `9326`).
+  - `categorie` (string, requis) : Catégorie (ex: `"U11"`, `"Senior"`).
+  - `numero_equipe` (integer, défaut: `1`) : Numéro d'équipe dans la catégorie.
+  - `force_refresh` (boolean, défaut: `false`) : Force le rechargement du cache poule.
+
+- **Retour** : un objet JSON de la forme :
+
+  ```jsonc
+  {
+    "status": "ok",                    // ou "no_result" si aucun match trouvé
+    "date": "2025-12-13 13:00:00",    // date du match
+    "journee": "5",                   // numéro de journée
+    "domicile": "Club A - 1",
+    "score_domicile": "19",
+    "exterieur": "Club B - 1",
+    "score_exterieur": "59",
+    "victoire": true                    // true si l'équipe suivie a gagné
+  }
+  ```
+
+---
+
+## `ffbb_next_match`
+
+**Description** : Prochain match à venir d'une équipe d'un club.
+
+S'appuie sur la résolution d'équipe et la poule associée pour déterminer le
+prochain match futur correspondant à l'équipe ciblée.
+
+- **Arguments** :
+  - `club_name` (string, optionnel) : Nom du club (ex: `"Stade Clermontois"`).
+  - `organisme_id` (integer, optionnel) : ID FFBB du club. Si renseigné, il prime sur `club_name`.
+  - `categorie` (string, optionnel) : Catégorie textuelle (ex: `"U11"`, `"U11M1"`, `"Senior"`).
+  - `numero_equipe` (integer, défaut: `1`) : Numéro d'équipe dans la catégorie.
+  - `force_refresh` (boolean, défaut: `false`) : Force le rechargement du cache poule.
+
+> Au moins l'un de `club_name` ou `organisme_id` doit être fourni pour une résolution fiable.
+
+- **Retour** : un objet JSON de la forme :
+
+  ```jsonc
+  {
+    "status": "ok",                     // ou "no_result" si aucun match futur
+    "date": "2026-01-10 14:00:00",     // date/heure du prochain match
+    "journee": "6",                    // numéro de journée
+    "adversaire": "Club B - 1",        // équipe adverse
+    "domicile_ou_exterieur": true       // true si l'équipe joue à domicile
+  }
+  ```

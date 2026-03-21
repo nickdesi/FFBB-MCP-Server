@@ -521,6 +521,8 @@ async def ffbb_get_classement_service(
                 "gagnes": c.get("gagnes"),
                 "perdus": c.get("perdus"),
                 "difference": c.get("difference"),
+                "paniers_marques": c.get("paniers_marques") or 0,
+                "paniers_encaisses": c.get("paniers_encaisses") or 0,
             }
         )
     _cache_set(_cache_detail, cache_key, flat, "classement")
@@ -1743,175 +1745,58 @@ def _match_team_name(nom_equipe_rencontre: str, organisme_nom: str, numero_equip
 
 
 async def ffbb_last_result_service(
-    *,
-    club_name: str | None = None,
-    organisme_id: int | str | None = None,
+    organisme_id: int,
     categorie: str,
     numero_equipe: int = 1,
     force_refresh: bool = False,
-) -> dict[str, Any]:
-    """Retourne le dernier match joue pour une equipe precise."""
-
-    if club_name is None and organisme_id is None:
-        raise ValueError("club_name ou organisme_id est requis")
-
-    from .services import ffbb_resolve_team_service  # pour eviter un cycle direct
-
-    team = await ffbb_resolve_team_service(
-        club_name=club_name,
-        organisme_id=organisme_id,
-        categorie=categorie,
-        numero_equipe=numero_equipe,
+) -> dict:
+    equipes = await ffbb_equipes_club_service(
+        organisme_id=organisme_id, filtre=categorie
     )
-    if not team or "poule_id" not in team:
+    if not equipes:
+        return {"status": "no_result", "message": f"Aucune équipe {categorie} trouvée."}
+
+    niveau_max = max(e.get("niveau", 0) for e in equipes)
+    poules_actives = [
+        e["poule_id"] for e in equipes
+        if e.get("niveau") == niveau_max and e.get("poule_id")
+    ]
+    organisme_nom = equipes[0].get("nom_equipe", "")
+
+    for poule_id in poules_actives:
+        poule = await get_poule_service(poule_id, force_refresh=force_refresh)
+        rencontres = poule.get("rencontres", [])
+
+        joues = [
+            r for r in rencontres
+            if r.get("joue") == 1
+            and r.get("resultatEquipe1") not in (None, "None")
+            and (
+                _match_team_name(r.get("nomEquipe1", ""), organisme_nom, numero_equipe)
+                or _match_team_name(r.get("nomEquipe2", ""), organisme_nom, numero_equipe)
+            )
+        ]
+        if not joues:
+            continue
+
+        dernier = sorted(joues, key=lambda r: r["date_rencontre"], reverse=True)[0]
+        est_domicile = _match_team_name(
+            dernier.get("nomEquipe1", ""), organisme_nom, numero_equipe
+        )
+        score_nous = int(dernier["resultatEquipe1"]) if est_domicile \
+                     else int(dernier["resultatEquipe2"])
+        score_eux  = int(dernier["resultatEquipe2"]) if est_domicile \
+                     else int(dernier["resultatEquipe1"])
+
         return {
-            "status": "no_result",
-            "message": "Aucune poule trouvee pour cette equipe.",
+            "status": "ok",
+            "date": dernier["date_rencontre"],
+            "journee": dernier.get("numeroJournee"),
+            "domicile": dernier["nomEquipe1"],
+            "score_domicile": dernier["resultatEquipe1"],
+            "exterieur": dernier["nomEquipe2"],
+            "score_exterieur": dernier["resultatEquipe2"],
+            "victoire": score_nous > score_eux,
         }
 
-    org_nom = team.get("nom_organisme") or team.get("club_nom") or ""
-    poule_id = team["poule_id"]
-
-    poule = await get_poule_service(poule_id, force_refresh=force_refresh)
-    rencontres = poule.get("rencontres", []) if isinstance(poule, dict) else []
-    if not isinstance(rencontres, list):
-        rencontres = []
-
-    candidats: list[dict[str, Any]] = []
-    for r in rencontres:
-        if not isinstance(r, dict):
-            continue
-        if r.get("joue") != 1:
-            continue
-        if r.get("resultatEquipe1") is None:
-            continue
-        nom1 = r.get("nomEquipe1") or ""
-        nom2 = r.get("nomEquipe2") or ""
-        if not (
-            _match_team_name(nom1, org_nom, numero_equipe)
-            or _match_team_name(nom2, org_nom, numero_equipe)
-        ):
-            continue
-        candidats.append(r)
-
-    if not candidats:
-        return {
-            "status": "no_result",
-            "message": "Aucun match joue trouve pour cette equipe.",
-        }
-
-    def _parse_dt(r: dict) -> datetime:
-        raw = r.get("date_rencontre") or ""
-        try:
-            return datetime.fromisoformat(raw)
-        except Exception:
-            return datetime.min
-
-    candidats.sort(key=_parse_dt, reverse=True)
-    last = candidats[0]
-
-    nom1 = last.get("nomEquipe1") or ""
-    nom2 = last.get("nomEquipe2") or ""
-    score1 = last.get("resultatEquipe1")
-    score2 = last.get("resultatEquipe2")
-
-    equipe_domicile = _match_team_name(nom1, org_nom, numero_equipe)
-
-    victoire = None
-    if isinstance(score1, int) and isinstance(score2, int):
-        victoire = score1 > score2 if equipe_domicile else score2 > score1
-
-    return {
-        "date": last.get("date_rencontre"),
-        "domicile": nom1,
-        "score_domicile": score1,
-        "exterieur": nom2,
-        "score_exterieur": score2,
-        "victoire": victoire,
-        "journee": last.get("journee"),
-    }
-
-
-async def ffbb_next_match_compact_service(
-    *,
-    club_name: str | None = None,
-    organisme_id: int | str | None = None,
-    categorie: str,
-    numero_equipe: int = 1,
-    force_refresh: bool = False,
-) -> dict[str, Any]:
-    """Retourne le prochain match a jouer pour une equipe precise."""
-
-    if club_name is None and organisme_id is None:
-        raise ValueError("club_name ou organisme_id est requis")
-
-    from .services import ffbb_resolve_team_service
-
-    team = await ffbb_resolve_team_service(
-        club_name=club_name,
-        organisme_id=organisme_id,
-        categorie=categorie,
-        numero_equipe=numero_equipe,
-    )
-    if not team or "poule_id" not in team:
-        return {
-            "status": "no_result",
-            "message": "Aucune poule trouvee pour cette equipe.",
-        }
-
-    org_nom = team.get("nom_organisme") or team.get("club_nom") or ""
-    poule_id = team["poule_id"]
-
-    poule = await get_poule_service(poule_id, force_refresh=force_refresh)
-    rencontres = poule.get("rencontres", []) if isinstance(poule, dict) else []
-    if not isinstance(rencontres, list):
-        rencontres = []
-
-    now = datetime.now(tz=ZoneInfo("Europe/Paris"))
-
-    futurs: list[dict[str, Any]] = []
-    for r in rencontres:
-        if not isinstance(r, dict):
-            continue
-        if r.get("joue") != 0:
-            continue
-        nom1 = r.get("nomEquipe1") or ""
-        nom2 = r.get("nomEquipe2") or ""
-        if not (
-            _match_team_name(nom1, org_nom, numero_equipe)
-            or _match_team_name(nom2, org_nom, numero_equipe)
-        ):
-            continue
-        raw_date = r.get("date_rencontre") or ""
-        try:
-            dt = datetime.fromisoformat(raw_date)
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=ZoneInfo("Europe/Paris"))
-        except Exception:
-            continue
-        if dt <= now:
-            continue
-        r_copy = dict(r)
-        r_copy["_dt_obj"] = dt
-        futurs.append(r_copy)
-
-    if not futurs:
-        return {
-            "status": "no_result",
-            "message": "Aucun prochain match trouve pour cette equipe.",
-        }
-
-    futurs.sort(key=lambda r: r["_dt_obj"])  # type: ignore[index]
-    nxt = futurs[0]
-
-    nom1 = nxt.get("nomEquipe1") or ""
-    nom2 = nxt.get("nomEquipe2") or ""
-    domicile = _match_team_name(nom1, org_nom, numero_equipe)
-    adversaire = nom2 if domicile else nom1
-
-    return {
-        "date": nxt.get("date_rencontre"),
-        "adversaire": adversaire,
-        "domicile_ou_exterieur": domicile,
-        "journee": nxt.get("journee"),
-    }
+    return {"status": "no_result", "message": "Aucun match joué trouvé."}

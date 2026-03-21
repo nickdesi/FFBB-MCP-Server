@@ -24,7 +24,8 @@ from .services import (
     ffbb_bilan_service,
     ffbb_equipes_club_service,
     ffbb_get_classement_service,
-    ffbb_next_match_compact_service,
+    ffbb_last_result_service,
+    ffbb_next_match_service,
     ffbb_resolve_team_service,
     ffbb_saison_bilan_service,
     get_cache_ttls,
@@ -395,7 +396,12 @@ async def ffbb_get(
         if type == "competition":
             return await get_competition_service(competition_id=id)
         elif type == "poule":
-            return await get_poule_service(id, force_refresh=force_refresh)
+            poule_data = await get_poule_service(id, force_refresh=force_refresh)
+            filtered = {
+                "id": poule_data.get("id"),
+                "rencontres": poule_data.get("rencontres", []),
+            }
+            return filtered
         elif type == "organisme":
             return await get_organisme_service(organisme_id=id)
         return {"error": f"Type inconnu: {type}"}
@@ -631,7 +637,48 @@ async def ffbb_team_summary(
 
 
 # ---------------------------------------------------------------------------
-# TOOL 9 — Prochain match
+# TOOL 9 — Dernier résultat
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(name="ffbb_last_result", annotations=_READONLY_ANNOTATIONS)
+async def ffbb_last_result(
+    organisme_id: Annotated[
+        int,
+        Field(description="Identifiant FFBB du club (organisme_id)")
+    ],
+    categorie: Annotated[
+        str,
+        Field(description="Catégorie de l'équipe (ex: 'U11', 'U11M', 'U11F')"),
+    ],
+    numero_equipe: Annotated[
+        int,
+        Field(description="Numéro d'equipe dans la categorie (1 par defaut)"),
+    ] = 1,
+    force_refresh: Annotated[
+        bool,
+        Field(description="Si True, force un rafraichissement des donnees de poule"),
+    ] = False,
+) -> dict[str, Any]:
+    """Dernier match joué pour une équipe précise.
+
+    Utiliser ce tool pour obtenir le dernier match joué par une équipe donnée.
+    Il agrège les différentes poules du club pour cette catégorie et
+    sélectionne la rencontre la plus récente jouée.
+
+    Si aucun match n'est trouvé, retourne un objet avec `status: "no_result"`.
+    """
+
+    return await ffbb_last_result_service(
+        organisme_id=organisme_id,
+        categorie=categorie,
+        numero_equipe=numero_equipe,
+        force_refresh=force_refresh,
+    )
+
+
+# ---------------------------------------------------------------------------
+# TOOL 10 — Prochain match
 # ---------------------------------------------------------------------------
 
 
@@ -666,7 +713,7 @@ async def ffbb_next_match(
     if club_name is None and organisme_id is None:
         raise ValueError("club_name ou organisme_id doit être fourni")
 
-    return await ffbb_next_match_compact_service(
+    return await ffbb_next_match_service(
         club_name=club_name,
         organisme_id=organisme_id,
         categorie=categorie,
