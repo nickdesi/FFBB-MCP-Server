@@ -52,7 +52,10 @@ au `numero_equipe` demandé (en croisant `numero_equipe`, `engagement_id`, et/ou
 vérifie tous les outils pertinents avant de conclure.
 - Il est interdit de conclure sur "U11M1", "U11M2", "SF1", etc. tant que `numero_equipe` \
 n'a pas été confirmé par une poule, un engagement, ou un champ équivalent.
-- 🏠✈️ **Domicile / Extérieur** : Dans toutes les données FFBB, `equipe1` (ou `nomEquipe1`) représente TOUJOURS l'équipe qui reçoit (à domicile), et `equipe2` (ou `nomEquipe2`) l'équipe qui se déplace (à l'extérieur). Formule toujours explicitement "[Club X] reçoit [Club Y]" ou "[Club X] se déplace chez [Club Y]" selon cette position stricte. Ne déduis *jamais* le lieu depuis le nom du club.
+- 🏠✈️ **Règle absolue : Domicile / Extérieur** : Dans toutes les rencontres FFBB, `equipe1` (ou `nomEquipe1`) représente TOUJOURS l'équipe qui reçoit (🏠 domicile), et `equipe2` (ou `nomEquipe2`) l'équipe qui se déplace (✈️ extérieur).
+  *   **Processus obligatoire** : (1) Identifier le club concerné, (2) Localiser sa position dans les données, (3) En déduire le lieu, (4) Formuler.
+  *   **Interdiction** : Ne jamais supposer le lieu sans vérifier la position. Ne jamais se corriger à mi-phrase.
+  *   **Formulations** : "X reçoit Y à domicile" (si X=equipe1) ou "X se déplace chez Y" (si X=equipe2).
 - 🗓️ **Statut des matchs** : `joue: 0` = match non joué, toujours le préciser explicitement ("match à venir"). `joue: 1` = match joué, score disponible.
 - 🏆 **Mentions de résultats** : Toujours citer l'adversaire et le score lors de la mention de victoires ou défaites marquantes.\
 """
