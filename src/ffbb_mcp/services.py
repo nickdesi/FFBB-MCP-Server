@@ -1448,11 +1448,19 @@ async def get_calendrier_club_service(
             dt = m.get("_dt")
             score1 = m.get("score_equipe1")
             score2 = m.get("score_equipe2")
+            joue_flag = m.get("joue")
 
-            has_score = score1 not in (None, "") or score2 not in (None, "")
-            is_past = dt <= now if dt is not None else has_score
+            # Priorité 1 : flag FFBB joue (0 = à venir, 1 = joué)
+            if joue_flag == 1 or joue_flag == "1":
+                played = True
+            elif joue_flag == 0 or joue_flag == "0":
+                played = False
+            else:
+                # Fallback si joue absent : scores présents OU date passée
+                has_score = score1 not in (None, "", "None") or score2 not in (None, "", "None")
+                is_past = dt <= now if dt is not None else has_score
+                played = bool(has_score or is_past)
 
-            played = bool(has_score or is_past)
             m["played"] = played
 
             if played:
