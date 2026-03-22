@@ -46,12 +46,15 @@ _RULES_METIER = """\
 - Ne jamais confondre club, engagement, équipe et poule.
 - Si plusieurs poules existent pour une même catégorie, vérifie laquelle correspond \
 au `numero_equipe` demandé (en croisant `numero_equipe`, `engagement_id`, et/ou le libellé).
-- Pour un bilan saison, agrège UNIQUEMENT les phases confirmées pour la même équipe.
+- Pour un bilan saison, agrège UNIQUEMENT les phases confirmées pour la même équipe. \
+⚠️ **Ne jamais additionner les stats inter-phases** sans vérifier l'indépendance des phases (risque de double comptage si les équipes se sont croisées).
 - L'absence de résultat sur un outil ne signifie pas absence de donnée globale : \
 vérifie tous les outils pertinents avant de conclure.
 - Il est interdit de conclure sur "U11M1", "U11M2", "SF1", etc. tant que `numero_equipe` \
 n'a pas été confirmé par une poule, un engagement, ou un champ équivalent.
-- 🏠✈️ **Domicile / Extérieur** : Dans toutes les données FFBB, `equipe1` (ou `nomEquipe1`) représente TOUJOURS l'équipe qui reçoit (à domicile), et `equipe2` (ou `nomEquipe2`) l'équipe qui se déplace (à l'extérieur). Formule toujours explicitement "[Club X] reçoit [Club Y]" ou "[Club X] se déplace chez [Club Y]" selon cette position stricte. Ne déduis *jamais* le lieu depuis le nom du club.\
+- 🏠✈️ **Domicile / Extérieur** : Dans toutes les données FFBB, `equipe1` (ou `nomEquipe1`) représente TOUJOURS l'équipe qui reçoit (à domicile), et `equipe2` (ou `nomEquipe2`) l'équipe qui se déplace (à l'extérieur). Formule toujours explicitement "[Club X] reçoit [Club Y]" ou "[Club X] se déplace chez [Club Y]" selon cette position stricte. Ne déduis *jamais* le lieu depuis le nom du club.
+- 🗓️ **Statut des matchs** : `joue: 0` = match non joué, toujours le préciser explicitement ("match à venir"). `joue: 1` = match joué, score disponible.
+- 🏆 **Mentions de résultats** : Toujours citer l'adversaire et le score lors de la mention de victoires ou défaites marquantes.\
 """
 
 _SEQUENCE = """\
