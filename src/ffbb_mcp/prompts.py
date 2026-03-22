@@ -48,7 +48,7 @@ _RULES_METIER = """\
 au `numero_equipe` demandé (en croisant `numero_equipe`, `engagement_id`, et/ou le libellé).
 - Pour un bilan saison, agrège UNIQUEMENT les phases confirmées pour la même équipe.
 - L'absence de résultat sur un outil ne signifie pas absence de donnée globale : \
-verrifie tous les outils pertinents avant de conclure.
+vérifie tous les outils pertinents avant de conclure.
 - Il est interdit de conclure sur "U11M1", "U11M2", "SF1", etc. tant que `numero_equipe` \
 n'a pas été confirmé par une poule, un engagement, ou un champ équivalent.\
 """

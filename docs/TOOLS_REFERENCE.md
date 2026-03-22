@@ -89,7 +89,7 @@ Le calendrier club s’appuie sur `get_calendrier_club_service` et renvoie une l
 
 **Contrat de données garanti** :
 
-- Les matchs sont **triés par date croissante** (du plus ancien au plus récent).
+- Les matchs sont **triés par date décroissante** (du plus récent au plus ancien).
 - La zone horaire utilisée pour l’interprétation des dates est **Europe/Paris**.
 - Pour chaque match, les champs suivants existent au minimum :
   - `id`: identifiant FFBB de la rencontre.
@@ -345,8 +345,8 @@ protéger l'API FFBB et éviter des réponses inutilisables pour les LLM :
   - messages orientés assistant (FR) pour guider la reformulation
     (ajouter le genre, préciser le numéro d'équipe, etc.),
   - codes d'erreur stables (`INTERNAL_ERROR`, `BAD_REQUEST`, ...).
-- **Logs de performance structurés** via `_log_timing` :
-  - chaque service critique logge `event`, `duration_s` et quelques champs clés
+- **Logs de performance structurés** :
+  - chaque service critique peut loguer `event`, `duration_s` et quelques champs clés
     (ex. `categorie`, `matches_count`, `truncated`),
   - permet de suivre les dérives de latence sans exposer de détails sensibles.
 
@@ -356,7 +356,7 @@ Pour ajouter un nouveau tool ou service, il est recommandé :
    valeurs autorisées) avec un message d'erreur utile pour l'agent.
 2. D'appliquer le même type de garde-fous de taille si la réponse peut devenir
    volumineuse (limite, troncature, warning clair pour le LLM).
-3. D'instrumenter `_log_timing` si le service risque d'être appelé fréquemment
+3. D'instrumenter des logs structurés si le service risque d'être appelé fréquemment
    ou de manière coûteuse.
 
 ---
@@ -410,7 +410,7 @@ prochain match futur correspondant à l'équipe ciblée.
 - **Arguments** :
   - `club_name` (string, optionnel) : Nom du club (ex: `"Stade Clermontois"`).
   - `organisme_id` (integer, optionnel) : ID FFBB du club. Si renseigné, il prime sur `club_name`.
-  - `categorie` (string, optionnel) : Catégorie textuelle (ex: `"U11"`, `"U11M1"`, `"Senior"`).
+  - `categorie` (string, requis) : Catégorie textuelle (ex: `"U11"`, `"U11M1"`, `"Senior"`).
   - `numero_equipe` (integer, défaut: `1`) : Numéro d'équipe dans la catégorie.
   - `force_refresh` (boolean, défaut: `false`) : Force le rechargement du cache poule.
 
@@ -440,3 +440,50 @@ prochain match futur correspondant à l'équipe ciblée.
 > 3. Dans le résultat, sélectionner le match où `is_last_match == true` et lire `score_equipe1` / `score_equipe2`.
 >
 > ⚠️ Ne pas utiliser `ffbb_get(type='poule')` pour ce cas : la réponse contient toute la poule (~100 matchs), est souvent tronquée côté MCP, et le dernier match du club peut se trouver dans la partie tronquée. Réserver `ffbb_get(type='poule')` aux demandes portant sur **toute la poule** (classement complet, historique complet, statistiques de poule).
+
+---
+
+## 📊 Outil de Bilan de Saison
+
+### `ffbb_bilan_saison`
+
+**Description** : Bilan détaillé de la saison pour une équipe précise, toutes phases confondues.
+
+Cet outil est optimisé pour les questions du type « Quel est le bilan de la saison des U11M1 ? ».
+Il agrège toutes les phases (toutes poules) de la saison FFBB pour l'équipe identifiée.
+
+**Arguments** :
+
+- `organisme_id` (integer|string, requis) : ID FFBB du club.
+- `categorie` (string, requis) : Catégorie + genre (ex: `"U11M"`, `"U13F"`, `"SeniorM"`).
+- `numero_equipe` (integer, requis) : Numéro d'équipe (1, 2, ...) pour identifier l'équipe précise.
+
+**Retour** : un objet JSON de la forme :
+
+```jsonc
+{
+  "bilan_total": {
+    "match_joues": 10,
+    "gagnes": 7,
+    "perdus": 2,
+    "nuls": 1,
+    "paniers_marques": 450,
+    "paniers_encaisses": 320,
+    "difference": 130
+  },
+  "phases": [
+    {
+      "competition": "Dépt U11M Phase 1",
+      "poule_id": "p1",
+      "position": 1,
+      "match_joues": 5,
+      "gagnes": 4,
+      "perdus": 1,
+      "nuls": 0,
+      "paniers_marques": 250,
+      "paniers_encaisses": 170,
+      "difference": 80
+    }
+  ]
+}
+```

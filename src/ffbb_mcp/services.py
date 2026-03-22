@@ -48,19 +48,6 @@ _cache_hit_hook: callable | None = record_cache_hit
 _cache_miss_hook: callable | None = record_cache_miss
 
 
-def set_cache_metrics_hooks(
-    *, on_hit: callable | None, on_miss: callable | None
-) -> None:
-    """Configure les callbacks utilisés pour tracer hits/miss des caches.
-
-    Cette fonction reste exposée pour compatibilité, mais par défaut on utilise
-    record_cache_hit/record_cache_miss de metrics.py.
-    """
-
-    global _cache_hit_hook, _cache_miss_hook
-    _cache_hit_hook = on_hit or record_cache_hit
-    _cache_miss_hook = on_miss or record_cache_miss
-
 
 def _notify_cache_hit(cache_name: str) -> None:
     if _cache_hit_hook is not None:
@@ -107,11 +94,19 @@ _cache_detail = TTLCache(maxsize=128, ttl=_DETAIL_TTL)
 _cache_calendrier = TTLCache(maxsize=64, ttl=_CALENDRIER_TTL)
 _cache_bilan = TTLCache(maxsize=64, ttl=_BILAN_TTL)
 _cache_lock = RLock()
-_inflight_lock: asyncio.Lock = asyncio.Lock()
+_inflight_lock: asyncio.Lock | None = None
 _inflight_detail: dict[str, asyncio.Task[Any]] = {}
 _inflight_search: dict[str, asyncio.Task[Any]] = {}
 _inflight_calendrier: dict[str, asyncio.Task[Any]] = {}
 _inflight_bilan: dict[str, asyncio.Task[Any]] = {}
+
+
+def _get_inflight_lock() -> asyncio.Lock:
+    """Retourne le lock inflight, en le créant lazily dans la boucle courante."""
+    global _inflight_lock
+    if _inflight_lock is None:
+        _inflight_lock = asyncio.Lock()
+    return _inflight_lock
 
 
 def get_cache_ttls() -> dict[str, int]:
@@ -363,7 +358,7 @@ async def _dedupe_inflight(
             return cached
 
     existing: asyncio.Task[Any] | None = None
-    async with _inflight_lock:
+    async with _get_inflight_lock():
         existing = inflight_map.get(cache_key)
         if existing is None:
             existing = asyncio.create_task(make_coro())
@@ -375,7 +370,7 @@ async def _dedupe_inflight(
             _cache_set(cache, cache_key, result, "detail")
         return result
     finally:
-        async with _inflight_lock:
+        async with _get_inflight_lock():
             inflight_map.pop(cache_key, None)
 
 
@@ -1523,57 +1518,6 @@ async def get_calendrier_club_service(
     )
 
 
-async def _resolve_poule_ids_for_categorie(org_data: dict, categorie: str) -> list[int]:
-    """Résout les poule_id pertinents pour une catégorie donnée.
-
-    - org_data : dict issu de get_organisme_service (model_dump())
-    - categorie : ex. "U11M", "U13F1" etc.
-
-    """
-    from mcp.shared.exceptions import ErrorData, McpError
-
-    engagements = org_data.get("engagements") or []
-    if not engagements:
-        raise McpError(
-            ErrorData(
-                code=400,
-                message="Aucune équipe engagée trouvée pour ce club.",
-            )
-        )
-
-    parsed = parse_categorie(categorie)
-    code = parsed.categorie
-
-    matched_poule_ids: list[int] = []
-    for eng in engagements:
-        comp = eng.get("idCompetition") or {}
-        cat_info = comp.get("categorie") or {}
-        comp_code = (cat_info.get("code") or "").upper()
-
-        if code and comp_code and comp_code != code:
-            continue
-
-        poule = eng.get("idPoule") or {}
-        poule_id = poule.get("id")
-        if poule_id is None:
-            continue
-        try:
-            matched_poule_ids.append(int(poule_id))
-        except (TypeError, ValueError):
-            continue
-
-    if not matched_poule_ids:
-        raise McpError(
-            ErrorData(
-                code=404,
-                message=(
-                    f"Aucune poule trouvée pour la catégorie {categorie!r} "
-                    "dans les engagements de ce club."
-                ),
-            )
-        )
-
-    return matched_poule_ids
 
 
 async def search_competitions_service(nom: str, limit: int = 20) -> list[dict]:

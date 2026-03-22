@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from pathlib import Path
@@ -615,19 +616,64 @@ async def ffbb_team_summary(
       - "Quel a été le dernier résultat de X ?".
     """
     try:
-        bilan = await ffbb_bilan_service(
+        # Résoudre l'équipe d'abord pour obtenir organisme_id et catégorie
+        resolve_result = await ffbb_resolve_team_service(
             club_name=club_name,
             organisme_id=organisme_id,
             categorie=categorie,
         )
 
-        # On laisse ffbb_bilan_service définir la structure détaillée et on
-        # se contente ici de renvoyer une vue standardisée attendue par les agents.
+        resolved_team = resolve_result.get("team")
+        resolved_org_id = None
+        resolved_num = 1
+        if resolved_team:
+            resolved_org_id = organisme_id
+            try:
+                resolved_num = int(resolved_team.get("numero_equipe") or 1)
+            except (TypeError, ValueError):
+                resolved_num = 1
+
+        # Lancer bilan + last_result + next_match en parallèle
+        bilan_coro = ffbb_bilan_service(
+            club_name=club_name,
+            organisme_id=organisme_id,
+            categorie=categorie,
+        )
+
+        # last_result et next_match nécessitent organisme_id
+        effective_org_id = organisme_id or (resolved_org_id if resolved_org_id else None)
+
+        if effective_org_id and categorie:
+            last_coro = ffbb_last_result_service(
+                organisme_id=int(effective_org_id),
+                categorie=categorie,
+                numero_equipe=resolved_num,
+            )
+            next_coro = ffbb_next_match_service(
+                organisme_id=effective_org_id,
+                categorie=categorie,
+                numero_equipe=resolved_num,
+            )
+            bilan, last_match, next_match = await asyncio.gather(
+                bilan_coro, last_coro, next_coro, return_exceptions=True
+            )
+            # Normaliser les exceptions en dicts d'erreur
+            if isinstance(bilan, Exception):
+                bilan = {"error": str(bilan)}
+            if isinstance(last_match, Exception):
+                last_match = None
+            if isinstance(next_match, Exception):
+                next_match = None
+        else:
+            bilan = await bilan_coro
+            last_match = None
+            next_match = None
+
         return {
-            "team": bilan.get("team"),
+            "team": resolved_team or bilan.get("team"),
             "phase_courante": bilan.get("phase_courante"),
-            "last_match": bilan.get("last_match"),
-            "next_match": bilan.get("next_match"),
+            "last_match": last_match,
+            "next_match": next_match,
             "summary": bilan.get("bilan_total"),
             "raw": bilan,
         }
@@ -723,7 +769,7 @@ async def ffbb_next_match(
 
 
 # ---------------------------------------------------------------------------
-# TOOL 10 — Bilan de saison
+# TOOL 11 — Bilan de saison
 # ---------------------------------------------------------------------------
 
 

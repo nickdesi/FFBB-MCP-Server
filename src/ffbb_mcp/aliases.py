@@ -11,24 +11,15 @@ CLUB_ALIASES = {
     "cb": "cholet basket",
     "jlb": "jl bourg",
     "bourg": "jl bourg",
-    "bcm": "cholet basket",  # wait, BCM = gravelines dunkerque
+    "bcm": "gravelines dunkerque",
     "gravelines": "bcm gravelines dunkerque",
     "pau": "elan bearnais",
     "msb": "le mans sarthe basket",
     "le mans": "le mans sarthe basket",
-    "sluc": "roanne",  # no, sluc nancy
+    "sluc": "nancy",
     "nancy": "sluc nancy",
     "sig": "strasbourg",
-    "pbr": "paris basket",  # well, pbr is levallois or paris.
 }
-
-# Corrections
-CLUB_ALIASES.update(
-    {
-        "bcm": "gravelines dunkerque",
-        "sluc": "nancy",
-    }
-)
 
 
 def normalize_query(query: str) -> str:

@@ -18,7 +18,6 @@ from ffbb_mcp.services import (
     _inflight_calendrier,
     _inflight_detail,
     _inflight_search,
-    _resolve_poule_ids_for_categorie,
     ffbb_bilan_service,
     ffbb_equipes_club_service,
     ffbb_get_classement_service,
@@ -341,29 +340,6 @@ class TestBilanService:
         mock_client.get_organisme_async.assert_awaited_once()
 
 
-class TestResolvePouleIdsForCategorie:
-    @pytest.mark.asyncio
-    async def test_raises_error_when_no_engagements(self):
-        with pytest.raises(McpError) as exc:
-            await _resolve_poule_ids_for_categorie(org_data={"engagements": []}, categorie="U11M")
-        assert "Aucune équipe engagée" in str(exc.value)
-
-    @pytest.mark.asyncio
-    async def test_returns_poule_ids_matching_categorie(self):
-        org_data = {
-            "engagements": [
-                {
-                    "idCompetition": {"nom": "U11M Région", "categorie": {"code": "U11"}},
-                    "idPoule": {"id": "101"},
-                },
-                {
-                    "idCompetition": {"nom": "U13F", "categorie": {"code": "U13"}},
-                    "idPoule": {"id": "202"},
-                },
-            ]
-        }
-        poule_ids = await _resolve_poule_ids_for_categorie(org_data=org_data, categorie="U11M")
-        assert poule_ids == [101]
 
 
 # ---------------------------------------------------------------------------
@@ -442,6 +418,7 @@ class TestCalendrierClubService:
         assert result[0]["equipe1"] == "CLERMONT"
         assert result[0]["score_equipe1"] == 50
 
+    @pytest.mark.asyncio
     async def test_deduplicates_poule_fetches(self, patch_get_client, mock_client):
         org_mock = MagicMock()
         org_mock.model_dump = MagicMock(

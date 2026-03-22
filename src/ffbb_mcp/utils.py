@@ -70,9 +70,16 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
     if re.search(r"\bF\b", s) or re.search(r"U\d{2}F", s) or "FÉM" in s or "FEM" in s:
         sexe = "F"
 
-    # 3) Numéro d'équipe (dernier chiffre non lié à Uxx)
+    # 3) Numéro d'équipe (chiffre final non lié à Uxx)
+    # On cherche un chiffre en fin de chaîne qui n'est PAS un digit du code Uxx.
+    # Exemples : U11M1 → 1, U11M → None, U13F2 → 2, U11 → None
     numero_equipe: int | None = None
-    num_match = re.search(r"(\d)\b(?!.*\d)", s)
+    # Retirer le pattern Uxx du début, puis chercher un chiffre isolé restant
+    remainder = s
+    if cat_match:
+        remainder = s[cat_match.end():]
+    # Chercher un chiffre libre (pas partie de Uxx) dans le reste
+    num_match = re.search(r"(\d+)", remainder)
     if num_match:
         try:
             numero_equipe = int(num_match.group(1))
