@@ -848,11 +848,15 @@ def main() -> None:
     if mode == "sse":
         host = os.environ.get("HOST", "0.0.0.0")
         port = int(os.environ.get("PORT", "9123"))
-        logger.info(f"Démarrage MCP FFBB en mode Streamable HTTP sur {host}:{port}...")
-        mcp.settings.streamable_http_path = "/mcp"
+        logger.info(f"Démarrage MCP FFBB en mode SSE standard sur {host}:{port}...")
+        
+        # Mode SSE standard complet (requis par Perplexity, Cursor, etc.)
+        mcp.settings.sse_path = "/sse"
+        mcp.settings.message_path = "/messages"
         mcp.settings.host = host
         mcp.settings.port = port
-        mcp.run(transport="streamable-http")
+        
+        mcp.run(transport="sse")
     else:
         logger.info("Démarrage MCP FFBB en mode stdio...")
         mcp.run(transport="stdio")
