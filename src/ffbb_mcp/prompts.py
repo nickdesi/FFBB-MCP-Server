@@ -87,6 +87,20 @@ Utilise **EN PRIORITÉ** :
 - Si `poule_id` connu : `ffbb_get(type='poule', id=<poule_id>)` puis filtre les matchs à venir.
 - Sinon (dernier recours) : `ffbb_club(action='calendrier')`.
 
+### Dernier match d'un club (score uniquement)
+
+1. `ffbb_search(type='organismes', query=<nom_club>)` → récupérer l'`organisme_id` du club.
+2. `ffbb_club(action="calendrier", organisme_id=..., filtre=<catégorie si précisée>)` → obtenir une liste courte de matchs passés et à venir.
+3. Identifier dans la liste le match avec `is_last_match == true` et retourner son score.
+
+⚠️ Ne **PAS** utiliser `ffbb_get(type='poule')` pour ce cas :
+   - la réponse contient toute la poule (~100 matchs) et est souvent tronquée côté MCP ;
+   - le dernier match du club peut se trouver dans la partie tronquée ;
+   - réserver `ffbb_get(type='poule')` uniquement si l'utilisateur demande explicitement :
+     - le classement complet de la poule ;
+     - l'historique entier des matchs de la poule ;
+     - des statistiques sur la poule entière.
+
 ### Autres
 - Recherche générale → `ffbb_search(type='all')`
 - Détails compétition → `ffbb_get(type='competition', id=…)` → liste les poules

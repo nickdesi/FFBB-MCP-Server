@@ -427,3 +427,16 @@ prochain match futur correspondant à l'équipe ciblée.
     "domicile_ou_exterieur": true       // true si l'équipe joue à domicile
   }
   ```
+
+---
+
+> [!TIP]
+> 🔎 **Score du dernier match d'un club**
+>
+> Pour obtenir le score du **dernier match joué** par un club (éventuellement filtré par catégorie) :
+>
+> 1. Utiliser `ffbb_search(type="organismes", query=<nom_club>)` pour récupérer l'`organisme_id`.
+> 2. Appeler `ffbb_club(action="calendrier", organisme_id=..., filtre=<catégorie si précisée>)`.
+> 3. Dans le résultat, sélectionner le match où `is_last_match == true` et lire `score_equipe1` / `score_equipe2`.
+>
+> ⚠️ Ne pas utiliser `ffbb_get(type='poule')` pour ce cas : la réponse contient toute la poule (~100 matchs), est souvent tronquée côté MCP, et le dernier match du club peut se trouver dans la partie tronquée. Réserver `ffbb_get(type='poule')` aux demandes portant sur **toute la poule** (classement complet, historique complet, statistiques de poule).

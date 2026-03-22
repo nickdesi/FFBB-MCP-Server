@@ -94,7 +94,32 @@ Ce document fournit des exemples de bout en bout pour aider les agents IA à sui
 
 ---
 
-## 4. Notes générales pour les agents IA
+## 4. Dernier match d'un club (score uniquement)
+
+**Question utilisateur**  
+> "Quel est le score du dernier match des U11M du Stade Clermontois ?"
+
+**Workflow attendu**
+
+1. Trouver le club (organisme) :
+   - `ffbb_search(type='organismes', query="Stade Clermontois")` → récupérer l'`organisme_id`.
+
+2. Récupérer un calendrier court pour la catégorie ciblée :
+   - `ffbb_club(action="calendrier", organisme_id=<ID>, filtre="U11M")`
+   - La réponse contient une liste de matchs avec, pour chacun : `played`, `is_last_match`, `is_next_match`, `score_equipe1`, `score_equipe2`, etc.
+
+3. Identifier le dernier match joué :
+   - filtrer le tableau sur `is_last_match == true` ;
+   - retourner ce match et son score pour répondre à la question.
+
+4. Explication importante :
+   - ne pas utiliser `ffbb_get(type='poule')` dans ce cas, car la poule contient souvent ~100 matchs et la réponse est tronquée côté MCP ;
+   - le dernier match du club pourrait se trouver dans la partie tronquée ;
+   - réserver `ffbb_get(type='poule')` aux cas où l'utilisateur demande explicitement le **classement complet** ou l'**historique entier** de la poule.
+
+---
+
+## 5. Notes générales pour les agents IA
 
 - Toujours privilégier les **outils unifiés** (`ffbb_bilan`, `ffbb_search`, `ffbb_get`, `ffbb_club`, `ffbb_lives`, `ffbb_saisons`) plutôt qu'une combinaison ad hoc d'appels bas niveau.
 - Garder en tête que les données FFBB sont **live** :
