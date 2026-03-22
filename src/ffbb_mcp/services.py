@@ -1378,30 +1378,13 @@ async def get_calendrier_club_service(
                 if not match_id or match_id in seen_match_ids:
                     continue
 
-                # --- Filtrage robuste : engagement_id OU nom_equipe ---
-                eng1 = match.get("idEngagementEquipe1")
-                eng2 = match.get("idEngagementEquipe2")
-                id_eng1 = eng1.get("id") if isinstance(eng1, dict) else eng1
-                id_eng2 = eng2.get("id") if isinstance(eng2, dict) else eng2
-
-                my_eng_id = equipe.get("engagement_id")
-                my_team_name = (equipe.get("nom_equipe") or "").lower().strip()
-
-                # Strategy 1: engagement ID matching (precise)
-                if my_eng_id and id_eng1 and id_eng2:
-                    if str(my_eng_id) not in (str(id_eng1), str(id_eng2)):
-                        continue
-                elif my_team_name:
-                    # Strategy 2: fall back to team name matching
-                    eq1_name = (
-                        match.get("nomEquipe1") or match.get("nom_equipe1") or ""
-                    ).lower()
-                    eq2_name = (
-                        match.get("nomEquipe2") or match.get("nom_equipe2") or ""
-                    ).lower()
-                    if my_team_name not in eq1_name and my_team_name not in eq2_name:
-                        continue
-
+                # La poule est déjà scopée à l'engagement du club :
+                # on ne charge que les poules où il est inscrit.
+                # Pas besoin de refiltrer par engagement_id/nom_equipe —
+                # ce filtre supprimait silencieusement tous les matchs
+                # car les IDs dans les rencontres (idEngagementEquipe1/2)
+                # ne correspondent pas à l'ID d'engagement de l'organisme.
+                # Seule la déduplication par match_id est nécessaire.
                 seen_match_ids.add(match_id)
 
                 eq1 = match.get("nomEquipe1", match.get("nom_equipe1", ""))
@@ -1410,11 +1393,13 @@ async def get_calendrier_club_service(
                 score2 = match.get("resultatEquipe2", match.get("resultat_equipe2"))
                 date_match = match.get("date_rencontre", match.get("date", ""))
                 journee = match.get("numeroJournee", match.get("numero_journee", ""))
+                joue = match.get("joue")
 
                 all_matches.append(
                     {
                         "id": match_id,
                         "date": date_match,
+                        "joue": joue,
                         "equipe1": eq1,
                         "equipe2": eq2,
                         "score_equipe1": score1,
