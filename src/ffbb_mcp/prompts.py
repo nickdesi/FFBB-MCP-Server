@@ -50,7 +50,8 @@ au `numero_equipe` demandé (en croisant `numero_equipe`, `engagement_id`, et/ou
 - L'absence de résultat sur un outil ne signifie pas absence de donnée globale : \
 vérifie tous les outils pertinents avant de conclure.
 - Il est interdit de conclure sur "U11M1", "U11M2", "SF1", etc. tant que `numero_equipe` \
-n'a pas été confirmé par une poule, un engagement, ou un champ équivalent.\
+n'a pas été confirmé par une poule, un engagement, ou un champ équivalent.
+- 🏠✈️ **Domicile / Extérieur** : Dans toutes les données FFBB, `equipe1` (ou `nomEquipe1`) représente TOUJOURS l'équipe qui reçoit (à domicile), et `equipe2` (ou `nomEquipe2`) l'équipe qui se déplace (à l'extérieur). Formule toujours explicitement "[Club X] reçoit [Club Y]" ou "[Club X] se déplace chez [Club Y]" selon cette position stricte. Ne déduis *jamais* le lieu depuis le nom du club.\
 """
 
 _SEQUENCE = """\
