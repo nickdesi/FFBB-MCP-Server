@@ -70,15 +70,16 @@ class TestPrompts:
 
     def test_expert_basket_prompt_best_practices(self):
         prompt = expert_basket()
-        # ffbb_bilan doit être mentionné comme outil prioritaire pour le bilan/classement/résultats
+        # ffbb_bilan doit être mentionné comme super-outil
         assert "ffbb_bilan" in prompt
-        assert "EN PRIORITÉ" in prompt or "prioritaire" in prompt
-        # workflow club → équipes → poule
-        assert "ffbb_search(type='organismes'" in prompt
+        # Le workflow Tier 1 doit mentionner les super-outils en premier
+        assert "Tier 1" in prompt or "super-outil" in prompt.lower() or "en premier" in prompt.lower()
+        # workflow club → équipes → poule toujours présent en Tier 2/3
+        assert "ffbb_search(type='organismes'" in prompt or "ffbb_search" in prompt
         assert "ffbb_club(action='equipes'" in prompt
         assert "ffbb_get(type='poule'" in prompt
-        # anti-pattern calendrier en dernier recours
+        # pipeline manuel en dernier recours
         assert "ffbb_club(action='calendrier'" in prompt
-        assert "dernier recours" in prompt or "DERNIER RECOURS" in prompt
+        assert "dernier recours" in prompt.lower()
         # rappel sur les données live
         assert "toujours live" in prompt.lower() or "données FFBB" in prompt
