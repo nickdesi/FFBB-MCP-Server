@@ -83,3 +83,17 @@ class TestPrompts:
         assert "dernier recours" in prompt.lower()
         # rappel sur les données live
         assert "toujours live" in prompt.lower() or "données FFBB" in prompt
+
+        # --- NOUVELLES RÈGLES ABSOLUES ---
+        # Domicile / Extérieur
+        assert "Règle absolue : Domicile / Extérieur" in prompt
+        assert "equipe1" in prompt and "equipe2" in prompt
+        assert "domicile" in prompt.lower() and "extérieur" in prompt.lower()
+        # Statut des matchs (joue: 0/1)
+        assert "joue: 0" in prompt and "joue: 1" in prompt
+        assert "à venir" in prompt.lower()
+        assert "match non joué" in prompt.lower()
+        # Mentions de résultats (adversaire + score)
+        assert "adversaire" in prompt.lower() and "score" in prompt.lower()
+        # Indépendance des phases
+        assert "inter-phases" in prompt.lower() and "double comptage" in prompt.lower()

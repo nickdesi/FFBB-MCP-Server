@@ -49,7 +49,7 @@ au `numero_equipe` demandé (en croisant `numero_equipe`, `engagement_id`, et/ou
 - Pour un bilan saison, **utilise le champ `bilan_total` retourné par les outils** \
 (`ffbb_bilan`, `ffbb_bilan_saison`, `ffbb_team_summary`). Ne recalcule JAMAIS un bilan \
 manuellement si ce champ est présent. \
-⚠️ Ne jamais additionner les stats inter-phases sans vérifier leur indépendance.
+⚠️ Ne jamais additionner les stats inter-phases sans vérifier leur indépendance (risque de double comptage).
 - L'absence de résultat sur un outil ne signifie pas absence de donnée globale : \
 vérifie tous les outils pertinents avant de conclure.
 - Il est interdit de conclure sur "U11M1", "U11M2", "SF1", etc. tant que `numero_equipe` \
