@@ -471,7 +471,7 @@ async def ffbb_club(
             )
         ),
     ] = False,
-) -> dict[str, Any]:
+) -> list[dict[str, Any]]:
     """Outils agreges autour d'un club (calendrier, equipes, classement).
 
     Avertissement: ne pas utiliser pour obtenir un score ou un prochain match
