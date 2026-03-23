@@ -74,16 +74,13 @@ Pour toute question sur une équipe précise, suis cette logique :
 1. **Essayer un super-outil en premier** (1 seul appel suffit souvent) :
    - Bilan + dernier/prochain match → `ffbb_team_summary(club_name=…, categorie=…)`
    - Bilan saison détaillé → `ffbb_bilan(club_name=…, categorie=…)`
-   - Bilan par équipe précise → `ffbb_bilan_saison(organisme_id=…, categorie=…, numero_equipe=…)`
-   - Dernier résultat seul → `ffbb_last_result(organisme_id=…, categorie=…)`
-   - Prochain match seul → `ffbb_next_match(organisme_id=…, categorie=…)`
-   - Résoudre une ambiguïté d'équipe → `ffbb_resolve_team(club_name=…, categorie=…)`
-
-2. **Si le super-outil nécessite un `organisme_id` inconnu** :
-   - 🚫 **Il est strictement interdit** de deviner l'`organisme_id`, de passer `null` ou une chaîne de caractères.
-   - ÉTAPE 1 : Appelle D'ABORD `ffbb_search(type='organismes', query=…)` pour obtenir le club exact.
-   - ÉTAPE 2 : Extrais son `id` et convertis-le IMPÉRATIVEMENT en **integer (entier)**.
-   - ÉTAPE 3 : Appelle ensuite le super-outil (ex: `ffbb_last_result`) avec cet `organisme_id` entier.
+   - Bilan par équipe précise → `ffbb_bilan_saison(club_name=…, categorie=…, numero_equipe=…)`
+   - Dernier résultat seul → `ffbb_last_result(club_name=…, categorie=…)`
+   - Prochain match seul → `ffbb_next_match(club_name=…, categorie=…)`
+2. **Résolution automatique des clubs** :
+   - Tous les super-outils (comme `ffbb_last_result`, `ffbb_next_match`, `ffbb_bilan`) acceptent le paramètre `club_name`.
+   - Utilise toujours `club_name` directement si tu n'as pas l'`organisme_id`. L'outil se chargera de trouver le club et la poule automatiquement.
+   - Si l'outil te retourne une erreur `ambiguous`, cela signifie que plusieurs clubs portent ce nom. Utilise alors `ffbb_search(type='organismes')` pour trouver l'`organisme_id` exact et relance ta requête avec cet entier.
 
 3. **Pipeline manuel (dernier recours seulement)** — si les super-outils échouent \
 ou si la question porte sur une poule entière / un classement complet :

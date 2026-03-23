@@ -693,9 +693,12 @@ async def ffbb_last_result(
         str,
         Field(description="Catégorie de l'équipe (ex: 'U11', 'U11M', 'U11F')"),
     ],
+    club_name: Annotated[
+        str | None, Field(description="Nom du club (ex: 'Stade Clermontois')")
+    ] = None,
     organisme_id: Annotated[
-        int | str | None,
-        Field(description="Identifiant FFBB du club (doit être un entier valide)")
+        int | None,
+        Field(description="Identifiant FFBB du club (organisme_id)")
     ] = None,
     numero_equipe: Annotated[
         int,
@@ -715,20 +718,14 @@ async def ffbb_last_result(
     Si aucun match n'est trouvé, retourne un objet avec `status: "no_result"`.
     """
 
-    if organisme_id is None or str(organisme_id).lower() == "null":
+    if club_name is None and organisme_id is None:
         return {
-            "error": "organisme_id est manquant ou nul. Veuillez d'abord appeler ffbb_search(type='organismes', query='Nom du club') pour trouver l'ID entier correct."
-        }
-    
-    try:
-        org_id_int = int(organisme_id)
-    except ValueError:
-        return {
-            "error": f"organisme_id invalide: '{organisme_id}'. Il doit s'agir d'un entier valide. Veuillez d'abord appeler ffbb_search(type='organismes')."
+            "error": "Veuillez fournir club_name ou organisme_id pour trouver l'équipe."
         }
 
     return await ffbb_last_result_service(
-        organisme_id=org_id_int,
+        club_name=club_name,
+        organisme_id=organisme_id,
         categorie=categorie,
         numero_equipe=numero_equipe,
         force_refresh=force_refresh,

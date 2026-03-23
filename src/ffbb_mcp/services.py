@@ -754,7 +754,12 @@ async def ffbb_equipes_club_service(
 
 
 async def ffbb_next_match_service(
-    *, organisme_id: int | str, categorie: str, numero_equipe: int | None = None
+    *,
+    club_name: str | None = None,
+    organisme_id: int | str | None = None,
+    categorie: str,
+    numero_equipe: int | None = None,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
     """Service interne pour ffbb_next_match.
 
@@ -762,12 +767,32 @@ async def ffbb_next_match_service(
     - charge la poule courante
     - retourne la prochaine rencontre non jouée.
     """
-    org_id_int = _coerce_numeric_id(organisme_id, "organisme_id")
-    # On filtre d'abord par catégorie (avec éventuelle info de genre)
-    equipes = await ffbb_equipes_club_service(
-        organisme_id=org_id_int,
-        filtre=categorie,
-    )
+    if not club_name and not organisme_id:
+        return {"status": "error", "message": "Fournir club_name ou organisme_id"}
+
+    target_org_ids: list[str] = []
+    if organisme_id:
+        target_org_ids = [str(organisme_id)]
+    elif club_name:
+        orgs = await search_organismes_service(nom=club_name, limit=3)
+        target_org_ids = [str(org.get("id")) for org in orgs if isinstance(org, dict) and org.get("id")]
+        
+    target_org_ids = list(dict.fromkeys(oid for oid in target_org_ids if oid))
+    
+    if not target_org_ids:
+        return {"status": "not_found", "message": f"Club '{club_name}' introuvable."}
+
+    import asyncio
+    eq_tasks = [
+        ffbb_equipes_club_service(organisme_id=oid, filtre=categorie)
+        for oid in target_org_ids
+    ]
+    eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
+    
+    equipes = []
+    for res in eq_results:
+        if isinstance(res, list):
+            equipes.extend(res)
 
     if not equipes:
         return {
@@ -1682,18 +1707,63 @@ def _match_team_name(nom_equipe_rencontre: str, organisme_nom: str, numero_equip
 
 
 async def ffbb_last_result_service(
-    organisme_id: int,
+    *,
+    club_name: str | None = None,
+    organisme_id: int | str | None = None,
     categorie: str,
     numero_equipe: int = 1,
     force_refresh: bool = False,
 ) -> dict:
     from datetime import datetime, timedelta
 
-    equipes = await ffbb_equipes_club_service(
-        organisme_id=organisme_id, filtre=categorie
-    )
+    if not club_name and not organisme_id:
+        return {"status": "error", "message": "Fournir club_name ou organisme_id"}
+
+    target_org_ids: list[str] = []
+    if organisme_id:
+        target_org_ids = [str(organisme_id)]
+    elif club_name:
+        orgs = await search_organismes_service(nom=club_name, limit=3)
+        target_org_ids = [str(org.get("id")) for org in orgs if isinstance(org, dict) and org.get("id")]
+        
+    target_org_ids = list(dict.fromkeys(oid for oid in target_org_ids if oid))
+    
+    if not target_org_ids:
+        return {"status": "not_found", "message": f"Club '{club_name}' introuvable."}
+
+    # Fetch équipes candidates for this category across solved orgs
+    import asyncio
+    async def _fetch_eq_for_org(oid: str):
+        eqs = await ffbb_equipes_club_service(organisme_id=oid, filtre=categorie)
+        if isinstance(eqs, list):
+             for eq in eqs:
+                 eq["_resolved_org_id"] = oid
+        return eqs
+
+    eq_tasks = [_fetch_eq_for_org(oid) for oid in target_org_ids]
+    eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
+    
+    equipes = []
+    for res in eq_results:
+        if isinstance(res, list):
+            equipes.extend(res)
+
     if not equipes:
         return {"status": "no_result", "message": f"Aucune équipe {categorie} trouvée."}
+
+    want_num = str(numero_equipe)
+    equipes = [e for e in equipes if (e.get("numero_equipe") or "").strip() == want_num]
+
+    if not equipes:
+        return {"status": "no_result", "message": f"Aucune équipe {categorie} {numero_equipe} trouvée."}
+
+    # Check multi-club ambiguity
+    distinct_orgs = {e.get("_resolved_org_id") for e in equipes}
+    if len(distinct_orgs) > 1:
+        return {
+            "status": "ambiguous",
+            "message": f"Il y a plusieurs clubs correspondant à '{club_name}' qui possèdent une équipe {categorie} {numero_equipe}. Veuillez utiliser ffbb_search pour trouver l'organisme_id exact et relancer la commande avec lui."
+        }
 
     niveau_max = max(e.get("niveau", 0) for e in equipes)
     poules_actives = [
