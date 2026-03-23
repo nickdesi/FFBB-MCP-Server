@@ -843,7 +843,6 @@ async def ffbb_next_match_service(
         }
 
     tz = ZoneInfo("Europe/Paris")
-    now = datetime.now(tz)
 
     def _parse_dt(raw: str | None) -> datetime | None:
         if not raw:
@@ -864,27 +863,47 @@ async def ffbb_next_match_service(
         return dt.astimezone(tz)
 
     upcoming: list[tuple[datetime, dict[str, Any]]] = []
+    my_eng = team.get("engagement_id")
+    organisme_nom = team.get("nom_equipe", "")
+    numero_equipe_int = int(numero_equipe) if numero_equipe else 1
+
     for m in rencontres:
+        # Filtrer pour cette équipe spécifique !
+        eng1 = m.get("idEngagementEquipe1")
+        eng2 = m.get("idEngagementEquipe2")
+        id_eng1 = str(eng1.get("id") if isinstance(eng1, dict) else eng1)
+        id_eng2 = str(eng2.get("id") if isinstance(eng2, dict) else eng2)
+        str_my_eng = str(my_eng) if my_eng else None
+
+        is_my_team = False
+        if str_my_eng and (str_my_eng in (id_eng1, id_eng2)):
+            is_my_team = True
+        else:
+            # Fallback nom de l'équipe
+            is_my_team = (
+                _match_team_name(m.get("nomEquipe1", ""), organisme_nom, numero_equipe_int)
+                or _match_team_name(m.get("nomEquipe2", ""), organisme_nom, numero_equipe_int)
+            )
+
+        if not is_my_team:
+            continue
+
         joue = m.get("joue")
         res1 = m.get("resultatEquipe1", m.get("resultat_equipe1"))
         res2 = m.get("resultatEquipe2", m.get("resultat_equipe2"))
 
-        # Match considéré non joué si flag joue == 0
-        # ou si les scores sont absents/"None".
+        # Match considéré non joué si flag joue == 0 ou null
         if joue not in (0, "0", None):
-            # joue == 1 → match joué
             continue
         if res1 not in (None, "", "None") or res2 not in (None, "", "None"):
-            # des scores sont présents → on considère joué
             continue
 
         dt = _parse_dt(m.get("date_rencontre", m.get("date")))
         if dt is None:
-            # On garde quand même, mais avec une date minimale pour le tri
             dt = datetime.max.replace(tzinfo=tz)
-        if dt < now:
-            # match déjà passé mais non marqué joué → on ignore
-            continue
+        
+        # On garde précieusement tous les matchs non joués (même dans le passé
+        # s'ils n'ont pas encore de score/report validé par la FFBB).
         upcoming.append((dt, m))
 
     if not upcoming:
