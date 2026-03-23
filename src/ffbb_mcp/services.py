@@ -1687,6 +1687,8 @@ async def ffbb_last_result_service(
     numero_equipe: int = 1,
     force_refresh: bool = False,
 ) -> dict:
+    from datetime import datetime, timedelta
+
     equipes = await ffbb_equipes_club_service(
         organisme_id=organisme_id, filtre=categorie
     )
@@ -1700,40 +1702,59 @@ async def ffbb_last_result_service(
     ]
     organisme_nom = equipes[0].get("nom_equipe", "")
 
-    for poule_id in poules_actives:
-        poule = await get_poule_service(poule_id, force_refresh=force_refresh)
-        rencontres = poule.get("rencontres", [])
+    async def _get_latest_match(refresh: bool):
+        all_joues = []
+        for poule_id in poules_actives:
+            poule = await get_poule_service(poule_id, force_refresh=refresh)
+            rencontres = poule.get("rencontres", [])
 
-        joues = [
-            r for r in rencontres
-            if r.get("joue") == 1
-            and r.get("resultatEquipe1") not in (None, "None")
-            and (
-                _match_team_name(r.get("nomEquipe1", ""), organisme_nom, numero_equipe)
-                or _match_team_name(r.get("nomEquipe2", ""), organisme_nom, numero_equipe)
-            )
-        ]
-        if not joues:
-            continue
+            joues = [
+                r for r in rencontres
+                if r.get("joue") == 1
+                and r.get("resultatEquipe1") not in (None, "None")
+                and (
+                    _match_team_name(r.get("nomEquipe1", ""), organisme_nom, numero_equipe)
+                    or _match_team_name(r.get("nomEquipe2", ""), organisme_nom, numero_equipe)
+                )
+            ]
+            all_joues.extend(joues)
 
-        dernier = sorted(joues, key=lambda r: r["date_rencontre"], reverse=True)[0]
-        est_domicile = _match_team_name(
-            dernier.get("nomEquipe1", ""), organisme_nom, numero_equipe
-        )
-        score_nous = int(dernier["resultatEquipe1"]) if est_domicile \
-                     else int(dernier["resultatEquipe2"])
-        score_eux  = int(dernier["resultatEquipe2"]) if est_domicile \
-                     else int(dernier["resultatEquipe1"])
+        if not all_joues:
+            return None
 
-        return {
-            "status": "ok",
-            "date": dernier["date_rencontre"],
-            "journee": dernier.get("numeroJournee"),
-            "domicile": dernier["nomEquipe1"],
-            "score_domicile": dernier["resultatEquipe1"],
-            "exterieur": dernier["nomEquipe2"],
-            "score_exterieur": dernier["resultatEquipe2"],
-            "victoire": score_nous > score_eux,
-        }
+        # Trie par date_rencontre (chaîne ISO string) pour prendre le plus récent
+        return sorted(all_joues, key=lambda r: str(r.get("date_rencontre", "")), reverse=True)[0]
 
-    return {"status": "no_result", "message": "Aucun match joué trouvé."}
+    # 1. Premier appel
+    dernier = await _get_latest_match(force_refresh)
+
+    # 2. Check 30 days
+    if dernier and not force_refresh:
+        date_str = dernier.get("date_rencontre", "")
+        if len(date_str) >= 10:
+            seuil_str = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+            if date_str[:10] < seuil_str:
+                logger.info(f"ffbb_last_result: match > 30 jours ({date_str[:10]} < {seuil_str}), force_refresh déclenché.")
+                dernier_refresh = await _get_latest_match(True)
+                if dernier_refresh:
+                    dernier = dernier_refresh
+
+    if not dernier:
+        return {"status": "no_result", "message": "Aucun match joué trouvé."}
+
+    est_domicile = _match_team_name(
+        dernier.get("nomEquipe1", ""), organisme_nom, numero_equipe
+    )
+    score_nous = int(dernier["resultatEquipe1"]) if est_domicile else int(dernier["resultatEquipe2"])
+    score_eux  = int(dernier["resultatEquipe2"]) if est_domicile else int(dernier["resultatEquipe1"])
+
+    return {
+        "status": "ok",
+        "date": dernier.get("date_rencontre", ""),
+        "journee": dernier.get("numeroJournee"),
+        "domicile": dernier.get("nomEquipe1", ""),
+        "score_domicile": dernier.get("resultatEquipe1"),
+        "exterieur": dernier.get("nomEquipe2", ""),
+        "score_exterieur": dernier.get("resultatEquipe2"),
+        "victoire": score_nous > score_eux,
+    }
