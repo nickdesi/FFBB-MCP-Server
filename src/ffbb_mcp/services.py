@@ -800,50 +800,32 @@ async def ffbb_next_match_service(
             "message": f"Aucune équipe trouvée pour la catégorie '{categorie}'.",
         }
 
-    # Si numero_equipe est fourni, on garde seulement celles qui correspondent
+    # Filtrer par numéro d'équipe
     if numero_equipe is not None:
         want = str(numero_equipe)
-        equipes = [
-            e for e in equipes if (e.get("numero_equipe") or "").strip() == want
-        ]
+        equipes = [e for e in equipes if (e.get("numero_equipe") or "").strip() == want]
         if not equipes:
             return {
                 "status": "not_found",
-                "message": (
-                    "Aucune équipe ne correspond à cette combinaison "
-                    f"categorie={categorie!r}, numero_equipe={numero_equipe}."
-                ),
+                "message": f"Aucune équipe trouvée pour categorie={categorie!r}, numero_equipe={numero_equipe}.",
             }
 
-    # S'il reste plusieurs engagements, on ne choisit pas au hasard
-    if len(equipes) > 1:
+    # Check multi-club ambiguity
+    distinct_orgs = {e.get("_resolved_org_id") for e in equipes}
+    if len(distinct_orgs) > 1:
         return {
             "status": "ambiguous",
-            "message": (
-                "Plusieurs engagements correspondent à cette catégorie. "
-                "Demandez à l'utilisateur de préciser la phase ou le numéro d'équipe.")
-            ,
-            "candidates": equipes,
+            "message": f"Il y a plusieurs clubs correspondant à '{club_name}' qui possèdent une équipe {categorie} {numero_equipe}. Utilisez ffbb_search pour trouver l'organisme_id exact."
         }
 
-    team = equipes[0]
-    poule_id = team.get("poule_id")
-    if not poule_id:
-        return {
-            "status": "not_found",
-            "message": "Aucune poule active trouvée pour cette équipe.",
-        }
+    poules_actives = [e["poule_id"] for e in equipes if e.get("poule_id")]
+    if not poules_actives:
+        return {"status": "not_found", "message": "Aucune poule active trouvée pour cette équipe."}
 
-    poule = await get_poule_service(poule_id)
-    rencontres = poule.get("rencontres") or []
-    if not rencontres:
-        return {
-            "status": "not_found",
-            "message": "Aucune rencontre trouvée dans la poule.",
-        }
+    organisme_nom = equipes[0].get("nom_equipe", "")
+    numero_equipe_int = int(numero_equipe) if numero_equipe else 1
 
     tz = ZoneInfo("Europe/Paris")
-
     def _parse_dt(raw: str | None) -> datetime | None:
         if not raw:
             return None
@@ -862,65 +844,68 @@ async def ffbb_next_match_service(
             dt = dt.replace(tzinfo=tz)
         return dt.astimezone(tz)
 
-    upcoming: list[tuple[datetime, dict[str, Any]]] = []
-    my_eng = team.get("engagement_id")
-    organisme_nom = team.get("nom_equipe", "")
-    numero_equipe_int = int(numero_equipe) if numero_equipe else 1
-
-    for m in rencontres:
-        # Filtrer pour cette équipe spécifique !
-        eng1 = m.get("idEngagementEquipe1")
-        eng2 = m.get("idEngagementEquipe2")
-        id_eng1 = str(eng1.get("id") if isinstance(eng1, dict) else eng1)
-        id_eng2 = str(eng2.get("id") if isinstance(eng2, dict) else eng2)
-        str_my_eng = str(my_eng) if my_eng else None
-
-        is_my_team = False
-        if str_my_eng and (str_my_eng in (id_eng1, id_eng2)):
-            is_my_team = True
-        else:
-            # Fallback nom de l'équipe
-            is_my_team = (
-                _match_team_name(m.get("nomEquipe1", ""), organisme_nom, numero_equipe_int)
-                or _match_team_name(m.get("nomEquipe2", ""), organisme_nom, numero_equipe_int)
-            )
-
-        if not is_my_team:
-            continue
-
-        joue = m.get("joue")
-        res1 = m.get("resultatEquipe1", m.get("resultat_equipe1"))
-        res2 = m.get("resultatEquipe2", m.get("resultat_equipe2"))
-
-        # Match considéré non joué si flag joue == 0 ou null
-        if joue not in (0, "0", None):
-            continue
-        if res1 not in (None, "", "None") or res2 not in (None, "", "None"):
-            continue
-
-        dt = _parse_dt(m.get("date_rencontre", m.get("date")))
-        if dt is None:
-            dt = datetime.max.replace(tzinfo=tz)
+    async def _fetch_and_filter_next(eq: dict):
+        poule_id = eq.get("poule_id")
+        my_eng = eq.get("engagement_id")
+        if not poule_id:
+            return []
         
-        # On garde précieusement tous les matchs non joués (même dans le passé
-        # s'ils n'ont pas encore de score/report validé par la FFBB).
-        upcoming.append((dt, m))
+        poule = await get_poule_service(poule_id, force_refresh=force_refresh)
+        upcoming_for_pool = []
+        for m in poule.get("rencontres", []):
+            eng1 = m.get("idEngagementEquipe1")
+            eng2 = m.get("idEngagementEquipe2")
+            id_eng1 = str(eng1.get("id") if isinstance(eng1, dict) else eng1)
+            id_eng2 = str(eng2.get("id") if isinstance(eng2, dict) else eng2)
+            str_my_eng = str(my_eng) if my_eng else None
+
+            is_my_team = False
+            if str_my_eng and (str_my_eng in (id_eng1, id_eng2)):
+                is_my_team = True
+            else:
+                is_my_team = (
+                    _match_team_name(m.get("nomEquipe1", ""), organisme_nom, numero_equipe_int)
+                    or _match_team_name(m.get("nomEquipe2", ""), organisme_nom, numero_equipe_int)
+                )
+
+            if not is_my_team:
+                continue
+
+            joue = m.get("joue")
+            res1 = m.get("resultatEquipe1", m.get("resultat_equipe1"))
+            res2 = m.get("resultatEquipe2", m.get("resultat_equipe2"))
+
+            if joue not in (0, "0", None):
+                continue
+            if res1 not in (None, "", "None") or res2 not in (None, "", "None"):
+                continue
+
+            dt = _parse_dt(m.get("date_rencontre", m.get("date")))
+            if dt is None:
+                dt = datetime.max.replace(tzinfo=tz)
+            
+            upcoming_for_pool.append((dt, m, eq))
+
+        return upcoming_for_pool
+
+    results = await asyncio.gather(*[_fetch_and_filter_next(e) for e in equipes], return_exceptions=True)
+    
+    upcoming = []
+    for res in results:
+        if isinstance(res, list):
+            upcoming.extend(res)
 
     if not upcoming:
-        return {
-            "status": "no_upcoming_match",
-            "message": "Aucun match à venir trouvé pour cette équipe.",
-        }
+        return {"status": "no_upcoming_match", "message": "Aucun match à venir trouvé pour cette équipe."}
 
     upcoming.sort(key=lambda x: x[0])
-    next_dt, next_match = upcoming[0]
+    next_dt, next_match, source_team = upcoming[0]
 
-    # Déterminer l'adversaire : si l'engagement 1/2 correspond à notre équipe.
     eng1 = next_match.get("idEngagementEquipe1")
     eng2 = next_match.get("idEngagementEquipe2")
     id_eng1 = eng1.get("id") if isinstance(eng1, dict) else eng1
     id_eng2 = eng2.get("id") if isinstance(eng2, dict) else eng2
-    my_eng = team.get("engagement_id")
+    my_eng = source_team.get("engagement_id")
 
     eq1_name = next_match.get("nomEquipe1", next_match.get("nom_equipe1", ""))
     eq2_name = next_match.get("nomEquipe2", next_match.get("nom_equipe2", ""))
@@ -933,7 +918,7 @@ async def ffbb_next_match_service(
         domicile = False
     else:
         # Fallback sur les noms
-        club_nom = (team.get("nom_equipe") or "").lower()
+        club_nom = (source_team.get("nom_equipe") or "").lower()
         if club_nom and club_nom in (eq1_name or "").lower():
             adversaire = eq2_name
             domicile = True
@@ -949,9 +934,9 @@ async def ffbb_next_match_service(
 
     return {
         "status": "ok",
-        "team": team,
+        "team": source_team,
         "match": {
-            "poule_id": poule_id,
+            "poule_id": source_team.get("poule_id"),
             "match_id": next_match.get("id"),
             "date": next_dt.isoformat(),
             "adversaire": adversaire,
