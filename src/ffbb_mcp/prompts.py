@@ -80,7 +80,10 @@ Pour toute question sur une équipe précise, suis cette logique :
    - Résoudre une ambiguïté d'équipe → `ffbb_resolve_team(club_name=…, categorie=…)`
 
 2. **Si le super-outil nécessite un `organisme_id` inconnu** :
-   - `ffbb_search(type='organismes', query=…)` → récupérer l'`organisme_id`.
+   - 🚫 **Il est strictement interdit** de deviner l'`organisme_id`, de passer `null` ou une chaîne de caractères.
+   - ÉTAPE 1 : Appelle D'ABORD `ffbb_search(type='organismes', query=…)` pour obtenir le club exact.
+   - ÉTAPE 2 : Extrais son `id` et convertis-le IMPÉRATIVEMENT en **integer (entier)**.
+   - ÉTAPE 3 : Appelle ensuite le super-outil (ex: `ffbb_last_result`) avec cet `organisme_id` entier.
 
 3. **Pipeline manuel (dernier recours seulement)** — si les super-outils échouent \
 ou si la question porte sur une poule entière / un classement complet :

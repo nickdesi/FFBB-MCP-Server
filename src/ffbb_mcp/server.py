@@ -689,14 +689,14 @@ async def ffbb_team_summary(
 
 @mcp.tool(name="ffbb_last_result", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_last_result(
-    organisme_id: Annotated[
-        int,
-        Field(description="Identifiant FFBB du club (organisme_id)")
-    ],
     categorie: Annotated[
         str,
         Field(description="Catégorie de l'équipe (ex: 'U11', 'U11M', 'U11F')"),
     ],
+    organisme_id: Annotated[
+        int | str | None,
+        Field(description="Identifiant FFBB du club (doit être un entier valide)")
+    ] = None,
     numero_equipe: Annotated[
         int,
         Field(description="Numéro d'equipe dans la categorie (1 par defaut)"),
@@ -715,8 +715,20 @@ async def ffbb_last_result(
     Si aucun match n'est trouvé, retourne un objet avec `status: "no_result"`.
     """
 
+    if organisme_id is None or str(organisme_id).lower() == "null":
+        return {
+            "error": "organisme_id est manquant ou nul. Veuillez d'abord appeler ffbb_search(type='organismes', query='Nom du club') pour trouver l'ID entier correct."
+        }
+    
+    try:
+        org_id_int = int(organisme_id)
+    except ValueError:
+        return {
+            "error": f"organisme_id invalide: '{organisme_id}'. Il doit s'agir d'un entier valide. Veuillez d'abord appeler ffbb_search(type='organismes')."
+        }
+
     return await ffbb_last_result_service(
-        organisme_id=organisme_id,
+        organisme_id=org_id_int,
         categorie=categorie,
         numero_equipe=numero_equipe,
         force_refresh=force_refresh,
