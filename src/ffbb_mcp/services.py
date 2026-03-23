@@ -1704,12 +1704,11 @@ async def ffbb_last_result_service(
 
     async def _get_latest_match(refresh: bool):
         all_joues = []
-        for poule_id in poules_actives:
-            poule = await get_poule_service(poule_id, force_refresh=refresh)
-            rencontres = poule.get("rencontres", [])
 
-            joues = [
-                r for r in rencontres
+        async def _fetch_and_filter(pid: str):
+            poule = await get_poule_service(pid, force_refresh=refresh)
+            return [
+                r for r in poule.get("rencontres", [])
                 if r.get("joue") == 1
                 and r.get("resultatEquipe1") not in (None, "None")
                 and (
@@ -1717,7 +1716,15 @@ async def ffbb_last_result_service(
                     or _match_team_name(r.get("nomEquipe2", ""), organisme_nom, numero_equipe)
                 )
             ]
-            all_joues.extend(joues)
+
+        import asyncio
+        results = await asyncio.gather(
+            *[_fetch_and_filter(pid) for pid in poules_actives], return_exceptions=True
+        )
+
+        for res in results:
+            if isinstance(res, list):
+                all_joues.extend(res)
 
         if not all_joues:
             return None
