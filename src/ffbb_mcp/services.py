@@ -1623,10 +1623,14 @@ async def ffbb_resolve_team_service(
         raise McpError(error=ErrorData(code=INTERNAL_ERROR, message=msg))
 
     # 2) Récupérer toutes les équipes candidates pour cette catégorie
-    eq_tasks = [
-        ffbb_equipes_club_service(organisme_id=oid, filtre=categorie)
-        for oid in target_org_ids
-    ]
+    async def _fetch_eq_for_org(oid: str):
+        eqs = await ffbb_equipes_club_service(organisme_id=oid, filtre=categorie)
+        if isinstance(eqs, list):
+             for eq in eqs:
+                 eq["_resolved_org_id"] = oid
+        return eqs
+
+    eq_tasks = [_fetch_eq_for_org(oid) for oid in target_org_ids]
     eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
 
     candidates: list[dict[str, Any]] = []
@@ -1653,11 +1657,28 @@ async def ffbb_resolve_team_service(
             "ambiguity": None,
         }
 
+    # Si on a plusieurs candidats, on vérifie s'ils appartiennent tous au même club
+    # et s'ils partagent tous le même numero_equipe. Si c'est le cas, ce ne sont
+    # que des phases successives (Phase 1, 2, 3...) de la même équipe réelle.
+    unique_orgs = {c.get("_resolved_org_id") for c in candidates}
+    unique_nums = {(str(c.get("numero_equipe") or "").strip()) for c in candidates}
+
+    if len(unique_orgs) == 1 and len(unique_nums) == 1:
+        # Trier par niveau pour prendre la phase la plus récente/haute (si dispo)
+        # ou simplement prendre la dernière de la liste qui est souvent chronologique.
+        # Par sécurité on prend la dernière:
+        return {
+            "status": "resolved",
+            "team": candidates[-1],
+            "candidates": candidates,
+            "ambiguity": None,
+        }
+
     ambiguity_msg = (
         "Plusieurs équipes correspondent à cette catégorie. "
         "Ne choisis pas d'équipe par défaut. "
-        "Demande à l'utilisateur de préciser le numéro d'équipe (1, 2, ...) "
-        "et/ou la phase avant de continuer."
+        "Demande à l'utilisateur de préciser l'organisme exact et le numéro d'équipe (ex: 1, 2) "
+        "avant de continuer."
     )
 
     return {
