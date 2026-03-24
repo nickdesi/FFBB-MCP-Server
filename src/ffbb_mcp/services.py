@@ -77,15 +77,16 @@ _RE_NUM_END = re.compile(r"(\d)$")
 # ---------------------------------------------------------------------------
 
 # TTL configurables via variables d'environnement pour affiner par type de données.
-# Données très dynamiques (poules/classements/calendriers) doivent être rafraîchies
-# très fréquemment, surtout les jours de match.
-_LIVES_TTL = _read_positive_int_env("FFBB_CACHE_TTL_LIVES", 30)
-_SEARCH_TTL = _read_positive_int_env("FFBB_CACHE_TTL_SEARCH", 600)
-_DETAIL_TTL = _read_positive_int_env("FFBB_CACHE_TTL_DETAIL", 43200)  # 12h par défaut
-_CALENDRIER_TTL = _read_positive_int_env("FFBB_CACHE_TTL_CALENDRIER", 120)
-_BILAN_TTL = _read_positive_int_env("FFBB_CACHE_TTL_BILAN", 300)
+# Pour garantir une fraîcheur "temps réel" (toujours à jour), les TTL des données dynamiques
+# (poules, calendriers, bilans) sont très courts (15-30s). La protection contre le burst
+# est assurée par le mécanisme de déduplication "inflight" (_dedupe_inflight).
+_LIVES_TTL = _read_positive_int_env("FFBB_CACHE_TTL_LIVES", 15)
+_SEARCH_TTL = _read_positive_int_env("FFBB_CACHE_TTL_SEARCH", 3600)  # La recherche change peu
+_DETAIL_TTL = _read_positive_int_env("FFBB_CACHE_TTL_DETAIL", 86400)  # 24h pour orga/saison
+_CALENDRIER_TTL = _read_positive_int_env("FFBB_CACHE_TTL_CALENDRIER", 30)
+_BILAN_TTL = _read_positive_int_env("FFBB_CACHE_TTL_BILAN", 30)
 # TTL spécifique ultra-court pour les poules (scores + rencontres).
-_POULE_TTL = _read_positive_int_env("FFBB_CACHE_TTL_POULE", 120)
+_POULE_TTL = _read_positive_int_env("FFBB_CACHE_TTL_POULE", 15)
 
 _cache_lives = TTLCache(maxsize=1, ttl=_LIVES_TTL)
 _cache_search = TTLCache(maxsize=256, ttl=_SEARCH_TTL)
