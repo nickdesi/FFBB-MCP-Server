@@ -1,13 +1,14 @@
 # 🏀 FFBB MCP Server
 
 <p align="center">
-  <img src="./assets/logo.webp" width="250" alt="FFBB MCP Logo" />
-  <br />
-  <b>Le pont entre l'IA et le Basketball français.</b>
-  <br />
-  <i>Statistiques, calendriers, classements et lives officiels FFBB directement dans vos LLMs.</i>
-  <br />
-  <br />
+  <img src="./assets/logo.webp" width="180" alt="FFBB MCP Logo" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);" />
+</p>
+
+<h3 align="center">Le pont absolu entre l'Intelligence Artificielle et le Basketball français.</h3>
+
+<p align="center">
+  Statistiques, calendriers, classements et scores en direct officiels de la FFBB, conçus spécifiquement pour les LLMs via le protocole MCP.
+  <br /><br />
   🌐 <b><a href="https://ffbb.desimone.fr">Visiter la Landing Page</a></b>
 </p>
 
@@ -15,7 +16,6 @@
   <img src="https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python" alt="Python Version" />
   <img src="https://img.shields.io/badge/MCP-Latest-orange?style=for-the-badge" alt="MCP Version" />
   <a href="https://smithery.ai/server/ffbb-mcp-server"><img src="https://img.shields.io/badge/Smithery-Supported-yellow?style=for-the-badge&logo=codeigniter" alt="Smithery Badge" /></a>
-  <a href="https://smithery.ai/servers/nickdesi/mcpffbb"><img src="https://smithery.ai/badge/nickdesi/mcpffbb" alt="Smithery Badge" /></a>
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
 </p>
 
@@ -23,45 +23,22 @@
 
 ## 🌟 Aperçu
 
-Le serveur **FFBB MCP** est la **première et unique référence mondiale** pour exposer les données officielles du basketball français (FFBB) au protocole MCP. Il permet aux agents IA (comme Claude, Gemini, Cursor) de naviguer intelligemment dans l'écosystème du basket français : des ligues nationales aux championnats départementaux, avec une compréhension métier inégalée.
+Le serveur **FFBB MCP** est la **première et unique référence mondiale** permettant d'exposer les données officielles du basketball français (FFBB) au protocole MCP (Model Context Protocol).
 
-L'instance publique hébergée à https://ffbb.desimone.fr/mcp est l'instance canonique à utiliser ; les clients doivent pointer vers cette URL pour accéder aux données et outils fournis.
+Il permet aux assistants IA (Claude, Gemini, Cursor) de naviguer intelligemment dans tout l'écosystème du basket français : des ligues nationales aux championnats régionaux et départementaux, avec une compréhension logique métier inégalée (résolution de noms de clubs ambigus, gestion des phases et poules, etc.).
 
-### 🏗️ Architecture
+> **L'instance publique canonique :**  
+> 👉 `https://ffbb.desimone.fr/mcp`  
+> Tous les clients IA doivent pointer vers cette URL en mode HTTP(S) / SSE.
 
-```mermaid
-flowchart TD
-  subgraph Clients ["Clients IA & IDEs"]
-    direction TB
-    A1["Google Antigravity"]
-    A2["VS Code (MCP Extension)"]
-    A3["Claude Desktop"]
-    A4["Cursor / AnythingLLM"]
-  end
+---
 
-  subgraph Hosted ["Hosted MCP Instance (https://ffbb.desimone.fr/mcp)"]
-    direction TB
-    B["Transport (SSE / HTTP)"]
-    C["Core Logic (FastMCP)"]
-    D["FFBB API Client"]
-  end
+## 🚀 Connecter votre assistant IA
 
-  subgraph Remote ["Official FFBB API"]
-    E["Official FFBB API"]
-  end
-
-  Clients -->|SSE / HTTP| Hosted
-  Hosted <--> Remote
-```
-
-## 🌐 Connecter votre assistant IA (Clients)
-
-L'instance publique du serveur FFBB MCP est accessible ici : https://ffbb.desimone.fr/mcp
-
-Voici des exemples de configuration pour les clients et environnements courants — remplacez l'URL par `https://ffbb.desimone.fr/mcp` si elle n'est pas déjà renseignée.
+L'URL de l'instance publique est prête à l'emploi. Voici comment l'intégrer dans vos outils favoris :
 
 ### Claude Desktop
-Ajoutez ou mettez à jour la configuration utilisateur pour pointer vers l'instance distante :
+Ajoutez cette configuration dans votre `claude_desktop_config.json` :
 
 ```json
 {
@@ -73,99 +50,89 @@ Ajoutez ou mettez à jour la configuration utilisateur pour pointer vers l'insta
 }
 ```
 
-### Claude Code
-Ajoutez le serveur distant via la CLI :
+### Cursor / VS Code (Extension MCP) / AnythingLLM
+Dans l'interface de gestion MCP de l'éditeur :
 
-```bash
-claude mcp add --transport http ffbb https://ffbb.desimone.fr/mcp
-```
+1. Type : `SSE` ou `HTTP` (streamable)
+2. URL : `https://ffbb.desimone.fr/mcp`
 
-### Gemini CLI
-Ajoutez l'URL dans `~/.gemini/settings.json` :
-
-```json
-{
-  "mcpServers": {
-    "ffbb": { "httpUrl": "https://ffbb.desimone.fr/mcp" }
-  }
-}
-```
-
-### Cursor / AnythingLLM / VS Code MCP Extension
-Dans les clients qui supportent MCP via HTTP/SSE, ajoutez un nouveau serveur de type `streamable` (ou `http`) et renseignez l'URL : `https://ffbb.desimone.fr/mcp`.
-
-### Smithery / intégrations (exemple)
-Installer ou configurer un client qui se connecte à un MCP via l'URL publique :
+### Smithery (Intégration automatisée)
 
 ```bash
 npx -y @smithery/cli@latest install @nickdesi/mcpffbb --client claude --mcp-url https://ffbb.desimone.fr/mcp
 ```
 
-### Remarques générales
-- Transport recommandé : SSE (Streamable HTTP) — l'URL `https://ffbb.desimone.fr/mcp` expose le transport SSE.
-- Health check : `/health` (GET) — utile pour vérifier la disponibilité depuis un UI de gestion ou un load balancer.
-- Si un client signale une erreur CORS/Origins, vérifiez que l'UI locale (ex : `http://localhost:8000` de l'inspector) est autorisée par l'instance si tu testes depuis ton poste.
-
 ---
 
-## 🛠️ Outils Disponibles
+## 🛠️ Boîte à Outils (Tools)
+
+Récemment refondu pour maximiser les performances des LLMs, le serveur propose 11 outils unifiés et sur-puissants :
+
+### 📊 Outils Prêts à l'Emploi (Recommandés)
 
 | Outil | Description | Paramètres Clés |
 | ----- | ----------- | --------------- |
-| `ffbb_search` | Recherche unifiée multi-critères. | `query`, `type` (competition, organisme, salle...), `limit` |
-| `ffbb_get` | Accès direct par ID technique. | `id`, `type` (competition, poule, organisme) |
-| `ffbb_club` | Actions groupées sur un club. | `action` (calendrier, equipes, classement), `club_name` ou `organisme_id` |
-| `ffbb_lives` | Scores en direct (cache 30s). | Aucun |
-| `ffbb_saisons` | Liste des saisons disponibles. | `active_only` |
+| ⚡ **`ffbb_bilan`** | Obtenir le bilan complet de A à Z (toutes phases) d'une équipe, ses classements & résultats en 1 appel. | `club_name` ou `organisme_id`, `categorie` (ex: U11M1) |
+| ⚡ **`ffbb_team_summary`** | Le résumé parfait pour un agent : bilan, phase courante, dernier match joué et prochain match. | `club_name` ou `organisme_id`, `categorie` |
+| 🏀 **`ffbb_last_result`** | Le score et détail du tout dernier match joué par l'équipe. | `categorie`, `club_name`, `numero_equipe` |
+| 🗓️ **`ffbb_next_match`** | Les infos du prochain match officiel à venir (adversaire, date, salle). | `categorie`, `club_name`, `numero_equipe` |
 
-> [!TIP]
-> Pour une documentation exhaustive des schémas et des exemples d'appels, consultez la [Référence des Outils](docs/TOOLS_REFERENCE.md).
+### 🔍 Outils d'Exploration & Data Brute
 
----
-
-## 🎭 Prompts Prédéfinis (Intelligence Embarquée)
-
-Le serveur expose des configurations prêtes à l'emploi pour transformer votre LLM en expert :
-
-- `expert_basket` : **Le point d'entrée recommandé.** Configure l'agent avec toutes les règles de désambiguïsation (M/F, Équipe 1/2) et les workflows optimaux pour naviguer dans les données.
-- `analyser_match` : Analyse approfondie d'une rencontre via son ID.
-- `bilan_equipe` : Génère un rapport statistique complet sur la saison d'une équipe spécifique.
-- `trouver_club`, `prochain_match`, `classement_poule` : Raccourcis pour des recherches ciblées.
+| Outil | Description | Paramètres Clés |
+| ----- | ----------- | --------------- |
+| `ffbb_search` | Le moteur de recherche global (clubs, compétitions, salles, matchs). | `query`, `type`, `limit` |
+| `ffbb_resolve_team` | Résout et trouve l'ID/les infos exactes d'une équipe via une chaîne (ex: "U13F-2"). | `club_name`, `categorie` |
+| `ffbb_get` | Accès direct aux classements complets et matchs par ID technique. | `id`, `type` (poule, competition, organisme) |
+| `ffbb_club` | Explorer le planning complet, l'ensemble des équipes ou tous les classements d'un club. | `action` (calendrier, equipes, classement), `club_name` |
+| `ffbb_lives` | Récupère tous les matchs actuellement en direct en France. | *Aucun* |
+| `ffbb_saisons` | Liste et détermine la saison FFBB en cours. | `active_only` |
 
 ---
 
-## 🔧 Troubleshooting (FAQ)
+## 🏗️ Architecture Technique
 
-- **Erreur 404 sur /mcp** : Assurez-vous d'utiliser `https` et non `http`.
-- **Délai de réponse** : L'API FFBB peut parfois être lente, augmentez le timeout de votre client si possible.
-- **WebSocket / SSE** : Sur Nginx Proxy Manager, activez impérativement **"Websockets Support"**.
-- **Monitoring** : Si le serveur semble inactif, vous pouvez vérifier son état via l'endpoint de santé : `https://ffbb.desimone.fr/health`.
+```mermaid
+flowchart LR
+    A[Agent IA\nClaude / Cursor] -->|SSE / HTTP\n/mcp| B(FastMCP Server\nffbb.desimone.fr)
+    B -->|Logique Métier & Cache| C{Services\nUnifiés}
+    C <-->|Client API V3| D[(FFBB API Officielle)]
+```
 
----
-
-## 📚 Documentation MCP, tools & performances
-
-Pour les détails complets sur les tools MCP exposés par ce serveur (paramètres,
-exemples d'appels, bonnes pratiques agents), voir :
-
-- `docs/TOOLS_REFERENCE.md`
-
-Pour la partie performance (benchmarks, mesures P95, intégration possible en CI),
-voir :
-
-- `docs/PERFORMANCE.md`
+- **Transport :** L'application est servie via HTTP(S) Streamable (Server-Sent Events) par FastMCP sur l'endpoint `/mcp`.
+- **Réduction de contexte :** Le `Service Layer` consolide de nombreux micro-appels FFBB en réponses JSON concises, économisant massivement les tokens de votre LLM.
+- **Performances :** Pour plus de détails sur les benchmarks, la latence et les P95, consultez `docs/PERFORMANCE.md`.
 
 ---
 
-## ⚠️ Remarque sur l'accès
+## 🎭 Intelligence Embarquée (Prompts)
 
-L'instance publique `https://ffbb.desimone.fr/mcp` est l'instance officielle à utiliser pour accéder aux données FFBB via MCP.
+Ce serveur expose des **Prompts** natifs pour donner instantanément de l'expertise métier à votre agent :
+
+- 🎓 `expert_basket` : Injecte les règles métier complexes de la FFBB à votre agent (catégories, désambiguïsation, utilisation optimale des outils unifiés). **Fortement recommandé.**
+- 📈 `bilan_equipe` : Prompt guidé pour sortir un rapport exhaustif d'une équipe.
+- 🏟️ `analyser_match` / `prochain_match` : Workflows en 1 clic pour décortiquer une rencontre spécifique.
+
 ---
 
-## 👨‍💻 Développement
+## 🔧 Dépannage & FAQ
 
-Consultez le guide [CONTRIBUTING.md](CONTRIBUTING.md) pour installer l'environnement de développement et soumettre des PRs.
+- **Mon IA ne trouve pas mon équipe locale :** Donnez-lui toujours le nom précis du club (ex: `Vichy` au lieu de `JA Vichy` si c'est ambigu) et utilisez **`ffbb_search`**.
+- **L'agent boucle sur des IDs introuvables :** Rappelez à l'agent d'utiliser `ffbb_bilan` avec le paramètre `club_name` pour qu'il fasse lui-même la résolution interne.
+- **Erreurs 404 :** Assurez-vous d'utiliser le endpoint canonique exact `https://ffbb.desimone.fr/mcp`.
+- **Serveur inactif :** Vérifiez le Health Check `https://ffbb.desimone.fr/health`.
 
-## 📄 Licence
+---
 
-Ce projet est sous licence [MIT](LICENSE).
+## 👨‍💻 Contribution & Sous le capot
+
+Pour découvrir la documentation technique exhaustive, le guide de contribution et les détails internes :
+1. [Références des outils complets (🛠️)](docs/TOOLS_REFERENCE.md)
+2. [Architecture détaillée (🏗️)](docs/ARCHITECTURE.md)
+3. [Guide de contribution (👨‍💻)](CONTRIBUTING.md)
+
+---
+<p align="center">
+  <i>Construit avec ❤️ pour la communauté du basket. Ce projet non-officiel n'est pas affilié à la Fédération Française de BasketBall.</i>
+</p>
+
