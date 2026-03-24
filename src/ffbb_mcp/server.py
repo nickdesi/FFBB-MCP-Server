@@ -860,7 +860,7 @@ def main() -> None:
         logger.info(f"Démarrage MCP FFBB en mode SSE standard sur {host}:{port}...")
         
         # Mode SSE standard complet (requis par Perplexity, Cursor, etc.)
-        mcp.settings.sse_path = "/sse"
+        mcp.settings.sse_path = "/mcp"
         mcp.settings.message_path = "/messages/"
         mcp.settings.host = host
         mcp.settings.port = port
