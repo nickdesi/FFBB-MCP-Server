@@ -679,10 +679,10 @@ async def ffbb_team_summary(
         )
 
         resolved_team = resolve_result.get("team")
-        resolved_org_id = None
+        club_resolu = resolve_result.get("club_resolu")
+        resolved_org_id = club_resolu.get("organisme_id") if club_resolu else organisme_id
         resolved_num = 1
         if resolved_team:
-            resolved_org_id = organisme_id
             try:
                 resolved_num = int(resolved_team.get("numero_equipe") or 1)
             except (TypeError, ValueError):
@@ -696,7 +696,7 @@ async def ffbb_team_summary(
         )
 
         # last_result et next_match nécessitent organisme_id
-        effective_org_id = organisme_id or (resolved_org_id if resolved_org_id else None)
+        effective_org_id = resolved_org_id
 
         if effective_org_id and categorie:
             last_coro = ffbb_last_result_service(
@@ -815,7 +815,10 @@ async def ffbb_next_match(
     """
 
     if club_name is None and organisme_id is None:
-        raise ValueError("club_name ou organisme_id doit être fourni")
+        return {
+            "status": "error",
+            "message": "Veuillez fournir club_name ou organisme_id pour trouver l'équipe.",
+        }
 
     return await ffbb_next_match_service(
         club_name=club_name,
