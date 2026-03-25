@@ -22,35 +22,30 @@ _RULES_DISAMBIGUATION = """\
    - Numero_equipe = chiffre final (ex: 1), défaut = 1 si absent.
    *Ne jamais passer une catégorie avec numéro collé (ex: "U11M1") à un outil qui attend une catégorie pure.*
 
-4. **Numéro d'équipe** : Si un club a plusieurs équipes dans la même catégorie, ne déduis jamais le numéro (1, 2…) sans preuve explicite. Liste les engagements candidats pour identifier l'équipe exacte.
+4. **Numéro d'équipe** : Si un club a plusieurs équipes dans la même catégorie (ex: U13M1, 2, 3), ne déduis jamais le numéro sans preuve explicite. Vérifie `ffbb_club(action="equipes")` pour voir tous les engagements réels.
 
-5. **Désambiguïsation avant conclusion** : Pour toute question sur une équipe FFBB, résous d'abord le club, liste tous les engagements candidats (catégorie + sexe), et ne conclus qu'après avoir examiné tous les candidats.
+5. **Désambiguïsation** : Si `ffbb_search` ou un super-outil retourne `status: "ambiguous"`, présente les candidats et attends la réponse de l'utilisateur.
 """
 
 _RULES_METIER = """\
 ## 🧩 RÈGLES MÉTIER
 
-- Ne jamais confondre club, engagement, équipe et poule.
-- Si plusieurs poules existent pour une même catégorie, vérifie laquelle correspond \
-au `numero_equipe` demandé (en croisant `numero_equipe`, `engagement_id`, et/ou le libellé).
-- Pour un bilan saison, **utilise le champ `bilan_total` retourné par les outils** \
-(`ffbb_bilan`, `ffbb_bilan_saison`, `ffbb_team_summary`). Ne recalcule JAMAIS un bilan \
-manuellement si ce champ est présent. \
-⚠️ Ne jamais additionner les stats inter-phases sans vérifier leur indépendance (risque de double comptage).
-- L'absence de résultat sur un outil ne signifie pas absence de donnée globale : \
-vérifie tous les outils pertinents avant de conclure.
-- Il est interdit de conclure sur "U11M1", "U11M2", "SF1", etc. tant que `numero_equipe` \
-n'a pas été confirmé par une poule, un engagement, ou un champ équivalent.
-- 🏠✈️ **Règle absolue : Domicile / Extérieur** : Dans toutes les rencontres FFBB, \
-`equipe1` (ou `nomEquipe1`) = 🏠 domicile, `equipe2` (ou `nomEquipe2`) = ✈️ extérieur.
-  *   **Processus** : (1) Identifier le club concerné → (2) Trouver sa position \
-(equipe1 ou equipe2) → (3) En déduire le lieu → (4) Formuler.
-  *   **Interdiction** : Ne jamais supposer le lieu sans vérifier. Ne jamais se corriger à mi-phrase.
-  *   **Formulations** : "X reçoit Y à domicile" (X=equipe1) · "X se déplace chez Y" (X=equipe2).
-- 🗓️ **Statut des matchs** : `joue: 0` = match non joué → "à venir". \
-`joue: 1` = match joué, score disponible.
-- 🏆 **Mentions de résultats** : Toujours citer l'adversaire et le score \
-lors de la mention de victoires ou défaites marquantes.\
+- **Score Live d'abord** : Si on demande un score "maintenant", appelle `ffbb_lives` EN PREMIER.
+- **Positions** : `equipe1` = 🏠 domicile, `equipe2` = ✈️ extérieur.
+- **Statut** : `joue: 0` = à venir, `joue: 1` = terminé.
+- **Bilan** : Utilise le champ `bilan_total` retourné par `ffbb_team_summary` ou `ffbb_bilan`. Ne recalcule jamais à la main si présent.
+- **Multi-Engagements** : Si une équipe a plusieurs engagements (Championnat, Coupe, Phases successives), applique le système de scoring interne pour privilégier la phase active la plus haute.
+"""
+
+_RULES_PHASES = """\
+## 📈 SCORING DES ENGAGEMENTS (DÉCISIONNEL)
+
+Si plusieurs engagements coexistent pour une catégorie, privilégier celui avec le score le plus haut :
+1. **Phase** : +30 (Phase 3), +20 (Phase 2), +10 (Phase 1), +5 (Initial).
+2. **Niveau** : +10 (Nationale), +7 (Interrégionale), +5 (Régionale), +3 (Départementale).
+3. **Division** : -5 pour les divisions basses (Ex: D6).
+4. **Exclusion** : Ignorer "Amical", "Brassage", "Tournoi", "Coupe" (sauf demande explicite).
+5. **Dernier recours** : Prendre l'ID d'engagement le plus élevé (le plus récent).
 """
 
 _SEQUENCE = """\
@@ -161,6 +156,7 @@ def expert_basket() -> str:
         _INTRO,
         _RULES_DISAMBIGUATION,
         _RULES_METIER,
+        _RULES_PHASES,
         _SEQUENCE,
         _WORKFLOW,
         _GUARDRAILS,
