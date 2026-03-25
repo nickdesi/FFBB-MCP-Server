@@ -13,31 +13,18 @@ _INTRO = (
 )
 
 _RULES_DISAMBIGUATION = """\
-## 🚨 RÈGLES DE DÉSAMBIGUÏSATION (obligatoires)
+1. **Cache de l'organisme_id** : Si un club a déjà été résolu dans la conversation (nom → organisme_id), réutilise directement cet organisme_id sans relancer de recherche par nom.
 
-1. **Genre manquant** : Si la catégorie (ex: U11) n'a pas de genre précisé (M ou F), \
-demande TOUJOURS une précision à l'utilisateur avant tout appel d'outil.
+2. **Genre manquant** : Si la catégorie (ex: U11) n'a pas de genre précisé (M ou F), demande TOUJOURS une précision à l'utilisateur avant tout appel d'outil.
 
-2. **Numéro d'équipe** : Si un club a plusieurs équipes dans la même catégorie, ne déduis \
-jamais le numéro (1, 2…) sans preuve explicite. Liste tous les engagements candidats, \
-puis identifie l'équipe exacte via `numero_equipe` ou des preuves indirectes concordantes \
-(libellé `- 1` / `- 2`, correspondance claire dans une poule).
+3. **Parsing de la catégorie** : Toute entrée de type "{CATEGORIE}{GENRE}{NUMERO}" (ex: U11M1) doit être décomposée :
+   - Categorie = partie alphanumérique (ex: "U11M")
+   - Numero_equipe = chiffre final (ex: 1), défaut = 1 si absent.
+   *Ne jamais passer une catégorie avec numéro collé (ex: "U11M1") à un outil qui attend une catégorie pure.*
 
-3. **Phases multiples** : Ne mélange jamais l'équipe 1 et l'équipe 2 lors de suivis \
-multi-phases. Pour un bilan saison, vérifie TOUTES les phases disponibles pour la même \
-équipe et n'agrège que celles confirmées pour cette équipe (même `engagement_id` / \
-`numero_equipe`).
+4. **Numéro d'équipe** : Si un club a plusieurs équipes dans la même catégorie, ne déduis jamais le numéro (1, 2…) sans preuve explicite. Liste les engagements candidats pour identifier l'équipe exacte.
 
-4. **Acronymes et noms alternatifs** : Si une recherche de club ne retourne aucun résultat \
-pertinent, effectue une recherche web pour trouver le nom complet/officiel, puis demande \
-confirmation à l'utilisateur avant de l'utiliser dans tes prochains appels.
-
-5. **Filtrage strict** : Quand un numéro d'équipe est précisé (ex: U13M**1**, U11F**2**), \
-présente UNIQUEMENT les données de cette équipe dans ta réponse finale.
-
-6. **Désambiguïsation avant conclusion** : Pour toute question sur une équipe FFBB, \
-résous d'abord le club, liste tous les engagements candidats (catégorie + sexe), \
-et ne conclus qu'après avoir examiné tous les candidats.\
+5. **Désambiguïsation avant conclusion** : Pour toute question sur une équipe FFBB, résous d'abord le club, liste tous les engagements candidats (catégorie + sexe), et ne conclus qu'après avoir examiné tous les candidats.
 """
 
 _RULES_METIER = """\
@@ -71,22 +58,14 @@ _SEQUENCE = """\
 
 Pour toute question sur une équipe précise, suis cette logique :
 
-1. **Essayer un super-outil en premier** (1 seul appel suffit souvent) :
-   - Bilan + dernier/prochain match → `ffbb_team_summary(club_name=…, categorie=…)`
-   - Bilan saison détaillé → `ffbb_bilan(club_name=…, categorie=…)`
-   - Bilan par équipe précise → `ffbb_bilan_saison(club_name=…, categorie=…, numero_equipe=…)`
-   - Dernier résultat seul → `ffbb_last_result(club_name=…, categorie=…)`
-   - Prochain match seul → `ffbb_next_match(club_name=…, categorie=…)`
-2. **Résolution automatique des clubs** :
-   - Tous les super-outils (comme `ffbb_last_result`, `ffbb_next_match`, `ffbb_bilan`) acceptent le paramètre `club_name`.
-   - Utilise toujours `club_name` directement si tu n'as pas l'`organisme_id`. L'outil se chargera de trouver le club et la poule automatiquement.
-   - Si l'outil te retourne une erreur `ambiguous`, cela signifie que plusieurs clubs portent ce nom. Utilise alors `ffbb_search(type='organismes')` pour trouver l'`organisme_id` exact et relance ta requête avec cet entier.
+1. **Parallélisation** : Lance tous les appels sans dépendance entre eux dans le même bloc (en parallèle). Les appels dépendants attendent le résultat précédent.
 
-3. **Pipeline manuel (dernier recours seulement)** — si les super-outils échouent \
-ou si la question porte sur une poule entière / un classement complet :
-   - `ffbb_club(action='equipes', organisme_id=…)` → poule_id
-   - `ffbb_get(type='poule', id=…)` → classement + matchs
-   - `ffbb_club(action='calendrier')` → liste brute de matchs
+2. **Résolution de l'organisme_id** : Si l'organisme_id n'est pas connu, utilise `ffbb_search(type='organismes', query=club_name)` PUIS enchaîne. *Ne jamais appeler ffbb_club ou ffbb_team_summary sans organisme_id.*
+
+3. **Résolution du poule_id pour un classement par phase** :
+   - Étape A — `ffbb_team_summary(organisme_id, categorie, numero_equipe)` → Identifier dans `raw.phases[]` la phase cible et extraire son `poule_id`.
+   - Étape B — `ffbb_club(action='classement', organisme_id, poule_id)` → Récupérer le classement complet.
+   *Alternative* : Tu peux utiliser `ffbb_club(action='classement', club_name=..., filtre=..., phase=...)` en un seul appel si disponible.
 
 4. **Répondre** en citant les phases et compétitions prises en compte.\
 """
@@ -101,18 +80,17 @@ _WORKFLOW = """\
 | Bilan global + dernier/prochain match | `ffbb_team_summary` | Tout en 1 appel |
 | Bilan saison (toutes phases agrégées) | `ffbb_bilan` | V/D/N + paniers par phase |
 | Bilan saison d'une équipe précise | `ffbb_bilan_saison` | Idem, filtré par `numero_equipe` |
+| Classement automagique par phase | `ffbb_club(action='classement')` | Classement + highlight si `phase` fournie |
 | Dernier score | `ffbb_last_result` | 1 match, score garanti |
 | Prochain match | `ffbb_next_match` | 1 match, date + adversaire |
-| Identifier une équipe ambiguë | `ffbb_resolve_team` | `team` + `candidates` |
 
-→ Ces outils gèrent en interne la résolution du club, des poules et des phases. \
-Ne jamais refaire ce travail à la main.
+→ Ces outils gèrent en interne la résolution du club et des phases si `organisme_id` est fourni.
 
 ### 🥈 Tier 2 — Outils ciblés (si Tier 1 insuffisant)
 
 | Besoin | Outil |
 |---|---|
-| Classement complet d'une poule | `ffbb_get(type='poule', id=…)` |
+| Classement complet d'une poule | `ffbb_club(action='classement', poule_id=…)` ou `ffbb_get(type='poule', id=…)` |
 | Détails d'une compétition (liste des poules) | `ffbb_get(type='competition', id=…)` |
 | Liste des équipes d'un club | `ffbb_club(action='equipes', organisme_id=…)` |
 | Recherche générale | `ffbb_search(type='all', query=…)` |
@@ -120,12 +98,10 @@ Ne jamais refaire ce travail à la main.
 
 ### 🥉 Tier 3 — Pipeline manuel (dernier recours)
 
-Utiliser UNIQUEMENT si les Tiers 1 et 2 échouent ou ne répondent pas à la question :
-- `ffbb_club(action='calendrier')` → liste brute de matchs (lourde, risque de troncature).
+Utiliser UNIQUEMENT si les Tiers 1 et 2 échouent :
+- `ffbb_club(action='calendrier')` → liste brute de matchs.
 - `ffbb_get(type='poule')` pour un historique complet de poule.
-
-⚠️ Ne PAS utiliser `ffbb_get(type='poule')` pour obtenir un simple dernier score \
-ou prochain match : la réponse contient ~100 matchs et risque d'être tronquée.\
+- **Rappel** : Les données FFBB sont toujours live.
 """
 
 _GUARDRAILS = """\
@@ -206,15 +182,12 @@ def prochain_match(club_name: str, categorie: str = "") -> str:
     if not club_name:
         raise ValueError("club_name est obligatoire.")
     equipe = f" — équipe {categorie}" if categorie else ""
-    filtre = f", filtre='{categorie}'" if categorie else ""
     return (
         f"Trouve le prochain match de '{club_name}'{equipe}.\n\n"
-        "**Stratégie (par ordre de priorité) :**\n"
-        f"1. `ffbb_team_summary(club_name='{club_name}', categorie='{categorie or '???'}')"  # type: ignore[syntax]
-        " → champ `next_match`.\n"
-        "2. Si indisponible : résous le club → l'équipe → récupère le `poule_id` "
-        "→ `ffbb_get(type='poule', id=<poule_id>)` → filtre les matchs à venir.\n"
-        f"3. Dernier recours : `ffbb_club(action='calendrier', club_name='{club_name}'{filtre})`.\n\n"
+        "**Stratégie (obligatoire) :**\n"
+        "1. Résolution de l'ID club : `ffbb_search(type='organismes', query=...)`.\n"
+        "2. Appel du super-outil : `ffbb_team_summary(organisme_id=..., categorie=...)` → champ `next_match`.\n"
+        "3. Si Tier 1 indisponible : `ffbb_club(action='calendrier', organisme_id=...)`.\n\n"
         "Donne la date, l'heure, l'adversaire et le lieu."
     )
 
@@ -240,26 +213,16 @@ def bilan_equipe(club_name: str, categorie: str) -> str:
     return (
         f"Établis le bilan complet de l'équipe '{categorie}' du club '{club_name}' "
         "sur la saison actuelle (toutes phases confondues).\n\n"
-        "Ce bilan cumule toutes les phases confirmées pour cette équipe.\n\n"
-        "Les données FFBB sont toujours LIVE : ne suppose jamais un cache côté LLM, ne PAS inventer de résultats.\n\n"
-        "**Si le genre (M/F) ou le numéro d'équipe est absent de la catégorie, "
-        "demande une précision à l'utilisateur avant tout appel d'outil.**\n\n"
-        "**Stratégie (par ordre de priorité / EN PRIORITÉ) :**\n"
-        f"1. Utilise EN PRIORITÉ `ffbb_team_summary(club_name='{club_name}', categorie='{categorie}')"  # type: ignore[syntax]
-        " pour obtenir : bilan global, phase courante, dernier et prochain match en un seul appel.\n"
-        f"2. Si `ffbb_team_summary` n'est pas disponible, utilise `ffbb_bilan(club_name='{club_name}', categorie='{categorie}')"  # type: ignore[syntax]
-        " pour le détail toutes phases.\n"
-        "   - Ne reconstruis PAS le bilan à la main à partir de `ffbb_get` ou `ffbb_club` si `ffbb_bilan` est disponible.\n"
-        "3. Si `ffbb_bilan` ne retourne pas assez d'informations, en DERNIER RECOURS seulement :\n"
-        "   a) `ffbb_search(type='organismes', query=...)` pour résoudre l'ID du club.\n"
-        "   b) `ffbb_club(action='equipes', organisme_id=...)` pour lister les équipes et leurs `poule_id`.\n"
-        "   c) `ffbb_get(type='poule', id=POULE_ID)` pour récupérer classement + tous les matchs de la poule.\n"
-        "   d) `ffbb_club(action='calendrier')` UNIQUEMENT si aucun `poule_id` exploitable n'est disponible.\n\n"
+        "Ce bilan cumule toutes les phases confirmées pour cette équipe. "
+        "Les données FFBB sont toujours LIVE : ne PAS inventer de résultats.\n\n"
+        "**Stratégie (obligatoire) :**\n"
+        "1. **ID Club** : Utilise `ffbb_search(type='organismes', query=...)` pour obtenir l'`organisme_id`.\n"
+        "2. **Équipe (EN PRIORITÉ)** : Utilise `ffbb_team_summary(organisme_id=..., categorie=...)` pour le bilan global.\n"
+        "3. **Détail** : Si besoin, `ffbb_bilan(organisme_id=..., categorie=...)` pour le détail par phase.\n"
+        "4. **dernier recours** : `ffbb_club(action='calendrier')` (avec `organisme_id`) si aucun bilan n'est disponible.\n\n"
         "**Format de réponse attendu :**\n"
-        "- **Bilan total saison** : matchs joués, victoires, défaites, nuls, "
-        "paniers marqués / encaissés, différence.\n"
-        "- **Détail par phase** : tableau avec position, V/D/N et paniers pour "
-        "chaque compétition/poule."
+        "- **Bilan total saison** : matchs joués, victoires, défaites, nuls.\n"
+        "- **Détail par phase** : tableau avec position et V/D/N pour chaque compétition/poule."
     )
 
 
