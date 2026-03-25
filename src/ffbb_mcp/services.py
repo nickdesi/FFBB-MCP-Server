@@ -483,9 +483,11 @@ async def ffbb_get_classement_service(
     poule_id: int | str,
     *,
     force_refresh: bool = False,
+    target_organisme_id: int | str | None = None,
+    target_num: int | str | None = None,
 ) -> list[dict[str, Any]]:
     poule_id_int = _coerce_numeric_id(poule_id, "poule_id")
-    cache_key = f"classement:{poule_id_int}"
+    cache_key = f"classement:{poule_id_int}:{target_organisme_id or ''}:{target_num or ''}"
 
     if not force_refresh:
         cached = _cache_get(_cache_detail, cache_key, "classement")
@@ -505,18 +507,36 @@ async def ffbb_get_classement_service(
     raw = data.get("classements", data.get("classement", []))
     if not isinstance(raw, list):
         raw = []
+    
     flat: list[dict[str, Any]] = []
+    target_org_str = str(target_organisme_id) if target_organisme_id else None
+    target_num_str = str(target_num) if target_num else None
+
     for c in raw:
         eng = c.get("id_engagement", {}) or {}
+        nom_equipe = eng.get("nom", "")
+        # Identification du club via organisme_id ou rapprochement par nom (fallback)
+        org_id = str(c.get("organisme_id") or eng.get("organisme_id") or "")
+        
+        is_target = False
+        if target_org_str and org_id == target_org_str:
+            if target_num_str:
+                num_equipe = str(eng.get("numero_equipe") or "")
+                if num_equipe == target_num_str:
+                    is_target = True
+            else:
+                is_target = True
+
         flat.append(
             {
                 "position": c.get("position"),
-                "equipe": eng.get("nom", ""),
+                "equipe": nom_equipe,
                 "points": c.get("points"),
                 "match_joues": c.get("match_joues"),
                 "gagnes": c.get("gagnes"),
                 "perdus": c.get("perdus"),
                 "difference": c.get("difference"),
+                "is_target": is_target,
                 "paniers_marques": c.get("paniers_marques") or 0,
                 "paniers_encaisses": c.get("paniers_encaisses") or 0,
             }
@@ -709,6 +729,13 @@ async def ffbb_equipes_club_service(
 
         # Enrichissement des champs dérivés
         numero_equipe = e.get("numeroEquipe")
+        if numero_equipe is None and nom_comp:
+            # Fallback: tenter d'extraire le numéro du nom de la compétition
+            # ex: "Dépt U11M - 2" ou "U11M1"
+            parsed_comp = parse_categorie(nom_comp)
+            if parsed_comp.numero_equipe:
+                numero_equipe = parsed_comp.numero_equipe
+
         if numero_equipe is not None:
             try:
                 # Normalise en str simple ("1", "2", ...)
@@ -1730,6 +1757,48 @@ def _match_team_name(nom_equipe_rencontre: str, organisme_nom: str, numero_equip
         return nom_norm.endswith(suffix_norm) or not has_digit
 
     return nom_norm.endswith(suffix_norm)
+
+
+async def resolve_poule_id_service(
+    organisme_id: int | str,
+    categorie: str,
+    phase_query: str | None = None,
+) -> str | None:
+    """Résout le poule_id d'une équipe pour une phase donnée (ex: 'phase 3').
+    
+    Si phase_query est None, retourne le poule_id de l'engagement le plus récent 
+    (plus haut niveau ou phase chronologique la plus avancée).
+    """
+    org_id_int = _coerce_numeric_id(organisme_id, "organisme_id")
+    equipes = await ffbb_equipes_club_service(
+        organisme_id=org_id_int, 
+        filtre=categorie
+    )
+    if not equipes:
+        return None
+
+    # Si une phase est spécifiée (ex: "phase 3")
+    if phase_query:
+        target_phase = phase_query.lower().strip()
+        # Normalisation légère pour matcher "p3", "phase 3", "3"
+        phase_num_match = re.search(r"(\d+)", target_phase)
+        phase_num = phase_num_match.group(1) if phase_num_match else target_phase
+        
+        for e in equipes:
+            comp_name = (e.get("competition") or "").lower()
+            phase_label = (e.get("phase_label") or "").lower()
+            
+            # On cherche le numéro de phase ou le label complet
+            if (phase_num in comp_name or 
+                phase_num in phase_label or 
+                target_phase in comp_name or 
+                target_phase in phase_label):
+                return str(e.get("poule_id"))
+
+    # Par défaut (ou si phase non trouvée), on prend l'engagement avec le niveau le plus élevé
+    # (souvent la phase la plus avancée dans la saison).
+    equipes.sort(key=lambda x: x.get("niveau", 0), reverse=True)
+    return str(equipes[0].get("poule_id"))
 
 
 async def ffbb_last_result_service(

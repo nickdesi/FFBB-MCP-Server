@@ -101,7 +101,7 @@ flowchart LR
 
 - **Transport :** L'application est servie via HTTP(S) Streamable (Server-Sent Events) par FastMCP sur l'endpoint `/mcp`.
 - **Réduction de contexte :** Le `Service Layer` consolide de nombreux micro-appels FFBB en réponses JSON concises, économisant massivement les tokens de votre LLM.
-- **Performances & Temps réel :** Les données dynamiques (scores, classements, calendriers) ont un cache ultra-court (15-30 secondes) **garantissant des données "toujours à jour"**. La protection contre les abus (anti-burst) est gérée par une déduplication en un seul vol (inflight request deduplication) couplée à un rate-limiter strict. Pour plus de détails sur les benchmarks, la latence et les P95, consultez `docs/PERFORMANCE.md`.
+- **Performances & Temps réel :** Les données dynamiques (scores, classements, calendriers) ont un cache ultra-court (15-30 secondes) **garantissant des données "toujours à jour"**. La protection contre les abus (anti-burst) est gérée par une déduplication en un seul vol (inflight request deduplication) couplée à un rate-limiter strict. L'outil `ffbb_club` auto-résout désormais les `poule_id` pour les classements par phase (ex: "phase 3") et met en avant l'équipe concernée.
 
 ---
 

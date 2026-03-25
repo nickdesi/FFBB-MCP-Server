@@ -37,6 +37,7 @@ from .services import (
     get_poule_service,
     get_saisons_service,
     multi_search_service,
+    resolve_poule_id_service,
     search_competitions_service,
     search_organismes_service,
     search_pratiques_service,
@@ -462,6 +463,15 @@ async def ffbb_club(
             )
         ),
     ] = None,
+    phase: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Nom ou numéro de la phase (ex: 'Phase 3', '2'). "
+                "Utilisé avec action='classement' pour auto-résoudre la poule."
+            )
+        ),
+    ] = None,
     force_refresh: Annotated[
         bool,
         Field(
@@ -494,11 +504,41 @@ async def ffbb_club(
                 organisme_id=organisme_id, filtre=filtre
             )
         elif action == "classement":
-            if not poule_id:
-                return [{"error": "poule_id requis pour action='classement'"}]
+            effective_poule_id = poule_id
+            target_org_id = organisme_id
+            target_num = None
+
+            # Auto-résolution du poule_id si manquant mais club+filtre présents
+            if not effective_poule_id and (club_name or organisme_id) and filtre:
+                # Résolution de l'organisme_id si seul le nom est fourni
+                if not target_org_id and club_name:
+                    orgs = await search_organismes_service(nom=club_name, limit=1)
+                    if orgs and isinstance(orgs[0], dict):
+                        target_org_id = orgs[0].get("id")
+
+                if target_org_id:
+                    # Parse le filtre pour extraire le numéro d'équipe si présent (ex: U11M1)
+                    from .utils import parse_categorie
+                    parsed = parse_categorie(filtre)
+                    target_num = parsed.numero_equipe if parsed else None
+                    
+                    # Tentative de résolution de la poule
+                    resolved_pid = await resolve_poule_id_service(
+                        target_org_id, 
+                        filtre, 
+                        phase_query=phase
+                    )
+                    if resolved_pid:
+                        effective_poule_id = resolved_pid
+
+            if not effective_poule_id:
+                return [{"error": "poule_id requis pour action='classement' (auto-résolution échouée)"}]
+            
             return await ffbb_get_classement_service(
-                poule_id=poule_id,
+                poule_id=effective_poule_id,
                 force_refresh=force_refresh,
+                target_organisme_id=target_org_id,
+                target_num=target_num
             )
         return [{"error": f"Action inconnue: {action}"}]
     except Exception as e:
