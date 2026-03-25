@@ -109,7 +109,7 @@ flowchart LR
 
 Ce serveur expose des **Prompts** natifs pour donner instantanément de l'expertise métier à votre agent :
 
-- 🎓 `expert_basket` : Injecte les règles métier complexes de la FFBB à votre agent (catégories, désambiguïsation, utilisation optimale des outils unifiés). **Fortement recommandé.**
+- 🎓 `expert_basket` : Injecte les règles métier complexes de la FFBB à votre agent (catégories, désambiguïsation, [règles de navigation multi-phases](docs/rules_ffbb.md), utilisation optimale des outils unifiés). **Fortement recommandé.**
 - 📈 `bilan_equipe` : Prompt guidé pour sortir un rapport exhaustif d'une équipe.
 - 🏟️ `analyser_match` / `prochain_match` : Workflows en 1 clic pour décortiquer une rencontre spécifique.
 
