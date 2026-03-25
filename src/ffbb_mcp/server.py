@@ -764,13 +764,10 @@ async def ffbb_last_result(
         Field(description="Si True, force un rafraichissement des donnees de poule"),
     ] = False,
 ) -> dict[str, Any]:
-    """Dernier match joué pour une équipe précise.
+    """Dernier résultat d'une équipe précise.
 
-    Utiliser ce tool pour obtenir le dernier match joué par une équipe donnée.
-    Il agrège les différentes poules du club pour cette catégorie et
-    sélectionne la rencontre la plus récente jouée.
-
-    Si aucun match n'est trouvé, retourne un objet avec `status: "no_result"`.
+    Recommendation LLM : Si la categorie est imprécise ou sans numéro (ex: 'U11M'),
+    appeler d'abord `ffbb_resolve_team` pour obtenir le `numero_equipe` reel.
     """
 
     if club_name is None and organisme_id is None:
