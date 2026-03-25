@@ -625,15 +625,10 @@ async def ffbb_resolve_team(
         ),
     ] = "U11M1",
 ) -> dict[str, Any]:
-    """Résout une équipe unique pour un club et une catégorie.
+    """Identifie une equipe unique (Pivot central).
 
-    Utilise ffbb_equipes_club_service et le parseur de catégorie commun pour
-    interpréter des entrées comme "U11M1", "U13F-2", etc.
-
-    Retourne :
-      - `team` : l'équipe résolue (ou null en cas d'ambiguïté)
-      - `candidates` : toutes les équipes candidates
-      - `ambiguity` : message explicite à relayer à l'utilisateur si nécessaire.
+    DOIT etre utilise avant `ffbb_next_match` ou `ffbb_last_result` si l'agent
+    ne connait pas le numero d'equipe exact ou si la categorie est ambiguë (ex: 'U11M').
     """
     return await ffbb_resolve_team_service(
         club_name=club_name, organisme_id=organisme_id, categorie=categorie
@@ -818,11 +813,8 @@ async def ffbb_next_match(
 ) -> dict[str, Any]:
     """Prochain match à jouer pour une équipe précise.
 
-    Utiliser ce tool pour obtenir le prochain match d'une équipe donnée.
-    Il résout automatiquement la bonne poule et sélectionne la prochaine
-    rencontre non jouée.
-
-    Si aucun prochain match n'est trouvé, retourne un objet avec `status: "no_result"`.
+    Recommendation LLM : Si la categorie est imprécise ou sans numéro (ex: 'U11M'),
+    appeler d'abord `ffbb_resolve_team` pour obtenir le `numero_equipe` reel.
     """
 
     if club_name is None and organisme_id is None:
