@@ -14,14 +14,14 @@ async def test_ffbb_club_equipes_auto_resolution():
     mock_equipes = AsyncMock(return_value=[{"id": "team1", "nom": "U11M1"}])
 
     with (
-        patch("ffbb_mcp.server.search_organismes_service", mock_search),
+        patch("ffbb_mcp.services.search_organismes_service", mock_search),
         patch("ffbb_mcp.server.ffbb_equipes_club_service", mock_equipes),
     ):
         # Appel sans organisme_id mais avec club_name
         result = await ffbb_club(action="equipes", club_name="Stade Clermontois")
 
-        # Vérifications
-        mock_search.assert_called_once_with(nom="Stade Clermontois", limit=1)
+        # Vérifications (limit=3 maintenant pour détecter l'ambiguïté)
+        mock_search.assert_called_once_with(nom="Stade Clermontois", limit=3)
         mock_equipes.assert_called_once_with(organisme_id=123, filtre=None)
         assert result == [{"id": "team1", "nom": "U11M1"}]
 
@@ -37,7 +37,7 @@ async def test_ffbb_club_classement_auto_resolution_full_chain():
     )
 
     with (
-        patch("ffbb_mcp.server.search_organismes_service", mock_search),
+        patch("ffbb_mcp.services.search_organismes_service", mock_search),
         patch("ffbb_mcp.server.resolve_poule_id_service", mock_resolve_poule),
         patch("ffbb_mcp.server.ffbb_get_classement_service", mock_classement),
     ):
@@ -50,7 +50,7 @@ async def test_ffbb_club_classement_auto_resolution_full_chain():
         )
 
         # Vérifications
-        mock_search.assert_called_once_with(nom="Stade Clermontois", limit=1)
+        mock_search.assert_called_once_with(nom="Stade Clermontois", limit=3)
         mock_resolve_poule.assert_called_once_with(123, "U11M", phase_query="Phase 3")
         mock_classement.assert_called_once_with(
             poule_id=456, force_refresh=False, target_organisme_id=123, target_num=None
@@ -64,8 +64,8 @@ async def test_ffbb_club_resolution_failure():
 
     mock_search = AsyncMock(return_value=[])  # Aucun club trouvé
 
-    with patch("ffbb_mcp.server.search_organismes_service", mock_search):
+    with patch("ffbb_mcp.services.search_organismes_service", mock_search):
         result = await ffbb_club(action="equipes", club_name="Club Inconnu")
 
         assert "error" in result[0]
-        assert "Impossible de résoudre l'organisme_id" in result[0]["error"]
+        assert "Aucun club trouvé" in result[0]["error"]

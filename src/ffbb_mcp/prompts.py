@@ -130,6 +130,25 @@ _BEHAVIOR = """\
 - En cas d'ambiguïté sur l'équipe exacte, explicite-la plutôt que de trancher silencieusement.\
 """
 
+_EXAMPLES = """\
+## 💡 EXEMPLES DE RAISONNEMENT
+
+**Scénario A : Ambiguïté Club (Nom vague)**
+1. User: "Résultats du Stade Clermontois."
+2. Agent appelle `ffbb_club(action='equipes', club_name='Stade Clermontois')`.
+3. Tool répond `{"error": "Plusieurs clubs correspondent...", "candidates": [{"id": 12, "nom": "Stade Clermontois Basket"}, {"id": 15, "nom": "Stade Clermontois Féminin"}]}`.
+4. Agent répond: "Plusieurs clubs correspondent au Stade Clermontois. Lequel recherches-tu ?
+   - Stade Clermontois Basket (M)
+   - Stade Clermontois Féminin (F)"
+
+**Scénario B : Catégorie Erronée (Aide à l'auto-correction)**
+1. User: "Calendrier U11M1 du Stade Clermontois."
+2. Agent appelle `ffbb_club(action='calendrier', club_name='Stade Clermontois', filtre='U11M1')`.
+3. Tool répond `{"error": "Aucune équipe...", "suggested_teams": ["U11M2", "U13M1"]}`.
+4. Agent raisonne: "L'équipe U11M1 n'est pas engagée cette saison, mais l'équipe U11M2 l'est. Je vais vérifier le calendrier de l'U11M2."
+5. Agent appelle `ffbb_club(...)` avec le bon filtre ou informe l'utilisateur.
+"""
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # FONCTIONS PURES (utilisées par le MCP ET les tests unitaires)
@@ -146,6 +165,7 @@ def expert_basket() -> str:
         _WORKFLOW,
         _GUARDRAILS,
         _BEHAVIOR,
+        _EXAMPLES,
     ])
 
 

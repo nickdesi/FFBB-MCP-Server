@@ -491,7 +491,28 @@ async def ffbb_club(
         # Résolution automatique de l'organisme_id si manquant mais club_name fourni
         target_org_id = organisme_id
         if not target_org_id and club_name:
-            orgs = await search_organismes_service(nom=club_name, limit=1)
+            # On cherche plusieurs candidats pour détecter l'ambiguïté
+            from .services import search_organismes_service
+            orgs = await search_organismes_service(nom=club_name, limit=3)
+            
+            if not orgs:
+                return [{"error": f"Aucun club trouvé pour '{club_name}'. Vérifie l'orthographe ou utilise ffbb_search."}]
+            
+            if len(orgs) > 1:
+                # Ambiguïté détectée : plusieurs candidats
+                candidates = [
+                    {
+                        "id": o.get("id"), 
+                        "nom": o.get("nom"), 
+                        "ville": o.get("ville_salle") or o.get("ville")
+                    } 
+                    for o in orgs if isinstance(o, dict)
+                ]
+                return [{
+                    "error": f"Plusieurs clubs correspondent à '{club_name}'. Précise l'organisme_id ou un nom plus exact.",
+                    "candidates": candidates
+                }]
+            
             if orgs and isinstance(orgs[0], dict):
                 target_org_id = orgs[0].get("id")
 

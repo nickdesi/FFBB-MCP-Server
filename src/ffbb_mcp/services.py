@@ -247,12 +247,11 @@ async def _safe_call(
     """
     logger.info(f"Début exécution: {operation_name}")
 
-    # If a factory is provided, use it to create fresh coroutines per attempt.
-    make_coro = None
+    # Si une factory est fournie, l'utiliser pour créer des coroutines fraîches par tentative.
     if callable(coro):
         make_coro = coro
     else:
-        # single-use coroutine passed; wrap into a factory that returns it once
+        # coroutine à usage unique passée ; l'envelopper dans une factory qui la retourne une fois
         single = coro
 
         def _once():
@@ -260,10 +259,8 @@ async def _safe_call(
 
         make_coro = _once
 
-    attempt = 0
     last_exc: Exception | None = None
-    while attempt < max(1, retries):
-        attempt += 1
+    for attempt in range(1, max(1, retries) + 1):
         try:
             current_coro = make_coro()
             result = await current_coro
@@ -272,22 +269,14 @@ async def _safe_call(
         except Exception as e:
             last_exc = e
 
-            # Decide if error is retriable
-            retriable = False
-            if isinstance(e, HTTPStatusError):
-                status = getattr(e.response, "status_code", None)
-                if status == 429:
-                    retriable = True
-            errname = type(e).__name__.lower()
-            msg = str(e).lower()
-            if "timeout" in errname or "timeout" in msg or "connection" in msg:
-                retriable = True
+            # Décider si l'erreur est réessayable
+            retriable = _is_retriable_error(e)
 
             if attempt >= retries or not retriable:
-                # no more retries or not retriable: raise handled error
+                # plus de tentatives ou pas réessayable : lever l'erreur gérée
                 raise _handle_api_error(e) from e
 
-            # exponential backoff with jitter
+            # backoff exponentiel avec jitter
             delay = min(max_delay, base_delay * (2 ** (attempt - 1)))
             jitter = random.random() * (delay * 0.1)
             sleep_for = delay + jitter
@@ -303,10 +292,28 @@ async def _safe_call(
                 await asyncio.sleep(sleep_for)
             except asyncio.CancelledError:
                 raise
-    # If we exit loop without returning, raise last exception formatted
+
+    # Si on sort de la boucle sans retourner, lever la dernière exception formatée
     if last_exc is not None:
         raise _handle_api_error(last_exc) from last_exc
     return None
+
+
+def _is_retriable_error(e: Exception) -> bool:
+    """Détermine si une erreur est réessayable."""
+    if isinstance(e, HTTPStatusError):
+        status = getattr(e.response, "status_code", None)
+        if status == 429:  # Rate limiting
+            return True
+        if status in (502, 503, 504):  # Server errors
+            return True
+
+    errname = type(e).__name__.lower()
+    msg = str(e).lower()
+    return any(
+        keyword in errname or keyword in msg
+        for keyword in ["timeout", "connection", "network", "temporary"]
+    )
 
 
 async def _safe_call_with_inflight(
@@ -392,7 +399,8 @@ async def get_lives_service() -> list[dict]:
             "Lives (Matchs en cours)", lambda: client.get_lives_async()
         )
     )
-    result = [serialize_model(live) for live in lives] if lives else []
+    lives_list = lives if isinstance(lives, list) else []
+    result = [serialize_model(live) for live in lives_list]
     _cache_set(_cache_lives, "lives", result, "lives")
     return result
 
@@ -409,7 +417,8 @@ async def get_saisons_service(active_only: bool = False) -> list[dict]:
             "Saisons", lambda: client.get_saisons_async(active_only=active_only)
         )
     )
-    result = [serialize_model(s) for s in saisons] if saisons else []
+    saisons_list = saisons if isinstance(saisons, list) else []
+    result = [serialize_model(s) for s in saisons_list]
     _cache_set(_cache_detail, cache_key, result, "saisons")
     return result
 
@@ -513,6 +522,8 @@ async def ffbb_get_classement_service(
     target_num_str = str(target_num) if target_num else None
 
     for c in raw:
+        if not isinstance(c, dict):
+            continue
         eng = c.get("id_engagement", {}) or {}
         nom_equipe = eng.get("nom", "")
         # Identification du club via organisme_id ou rapprochement par nom (fallback)
@@ -687,98 +698,99 @@ async def ffbb_equipes_club_service(
         return []
 
     raw = data.get("engagements", []) if isinstance(data, dict) else []
-    flat: list[dict[str, Any]] = []
+    all_teams: list[dict[str, Any]] = []
     club_nom = data.get("nom", "")
 
     parsed_filter: ParsedCategorie | None = parse_categorie(filtre) if filtre else None
 
     for e in raw:
+        if not isinstance(e, dict):
+            continue
         comp = e.get("idCompetition", {}) or {}
         poule = e.get("idPoule", {}) or {}
         cat = comp.get("categorie", {}) or {}
         nom_comp = comp.get("nom", "")
         sexe_field = (comp.get("sexe") or "").upper()
 
-        # Filtre optionnel :
-        # - on applique toujours le filtre sur le code de catégorie (strict)
-        # - on n’exclut sur le sexe / numero_equipe que lorsqu’une information explicite
-        #   est disponible côté FFBB. En absence de champ, on laisse passer le candidat,
-        #   et la désambiguïsation fine est gérée plus haut (ffbb_resolve_team_service).
-        if parsed_filter is not None:
-            cat_code = (cat.get("code") or "").upper()
-            if parsed_filter.categorie and cat_code != parsed_filter.categorie:
-                continue
-
-            if parsed_filter.sexe == "F" and sexe_field == "M":
-                continue
-            if parsed_filter.sexe == "M" and sexe_field == "F":
-                continue
-
-            if parsed_filter.numero_equipe is not None:
-                team_num_raw = e.get("numeroEquipe")
-                team_num: int | None
-                try:
-                    team_num = int(team_num_raw) if team_num_raw is not None else None
-                except (TypeError, ValueError):
-                    team_num = None
-
-                # Si l’API FFBB expose un numeroEquipe explicite différent du filtre,
-                # on exclut. Sinon (numeroEquipe manquant ou égal), on garde.
-                if team_num is not None and team_num != parsed_filter.numero_equipe:
-                    continue
-
         # Enrichissement des champs dérivés
         numero_equipe = e.get("numeroEquipe")
         if numero_equipe is None and nom_comp:
-            # Fallback: tenter d'extraire le numéro du nom de la compétition
-            # ex: "Dépt U11M - 2" ou "U11M1"
             parsed_comp = parse_categorie(nom_comp)
             if parsed_comp.numero_equipe:
                 numero_equipe = parsed_comp.numero_equipe
 
         if numero_equipe is not None:
             try:
-                # Normalise en str simple ("1", "2", ...)
                 numero_equipe = str(int(numero_equipe))
             except (TypeError, ValueError):
                 numero_equipe = str(numero_equipe)
 
         categorie_code = cat.get("code", "") or ""
-        # Suffixe de genre compact pour le label ("M"/"F" ou "")
-        sexe_suffix = ""
-        if sexe_field == "M":
-            sexe_suffix = "M"
-        elif sexe_field == "F":
-            sexe_suffix = "F"
+        sexe_suffix = "M" if sexe_field == "M" else "F" if sexe_field == "F" else ""
 
-        # Construction d'un label prêt pour les agents, ex: "Stade Clermontois U11M1"
         base_cat = f"{categorie_code}{sexe_suffix}".strip()
         num_suffix = numero_equipe or ""
         cat_label = f"{base_cat}{num_suffix}" if base_cat or num_suffix else ""
         team_label = f"{club_nom} {cat_label}".strip()
-
-        # Phase/label si disponible dans la structure d'engagement
         phase_label = e.get("phase") or e.get("libellePhase") or None
-
         team_id = e.get("id")
 
-        flat.append(
+        team_info = {
+            "team_id": team_id,
+            "engagement_id": team_id,
+            "numero_equipe": numero_equipe,
+            "team_label": cat_label or team_label,
+            "phase_label": phase_label,
+            "nom_equipe": club_nom,
+            "competition": nom_comp,
+            "competition_id": comp.get("id"),
+            "poule_id": poule.get("id"),
+            "sexe": comp.get("sexe", ""),
+            "categorie": categorie_code,
+            "niveau": comp.get("competition_origine_niveau"),
+        }
+        all_teams.append(team_info)
+
+    # Filtrage
+    if parsed_filter is None:
+        return all_teams
+
+    assert parsed_filter is not None
+    filtered_teams: list[dict[str, Any]] = []
+    for t in all_teams:
+
+        # Filtre catégorie (strict)
+        if (
+            parsed_filter.categorie
+            and t["categorie"].upper() != parsed_filter.categorie.upper()
+        ):
+            continue
+        # Filtre sexe
+        if parsed_filter.sexe == "F" and (t["sexe"] or "").upper() == "M":
+            continue
+        if parsed_filter.sexe == "M" and (t["sexe"] or "").upper() == "F":
+            continue
+        # Filtre numéro d'équipe
+        if (
+            parsed_filter.numero_equipe is not None
+            and t["numero_equipe"] is not None
+            and t["numero_equipe"] != str(parsed_filter.numero_equipe)
+        ):
+            continue
+        filtered_teams.append(t)
+
+    if not filtered_teams:
+        # Ambiguity Hinting: si aucun match mais filtre présent, on liste les options possibles
+        suggestions = sorted(list({t["team_label"] for t in all_teams}))
+        return [
             {
-                "team_id": team_id,
-                "engagement_id": team_id,
-                "numero_equipe": numero_equipe,
-                "team_label": cat_label or team_label,
-                "phase_label": phase_label,
-                "nom_equipe": club_nom,
-                "competition": nom_comp,
-                "competition_id": comp.get("id"),
-                "poule_id": poule.get("id"),
-                "sexe": comp.get("sexe", ""),
-                "categorie": categorie_code,
-                "niveau": comp.get("competition_origine_niveau"),
+                "error": f"Aucune équipe matchant '{filtre}' trouvée pour '{club_nom}'.",
+                "suggested_teams": suggestions,
+                "hint": "Utilise l'un des labels suggérés pour une précision exacte.",
             }
-        )
-    return flat
+        ]
+
+    return filtered_teams
 
 
 async def ffbb_next_match_service(
@@ -831,12 +843,22 @@ async def ffbb_next_match_service(
     # Filtrer par numéro d'équipe
     if numero_equipe is not None:
         want = str(numero_equipe)
-        equipes = [e for e in equipes if (e.get("numero_equipe") or "").strip() == want]
-        if not equipes:
-            return {
-                "status": "not_found",
-                "message": f"Aucune équipe trouvée pour categorie={categorie!r}, numero_equipe={numero_equipe}.",
-            }
+        filtered_by_num = [e for e in equipes if (e.get("numero_equipe") or "").strip() == want]
+        
+        if not filtered_by_num:
+            # If no team matches the number, check if the original list had an error hint
+            if len(equipes) == 1 and "error" in equipes[0]:
+                return {
+                    "status": "not_found",
+                    "message": equipes[0]["error"],
+                    "suggestions": equipes[0].get("suggested_teams")
+                }
+            else:
+                return {
+                    "status": "not_found",
+                    "message": f"Aucune équipe trouvée pour categorie={categorie!r}, numero_equipe={numero_equipe}.",
+                }
+        equipes = filtered_by_num
 
     # Check multi-club ambiguity
     distinct_orgs = {e.get("_resolved_org_id") for e in equipes}
@@ -993,10 +1015,13 @@ async def ffbb_saison_bilan_service(
         organisme_id=org_id_int,
         filtre=categorie,
     )
-    if not equipes:
+    # Gestion du format d'erreur avec suggestions ( Ambiguity Hinting )
+    if not equipes or (len(equipes) == 1 and "error" in equipes[0]):
+        error_msg = equipes[0]["error"] if equipes else f"Aucune équipe trouvée pour la catégorie '{categorie}'."
         return {
             "status": "not_found",
-            "message": f"Aucune équipe trouvée pour la catégorie '{categorie}'.",
+            "message": error_msg,
+            "suggestions": equipes[0].get("suggested_teams") if equipes else [],
         }
 
     want_num = str(numero_equipe)
@@ -1188,7 +1213,9 @@ async def ffbb_bilan_service(
         equipes: list[dict[str, Any]] = []
         for res in eq_results:
             if isinstance(res, list):
-                equipes.extend(res)
+                for e in res:
+                    if isinstance(e, dict) and "error" not in e:
+                        equipes.append(e)
 
         if not equipes:
             return {"error": f"Aucune équipe trouvée pour la catégorie '{categorie}'"}
@@ -1258,7 +1285,7 @@ async def ffbb_bilan_service(
 
         # 4. Agréger par phase
         phases: list[dict[str, Any]] = []
-        totaux: dict[str, int] = {
+        totaux = {
             "match_joues": 0,
             "gagnes": 0,
             "perdus": 0,
@@ -1269,8 +1296,12 @@ async def ffbb_bilan_service(
         }
 
         for pid, poule_data in poules_map.items():
+            if not isinstance(poule_data, dict):
+                continue
             eng_ids_here = poule_to_eng.get(pid, set())
             for entry in poule_data.get("classements", []):
+                if not isinstance(entry, dict):
+                    continue
                 eng = entry.get("id_engagement", {}) or {}
                 entry_eng_id = str(eng.get("id", ""))
                 entry_org_id = str(entry.get("organisme_id", ""))
@@ -1373,7 +1404,8 @@ async def get_calendrier_club_service(
         equipes: list[dict[str, Any]] = []
         for res in eq_results:
             if isinstance(res, list):
-                equipes.extend(res)
+                # FILTRE: on ignore les dictionnaires d'erreur (Hinting) pour le traitement interne
+                equipes.extend([e for e in res if isinstance(e, dict) and "error" not in e])
             elif isinstance(res, Exception):
                 logger.error("Erreur lors de la récupération des équipes: %s", res)
 
@@ -1384,6 +1416,8 @@ async def get_calendrier_club_service(
         deduped_equipes: list[dict[str, Any]] = []
         seen_engagement_ids: set[str] = set()
         for equipe in equipes:
+            if not isinstance(equipe, dict):
+                continue
             engagement_id = equipe.get("engagement_id")
             if engagement_id is None:
                 deduped_equipes.append(equipe)
@@ -1424,13 +1458,15 @@ async def get_calendrier_club_service(
 
             poule_data = poules_by_id.get(str(poule_id))
             if (
-                isinstance(poule_data, Exception)
+                not isinstance(poule_data, dict)
                 or not poule_data
                 or "rencontres" not in poule_data
             ):
                 continue
 
             for match in poule_data.get("rencontres", []):
+                if not isinstance(match, dict):
+                    continue
                 match_id = match.get("id")
                 if not match_id or match_id in seen_match_ids:
                     continue
@@ -1664,7 +1700,9 @@ async def ffbb_resolve_team_service(
     candidates: list[dict[str, Any]] = []
     for res in eq_results:
         if isinstance(res, list):
-            candidates.extend(res)
+            for e in res:
+                if isinstance(e, dict) and "error" not in e:
+                    candidates.append(e)
         elif isinstance(res, Exception):
             logger.error("Erreur lors de la récupération des équipes: %s", res)
 
