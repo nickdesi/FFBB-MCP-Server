@@ -488,51 +488,50 @@ async def ffbb_club(
     d'une equipe specifique. Utiliser `ffbb_last_result` et `ffbb_next_match` a la place.
     """
     try:
+        # Résolution automatique de l'organisme_id si manquant mais club_name fourni
+        target_org_id = organisme_id
+        if not target_org_id and club_name:
+            orgs = await search_organismes_service(nom=club_name, limit=1)
+            if orgs and isinstance(orgs[0], dict):
+                target_org_id = orgs[0].get("id")
+
         if action == "calendrier":
-            if not organisme_id and not club_name:
+            if not target_org_id and not club_name:
                 return [{"error": "Fournir organisme_id ou club_name"}]
             return await get_calendrier_club_service(
                 club_name=club_name,
-                organisme_id=organisme_id,
+                organisme_id=target_org_id,
                 categorie=filtre,
                 force_refresh=force_refresh,
             )
         elif action == "equipes":
-            if not organisme_id:
-                return [{"error": "organisme_id requis pour action='equipes'"}]
+            if not target_org_id:
+                return [{"error": "Impossible de résoudre l'organisme_id pour ce club. Essaye ffbb_search(type='organismes')."}]
             return await ffbb_equipes_club_service(
-                organisme_id=organisme_id, filtre=filtre
+                organisme_id=target_org_id, filtre=filtre
             )
         elif action == "classement":
             effective_poule_id = poule_id
-            target_org_id = organisme_id
             target_num = None
 
-            # Auto-résolution du poule_id si manquant mais club+filtre présents
-            if not effective_poule_id and (club_name or organisme_id) and filtre:
-                # Résolution de l'organisme_id si seul le nom est fourni
-                if not target_org_id and club_name:
-                    orgs = await search_organismes_service(nom=club_name, limit=1)
-                    if orgs and isinstance(orgs[0], dict):
-                        target_org_id = orgs[0].get("id")
-
-                if target_org_id:
-                    # Parse le filtre pour extraire le numéro d'équipe si présent (ex: U11M1)
-                    from .utils import parse_categorie
-                    parsed = parse_categorie(filtre)
-                    target_num = parsed.numero_equipe if parsed else None
-                    
-                    # Tentative de résolution de la poule
-                    resolved_pid = await resolve_poule_id_service(
-                        target_org_id, 
-                        filtre, 
-                        phase_query=phase
-                    )
-                    if resolved_pid:
-                        effective_poule_id = resolved_pid
+            # Auto-résolution du poule_id si manquant mais club/filtre présents
+            if not effective_poule_id and target_org_id and filtre:
+                # Parse le filtre pour extraire le numéro d'équipe si présent (ex: U11M1)
+                from .utils import parse_categorie
+                parsed = parse_categorie(filtre)
+                target_num = parsed.numero_equipe if parsed else None
+                
+                # Tentative de résolution de la poule via le service dédié
+                resolved_pid = await resolve_poule_id_service(
+                    target_org_id, 
+                    filtre, 
+                    phase_query=phase
+                )
+                if resolved_pid:
+                    effective_poule_id = resolved_pid
 
             if not effective_poule_id:
-                return [{"error": "poule_id requis pour action='classement' (auto-résolution échouée)"}]
+                return [{"error": "poule_id requis pour action='classement' (auto-résolution échouée - indique la phase ou vérifie l'ID de poule)"}]
             
             return await ffbb_get_classement_service(
                 poule_id=effective_poule_id,
