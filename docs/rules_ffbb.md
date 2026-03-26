@@ -223,3 +223,19 @@ Pour le dernier résultat :
       NON → score suivant → retour [5]
 [6] Tous épuisés → force_refresh=true → retour [2]
 [7] Toujours rien → saison terminée/pause → informer + proposer ffbb_bilan
+
+---
+
+### Implémentation technique — Champs et Casing
+
+**1. Champ `joue` (Match terminé/non-joué)**
+- Le système filtre les matchs à venir avec : `if joue not in (0, "0", None):`.
+- `0` ou `"0"` indique un match programmé non encore validé par le système live.
+- `None` est explicitement inclus pour considérer les matchs sans date ou sans état (`joue=null` dans l'API) comme "non-joués" (ex: matchs reportés sans nouvelle date fixée).
+
+**2. Casing des données (CamelCase vs Snake_case)**
+- L'API FFBB et le client v3 utilisent principalement du **camelCase** pour les clés d'objets imbriqués (ex: `idCompetition`, `libellePoule`).
+- La fonction `serialize_model` (via `model_dump`) de Pydantic v2 préserve ce casing lors de la conversion en JSON.
+- Les services et l'agent doivent privilégier l'accès via les clés d'origine (ex: `obj.get("idCompetition")`) pour garantir la compatibilité avec la source de vérité.
+- **Exceptions** : Certains champs de premier niveau (id, nom) peuvent être normalisés par le client, mais les objets `engagements` et `rencontres` conservent les clés FFBB brutes.
+```

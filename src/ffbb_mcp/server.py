@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import platform
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
@@ -252,9 +253,6 @@ async def ffbb_version() -> dict[str, Any]:
     Retourne une structure compacte et strictement typée, pratique pour les
     agents et les outils de supervision.
     """
-
-    import platform
-
     return {
         "package_version": _PACKAGE_VERSION,
         "python_version": platform.python_version(),
@@ -399,11 +397,12 @@ async def ffbb_get(
             return await get_competition_service(competition_id=id)
         elif type == "poule":
             poule_data = await get_poule_service(id, force_refresh=force_refresh)
-            filtered = {
+            return {
                 "id": poule_data.get("id"),
+                "nom": poule_data.get("libelle"),
+                "classements": poule_data.get("classements", []),
                 "rencontres": poule_data.get("rencontres", []),
             }
-            return filtered
         elif type == "organisme":
             return await get_organisme_service(organisme_id=id)
         return {"error": f"Type inconnu: {type}"}
@@ -492,7 +491,6 @@ async def ffbb_club(
         target_org_id = organisme_id
         if not target_org_id and club_name:
             # On cherche plusieurs candidats pour détecter l'ambiguïté
-            from .services import search_organismes_service
             orgs = await search_organismes_service(nom=club_name, limit=3)
             
             if not orgs:
@@ -527,7 +525,7 @@ async def ffbb_club(
             )
         elif action == "equipes":
             if not target_org_id:
-                return [{"error": "Impossible de résoudre l'organisme_id pour ce club. Essaye ffbb_search(type='organismes')."}]
+                return [{"error": "organisme_id requis pour l'action 'equipes' (la résolution du club_name a échoué)."}]
             return await ffbb_equipes_club_service(
                 organisme_id=target_org_id, filtre=filtre
             )
@@ -688,15 +686,16 @@ async def ffbb_team_summary(
             except (TypeError, ValueError):
                 resolved_num = 1
 
-        # Lancer bilan + last_result + next_match en parallèle
-        bilan_coro = ffbb_bilan_service(
-            club_name=club_name,
-            organisme_id=organisme_id,
-            categorie=categorie,
-        )
-
         # last_result et next_match nécessitent organisme_id
         effective_org_id = resolved_org_id
+
+        # Lancer bilan + last_result + next_match en parallèle
+        # On passe effective_org_id au lieu de club_name pour éviter une double résolution
+        bilan_coro = ffbb_bilan_service(
+            club_name=None,
+            organisme_id=effective_org_id,
+            categorie=categorie,
+        )
 
         if effective_org_id and categorie:
             last_coro = ffbb_last_result_service(

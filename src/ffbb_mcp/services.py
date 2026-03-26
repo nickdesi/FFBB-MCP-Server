@@ -376,13 +376,16 @@ async def _safe_call_with_inflight(
         dec_inflight()
 
 
-async def _dedupe_inflight_detail(cache_key: str, make_coro) -> Any:
+async def _dedupe_inflight_detail(
+    cache_key: str, make_coro, cache_name: str = "detail"
+) -> Any:
     """Déduplique les appels concurrents sur la même clé de détail."""
     return await _dedupe_inflight(
         cache=_cache_detail,
         cache_key=cache_key,
         inflight_map=_inflight_detail,
         make_coro=make_coro,
+        cache_name=cache_name,
     )
 
 
@@ -392,10 +395,11 @@ async def _dedupe_inflight(
     cache_key: str,
     inflight_map: dict[str, asyncio.Task[Any]],
     make_coro,
+    cache_name: str,
 ) -> Any:
     """Déduplique les appels concurrents sur une clé et met en cache le résultat."""
     if cache is not None:
-        cached = _cache_get(cache, cache_key, "detail")
+        cached = _cache_get(cache, cache_key, cache_name)
         if cached is not None:
             return cached
 
@@ -409,7 +413,7 @@ async def _dedupe_inflight(
     try:
         result = await existing
         if cache is not None:
-            _cache_set(cache, cache_key, result, "detail")
+            _cache_set(cache, cache_key, result, cache_name)
         return result
     finally:
         async with _get_inflight_lock():
@@ -471,12 +475,15 @@ async def get_competition_service(competition_id: int | str) -> dict:
         )
         return serialize_model(comp) or {}
 
-    return await _dedupe_inflight_detail(cache_key, _fetch)
+    return await _dedupe_inflight_detail(cache_key, _fetch, cache_name="competition")
 
 
 async def get_poule_service(poule_id: int | str, *, force_refresh: bool = False) -> dict:
     poule_id_int = _coerce_numeric_id(poule_id, "poule_id")
     cache_key = f"poule:{poule_id_int}"
+
+    if force_refresh:
+        _cache_detail.pop(cache_key, None)
 
     async def _fetch() -> dict:
         client = await get_client_async()
@@ -491,15 +498,10 @@ async def get_poule_service(poule_id: int | str, *, force_refresh: bool = False)
         _cache_set(_cache_detail, cache_key, data, "poule")
         return data
 
-    if force_refresh:
-        result = await _fetch()
-        _cache_set(_cache_detail, cache_key, result, "poule")
-        return result
-
     # On utilise toujours le mécanisme de déduplication pour éviter de frapper
     # l'API FFBB plusieurs fois pour la même poule en parallèle.
     # _dedupe_inflight_detail gère déjà la lecture/écriture du cache.
-    return await _dedupe_inflight_detail(cache_key, _fetch)
+    return await _dedupe_inflight_detail(cache_key, _fetch, cache_name="poule")
 
 
 async def get_organisme_service(organisme_id: int | str) -> dict:
@@ -516,7 +518,7 @@ async def get_organisme_service(organisme_id: int | str) -> dict:
         )
         return serialize_model(org) or {}
 
-    return await _dedupe_inflight_detail(cache_key, _fetch)
+    return await _dedupe_inflight_detail(cache_key, _fetch, cache_name="organisme")
 
 
 async def ffbb_get_classement_service(
@@ -613,6 +615,7 @@ async def _search_generic(
         cache_key=cache_key,
         inflight_map=_inflight_search,
         make_coro=_fetch,
+        cache_name="search",
     )
 
 
@@ -700,6 +703,7 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
         cache_key=cache_key,
         inflight_map=_inflight_search,
         make_coro=_fetch,
+        cache_name="search",
     )
 
 
@@ -841,36 +845,19 @@ async def ffbb_next_match_service(
     if not club_name and not organisme_id:
         return {"status": "error", "message": "Fournir club_name ou organisme_id"}
 
-    # Résolution des organismes avec métadonnées
-    resolved_clubs = []
-    if organisme_id:
-        org_info = await get_organisme_service(str(organisme_id))
-        if org_info and isinstance(org_info, dict):
-            resolved_clubs.append({
-                "nom": org_info.get("nom", ""),
-                "organisme_id": org_info.get("id"),
-                "code": org_info.get("code", "")
-            })
-    elif club_name:
-        orgs = await search_organismes_service(nom=club_name, limit=3)
-        for org in orgs:
-            if isinstance(org, dict) and org.get("id"):
-                resolved_clubs.append({
-                    "nom": org.get("nom", ""),
-                    "organisme_id": org.get("id"),
-                    "code": org.get("code", "")
-                })
+    # Résolution des organismes avec métadonnées (CENTRALISÉ)
+    resolved_clubs, org_data = await _resolve_club_and_org(club_name, organisme_id)
 
     if not resolved_clubs:
         return {
-            "status": "not_found", 
+            "status": "not_found",
             "message": f"Club '{club_name or organisme_id}' introuvable.",
             "club_resolu": None
         }
 
     # Si ambiguïté sur le club, on s'arrête là (sauf si un seul club matchait)
     if len(resolved_clubs) > 1 and not organisme_id:
-         return {
+        return {
             "status": "ambiguous",
             "message": f"Plusieurs clubs correspondent à '{club_name}'. Précisez l'organisme_id.",
             "candidates": resolved_clubs,
@@ -880,8 +867,10 @@ async def ffbb_next_match_service(
     club_resolu = resolved_clubs[0]
     target_org_id = str(club_resolu["organisme_id"])
 
-    import asyncio
-    equipes = await ffbb_equipes_club_service(organisme_id=target_org_id, filtre=categorie)
+    # Fetch équipes candidates for this category
+    equipes = await ffbb_equipes_club_service(
+        organisme_id=target_org_id, filtre=categorie, org_data=org_data
+    )
     
     if not equipes or (isinstance(equipes, list) and len(equipes) == 1 and "error" in equipes[0]):
         msg = equipes[0]["error"] if (equipes and "error" in equipes[0]) else f"Aucune équipe trouvée pour la catégorie '{categorie}'."
@@ -1227,31 +1216,10 @@ async def ffbb_bilan_service(
     cache_key = f"bilan:{organisme_id or ''}:{(club_name or '').lower().strip()}:{categorie or ''}"
 
     async def _fetch() -> dict[str, Any]:
-        # 1. Résoudre l'organisme_id
-        target_org_ids: list[str] = []
-        club_nom = club_name or ""
-
-        # FIX: org_data initialisé à None avant le try pour éviter un NameError
-        # si get_organisme_service lève une exception.
-        org_data: dict | None = None
-
-        if organisme_id:
-            target_org_ids = [str(organisme_id)]
-            try:
-                org_data = await get_organisme_service(organisme_id)
-                if isinstance(org_data, dict) and org_data.get("nom"):
-                    club_nom = org_data.get("nom")
-            except Exception:
-                pass
-        elif club_name:
-            orgs = await search_organismes_service(nom=club_name, limit=5)
-            target_org_ids = [
-                str(org["id"])
-                for org in orgs
-                if isinstance(org, dict) and org.get("id")
-            ]
-            if orgs and isinstance(orgs[0], dict):
-                club_nom = orgs[0].get("nom", club_name) or club_name or ""
+        # 1. Résoudre l'organisme_id (CENTRALISÉ)
+        resolved_clubs, org_data = await _resolve_club_and_org(club_name, organisme_id)
+        target_org_ids = [str(c["organisme_id"]) for c in resolved_clubs]
+        club_nom = resolved_clubs[0]["nom"] if resolved_clubs else (club_name or "")
 
         if not target_org_ids:
             return {"error": f"Club '{club_name}' introuvable"}
@@ -1259,20 +1227,15 @@ async def ffbb_bilan_service(
         # 2. Récupérer les équipes filtrées en parallèle
         eq_tasks = []
         for oid in target_org_ids:
-            if (
-                organisme_id
-                and str(oid) == str(organisme_id)
-                and isinstance(org_data, dict)
-            ):
-                eq_tasks.append(
-                    ffbb_equipes_club_service(
-                        organisme_id=oid, filtre=categorie, org_data=org_data
-                    )
+            # On passe org_data seulement si c'est l'organisme cible direct
+            # pour optimiser l'appel interne.
+            is_target = organisme_id and str(oid) == str(organisme_id)
+            pass_org = org_data if is_target else None
+            eq_tasks.append(
+                ffbb_equipes_club_service(
+                    organisme_id=oid, filtre=categorie, org_data=pass_org
                 )
-            else:
-                eq_tasks.append(
-                    ffbb_equipes_club_service(organisme_id=oid, filtre=categorie)
-                )
+            )
         eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
 
         equipes: list[dict[str, Any]] = []
@@ -1311,18 +1274,8 @@ async def ffbb_bilan_service(
             async with semaphore:
                 try:
                     return await get_poule_service(pid)
-                except McpError:
-                    try:
-                        client = await get_client_async()
-                        poule = await _with_ffbb_semaphore(
-                            _safe_call_with_inflight(
-                                f"Poule {pid}",
-                                lambda: client.get_poule_async(poule_id=pid),
-                            )
-                        )
-                        return serialize_model(poule) or {}
-                    except Exception as e:
-                        return e
+                except Exception as e:
+                    return e
 
         poules_raw = await asyncio.gather(
             *[_fetch_poule_bilan(pid) for pid in unique_poule_ids],
@@ -1427,6 +1380,7 @@ async def ffbb_bilan_service(
         cache_key=cache_key,
         inflight_map=_inflight_bilan,
         make_coro=_fetch,
+        cache_name="bilan",
     )
 
 
@@ -1449,18 +1403,9 @@ async def get_calendrier_club_service(
     cache_key = f"calendrier:{organisme_id or ''}:{(club_name or '').lower().strip()}:{categorie or ''}"
 
     async def _fetch() -> list[dict]:
-        # 1. Résoudre les organismes cibles
-        target_org_ids: list[str] = []
-
-        if organisme_id:
-            target_org_ids = [str(organisme_id)]
-        elif club_name:
-            orgs = await search_organismes_service(nom=club_name, limit=3)
-            target_org_ids = [
-                str(org.get("id"))
-                for org in orgs
-                if isinstance(org, dict) and org.get("id")
-            ]
+        # 1. Résoudre les organismes cibles (CENTRALISÉ)
+        resolved_clubs, _ = await _resolve_club_and_org(club_name, organisme_id, limit=3)
+        target_org_ids = [str(c["organisme_id"]) for c in resolved_clubs]
 
         # Dédupliquer / nettoyer
         target_org_ids = list(dict.fromkeys(oid for oid in target_org_ids if oid))
@@ -1667,13 +1612,14 @@ async def get_calendrier_club_service(
     # force_refresh contourne le cache de calendrier, mais continue de bénéficier
     # de la déduplication inflight.
     if force_refresh:
-        return await _fetch()
+        _cache_calendrier.pop(cache_key, None)
 
     return await _dedupe_inflight(
         cache=_cache_calendrier,
         cache_key=cache_key,
         inflight_map=_inflight_calendrier,
         make_coro=_fetch,
+        cache_name="calendrier",
     )
 
 
@@ -1739,31 +1685,14 @@ async def ffbb_resolve_team_service(
             )
         )
 
-    # 1) Résoudre l'organisme avec métadonnées
-    resolved_clubs = []
-    if organisme_id is not None:
-        org_info = await get_organisme_service(str(organisme_id))
-        if org_info and isinstance(org_info, dict):
-            resolved_clubs.append({
-                "nom": org_info.get("nom", ""),
-                "organisme_id": org_info.get("id"),
-                "code": org_info.get("code", "")
-            })
-    elif club_name:
-        orgs = await search_organismes_service(nom=club_name, limit=5)
-        for org in orgs:
-            if isinstance(org, dict) and org.get("id"):
-                resolved_clubs.append({
-                    "nom": org.get("nom", ""),
-                    "organisme_id": org.get("id"),
-                    "code": org.get("code", "")
-                })
+    # 1) Résoudre l'organisme avec métadonnées (CENTRALISÉ)
+    resolved_clubs, _ = await _resolve_club_and_org(club_name, organisme_id)
 
     if not resolved_clubs:
         return {
-            "status": "not_found", 
+            "status": "not_found",
             "team": None,
-            "candidates": [], 
+            "candidates": [],
             "ambiguity": f"Club '{club_name or organisme_id}' introuvable",
             "club_resolu": None
         }
@@ -1869,6 +1798,51 @@ def _normalize_name(value: str) -> str:
     return "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
 
 
+async def _resolve_club_and_org(
+    club_name: str | None, organisme_id: int | str | None, limit: int = 5
+) -> tuple[list[dict[str, Any]], dict | None]:
+    """Centralise la résolution d'un club vers une liste d'organismes candidats.
+    Retourne (candidats, premier_org_data).
+    """
+    resolved = []
+    org_data = None
+    if organisme_id is not None:
+        try:
+            org_info = await get_organisme_service(str(organisme_id))
+            if org_info and isinstance(org_info, dict):
+                org_data = org_info
+                resolved.append(
+                    {
+                        "nom": org_info.get("nom", ""),
+                        "organisme_id": org_info.get("id"),
+                        "code": org_info.get("code", ""),
+                    }
+                )
+        except Exception:
+            pass
+    elif club_name:
+        orgs = await search_organismes_service(nom=club_name, limit=limit)
+        if orgs:
+            # On récupère le détail du premier pour avoir les métadonnées riches (engagements, etc.)
+            try:
+                first_org_id = orgs[0].get("id")
+                if first_org_id:
+                    org_data = await get_organisme_service(first_org_id)
+            except Exception:
+                pass
+
+        for org in orgs:
+            if isinstance(org, dict) and org.get("id"):
+                resolved.append(
+                    {
+                        "nom": org.get("nom", ""),
+                        "organisme_id": org.get("id"),
+                        "code": org.get("code", ""),
+                    }
+                )
+    return resolved, org_data
+
+
 def _match_team_name(
     nom_equipe_rencontre: str, organisme_nom: str, numero_equipe: int | None
 ) -> bool:
@@ -1888,11 +1862,14 @@ def _match_team_name(
     if club_norm not in nom_norm:
         return False
 
-    suffix = f"- {numero_equipe}"
+    # On traite None comme 1 pour la recherche de suffixe (équipe unique ou principale)
+    search_num = numero_equipe if numero_equipe is not None else 1
+    suffix = f"- {search_num}"
     suffix_norm = _normalize_name(suffix)
 
-    if numero_equipe == 1:
+    if search_num == 1:
         # Equipe unique : suffixe optionnel.
+        # On accepte soit le suffixe "- 1", soit l'absence de chiffre dans le nom.
         has_digit = any(ch.isdigit() for ch in nom_norm)
         return nom_norm.endswith(suffix_norm) or not has_digit
 
@@ -1937,7 +1914,8 @@ async def resolve_poule_id_service(
 
     # Par défaut (ou si phase non trouvée), on prend l'engagement avec le niveau le plus élevé
     # (souvent la phase la plus avancée dans la saison).
-    equipes.sort(key=lambda x: x.get("niveau", 0), reverse=True)
+    # FIX: handle None correctly for sort
+    equipes.sort(key=lambda x: x.get("niveau") or 0, reverse=True)
     return str(equipes[0].get("poule_id"))
 
 
@@ -1951,36 +1929,19 @@ async def ffbb_last_result_service(
 ) -> dict:
     from datetime import datetime, timedelta
 
-    # Résolution des organismes avec métadonnées
-    resolved_clubs = []
-    if organisme_id:
-        org_info = await get_organisme_service(str(organisme_id))
-        if org_info and isinstance(org_info, dict):
-            resolved_clubs.append({
-                "nom": org_info.get("nom", ""),
-                "organisme_id": org_info.get("id"),
-                "code": org_info.get("code", "")
-            })
-    elif club_name:
-        orgs = await search_organismes_service(nom=club_name, limit=3)
-        for org in orgs:
-            if isinstance(org, dict) and org.get("id"):
-                resolved_clubs.append({
-                    "nom": org.get("nom", ""),
-                    "organisme_id": org.get("id"),
-                    "code": org.get("code", "")
-                })
+    # 1. Résolution des organismes avec métadonnées (CENTRALISÉ)
+    resolved_clubs, org_data = await _resolve_club_and_org(club_name, organisme_id)
 
     if not resolved_clubs:
         return {
-            "status": "not_found", 
+            "status": "not_found",
             "message": f"Club '{club_name or organisme_id}' introuvable.",
             "club_resolu": None
         }
 
     # Si ambiguïté sur le club, on s'arrête là
     if len(resolved_clubs) > 1 and not organisme_id:
-         return {
+        return {
             "status": "ambiguous",
             "message": f"Plusieurs clubs correspondent à '{club_name}'. Précisez l'organisme_id.",
             "candidates": resolved_clubs,
@@ -1991,8 +1952,9 @@ async def ffbb_last_result_service(
     target_org_id = str(club_resolu["organisme_id"])
 
     # Fetch équipes candidates for this category
-    import asyncio
-    equipes = await ffbb_equipes_club_service(organisme_id=target_org_id, filtre=categorie)
+    equipes = await ffbb_equipes_club_service(
+        organisme_id=target_org_id, filtre=categorie, org_data=org_data
+    )
     
     if not equipes or (isinstance(equipes, list) and len(equipes) == 1 and "error" in equipes[0]):
         msg = equipes[0]["error"] if (equipes and "error" in equipes[0]) else f"Aucune équipe trouvée pour la catégorie '{categorie}'."
