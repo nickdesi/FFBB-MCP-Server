@@ -238,4 +238,18 @@ Pour le dernier résultat :
 - La fonction `serialize_model` (via `model_dump`) de Pydantic v2 préserve ce casing lors de la conversion en JSON.
 - Les services et l'agent doivent privilégier l'accès via les clés d'origine (ex: `obj.get("idCompetition")`) pour garantir la compatibilité avec la source de vérité.
 - **Exceptions** : Certains champs de premier niveau (id, nom) peuvent être normalisés par le client, mais les objets `engagements` et `rencontres` conservent les clés FFBB brutes.
+
+---
+
+### Règle 10 — Résolution intelligente (M/F)
+
+Lors de la résolution d'un club par son nom (ex: "Stade Clermontois"), le système applique une logique de filtrage par genre :
+
+1. **Extraction du genre** : Le genre est extrait de la catégorie (ex: "U11M1" -> Masculin, "U13F" -> Féminin).
+2. **Filtrage des candidats** :
+   - Si l'équipe est **Masculine** : Priorité aux organismes qui NE contiennent PAS "FÉMININ" dans leur nom.
+   - Si l'équipe est **Féminine** : Priorité aux organismes qui CONTIENNENT "FÉMININ" (ou équivalent) dans leur nom.
+3. **Exception** : Si l'utilisateur fournit le nom complet (ex: "Stade Clermontois Basket Féminin"), ce choix est respecté sans application de la logique M/F.
+4. **Persistance** : Une fois l'organisme résolu, son `organisme_id` est réutilisé pour tous les appels suivants tant que le genre reste cohérent.
+5. **Transparence en cas d'échec** : Si aucun engagement n'est trouvé après application de cette branche, le système doit lister tous les organismes considérés (en précisant ceux marqués "Féminin") pour validation manuelle.
 ```

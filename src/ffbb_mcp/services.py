@@ -846,7 +846,11 @@ async def ffbb_next_match_service(
         return {"status": "error", "message": "Fournir club_name ou organisme_id"}
 
     # Résolution des organismes avec métadonnées (CENTRALISÉ)
-    resolved_clubs, org_data = await _resolve_club_and_org(club_name, organisme_id)
+    resolved_clubs, org_data = await _resolve_club_and_org(
+        club_name=club_name,
+        organisme_id=organisme_id,
+        categorie=categorie,
+    )
 
     if not resolved_clubs:
         return {
@@ -1217,7 +1221,9 @@ async def ffbb_bilan_service(
 
     async def _fetch() -> dict[str, Any]:
         # 1. Résoudre l'organisme_id (CENTRALISÉ)
-        resolved_clubs, org_data = await _resolve_club_and_org(club_name, organisme_id)
+        resolved_clubs, org_data = await _resolve_club_and_org(
+            club_name=club_name, organisme_id=organisme_id, categorie=categorie
+        )
         target_org_ids = [str(c["organisme_id"]) for c in resolved_clubs]
         club_nom = resolved_clubs[0]["nom"] if resolved_clubs else (club_name or "")
 
@@ -1404,7 +1410,12 @@ async def get_calendrier_club_service(
 
     async def _fetch() -> list[dict]:
         # 1. Résoudre les organismes cibles (CENTRALISÉ)
-        resolved_clubs, _ = await _resolve_club_and_org(club_name, organisme_id, limit=3)
+        resolved_clubs, _ = await _resolve_club_and_org(
+            club_name=club_name,
+            organisme_id=organisme_id,
+            categorie=categorie,
+            limit=5
+        )
         target_org_ids = [str(c["organisme_id"]) for c in resolved_clubs]
 
         # Dédupliquer / nettoyer
@@ -1686,7 +1697,11 @@ async def ffbb_resolve_team_service(
         )
 
     # 1) Résoudre l'organisme avec métadonnées (CENTRALISÉ)
-    resolved_clubs, _ = await _resolve_club_and_org(club_name, organisme_id)
+    resolved_clubs, _ = await _resolve_club_and_org(
+        club_name=club_name,
+        organisme_id=organisme_id,
+        categorie=categorie
+    )
 
     if not resolved_clubs:
         return {
@@ -1799,31 +1814,54 @@ def _normalize_name(value: str) -> str:
 
 
 async def _resolve_club_and_org(
-    club_name: str | None, organisme_id: int | str | None, limit: int = 5
+    club_name: str | None,
+    organisme_id: int | str | None,
+    categorie: str | None = None,
+    limit: int = 5
 ) -> tuple[list[dict[str, Any]], dict | None]:
     """Centralise la résolution d'un club vers une liste d'organismes candidats.
     Retourne (candidats, premier_org_data).
+
+    Si categorie est fournie, applique une logique de filtrage M/F (Règle 10).
     """
     resolved = []
     org_data = None
+
     if organisme_id is not None:
         try:
             org_info = await get_organisme_service(str(organisme_id))
             if org_info and isinstance(org_info, dict):
                 org_data = org_info
-                resolved.append(
-                    {
-                        "nom": org_info.get("nom", ""),
-                        "organisme_id": org_info.get("id"),
-                        "code": org_info.get("code", ""),
-                    }
-                )
+                resolved.append({
+                    "nom": org_info.get("nom", ""),
+                    "organisme_id": org_info.get("id"),
+                    "code": org_info.get("code", ""),
+                })
         except Exception:
             pass
     elif club_name:
         orgs = await search_organismes_service(nom=club_name, limit=limit)
+
+        # Application de la Règle 10 (Smart Resolution M/F)
+        if len(orgs) > 1 and categorie:
+            parsed = parse_categorie(categorie)
+            gender = parsed.sexe  # 'M' or 'F' or None
+
+            # Si le nom fourni contient déjà "FEMININ", on ne filtre pas (choix explicite)
+            name_norm = _normalize_name(club_name)
+            is_explicit_fem = "FEMININ" in name_norm
+
+            if gender and not is_explicit_fem:
+                fem_orgs = [o for o in orgs if "FEMININ" in _normalize_name(str(o.get("nom", "")))]
+                gen_orgs = [o for o in orgs if "FEMININ" not in _normalize_name(str(o.get("nom", "")))]
+
+                if gender == "F" and fem_orgs:
+                    orgs = fem_orgs # On priorise les clubs féminins
+                elif gender == "M" and gen_orgs:
+                    orgs = gen_orgs # On priorise les clubs généraux/masculins
+
         if orgs:
-            # On récupère le détail du premier pour avoir les métadonnées riches (engagements, etc.)
+            # On récupère le détail du premier pour avoir les métadonnées riches
             try:
                 first_org_id = orgs[0].get("id")
                 if first_org_id:
@@ -1833,13 +1871,12 @@ async def _resolve_club_and_org(
 
         for org in orgs:
             if isinstance(org, dict) and org.get("id"):
-                resolved.append(
-                    {
-                        "nom": org.get("nom", ""),
-                        "organisme_id": org.get("id"),
-                        "code": org.get("code", ""),
-                    }
-                )
+                resolved.append({
+                    "nom": org.get("nom", ""),
+                    "organisme_id": org.get("id"),
+                    "code": org.get("code", ""),
+                })
+
     return resolved, org_data
 
 
@@ -1930,7 +1967,11 @@ async def ffbb_last_result_service(
     from datetime import datetime, timedelta
 
     # 1. Résolution des organismes avec métadonnées (CENTRALISÉ)
-    resolved_clubs, org_data = await _resolve_club_and_org(club_name, organisme_id)
+    resolved_clubs, org_data = await _resolve_club_and_org(
+        club_name=club_name,
+        organisme_id=organisme_id,
+        categorie=categorie
+    )
 
     if not resolved_clubs:
         return {
