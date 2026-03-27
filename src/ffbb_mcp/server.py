@@ -8,6 +8,8 @@ from typing import Annotated, Any, Literal
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import Field
+from starlette.applications import Starlette
+from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import (
     FileResponse,
@@ -17,6 +19,7 @@ from starlette.responses import (
     RedirectResponse,
     Response,
 )
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from . import __version__ as _PACKAGE_VERSION
 from .metrics import generate_prometheus_metrics
@@ -909,14 +912,34 @@ def main() -> None:
         host = os.environ.get("HOST", "0.0.0.0")
         port = int(os.environ.get("PORT", "9123"))
         logger.info(f"Démarrage MCP FFBB en mode SSE standard sur {host}:{port}...")
-        
-        # Mode SSE standard complet (requis par Perplexity, Cursor, etc.)
+
+        # Configuration des chemins pour éviter les conflits et erreurs 405
+        # /mcp pour le flux SSE (GET), /mcp/messages pour les commandes (POST)
         mcp.settings.sse_path = "/mcp"
-        mcp.settings.message_path = "/mcp"
-        mcp.settings.host = host
-        mcp.settings.port = port
-        
-        mcp.run(transport="sse")
+        mcp.settings.message_path = "/mcp/messages"
+
+        # Création de l'application Starlette manuelle pour injecter les middlewares
+        # essentiels en production (HTTPS derrière proxy, CORS)
+        app = Starlette(debug=False)
+
+        # Middleware pour gérer les headers de proxy (X-Forwarded-Proto pour HTTPS)
+        # Indispensable pour que le serveur sache qu'il est en HTTPS derrière Nginx
+        app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
+
+        # Middleware CORS pour autoriser les clients MCP (web ou desktop)
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_methods=["*"],
+            allow_headers=["*"],
+            expose_headers=["Content-Type", "Authorization"],
+        )
+
+        # Montage du serveur MCP (SSE)
+        app.mount("/", mcp.sse_app())
+
+        import uvicorn
+        uvicorn.run(app, host=host, port=port, log_level="info")
     else:
         logger.info("Démarrage MCP FFBB en mode stdio...")
         mcp.run(transport="stdio")
