@@ -912,7 +912,7 @@ def main() -> None:
         
         # Mode SSE standard complet (requis par Perplexity, Cursor, etc.)
         mcp.settings.sse_path = "/mcp"
-        mcp.settings.message_path = "/messages/"
+        mcp.settings.message_path = "/mcp"
         mcp.settings.host = host
         mcp.settings.port = port
         
