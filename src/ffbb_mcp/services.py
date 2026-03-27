@@ -215,7 +215,7 @@ def _coerce_numeric_id(value: int | str, label: str) -> int:
 # ---------------------------------------------------------------------------
 
 
-def _handle_api_error(e: Exception) -> McpError:
+def handle_api_error(e: Exception) -> McpError:
     """Formatage cohérent des erreurs API pour tous les outils."""
     if isinstance(e, McpError):
         return e
@@ -308,7 +308,7 @@ async def _safe_call(
 
             if attempt >= retries or not retriable:
                 # plus de tentatives ou pas réessayable : lever l'erreur gérée
-                raise _handle_api_error(e) from e
+                raise handle_api_error(e) from e
 
             # backoff exponentiel avec jitter
             delay = min(max_delay, base_delay * (2 ** (attempt - 1)))
@@ -329,7 +329,7 @@ async def _safe_call(
 
     # Si on sort de la boucle sans retourner, lever la dernière exception formatée
     if last_exc is not None:
-        raise _handle_api_error(last_exc) from last_exc
+        raise handle_api_error(last_exc) from last_exc
     return None
 
 
@@ -1834,7 +1834,7 @@ async def _resolve_club_and_org(
                 org_data = org_info
                 resolved.append({
                     "nom": org_info.get("nom", ""),
-                    "organisme_id": org_info.get("id"),
+                    "organisme_id": org_info.get("id") or organisme_id,
                     "code": org_info.get("code", ""),
                 })
         except Exception:

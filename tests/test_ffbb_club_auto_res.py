@@ -14,7 +14,7 @@ async def test_ffbb_club_equipes_auto_resolution():
     mock_equipes = AsyncMock(return_value=[{"id": "team1", "nom": "U11M1"}])
 
     with (
-        patch("ffbb_mcp.services.search_organismes_service", mock_search),
+        patch("ffbb_mcp.server.search_organismes_service", mock_search),
         patch("ffbb_mcp.server.ffbb_equipes_club_service", mock_equipes),
     ):
         # Appel sans organisme_id mais avec club_name
@@ -37,7 +37,7 @@ async def test_ffbb_club_classement_auto_resolution_full_chain():
     )
 
     with (
-        patch("ffbb_mcp.services.search_organismes_service", mock_search),
+        patch("ffbb_mcp.server.search_organismes_service", mock_search),
         patch("ffbb_mcp.server.resolve_poule_id_service", mock_resolve_poule),
         patch("ffbb_mcp.server.ffbb_get_classement_service", mock_classement),
     ):
@@ -64,7 +64,7 @@ async def test_ffbb_club_resolution_failure():
 
     mock_search = AsyncMock(return_value=[])  # Aucun club trouvé
 
-    with patch("ffbb_mcp.services.search_organismes_service", mock_search):
+    with patch("ffbb_mcp.server.search_organismes_service", mock_search):
         result = await ffbb_club(action="equipes", club_name="Club Inconnu")
 
         assert "error" in result[0]

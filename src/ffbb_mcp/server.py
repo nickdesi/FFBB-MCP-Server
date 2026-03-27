@@ -40,6 +40,7 @@ from .services import (
     get_organisme_service,
     get_poule_service,
     get_saisons_service,
+    handle_api_error,
     multi_search_service,
     resolve_poule_id_service,
     search_competitions_service,
@@ -309,8 +310,7 @@ async def ffbb_search(
         }
         return await dispatch[type](nom=query, limit=limit)
     except Exception as e:
-        logger.error(f"ffbb_search failed: {e}")
-        return [{"error": str(e)}]
+        raise handle_api_error(e) from e
 
 
 # ---------------------------------------------------------------------------
@@ -354,8 +354,7 @@ async def ffbb_bilan(
             categorie=categorie,
         )
     except Exception as e:
-        logger.error(f"ffbb_bilan failed: {e}")
-        return {"error": str(e)}
+        raise handle_api_error(e) from e
 
 
 # ---------------------------------------------------------------------------
@@ -410,8 +409,7 @@ async def ffbb_get(
             return await get_organisme_service(organisme_id=id)
         return {"error": f"Type inconnu: {type}"}
     except Exception as e:
-        logger.error(f"ffbb_get failed: {e}")
-        return {"error": str(e)}
+        raise handle_api_error(e) from e
 
 
 # ---------------------------------------------------------------------------
@@ -563,8 +561,7 @@ async def ffbb_club(
             )
         return [{"error": f"Action inconnue: {action}"}]
     except Exception as e:
-        logger.error(f"ffbb_club failed: {e}")
-        return [{"error": str(e)}]
+        raise handle_api_error(e) from e
 
 
 # ---------------------------------------------------------------------------
@@ -578,8 +575,7 @@ async def ffbb_get_lives() -> list[dict[str, Any]]:
     try:
         return await get_lives_service()
     except Exception as e:
-        logger.error(f"ffbb_lives failed: {e}")
-        return [{"error": str(e)}]
+        raise handle_api_error(e) from e
 
 
 # ---------------------------------------------------------------------------
@@ -597,8 +593,7 @@ async def ffbb_get_saisons(
     try:
         return await get_saisons_service(active_only=active_only)
     except Exception as e:
-        logger.error(f"ffbb_saisons failed: {e}")
-        return [{"error": str(e)}]
+        raise handle_api_error(e) from e
 
 
 # ---------------------------------------------------------------------------
@@ -735,8 +730,7 @@ async def ffbb_team_summary(
             "raw": bilan,
         }
     except Exception as e:
-        logger.error(f"ffbb_team_summary failed: {e}")
-        return {"error": str(e)}
+        raise handle_api_error(e) from e
 
 
 # ---------------------------------------------------------------------------

@@ -149,6 +149,7 @@ class TestEquipesClubService:
         org_mock = MagicMock()
         org_mock.model_dump = MagicMock(
             return_value={
+                "id": 123,
                 "nom": "Club Test",
                 "engagements": [
                     {
@@ -270,7 +271,7 @@ class TestBilanService:
                         "categorie": {"code": "u11"},
                         "competition_origine_niveau": 1,
                     },
-                    "idPoule": {"id": "p1"},
+                    "idPoule": {"id": "1001"},
                 },
                 {
                     "id": "eng2",
@@ -282,15 +283,15 @@ class TestBilanService:
                         "categorie": {"code": "u11"},
                         "competition_origine_niveau": 2,
                     },
-                    "idPoule": {"id": "p2"},
+                    "idPoule": {"id": "1002"},
                 },
             ],
         )
         poule1 = self._make_poule_mock(
-            "p1", "eng1", "9326", gagnes=3, perdus=0, pm=150, pe=40
+            "1001", "eng1", "9326", gagnes=3, perdus=0, pm=150, pe=40
         )
         poule2 = self._make_poule_mock(
-            "p2", "eng2", "9326", gagnes=6, perdus=0, pm=300, pe=100
+            "1002", "eng2", "9326", gagnes=6, perdus=0, pm=300, pe=100
         )
 
         mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
@@ -328,7 +329,7 @@ class TestBilanService:
             ],
         )
         poule1 = self._make_poule_mock(
-            "p1", "eng1", "9326", gagnes=3, perdus=0, pm=100, pe=30
+            "1001", "eng1", "9326", gagnes=3, perdus=0, pm=100, pe=30
         )
         mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
         mock_client.get_poule_async = AsyncMock(return_value=poule1)
@@ -549,12 +550,17 @@ class TestCalendrierClubService:
         # Force une petite limite pour le test
         monkeypatch.setenv("FFBB_MAX_CALENDAR_MATCHES", "3")
 
+        # 0. Mock get_organisme (requis par _resolve_club_and_org)
+        org_mock = MagicMock()
+        org_mock.model_dump = MagicMock(return_value={"id": 123, "nom": "Club", "engagements": []})
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
         # 1. Mock ffbb_equipes_club_service pour renvoyer une equipe valable
         async def _fake_equipes_club_service(organisme_id: int | str, filtre: str | None = None):
             return [
                 {
                     "engagement_id": 1001,
-                    "poule_id": 201,
+                    "poule_id": 2001,
                     "nom_equipe": "CLERMONT",
                     "competition": "U13F",
                 }
@@ -581,7 +587,7 @@ class TestCalendrierClubService:
             )
         poule_mock.model_dump = MagicMock(
             return_value={
-                "id": 201,
+                "id": 2001,
                 "rencontres": rencontres,
                 "classements": [],
             }
@@ -706,6 +712,7 @@ class TestResolveTeamService:
         org_mock = MagicMock()
         org_mock.model_dump = MagicMock(
             return_value={
+                "id": 123,
                 "nom": "Club Test",
                 "engagements": [
                     {
@@ -781,6 +788,7 @@ class TestResolveTeamService:
         org_mock = MagicMock()
         org_mock.model_dump = MagicMock(
             return_value={
+                "id": 123,
                 "nom": "Club Test",
                 "engagements": [],
             }
