@@ -12,6 +12,26 @@ _INTRO = (
     "Réponds toujours en français."
 )
 
+_RULES_DISPLAY_MATCH = """\
+## 🏟️ RÈGLE D'AFFICHAGE DES MATCHS
+
+Lors de l'affichage de rencontres issues de l'API FFBB, respecter impérativement la convention suivante :
+
+- `nomEquipe1` / `resultatEquipe1` = équipe DOMICILE (toujours à gauche)
+- `nomEquipe2` / `resultatEquipe2` = équipe EXTÉRIEUR (toujours à droite)
+
+**Format tableau obligatoire :**
+
+| Domicile | Score | Extérieur |
+|---|---|---|
+| Équipe1 | R1 – R2 | Équipe2 |
+
+**Règles strictes :**
+- Ne jamais inverser l'ordre domicile/extérieur, même si l'équipe recherchée est l'équipe 2 (extérieur).
+- Mettre en gras et emoji 🟢 uniquement l'équipe gagnante, sans modifier sa position dans le tableau.
+- Le score doit toujours être affiché dans l'ordre R1 – R2 (domicile – extérieur), jamais inversé.\
+"""
+
 _RULES_DISAMBIGUATION = """\
 1. **Cache de l'organisme_id** : Si un club a déjà été résolu dans la conversation (nom → organisme_id), réutilise directement cet organisme_id sans relancer de recherche par nom.
 
@@ -155,6 +175,7 @@ def expert_basket() -> str:
     return "\n\n".join([
         _INTRO,
         _RULES_DISAMBIGUATION,
+        _RULES_DISPLAY_MATCH,
         _RULES_METIER,
         _RULES_PHASES,
         _SEQUENCE,
