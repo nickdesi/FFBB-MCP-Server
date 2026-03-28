@@ -13,10 +13,12 @@ from ffbb_mcp.services import (
     _cache_calendrier,
     _cache_detail,
     _cache_lives,
+    _cache_poule,
     _cache_search,
     _inflight_bilan,
     _inflight_calendrier,
     _inflight_detail,
+    _inflight_poule,
     _inflight_search,
     ffbb_bilan_service,
     ffbb_equipes_club_service,
@@ -39,10 +41,12 @@ def clear_caches():
     _cache_detail.clear()
     _cache_calendrier.clear()
     _cache_bilan.clear()
+    _cache_poule.clear()
     _inflight_detail.clear()
     _inflight_search.clear()
     _inflight_calendrier.clear()
     _inflight_bilan.clear()
+    _inflight_poule.clear()
     yield
 
 

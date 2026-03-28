@@ -10,6 +10,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import Field
 from starlette.applications import Starlette
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from starlette.requests import Request
 from starlette.responses import (
     FileResponse,
@@ -914,7 +915,7 @@ def main() -> None:
 
         # Création de l'application Starlette manuelle pour injecter les middlewares
         # essentiels en production (HTTPS derrière proxy, CORS)
-        app = Starlette(debug=False)
+        app = Starlette(debug=False, redirect_slashes=False)
 
         # Middleware pour gérer les headers de proxy (X-Forwarded-Proto pour HTTPS)
         # Indispensable pour que le serveur sache qu'il est en HTTPS derrière Nginx
@@ -928,6 +929,9 @@ def main() -> None:
             allow_headers=["*"],
             expose_headers=["Content-Type", "Authorization"],
         )
+
+        # Middleware GZip pour compresser les réponses JSON volumineuses
+        app.add_middleware(GZipMiddleware, minimum_size=1000)
 
         # Montage du serveur MCP (SSE)
         app.mount("/", mcp.sse_app())

@@ -128,12 +128,14 @@ _cache_search = TTLCache(maxsize=256, ttl=_SEARCH_TTL)
 _cache_detail = TTLCache(maxsize=128, ttl=_DETAIL_TTL)
 _cache_calendrier = TTLCache(maxsize=64, ttl=_CALENDRIER_TTL)
 _cache_bilan = TTLCache(maxsize=64, ttl=_BILAN_TTL)
+_cache_poule = TTLCache(maxsize=128, ttl=_POULE_TTL)
 _cache_lock = RLock()
 _inflight_lock: asyncio.Lock | None = None
 _inflight_detail: dict[str, asyncio.Task[Any]] = {}
 _inflight_search: dict[str, asyncio.Task[Any]] = {}
 _inflight_calendrier: dict[str, asyncio.Task[Any]] = {}
 _inflight_bilan: dict[str, asyncio.Task[Any]] = {}
+_inflight_poule: dict[str, asyncio.Task[Any]] = {}
 
 
 def _get_inflight_lock() -> asyncio.Lock:
@@ -157,7 +159,7 @@ def get_cache_ttls() -> dict[str, int]:
         "detail": int(_cache_detail.ttl),
         "calendrier": int(_cache_calendrier.ttl),
         "bilan": int(_cache_bilan.ttl),
-        "poule": _POULE_TTL,
+        "poule": int(_cache_poule.ttl),
     }
 
 
@@ -483,7 +485,7 @@ async def get_poule_service(poule_id: int | str, *, force_refresh: bool = False)
     cache_key = f"poule:{poule_id_int}"
 
     if force_refresh:
-        _cache_detail.pop(cache_key, None)
+        _cache_poule.pop(cache_key, None)
 
     async def _fetch() -> dict:
         client = await get_client_async()
@@ -494,14 +496,19 @@ async def get_poule_service(poule_id: int | str, *, force_refresh: bool = False)
             ),
         )
         data = serialize_model(poule) or {}
-        # On met à jour explicitement un cache dédié très court pour les poules.
-        _cache_set(_cache_detail, cache_key, data, "poule")
+        # On met à jour explicitement le cache dédié très court pour les poules.
+        _cache_set(_cache_poule, cache_key, data, "poule")
         return data
 
     # On utilise toujours le mécanisme de déduplication pour éviter de frapper
     # l'API FFBB plusieurs fois pour la même poule en parallèle.
-    # _dedupe_inflight_detail gère déjà la lecture/écriture du cache.
-    return await _dedupe_inflight_detail(cache_key, _fetch, cache_name="poule")
+    return await _dedupe_inflight(
+        cache=_cache_poule,
+        cache_key=cache_key,
+        inflight_map=_inflight_poule,
+        make_coro=_fetch,
+        cache_name="poule",
+    )
 
 
 async def get_organisme_service(organisme_id: int | str) -> dict:
@@ -532,7 +539,7 @@ async def ffbb_get_classement_service(
     cache_key = f"classement:{poule_id_int}:{target_organisme_id or ''}:{target_num or ''}"
 
     if not force_refresh:
-        cached = _cache_get(_cache_detail, cache_key, "classement")
+        cached = _cache_get(_cache_poule, cache_key, "classement")
         if cached is not None:
             return cached
 
@@ -585,7 +592,7 @@ async def ffbb_get_classement_service(
                 "paniers_encaisses": c.get("paniers_encaisses") or 0,
             }
         )
-    _cache_set(_cache_detail, cache_key, flat, "classement")
+    _cache_set(_cache_poule, cache_key, flat, "classement")
     return flat
 
 
