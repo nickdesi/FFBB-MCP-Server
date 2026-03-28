@@ -915,7 +915,8 @@ def main() -> None:
 
         # Création de l'application Starlette manuelle pour injecter les middlewares
         # essentiels en production (HTTPS derrière proxy, CORS)
-        app = Starlette(debug=False, redirect_slashes=False)
+        app = Starlette(debug=False)
+        app.router.redirect_slashes = False
 
         # Middleware pour gérer les headers de proxy (X-Forwarded-Proto pour HTTPS)
         # Indispensable pour que le serveur sache qu'il est en HTTPS derrière Nginx
