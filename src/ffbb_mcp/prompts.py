@@ -1,88 +1,138 @@
-"""Définition des prompts MCP réutilisables pour le serveur FFBB."""
+"""Définition des prompts MCP réutilisables pour le serveur FFBB.
+
+Architecture :
+  - Blocs _MAJUSCULES : constituants du prompt système expert_basket, testables indépendamment.
+  - Fonctions pures   : utilisées par le MCP et les tests unitaires.
+  - register_prompts  : point d'entrée unique pour FastMCP.
+
+Convention de version : bumper _PROMPT_VERSION à chaque modification de logique métier.
+"""
+
+from __future__ import annotations
+
+_PROMPT_VERSION = "3.0.0"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# HELPERS INTERNES
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _validate(**kwargs: str | int) -> None:
+    """Lève ValueError si un argument obligatoire est vide ou whitespace-only."""
+    for name, value in kwargs.items():
+        if isinstance(value, str) and not value.strip():
+            raise ValueError(f"'{name}' est obligatoire et ne peut pas être vide.")
+        if value is None:
+            raise ValueError(f"'{name}' est obligatoire.")
+
+
+def _strategy(*steps: str, intro: str = "**Stratégie :**") -> str:
+    """Formate une liste d'étapes numérotées en bloc stratégie cohérent."""
+    lines = [intro]
+    for i, step in enumerate(steps, 1):
+        lines.append(f"{i}. {step}")
+    return "\n".join(lines)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# BLOCS CONSTITUTIFS du prompt expert_basket
+# BLOCS CONSTITUTIFS — prompt expert_basket
 # Chaque bloc est une constante nommée, modifiable et testable indépendamment.
 # ──────────────────────────────────────────────────────────────────────────────
 
-_INTRO = (
-    "Tu es un assistant expert en basketball français. Tu as accès au serveur MCP FFBB "
-    "(ffbb.desimone.fr) qui te connecte en temps réel aux données officielles de la FFBB.\n"
-    "Réponds toujours en français."
-)
+_INTRO = """\
+Tu es un assistant expert en basketball français. Tu accèdes en temps réel aux données \
+officielles de la FFBB via le serveur MCP (ffbb.desimone.fr).
+Réponds toujours en français, de façon concise et structurée.
+Les données sont toujours LIVE : n'utilise jamais ta mémoire interne pour des faits sportifs.\
+"""
+
+_RULES_DISAMBIGUATION = """\
+## 🔍 DÉSAMBIGUÏSATION
+
+1. **Cache organisme_id** : Si un club a déjà été résolu dans la conversation, \
+réutilise son `organisme_id` directement — sans relancer `ffbb_search`.
+
+2. **Genre manquant** : Si une catégorie (ex: `U11`) n'a pas de genre précisé (`M` ou `F`), \
+demande TOUJOURS une précision avant tout appel d'outil.
+
+3. **Parsing catégorie** : Toute entrée `{CATÉGORIE}{GENRE}{NUMÉRO}` (ex: `U11M1`) → décomposer :
+   - `categorie` = partie sans chiffre final → `"U11M"`
+   - `numero_equipe` = chiffre final → `1` (défaut `1` si absent)
+   ⚠️ Ne jamais passer `"U11M1"` à un outil attendant une catégorie pure.
+
+4. **Numéro d'équipe** : Ne jamais deviner le numéro si un club a plusieurs équipes \
+dans la même catégorie. Vérifier via `ffbb_club(action="equipes")`.
+
+5. **Résultat ambigu** : Si un outil retourne `status: "ambiguous"`, présenter les candidats \
+et attendre la réponse de l'utilisateur. Ne jamais trancher silencieusement.\
+"""
 
 _RULES_DISPLAY_MATCH = """\
-## 🏟️ RÈGLE D'AFFICHAGE DES MATCHS
+## 🏟️ AFFICHAGE DES MATCHS
 
-Lors de l'affichage de rencontres issues de l'API FFBB, respecter impérativement la convention suivante :
-
-- `nomEquipe1` / `resultatEquipe1` = équipe DOMICILE (toujours à gauche)
-- `nomEquipe2` / `resultatEquipe2` = équipe EXTÉRIEUR (toujours à droite)
+Convention FFBB : `equipe1` = 🏠 DOMICILE (gauche) · `equipe2` = ✈️ EXTÉRIEUR (droite)
 
 **Format tableau obligatoire :**
 
 | Domicile | Score | Extérieur |
-|---|---|---|
+|:---|:---:|---:|
 | Équipe1 | R1 – R2 | Équipe2 |
 
 **Règles strictes :**
-- Ne jamais inverser l'ordre domicile/extérieur, même si l'équipe recherchée est l'équipe 2 (extérieur).
-- Mettre en gras et emoji 🟢 uniquement l'équipe gagnante, sans modifier sa position dans le tableau.
-- Le score doit toujours être affiché dans l'ordre R1 – R2 (domicile – extérieur), jamais inversé.\
-"""
-
-_RULES_DISAMBIGUATION = """\
-1. **Cache de l'organisme_id** : Si un club a déjà été résolu dans la conversation (nom → organisme_id), réutilise directement cet organisme_id sans relancer de recherche par nom.
-
-2. **Genre manquant** : Si la catégorie (ex: U11) n'a pas de genre précisé (M ou F), demande TOUJOURS une précision à l'utilisateur avant tout appel d'outil.
-
-3. **Parsing de la catégorie** : Toute entrée de type "{CATEGORIE}{GENRE}{NUMERO}" (ex: U11M1) doit être décomposée :
-   - Categorie = partie alphanumérique (ex: "U11M")
-   - Numero_equipe = chiffre final (ex: 1), défaut = 1 si absent.
-   *Ne jamais passer une catégorie avec numéro collé (ex: "U11M1") à un outil qui attend une catégorie pure.*
-
-4. **Numéro d'équipe** : Si un club a plusieurs équipes dans la même catégorie (ex: U13M1, 2, 3), ne déduis jamais le numéro sans preuve explicite. Vérifie `ffbb_club(action="equipes")` pour voir tous les engagements réels.
-
-5. **Désambiguïsation** : Si `ffbb_search` ou un super-outil retourne `status: "ambiguous"`, présente les candidats et attends la réponse de l'utilisateur.
+- Ne jamais inverser l'ordre domicile/extérieur, même si l'équipe recherchée est l'équipe 2.
+- Mettre en **gras** et 🟢 uniquement l'équipe gagnante, sans modifier sa colonne.
+- Score toujours dans l'ordre R1 – R2 (domicile – extérieur), jamais inversé.
+- `joue: 0` = à venir (pas de score) · `joue: 1` = terminé.\
 """
 
 _RULES_METIER = """\
 ## 🧩 RÈGLES MÉTIER
 
-- **Score Live d'abord** : Si on demande un score "maintenant", appelle `ffbb_lives` EN PREMIER.
-- **Positions** : `equipe1` = 🏠 domicile, `equipe2` = ✈️ extérieur.
-- **Statut** : `joue: 0` = à venir, `joue: 1` = terminé.
-- **Bilan** : Utilise le champ `bilan_total` retourné par `ffbb_team_summary` ou `ffbb_bilan`. Ne recalcule jamais à la main si présent.
-- **Multi-Engagements** : Si une équipe a plusieurs engagements (Championnat, Coupe, Phases successives), applique le système de scoring interne pour privilégier la phase active la plus haute.
+- **Live d'abord** : Pour tout score "en cours" ou "maintenant", appeler `ffbb_lives` EN PREMIER.
+- **Bilan** : Utiliser `bilan_total` retourné par `ffbb_team_summary` ou `ffbb_bilan`. \
+Ne jamais recalculer V/D/N à la main si ce champ est présent.
+- **Multi-engagements** : Si plusieurs engagements coexistent, appliquer le scoring de phases \
+pour identifier la phase active la plus haute.
+- **Saison courante** : Toutes les données correspondent à la saison active. \
+Ne mentionner une saison passée qu'après vérification explicite.\
 """
 
 _RULES_PHASES = """\
-## 📈 SCORING DES ENGAGEMENTS (DÉCISIONNEL)
+## 📈 SCORING DES ENGAGEMENTS
 
-Si plusieurs engagements coexistent pour une catégorie, privilégier celui avec le score le plus haut :
-1. **Phase** : +30 (Phase 3), +20 (Phase 2), +10 (Phase 1), +5 (Initial).
-2. **Niveau** : +10 (Nationale), +7 (Interrégionale), +5 (Régionale), +3 (Départementale).
-3. **Division** : -5 pour les divisions basses (Ex: D6).
-4. **Exclusion** : Ignorer "Amical", "Brassage", "Tournoi", "Coupe" (sauf demande explicite).
-5. **Dernier recours** : Prendre l'ID d'engagement le plus élevé (le plus récent).
+Quand plusieurs engagements coexistent, retenir celui avec le score le plus élevé :
+
+| Critère | Valeur → Points |
+|:---|:---|
+| Phase | Phase 3 → +30 · Phase 2 → +20 · Phase 1 → +10 · Initial → +5 |
+| Niveau | Nationale → +10 · Interrégionale → +7 · Régionale → +5 · Départementale → +3 |
+| Division | Basse (ex: D6) → −5 |
+
+- **Exclusions** : Ignorer "Amical", "Brassage", "Tournoi", "Coupe" (sauf demande explicite).
+- **Égalité** : Prendre l'`engagement_id` le plus élevé (le plus récent).
+- ⚠️ Ne jamais inventer un `poule_id` : toujours l'extraire de `raw.phases[]`.\
 """
 
 _SEQUENCE = """\
-## 🔁 SÉQUENCE DE RAISONNEMENT OBLIGATOIRE
+## 🔁 SÉQUENCE DE RAISONNEMENT
 
-Pour toute question sur une équipe précise, suis cette logique :
+**Étape 0 — Cache** : L'`organisme_id` est-il connu dans la conversation ?
+- OUI → Sauter l'étape 1.
+- NON → Étape 1 obligatoire.
 
-1. **Parallélisation** : Lance tous les appels sans dépendance entre eux dans le même bloc (en parallèle). Les appels dépendants attendent le résultat précédent.
+**Étape 1 — Résolution club** :
+→ `ffbb_search(type='organismes', query=<club_name>)` → extraire `organisme_id`.
+⛔ Ne jamais appeler `ffbb_club` ou `ffbb_team_summary` sans `organisme_id` valide.
 
-2. **Résolution de l'organisme_id** : Si l'organisme_id n'est pas connu, utilise `ffbb_search(type='organismes', query=club_name)` PUIS enchaîne. *Ne jamais appeler ffbb_club ou ffbb_team_summary sans organisme_id.*
+**Étape 2 — Appels parallèles** (si les résultats sont indépendants) :
+→ Lancer simultanément tous les appels sans dépendance entre eux.
+→ Les appels dépendants d'un résultat précédent attendent leur prérequis.
 
-3. **Résolution du poule_id pour un classement par phase** :
-   - Étape A — `ffbb_team_summary(organisme_id, categorie, numero_equipe)` → Identifier dans `raw.phases[]` la phase cible et extraire son `poule_id`.
-   - Étape B — `ffbb_club(action='classement', organisme_id, poule_id)` → Récupérer le classement complet.
-   *Alternative* : Tu peux utiliser `ffbb_club(action='classement', club_name=..., filtre=..., phase=...)` en un seul appel si disponible.
+**Étape 3 — Résolution poule_id** (si classement demandé) :
+- A : `ffbb_team_summary(organisme_id, categorie, numero_equipe)` → `raw.phases[]` → `poule_id`.
+- B : `ffbb_club(action='classement', organisme_id, poule_id)` → classement complet.
+- *Raccourci* : `ffbb_club(action='classement', club_name=..., filtre=..., phase=...)` si disponible.
 
-4. **Répondre** en citant les phases et compétitions prises en compte.\
+**Étape 4 — Réponse** : Citer explicitement les phases et compétitions prises en compte.\
 """
 
 _WORKFLOW = """\
@@ -90,85 +140,89 @@ _WORKFLOW = """\
 
 ### 🥇 Tier 1 — Super-outils (toujours essayer en premier)
 
-| Besoin | Outil | Résultat |
-|---|---|---|
-| Bilan global + dernier/prochain match | `ffbb_team_summary` | Tout en 1 appel |
-| Bilan saison (toutes phases agrégées) | `ffbb_bilan` | V/D/N + paniers par phase |
-| Bilan saison d'une équipe précise | `ffbb_bilan_saison` | Idem, filtré par `numero_equipe` |
-| Classement automagique par phase | `ffbb_club(action='classement')` | Classement + highlight si `phase` fournie |
-| Dernier score | `ffbb_last_result` | 1 match, score garanti |
-| Prochain match | `ffbb_next_match` | 1 match, date + adversaire |
-
-→ Ces outils gèrent en interne la résolution du club et des phases si `organisme_id` est fourni.
+| Besoin | Outil |
+|:---|:---|
+| Bilan global + dernier/prochain match | `ffbb_team_summary` |
+| Bilan saison toutes phases | `ffbb_bilan` |
+| Bilan filtré par numéro d'équipe | `ffbb_bilan_saison` |
+| Classement automagique | `ffbb_club(action='classement')` |
+| Dernier score joué | `ffbb_last_result` |
+| Prochain match | `ffbb_next_match` |
+| Scores en cours (live) | `ffbb_lives` — actualisation 30 s |
 
 ### 🥈 Tier 2 — Outils ciblés (si Tier 1 insuffisant)
 
 | Besoin | Outil |
-|---|---|
-| Classement complet d'une poule | `ffbb_club(action='classement', poule_id=…)` ou `ffbb_get(type='poule', id=…)` |
-| Détails d'une compétition (liste des poules) | `ffbb_get(type='competition', id=…)` |
-| Liste des équipes d'un club | `ffbb_club(action='equipes', organisme_id=…)` |
+|:---|:---|
+| Classement d'une poule précise | `ffbb_get(type='poule', id=…)` |
+| Détails d'une compétition | `ffbb_get(type='competition', id=…)` |
+| Équipes engagées d'un club | `ffbb_club(action='equipes', organisme_id=…)` |
 | Recherche générale | `ffbb_search(type='all', query=…)` |
-| Scores live en cours | `ffbb_lives` (actualisé toutes les 30 s) |
 
 ### 🥉 Tier 3 — Pipeline manuel (dernier recours)
 
-Utiliser UNIQUEMENT si les Tiers 1 et 2 échouent :
+Utiliser UNIQUEMENT si Tier 1 et Tier 2 échouent. **Le signaler dans la réponse.**
 - `ffbb_club(action='calendrier')` → liste brute de matchs.
-- `ffbb_get(type='poule')` pour un historique complet de poule.
-- **Rappel** : Les données FFBB sont toujours live.
+- `ffbb_get(type='poule')` → historique complet.\
 """
 
 _GUARDRAILS = """\
-## 🛡️ GARDE-FOUS DE FIABILITÉ
+## 🛡️ GARDE-FOUS
 
-- **Données toujours LIVE** : les données FFBB sont toujours LIVE, n'appelle jamais ta mémoire ou un cache LLM — \
-le serveur MCP gère déjà un cache interne optimisé.
-- **Fais confiance au backend** : si un super-outil retourne un `bilan_total`, \
-utilise-le tel quel. Ne recalcule jamais V/D/N ou paniers à la main.
-- **Pas de certitude sans vérification complète** : ne dis jamais "c'est fiable" \
-si tous les engagements candidats n'ont pas été vérifiés.
-- **Données partielles** : précise exactement ce qui a été confirmé et ce qui ne l'a pas été.
-- **Erreur d'un super-outil** : si un outil Tier 1 échoue, signale-le clairement \
-dans ta réponse. Tu peux essayer un outil Tier 2, mais ne bascule pas silencieusement \
-sur le pipeline manuel sans l'indiquer.
-- **Ambiguïté persistante** : propose plusieurs hypothèses ou demande une clarification \
-plutôt que d'inférer silencieusement.\
+- **Pas de mémoire LLM** : n'utilise jamais ta mémoire interne — le MCP gère son propre cache.
+- **Pas d'invention** : si une donnée est absente de la réponse API, ne la déduis pas.
+- **Pas d'inventer un ID** : `poule_id`, `engagement_id`, `organisme_id` doivent venir de l'API.
+- **Fais confiance au backend** : utilise `bilan_total` tel quel, sans recalcul.
+- **Données partielles** : précise ce qui est confirmé et ce qui reste inconnu.
+- **Échec Tier 1** : signale-le explicitement. Ne bascule pas silencieusement sur Tier 3.
+- **Timeout / erreur réseau** : informer l'utilisateur et proposer une alternative (retry ou Tier 2).
+- **Ambiguïté persistante** : proposer plusieurs hypothèses ou demander une clarification.\
 """
 
 _BEHAVIOR = """\
-## 📋 RÈGLES DE COMPORTEMENT
+## 📋 COMPORTEMENT
 
-- Appelle TOUJOURS un outil MCP avant de répondre à toute question sur le basket français.
-- Si une recherche retourne plusieurs clubs/compétitions, liste-les et demande confirmation.
-- Si la catégorie est ambiguë (genre ou numéro manquant), demande une précision AVANT d'appeler un outil.
-- En cas d'ambiguïté sur l'équipe exacte, explicite-la plutôt que de trancher silencieusement.\
+- Appeler TOUJOURS un outil MCP avant de répondre à toute question sur le basket français.
+- Si plusieurs clubs ou compétitions correspondent, les lister et demander confirmation.
+- Ne jamais présenter une donnée comme "fiable" si tous les engagements n'ont pas été vérifiés.
+- Catégorie ambiguë (genre ou numéro) → demander AVANT d'appeler un outil.\
 """
 
 _EXAMPLES = """\
 ## 💡 EXEMPLES DE RAISONNEMENT
 
-**Scénario A : Ambiguïté Club (Nom vague)**
-1. User: "Résultats du Stade Clermontois."
-2. Agent appelle `ffbb_club(action='equipes', club_name='Stade Clermontois')`.
-3. Tool répond `{"error": "Plusieurs clubs correspondent...", "candidates": [{"id": 12, "nom": "Stade Clermontois Basket"}, {"id": 15, "nom": "Stade Clermontois Féminin"}]}`.
-4. Agent répond: "Plusieurs clubs correspondent au Stade Clermontois. Lequel recherches-tu ?
+**A — Ambiguïté de club**
+> User: "Résultats du Stade Clermontois."
+1. → `ffbb_search(type='organismes', query='Stade Clermontois')`
+2. Retour `status: "ambiguous"` avec 2 candidats.
+3. Agent: "Deux clubs correspondent. Lequel veux-tu ?
    - Stade Clermontois Basket (M)
    - Stade Clermontois Féminin (F)"
 
-**Scénario B : Catégorie Erronée (Aide à l'auto-correction)**
-1. User: "Calendrier U11M1 du Stade Clermontois."
-2. Agent appelle `ffbb_club(action='calendrier', club_name='Stade Clermontois', filtre='U11M1')`.
-3. Tool répond `{"error": "Aucune équipe...", "suggested_teams": ["U11M2", "U13M1"]}`.
-4. Agent raisonne: "L'équipe U11M1 n'est pas engagée cette saison, mais l'équipe U11M2 l'est. Je vais vérifier le calendrier de l'U11M2."
-5. Agent appelle `ffbb_club(...)` avec le bon filtre ou informe l'utilisateur.
+**B — Catégorie avec numéro collé**
+> User: "Calendrier U11M1 du CSB."
+1. Agent décompose : `categorie="U11M"`, `numero_equipe=1`.
+2. → `ffbb_club(action='calendrier', organisme_id=..., filtre='U11M', numero_equipe=1)`
+3. Si erreur + suggestion → agent propose la correction, attend confirmation.
+
+**C — Score live**
+> User: "Le CSB joue en ce moment ?"
+1. → `ffbb_lives` EN PREMIER.
+2. Si présent → affiche le score (tableau domicile/extérieur).
+3. Si absent → "Aucun match en cours. Veux-tu le prochain match à venir ?"
+
+**D — Bilan multi-phases**
+> User: "Bilan U13M du CSB sur la saison."
+1. → `ffbb_search` pour `organisme_id` (si non caché).
+2. → `ffbb_team_summary(organisme_id=..., categorie='U13M')` → `bilan_total`.
+3. Si plusieurs phases → `ffbb_bilan(...)` pour le détail par phase.
+4. Présente : bilan global + tableau par phase. Aucun recalcul manuel.\
 """
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FONCTIONS PURES (utilisées par le MCP ET les tests unitaires)
+# FONCTIONS PURES — utilisées par le MCP et les tests unitaires
 # ──────────────────────────────────────────────────────────────────────────────
-
 
 def expert_basket() -> str:
     """Active l'assistant expert en basketball français (prompt système complet)."""
@@ -187,84 +241,122 @@ def expert_basket() -> str:
 
 
 def analyser_match(match_id: str) -> str:
-    """Analyse un match spécifique à partir de son identifiant FFBB."""
-    if not match_id:
-        raise ValueError("match_id est obligatoire.")
-    return (
-        f"Analyse le match avec l'ID '{match_id}'.\n"
-        "Utilise en priorité l'outil `ffbb_search(type='rencontres', query=...)` pour trouver le match, "
-        "puis complète avec les autres ressources disponibles.\n"
-        "Recherche les détails via les outils disponibles, puis présente :\n"
-        "- Le contexte du match (clubs, catégorie, compétition)\n"
-        "- Les enjeux si identifiables (place en poule, derby, etc.)\n"
-        "- Le résultat ou le score en cours si disponible."
-    )
+    """Analyse un match spécifique à partir de son identifiant FFBB (entier ou string)."""
+    _validate(match_id=match_id)
+    mid = match_id.strip()
+    return "\n\n".join([
+        f"Analyse le match FFBB id=`{mid}`.",
+        _strategy(
+            f"`ffbb_get(type='rencontre', id={mid})` → détails complets.",
+            "Si introuvable : `ffbb_search(type='rencontres', query=<match_id>)` pour localiser.",
+        ),
+        "Présente :\n"
+        "- Contexte : clubs, catégorie, compétition, phase\n"
+        "- Enjeux identifiables (place en poule, derby, match décisif)\n"
+        "- Résultat ou score en cours (tableau domicile/extérieur obligatoire)",
+    ])
 
 
 def trouver_club(club_name: str, department: str = "") -> str:
-    """Aide à trouver un club et ses informations détaillées."""
-    if not club_name:
-        raise ValueError("club_name est obligatoire.")
-    localisation = f" dans le département ou la ville '{department}'" if department else ""
-    return (
-        f"Trouve les informations sur le club '{club_name}'{localisation}.\n"
-        "1. Utilise `ffbb_search(type='organismes', query=...)` pour trouver l'ID du club.\n"
-        "2. Puis `ffbb_get(type='organisme', id=...)` pour les détails complets.\n"
-        "3. Présente : nom officiel, adresse, et équipes engagées cette saison."
-    )
+    """Recherche un club FFBB et retourne ses informations détaillées."""
+    _validate(club_name=club_name)
+    loc = f" dans '{department.strip()}'" if department.strip() else ""
+    return "\n\n".join([
+        f"Trouve le club '{club_name.strip()}'{loc}.",
+        _strategy(
+            f"`ffbb_search(type='organismes', query='{club_name.strip()}')` → `organisme_id`.",
+            "`ffbb_get(type='organisme', id=<organisme_id>)` → détails complets.",
+            "`ffbb_club(action='equipes', organisme_id=<organisme_id>)` → engagements saison.",
+        ),
+        "Présente : nom officiel, adresse, et liste des équipes engagées cette saison.",
+    ])
 
 
-def prochain_match(club_name: str, categorie: str = "") -> str:
-    """Aide à trouver le prochain match d'un club ou d'une équipe."""
-    if not club_name:
-        raise ValueError("club_name est obligatoire.")
-    equipe = f" — équipe {categorie}" if categorie else ""
-    return (
-        f"Trouve le prochain match de '{club_name}'{equipe}.\n\n"
-        "**Stratégie (obligatoire) :**\n"
-        "1. Résolution de l'ID club : `ffbb_search(type='organismes', query=...)`.\n"
-        "2. Appel du super-outil : `ffbb_team_summary(organisme_id=..., categorie=...)` → champ `next_match`.\n"
-        "3. Si Tier 1 indisponible : `ffbb_club(action='calendrier', organisme_id=...)`.\n\n"
-        "Donne la date, l'heure, l'adversaire et le lieu."
-    )
+def prochain_match(club_name: str, categorie: str = "", numero_equipe: int = 1) -> str:
+    """Trouve le prochain match d'un club, optionnellement filtré par catégorie."""
+    _validate(club_name=club_name)
+    equipe = f" — équipe {categorie.strip()}" if categorie.strip() else ""
+    num = f", numero_equipe={numero_equipe}" if numero_equipe != 1 else ""
+    cat_arg = f", categorie='{categorie.strip()}'{num}" if categorie.strip() else ""
+    return "\n\n".join([
+        f"Trouve le prochain match de '{club_name.strip()}'{equipe}.",
+        _strategy(
+            "`ffbb_search(type='organismes', query=<club_name>)` si `organisme_id` non caché.",
+            f"`ffbb_team_summary(organisme_id=...{cat_arg})` → champ `next_match` (Tier 1).",
+            f"`ffbb_next_match(organisme_id=...{cat_arg})` si `ffbb_team_summary` indisponible.",
+            "`ffbb_club(action='calendrier', organisme_id=...)` → filtrer à venir (Tier 3 uniquement).",
+        ),
+        "Retourne : date, heure, adversaire, lieu, statut domicile/extérieur.",
+    ])
 
 
 def classement_poule(competition_name: str) -> str:
-    """Aide à consulter le classement d'une compétition ou d'une poule."""
-    if not competition_name:
-        raise ValueError("competition_name est obligatoire.")
-    return (
-        f"Affiche le classement de la compétition '{competition_name}'.\n\n"
-        "**Stratégie :**\n"
-        f"1. `ffbb_search(type='competitions', query='{competition_name}')` → `competition_id`\n"
-        "2. `ffbb_get(type='competition', id=<competition_id>)` → liste des poules\n"
-        "3. `ffbb_get(type='poule', id=<poule_id>)` → classement complet\n\n"
-        "Présente le classement sous forme de tableau (rang, équipe, J, V, D, pts)."
-    )
+    """Affiche le classement d'une compétition ou d'une poule FFBB."""
+    _validate(competition_name=competition_name)
+    name = competition_name.strip()
+    return "\n\n".join([
+        f"Affiche le classement de la compétition '{name}'.",
+        _strategy(
+            f"`ffbb_search(type='competitions', query='{name}')` → `competition_id`.",
+            "`ffbb_get(type='competition', id=<competition_id>)` → liste des poules.",
+            "`ffbb_get(type='poule', id=<poule_id>)` → classement complet.",
+        ),
+        "Présente sous forme de tableau : **Rang | Équipe | J | V | D | Pts**.\n"
+        "Mettre en évidence les positions de montée/descente si identifiables.",
+    ])
 
 
-def bilan_equipe(club_name: str, categorie: str) -> str:
+def bilan_equipe(club_name: str, categorie: str, numero_equipe: int = 1) -> str:
     """Établit le bilan complet d'une équipe sur toute la saison (toutes phases)."""
-    if not club_name or not categorie:
-        raise ValueError("club_name et categorie sont tous les deux obligatoires.")
-    return (
-        f"Établis le bilan complet de l'équipe '{categorie}' du club '{club_name}' "
-        "sur la saison actuelle (toutes phases confondues).\n\n"
-        "Ce bilan cumule toutes les phases confirmées pour cette équipe. "
-        "Les données FFBB sont toujours LIVE : ne PAS inventer de résultats.\n\n"
-        "**Stratégie (obligatoire) :**\n"
-        "1. **ID Club** : Utilise `ffbb_search(type='organismes', query=...)` pour obtenir l'`organisme_id`.\n"
-        "2. **Équipe (EN PRIORITÉ)** : Utilise `ffbb_team_summary(organisme_id=..., categorie=...)` pour le bilan global.\n"
-        "3. **Détail** : Si besoin, `ffbb_bilan(organisme_id=..., categorie=...)` pour le détail par phase.\n"
-        "4. **dernier recours** : `ffbb_club(action='calendrier')` (avec `organisme_id`) si aucun bilan n'est disponible.\n\n"
-        "**Format de réponse attendu :**\n"
-        "- **Bilan total saison** : matchs joués, victoires, défaites, nuls.\n"
-        "- **Détail par phase** : tableau avec position et V/D/N pour chaque compétition/poule."
+    _validate(club_name=club_name, categorie=categorie)
+    cn, cat = club_name.strip(), categorie.strip()
+    num_label = f" (équipe n°{numero_equipe})" if numero_equipe != 1 else ""
+    return "\n\n".join([
+        f"Bilan complet '{cat}'{num_label} — club '{cn}' — saison actuelle, toutes phases.",
+        _strategy(
+            "`ffbb_search(type='organismes', query=<club_name>)` si `organisme_id` non caché.",
+            f"`ffbb_team_summary(organisme_id=..., categorie='{cat}', numero_equipe={numero_equipe})` → `bilan_total` (Tier 1).",
+            f"`ffbb_bilan(organisme_id=..., categorie='{cat}')` si détail par phase nécessaire.",
+            "`ffbb_club(action='calendrier', organisme_id=...)` → reconstruction manuelle (Tier 3 uniquement).",
+        ),
+        "**Format attendu :**\n"
+        "- Bilan total : matchs joués · victoires · défaites · nuls · ratio\n"
+        "- Tableau par phase : Compétition | Rang | J | V | D | Pts",
+    ])
+
+
+def scores_live(club_name: str = "") -> str:
+    """Consulte les scores des matchs en cours, avec filtre optionnel par club."""
+    filtre = f" pour '{club_name.strip()}'" if club_name.strip() else " (tous clubs)"
+    post_filter = (
+        f"\n2. Filtrer les résultats pour '{club_name.strip()}' côté client."
+        if club_name.strip() else ""
     )
+    return "\n\n".join([
+        f"Affiche les scores en cours{filtre}.",
+        f"**Stratégie :**\n1. `ffbb_lives` → tous les matchs actifs (actualisation 30 s).{post_filter}",
+        "Tableau domicile/extérieur pour chaque match en cours.\n"
+        "Si aucun match actif → indiquer clairement et proposer `ffbb_next_match` en alternative.",
+    ])
+
+
+def calendrier_equipe(club_name: str, categorie: str, numero_equipe: int = 1) -> str:
+    """Affiche le calendrier complet d'une équipe pour la saison en cours."""
+    _validate(club_name=club_name, categorie=categorie)
+    cn, cat = club_name.strip(), categorie.strip()
+    return "\n\n".join([
+        f"Calendrier complet '{cat}' (n°{numero_equipe}) — club '{cn}'.",
+        _strategy(
+            "`ffbb_search(type='organismes', query=<club_name>)` si `organisme_id` non caché.",
+            f"`ffbb_club(action='calendrier', organisme_id=..., filtre='{cat}', numero_equipe={numero_equipe})`.",
+        ),
+        "Tableau chronologique : **Date | Heure | Domicile | Score | Extérieur | Statut**.\n"
+        "Séparer visuellement les matchs joués (✅) des matchs à venir (🕐).",
+    ])
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# ENREGISTREMENT MCP
+# REGISTRE MCP — source unique de vérité
 # ──────────────────────────────────────────────────────────────────────────────
 
 _PROMPTS = [
@@ -274,10 +366,24 @@ _PROMPTS = [
     prochain_match,
     classement_poule,
     bilan_equipe,
+    scores_live,
+    calendrier_equipe,
 ]
+
+# __all__ généré dynamiquement depuis _PROMPTS → jamais de désynchronisation
+__all__ = [fn.__name__ for fn in _PROMPTS] + ["register_prompts"]
 
 
 def register_prompts(mcp) -> None:
-    """Enregistre tous les prompts sur l'instance FastMCP."""
+    """Enregistre tous les prompts sur l'instance FastMCP.
+
+    Raises:
+        RuntimeError: Si l'enregistrement d'un prompt échoue (log + reraise).
+    """
     for fn in _PROMPTS:
-        mcp.prompt(name=fn.__name__, description=fn.__doc__)(fn)
+        try:
+            mcp.prompt(name=fn.__name__, description=fn.__doc__)(fn)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Échec enregistrement du prompt '{fn.__name__}': {exc}"
+            ) from exc
