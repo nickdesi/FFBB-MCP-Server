@@ -134,11 +134,20 @@ def generate_prometheus_metrics() -> str:
     Elles restent disponibles via get_snapshot() pour les besoins internes.
     """
     snap = get_snapshot()
+    uptime = snap["uptime_seconds"]
+    days = int(uptime // 86400)
+    hours = int((uptime % 86400) // 3600)
+    minutes = int((uptime % 3600) // 60)
+    uptime_fmt = f"{days:03d}:{hours:02d}:{minutes:02d}"
 
     lines: list[str] = [
         "# HELP ffbb_uptime_seconds Uptime du serveur en secondes",
         "# TYPE ffbb_uptime_seconds gauge",
-        f"ffbb_uptime_seconds {snap['uptime_seconds']:.2f}",
+        f"ffbb_uptime_seconds {uptime:.2f}",
+        "",
+        "# HELP ffbb_uptime_formatted Uptime lisible (JJJ:HH:MM)",
+        "# TYPE ffbb_uptime_formatted gauge",
+        f'ffbb_uptime_formatted{{human="{uptime_fmt}"}} 1',
         "",
         "# HELP ffbb_api_calls_total Total des appels vers l'API FFBB",
         "# TYPE ffbb_api_calls_total counter",
