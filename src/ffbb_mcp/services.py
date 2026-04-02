@@ -5,6 +5,7 @@ import logging
 import os
 import random
 import re
+import time
 import traceback
 from datetime import datetime
 from threading import RLock
@@ -18,7 +19,13 @@ from mcp.types import INTERNAL_ERROR
 
 from .aliases import enrich_acronym_cache, normalize_query
 from .client import get_client_async
-from .metrics import dec_inflight, inc_inflight, record_cache_hit, record_cache_miss
+from .metrics import (
+    dec_inflight,
+    inc_inflight,
+    record_cache_hit,
+    record_cache_miss,
+    record_call,
+)
 from .utils import ParsedCategorie, parse_categorie, serialize_model
 
 logger = logging.getLogger("ffbb-mcp")
@@ -297,12 +304,15 @@ async def _safe_call(
 
     last_exc: Exception | None = None
     for attempt in range(1, max(1, retries) + 1):
+        t0 = time.time()
         try:
             current_coro = make_coro()
             result = await current_coro
+            record_call(time.time() - t0, is_error=False)
             logger.info(f"Succès: {operation_name} (attempt {attempt})")
             return result
         except Exception as e:
+            record_call(time.time() - t0, is_error=True)
             last_exc = e
 
             # Décider si l'erreur est réessayable
