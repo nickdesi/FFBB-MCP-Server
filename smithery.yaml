@@ -27,5 +27,5 @@ configSchema:
       default: "https://ffbb.desimone.fr"
     MCP_MODE:
       type: string
-      description: The execution mode of the MCP server (sse or stdio).
+      description: "Mode d'exécution du serveur MCP : 'sse' active le transport Streamable HTTP (spec 2025-11-25), 'stdio' pour usage local."
       default: "sse"

@@ -29,7 +29,7 @@ Il permet aux assistants IA (Claude, Gemini, Cursor) de naviguer intelligemment 
 
 > **L'instance publique canonique :**  
 > 👉 `https://ffbb.desimone.fr/mcp`  
-> Tous les clients IA doivent pointer vers cette URL en mode HTTP(S) / SSE.
+> Tous les clients IA doivent pointer vers cette URL. Transport : **Streamable HTTP** (spec MCP 2025-11-25).
 
 ---
 
@@ -53,7 +53,7 @@ Ajoutez cette configuration dans votre `claude_desktop_config.json` :
 ### Cursor / VS Code (Extension MCP) / AnythingLLM
 Dans l'interface de gestion MCP de l'éditeur :
 
-1. Type : `SSE` ou `HTTP` (streamable)
+1. Type : `Streamable HTTP` (ou `HTTP` selon le client)
 2. URL : `https://ffbb.desimone.fr/mcp`
 
 ### Smithery (Intégration automatisée)
@@ -94,12 +94,12 @@ Récemment refondu pour maximiser les performances des LLMs, le serveur propose 
 
 ```mermaid
 flowchart LR
-    A[Agent IA\nClaude / Cursor] -->|SSE / HTTP\n/mcp| B(FastMCP Server\nffbb.desimone.fr)
-    B -->|Logique Métier & Cache| C{Services\nUnifiés}
-    C <-->|Client API V3| D[(FFBB API Officielle)]
+    A["Agent IA\nClaude / Cursor"] -->|"Streamable HTTP\nPOST /mcp"| B("FastMCP Server\nffbb.desimone.fr")
+    B -->|"Logique Métier & Cache"| C{"Services\nUnifiés"}
+    C <-->|"Client API V3"| D[("FFBB API Officielle")]
 ```
 
-- **Transport :** L'application est servie via HTTP(S) Streamable (Server-Sent Events) par FastMCP sur l'endpoint `/mcp`.
+- **Transport :** Streamable HTTP (spec MCP 2025-11-25) — endpoint unique `/mcp` acceptant POST (JSON-RPC) et GET (SSE optionnel).
 - **Réduction de contexte :** Le `Service Layer` consolide de nombreux micro-appels FFBB en réponses JSON concises, économisant massivement les tokens de votre LLM.
 - **Performances & Temps réel :** Les données dynamiques (scores, classements, calendriers) ont un cache ultra-court (15-30 secondes) **garantissant des données "toujours à jour"**. La protection contre les abus (anti-burst) est gérée par une déduplication en un seul vol (inflight request deduplication) couplée à un rate-limiter strict. L'outil `ffbb_club` auto-résout désormais les `poule_id` pour les classements par phase (ex: "phase 3") et met en avant l'équipe concernée.
 

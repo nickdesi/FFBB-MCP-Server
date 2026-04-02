@@ -13,7 +13,7 @@ Nous utilisons le framework `mcp.server.fastmcp` pour simplifier la définition 
 Le serveur supporte deux modes d'exposition :
 
 - **Stdio** : Utilisé pour l'exécution locale (via `uvx`). Communication via stdin/stdout.
-- **SSE (Streamable HTTP)** : Utilisé pour le déploiement cloud (Cloudify). Communication via des événements HTTP (Server-Sent Events) exploités par FastAPI.
+- **Streamable HTTP** (spec MCP 2025-11-25) : Utilisé pour le déploiement cloud (Coolify). Endpoint unique `/mcp` acceptant `POST` (JSON-RPC) et `GET` (SSE server-to-client optionnel). Transport configuré via `MCP_MODE=sse`.
 
 ### 3. Service Layer (`services.py`)
 
@@ -50,14 +50,19 @@ sequenceDiagram
     MCP-->>LLM: Réponse finale
 ```
 
-## 🌐 Déploiement SSE
+## 🌐 Déploiement Streamable HTTP
 
-En mode `SSE`, le serveur configure FastMCP pour exposer le transport HTTP streamable standard sur l'endpoint `/mcp` (et `/messages/`). Un endpoint de monitoring `/health` et d'autres routes annexes sont également exposées par l'application sous-jacente indépendamment du router MCP.
+En mode `sse` (ou `http`/`streamable-http`), le serveur configure FastMCP pour exposer le transport **Streamable HTTP** (spec 2025-11-25) sur l'endpoint unique `/mcp` :
+
+- `POST /mcp` → JSON-RPC (initialize, tools/call…) — **obligatoire**
+- `GET /mcp` → SSE server-to-client — optionnel
+
+D'autres routes annexes (`/health`, `/metrics`, `/`) sont également exposées par l'application.
 
 ## 🖥️ Clients Supportés
 
 Le serveur **FFBB MCP** est compatible avec tout client respectant le protocole MCP :
 
-- **Google Antigravity** : Intégration native via SSE.
-- **Claude Desktop / Claude Code** : Support via Stdio (local) ou SSE (distant).
+- **Google Antigravity** : Intégration native via Streamable HTTP.
+- **Claude Desktop / Claude Code** : Support via Stdio (local) ou Streamable HTTP (distant).
 - **Cursor / IDEs** : Compatibilité via le plugin MCP.
