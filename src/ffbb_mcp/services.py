@@ -16,7 +16,7 @@ from httpx import HTTPStatusError
 from mcp.shared.exceptions import ErrorData, McpError
 from mcp.types import INTERNAL_ERROR
 
-from .aliases import normalize_query
+from .aliases import enrich_acronym_cache, normalize_query
 from .client import get_client_async
 from .metrics import dec_inflight, inc_inflight, record_cache_hit, record_cache_miss
 from .utils import ParsedCategorie, parse_categorie, serialize_model
@@ -1878,11 +1878,15 @@ async def _resolve_club_and_org(
 
         for org in orgs:
             if isinstance(org, dict) and org.get("id"):
+                nom = org.get("nom", "")
                 resolved.append({
-                    "nom": org.get("nom", ""),
+                    "nom": nom,
                     "organisme_id": org.get("id"),
                     "code": org.get("code", ""),
                 })
+                # Enrichissement auto du cache d'acronymes
+                if nom:
+                    enrich_acronym_cache(nom)
 
     return resolved, org_data
 
