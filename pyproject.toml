@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 dependencies = [
-    "mcp[cli]>=1.0.0",
+    "mcp[cli]>=1.8.0",
     "ffbb-api-client-v3 @ git+https://github.com/nickdesi/FFBBApiClientV3.git",
     "anysqlite>=0.0.5",
     "uvicorn",

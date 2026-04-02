@@ -3,7 +3,8 @@ FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
-# Configurer l'environnement MCP en mode Serveur Web (SSE)
+# MCP_MODE=sse → désormais déclenche le transport Streamable HTTP (spec 2025-11-25)
+# Valeur conservée pour la rétrocompatibilité avec Coolify / les scripts existants
 ENV MCP_MODE=sse
 ENV PORT=9123
 ENV HOST=0.0.0.0

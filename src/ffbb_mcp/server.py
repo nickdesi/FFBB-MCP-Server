@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import logging
 import os
 import platform
@@ -20,6 +21,7 @@ from starlette.responses import (
     RedirectResponse,
     Response,
 )
+from starlette.routing import Mount
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from . import __version__ as _PACKAGE_VERSION
@@ -91,6 +93,11 @@ mcp = FastMCP(
         "Règles : catégorie sans genre → demander M ou F. Plusieurs équipes même catégorie → demander laquelle."
     ),
     dependencies=["mcp", "ffbb-api-client-v3"],
+    # Streamable HTTP transport (MCP spec 2025-11-25)
+    # stateless_http=True → pas de session persistante (scalabilité horizontale)
+    # json_response=True  → répond en application/json (plus simple que SSE pour POST)
+    stateless_http=True,
+    json_response=True,
     transport_security=TransportSecuritySettings(
         enable_dns_rebinding_protection=_dns_protection,
         allowed_hosts=_allowed_hosts,
@@ -903,39 +910,63 @@ def main() -> None:
     )
     mode = os.environ.get("MCP_MODE", "stdio").lower()
 
-    if mode == "sse":
+    if mode in ("sse", "http", "streamable-http"):
         host = os.environ.get("HOST", "0.0.0.0")
         port = int(os.environ.get("PORT", "9123"))
-        logger.info(f"Démarrage MCP FFBB en mode SSE standard sur {host}:{port}...")
+        logger.info(f"Démarrage MCP FFBB en mode Streamable HTTP sur {host}:{port}/mcp ...")
 
-        # Configuration des chemins pour éviter les conflits et erreurs 405
-        # /mcp pour le flux SSE (GET), /mcp/messages pour les commandes (POST)
-        mcp.settings.sse_path = "/mcp"
-        mcp.settings.message_path = "/mcp/messages"
+        # Transport Streamable HTTP — spec MCP 2025-11-25
+        # Un endpoint unique /mcp accepte GET et POST
+        # GET /mcp  → SSE server-to-client (optionnel, 405 si non supporté)
+        # POST /mcp → JSON-RPC (initialize, tools/call, etc.)
+        mcp.settings.streamable_http_path = "/mcp"
 
-        # Création de l'application Starlette manuelle pour injecter les middlewares
-        # essentiels en production (HTTPS derrière proxy, CORS)
-        app = Starlette(debug=False)
+        # Lifespan requis pour gérer le session_manager du transport Streamable HTTP
+        @contextlib.asynccontextmanager
+        async def lifespan(app: Starlette):
+            async with mcp.session_manager.run():
+                yield
+
+        # streamable_http_app() retourne une Starlette app avec TOUTES les routes :
+        #   - /mcp  → endpoint MCP Streamable HTTP (GET + POST)
+        #   - /health, /metrics, /logo.webp, /, etc. → custom routes
+        # On la monte à la racine pour préserver tous les chemins.
+        mcp_app = mcp.streamable_http_app()
+
+        # Création de l'application Starlette racine avec lifespan
+        app = Starlette(
+            debug=False,
+            routes=[Mount("/", app=mcp_app)],
+            lifespan=lifespan,
+        )
         app.router.redirect_slashes = False
 
         # Middleware pour gérer les headers de proxy (X-Forwarded-Proto pour HTTPS)
         # Indispensable pour que le serveur sache qu'il est en HTTPS derrière Nginx
         app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
 
-        # Middleware CORS pour autoriser les clients MCP (web ou desktop)
+        # Middleware CORS — spec 2025-11-25 :
+        # Methods : GET, POST, OPTIONS obligatoires
+        # Headers : Content-Type, Accept, Mcp-Session-Id, MCP-Protocol-Version obligatoires
         app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],
-            allow_methods=["*"],
-            allow_headers=["*"],
-            expose_headers=["Content-Type", "Authorization"],
+            allow_methods=["GET", "POST", "OPTIONS", "DELETE"],
+            allow_headers=[
+                "Content-Type",
+                "Accept",
+                "Authorization",
+                "Mcp-Session-Id",
+                "MCP-Protocol-Version",
+                "X-Forwarded-For",
+                "X-Forwarded-Proto",
+                "X-Real-IP",
+            ],
+            expose_headers=["Content-Type", "Mcp-Session-Id"],
         )
 
         # Middleware GZip pour compresser les réponses JSON volumineuses
         app.add_middleware(GZipMiddleware, minimum_size=1000)
-
-        # Montage du serveur MCP (SSE)
-        app.mount("/", mcp.sse_app())
 
         import uvicorn
         uvicorn.run(app, host=host, port=port, log_level="info")
