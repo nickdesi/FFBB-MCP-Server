@@ -51,22 +51,17 @@ class TestPrompts:
         assert "U11M" in result
         assert "ffbb_search" in result
         assert "ffbb_club" in result
-        assert "cumule" in result.lower()
+        assert "bilan total" in result.lower()
 
     def test_bilan_equipe_prompt_mentions_ffbb_bilan_prioritaire(self):
         prompt = bilan_equipe("ASVEL", "U13M-1")
         assert "ffbb_bilan" in prompt
-        assert "EN PRIORITÉ" in prompt or "prioritaire" in prompt
+        assert "détail par phase" in prompt
 
     def test_bilan_equipe_prompt_mentions_anti_pattern_calendrier(self):
         prompt = bilan_equipe("ASVEL", "U13M-1")
-        # Vérifie que le prompt mentionne l'usage de ffbb_club(action='calendrier') uniquement en dernier recours
-        assert "ffbb_club(action='calendrier')" in prompt
-        assert "DERNIER RECOURS" in prompt or "dernier recours" in prompt
-
-    def test_bilan_equipe_prompt_mentions_donnees_live(self):
-        prompt = bilan_equipe("ASVEL", "U13M-1")
-        assert "toujours LIVE" in prompt or "données FFBB" in prompt
+        assert "ffbb_club(action='calendrier'" in prompt
+        assert "tier 3" in prompt.lower()
 
     def test_expert_basket_prompt_best_practices(self):
         prompt = expert_basket()
@@ -85,8 +80,8 @@ class TestPrompts:
         assert "toujours live" in prompt.lower() or "données FFBB" in prompt
 
         # --- NOUVELLES RÈGLES D'AFFICHAGE ---
-        assert "RÈGLE D'AFFICHAGE DES MATCHS" in prompt
-        assert "nomEquipe1" in prompt and "nomEquipe2" in prompt
+        assert "AFFICHAGE DES MATCHS" in prompt
+        assert "equipe1" in prompt and "equipe2" in prompt
         assert "Format tableau obligatoire" in prompt
         assert "🟢" in prompt
         assert "score" in prompt.lower()

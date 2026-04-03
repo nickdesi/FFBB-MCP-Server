@@ -65,6 +65,10 @@ async def test_phase_prioritization_next_match():
         patch(
             "ffbb_mcp.services.get_poule_service", AsyncMock(side_effect=side_effect)
         ),
+        patch(
+            "ffbb_mcp.services._resolve_club_and_org",
+            AsyncMock(return_value=([{"nom": "Club", "organisme_id": "123"}], {})),
+        ),
     ):
         result = await ffbb_next_match_service(
             organisme_id=123, categorie="U11M", numero_equipe=1
@@ -133,6 +137,10 @@ async def test_phase_prioritization_last_result():
         ),
         patch(
             "ffbb_mcp.services.get_poule_service", AsyncMock(side_effect=side_effect)
+        ),
+        patch(
+            "ffbb_mcp.services._resolve_club_and_org",
+            AsyncMock(return_value=([{"nom": "Club", "organisme_id": "123"}], {})),
         ),
     ):
         result = await ffbb_last_result_service(
