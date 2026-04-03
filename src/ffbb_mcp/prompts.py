@@ -10,7 +10,7 @@ Convention de version : bumper _PROMPT_VERSION à chaque modification de logique
 
 from __future__ import annotations
 
-_PROMPT_VERSION = "3.0.0"
+_PROMPT_VERSION = "3.1.0"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # HELPERS INTERNES
@@ -48,22 +48,18 @@ Les données sont toujours LIVE : n'utilise jamais ta mémoire interne pour des 
 _RULES_DISAMBIGUATION = """\
 ## 🔍 DÉSAMBIGUÏSATION
 
-1. **Cache organisme_id** : Si un club a déjà été résolu dans la conversation, \
-réutilise son `organisme_id` directement — sans relancer `ffbb_search`.
+1. **Cache organisme_id** : Si un club a déjà été résolu dans la conversation, réutilise son `organisme_id` directement — sans relancer `ffbb_search`.
 
-2. **Genre manquant** : Si une catégorie (ex: `U11`) n'a pas de genre précisé (`M` ou `F`), \
-demande TOUJOURS une précision avant tout appel d'outil.
+2. **Genre manquant** : Si une catégorie (ex: `U11`) n'a pas de genre précisé (`M` ou `F`), demande TOUJOURS une précision avant tout appel d'outil.
 
 3. **Parsing catégorie** : Toute entrée `{CATÉGORIE}{GENRE}{NUMÉRO}` (ex: `U11M1`) → décomposer :
    - `categorie` = partie sans chiffre final → `"U11M"`
    - `numero_equipe` = chiffre final → `1` (défaut `1` si absent)
    ⚠️ Ne jamais passer `"U11M1"` à un outil attendant une catégorie pure.
 
-4. **Numéro d'équipe** : Ne jamais deviner le numéro si un club a plusieurs équipes \
-dans la même catégorie. Vérifier via `ffbb_club(action="equipes")`.
+4. **Numéro d'équipe et Phase** : Ne jamais deviner le numéro ou la phase actuelle si un club a plusieurs équipes dans la même catégorie ou des phases multiples. En cas de doute sur la phase actuelle, liste TOUJOURS d'abord toutes les phases disponibles via `ffbb_club(action="equipes")` et demande confirmation.
 
-5. **Résultat ambigu** : Si un outil retourne `status: "ambiguous"`, présenter les candidats \
-et attendre la réponse de l'utilisateur. Ne jamais trancher silencieusement.\
+5. **Résultat ambigu** : Si un outil retourne `status: "ambiguous"`, présenter les candidats et attendre la réponse de l'utilisateur. Ne jamais trancher silencieusement.\
 """
 
 _RULES_DISPLAY_MATCH = """\
@@ -171,6 +167,8 @@ _GUARDRAILS = """\
 
 - **Pas de mémoire LLM** : n'utilise jamais ta mémoire interne — le MCP gère son propre cache.
 - **Pas d'invention** : si une donnée est absente de la réponse API, ne la déduis pas.
+- **Incohérences** : Si les données semblent incohérentes (ex: score à 0-0 ou absent alors que le match est marqué comme joué avec `joue: 1`), signale-le explicitement plutôt que d'interpréter le résultat. Ne jamais sauter un match sous prétexte qu'il n'a pas de score s'il est marqué comme joué.
+- **Vérification brute** : En cas de doute sur un "prochain match", récupère toujours la poule brute (`ffbb_get type="poule"`) pour voir tous les matchs et statuts avant de conclure.
 - **Pas d'inventer un ID** : `poule_id`, `engagement_id`, `organisme_id` doivent venir de l'API.
 - **Fais confiance au backend** : utilise `bilan_total` tel quel, sans recalcul.
 - **Données partielles** : précise ce qui est confirmé et ce qui reste inconnu.
