@@ -10,23 +10,27 @@ Convention de version : bumper _PROMPT_VERSION à chaque modification de logique
 
 from __future__ import annotations
 
-_PROMPT_VERSION = "3.1.0"
+_PROMPT_VERSION = "3.2.0"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # HELPERS INTERNES
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _validate(**kwargs: str | int) -> None:
-    """Lève ValueError si un argument obligatoire est vide ou whitespace-only."""
+    """Lève ValueError si un argument obligatoire est vide, whitespace-only, None ou int invalide."""
     for name, value in kwargs.items():
-        if isinstance(value, str) and not value.strip():
-            raise ValueError(f"'{name}' est obligatoire et ne peut pas être vide.")
         if value is None:
             raise ValueError(f"'{name}' est obligatoire.")
+        if isinstance(value, str) and not value.strip():
+            raise ValueError(f"'{name}' est obligatoire et ne peut pas être vide.")
+        if isinstance(value, int) and value < 0:
+            raise ValueError(f"'{name}' doit être un entier positif ou nul.")
 
 
 def _strategy(*steps: str, intro: str = "**Stratégie :**") -> str:
     """Formate une liste d'étapes numérotées en bloc stratégie cohérent."""
+    if not steps:
+        raise ValueError("_strategy() requiert au moins une étape.")
     lines = [intro]
     for i, step in enumerate(steps, 1):
         lines.append(f"{i}. {step}")
@@ -38,11 +42,12 @@ def _strategy(*steps: str, intro: str = "**Stratégie :**") -> str:
 # Chaque bloc est une constante nommée, modifiable et testable indépendamment.
 # ──────────────────────────────────────────────────────────────────────────────
 
-_INTRO = """\
+_INTRO = f"""\
 Tu es un assistant expert en basketball français. Tu accèdes en temps réel aux données \
 officielles de la FFBB via le serveur MCP (ffbb.desimone.fr).
 Réponds toujours en français, de façon concise et structurée.
-Les données sont toujours LIVE : n'utilise jamais ta mémoire interne pour des faits sportifs.\
+Les données sont toujours LIVE : n'utilise jamais ta mémoire interne pour des faits sportifs.
+<!-- prompt_version: {_PROMPT_VERSION} -->\
 """
 
 _RULES_DISAMBIGUATION = """\
@@ -85,7 +90,7 @@ _RULES_METIER = """\
 
 - **Live d'abord** : Pour tout score "en cours" ou "maintenant", appeler `ffbb_lives` EN PREMIER.
 - **Bilan** : Utiliser `bilan_total` retourné par `ffbb_team_summary` ou `ffbb_bilan`. \
-Ne jamais recalculer V/D/N à la main si ce champ est présent.
+Ne jamais recalculer V/D à la main si ce champ est présent.
 - **Multi-engagements** : Si plusieurs engagements coexistent, appliquer le scoring de phases \
 pour identifier la phase active la plus haute.
 - **Saison courante** : Toutes les données correspondent à la saison active. \
@@ -101,7 +106,7 @@ Quand plusieurs engagements coexistent, retenir celui avec le score le plus éle
 |:---|:---|
 | Phase | Phase 3 → +30 · Phase 2 → +20 · Phase 1 → +10 · Initial → +5 |
 | Niveau | Nationale → +10 · Interrégionale → +7 · Régionale → +5 · Départementale → +3 |
-| Division | Basse (ex: D6) → −5 |
+| Division | Basse (ex: D6) → -5 |
 
 - **Exclusions** : Ignorer "Amical", "Brassage", "Tournoi", "Coupe" (sauf demande explicite).
 - **Égalité** : Prendre l'`engagement_id` le plus élevé (le plus récent).
@@ -153,7 +158,7 @@ _WORKFLOW = """\
 | Classement d'une poule précise | `ffbb_get(type='poule', id=…)` |
 | Détails d'une compétition | `ffbb_get(type='competition', id=…)` |
 | Équipes engagées d'un club | `ffbb_club(action='equipes', organisme_id=…)` |
-| Recherche générale | `ffbb_search(type='all', query=…)` |
+| Recherche générale | `ffbb_search(type='organismes', query=…)` |
 
 ### 🥉 Tier 3 — Pipeline manuel (dernier recours)
 
@@ -246,7 +251,7 @@ def analyser_match(match_id: str) -> str:
         f"Analyse le match FFBB id=`{mid}`.",
         _strategy(
             f"`ffbb_get(type='rencontre', id={mid})` → détails complets.",
-            "Si introuvable : `ffbb_search(type='rencontres', query=<match_id>)` pour localiser.",
+            "Si introuvable : `ffbb_search(type='organismes', query=<match_id>)` pour localiser.",
         ),
         "Présente :\n"
         "- Contexte : clubs, catégorie, compétition, phase\n"
@@ -272,7 +277,7 @@ def trouver_club(club_name: str, department: str = "") -> str:
 
 def prochain_match(club_name: str, categorie: str = "", numero_equipe: int = 1) -> str:
     """Trouve le prochain match d'un club, optionnellement filtré par catégorie."""
-    _validate(club_name=club_name)
+    _validate(club_name=club_name, numero_equipe=numero_equipe)
     equipe = f" — équipe {categorie.strip()}" if categorie.strip() else ""
     num = f", numero_equipe={numero_equipe}" if numero_equipe != 1 else ""
     cat_arg = f", categorie='{categorie.strip()}'{num}" if categorie.strip() else ""
@@ -295,7 +300,7 @@ def classement_poule(competition_name: str) -> str:
     return "\n\n".join([
         f"Affiche le classement de la compétition '{name}'.",
         _strategy(
-            f"`ffbb_search(type='competitions', query='{name}')` → `competition_id`.",
+            f"`ffbb_search(type='organismes', query='{name}')` → `competition_id`.",
             "`ffbb_get(type='competition', id=<competition_id>)` → liste des poules.",
             "`ffbb_get(type='poule', id=<poule_id>)` → classement complet.",
         ),
@@ -306,7 +311,7 @@ def classement_poule(competition_name: str) -> str:
 
 def bilan_equipe(club_name: str, categorie: str, numero_equipe: int = 1) -> str:
     """Établit le bilan complet d'une équipe sur toute la saison (toutes phases)."""
-    _validate(club_name=club_name, categorie=categorie)
+    _validate(club_name=club_name, categorie=categorie, numero_equipe=numero_equipe)
     cn, cat = club_name.strip(), categorie.strip()
     num_label = f" (équipe n°{numero_equipe})" if numero_equipe != 1 else ""
     return "\n\n".join([
@@ -318,7 +323,7 @@ def bilan_equipe(club_name: str, categorie: str, numero_equipe: int = 1) -> str:
             "`ffbb_club(action='calendrier', organisme_id=...)` → reconstruction manuelle (Tier 3 uniquement).",
         ),
         "**Format attendu :**\n"
-        "- Bilan total : matchs joués · victoires · défaites · nuls · ratio\n"
+        "- Bilan total : matchs joués · victoires · défaites · ratio V/D\n"
         "- Tableau par phase : Compétition | Rang | J | V | D | Pts",
     ])
 
@@ -326,13 +331,12 @@ def bilan_equipe(club_name: str, categorie: str, numero_equipe: int = 1) -> str:
 def scores_live(club_name: str = "") -> str:
     """Consulte les scores des matchs en cours, avec filtre optionnel par club."""
     filtre = f" pour '{club_name.strip()}'" if club_name.strip() else " (tous clubs)"
-    post_filter = (
-        f"\n2. Filtrer les résultats pour '{club_name.strip()}' côté client."
-        if club_name.strip() else ""
-    )
+    steps = ["`ffbb_lives` → tous les matchs actifs (actualisation 30 s)."]
+    if club_name.strip():
+        steps.append(f"Filtrer les résultats pour '{club_name.strip()}' côté client.")
     return "\n\n".join([
         f"Affiche les scores en cours{filtre}.",
-        f"**Stratégie :**\n1. `ffbb_lives` → tous les matchs actifs (actualisation 30 s).{post_filter}",
+        _strategy(*steps),
         "Tableau domicile/extérieur pour chaque match en cours.\n"
         "Si aucun match actif → indiquer clairement et proposer `ffbb_next_match` en alternative.",
     ])
@@ -340,7 +344,7 @@ def scores_live(club_name: str = "") -> str:
 
 def calendrier_equipe(club_name: str, categorie: str, numero_equipe: int = 1) -> str:
     """Affiche le calendrier complet d'une équipe pour la saison en cours."""
-    _validate(club_name=club_name, categorie=categorie)
+    _validate(club_name=club_name, categorie=categorie, numero_equipe=numero_equipe)
     cn, cat = club_name.strip(), categorie.strip()
     return "\n\n".join([
         f"Calendrier complet '{cat}' (n°{numero_equipe}) — club '{cn}'.",
