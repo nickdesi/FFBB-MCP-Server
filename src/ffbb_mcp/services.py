@@ -1970,10 +1970,17 @@ async def resolve_poule_id_service(
                 target_phase in phase_label):
                 return str(e.get("poule_id"))
 
-    # Par défaut (ou si phase non trouvée), on prend l'engagement avec le niveau le plus élevé
-    # (souvent la phase la plus avancée dans la saison).
-    # FIX: handle None correctly for sort
-    equipes.sort(key=lambda x: x.get("niveau") or 0, reverse=True)
+    # Par défaut (ou si phase non trouvée), on prend l'engagement avec la phase la plus avancée
+    # ou le niveau le plus élevé. On extrait le numéro de phase du label pour trier.
+    def sort_key(e: dict) -> tuple[int, int]:
+        label = str(e.get("phase_label") or e.get("competition") or "")
+        # Cherche le dernier numéro présent dans le titre s'il y a le mot phase ou simplement des chiffres
+        # La méthode la plus robuste (comme suggéré par l'utilisateur) est de chercher le dernier nombre
+        nums = re.findall(r'\d+', label)
+        phase_num = int(nums[-1]) if nums else 0
+        return (phase_num, e.get("niveau") or 0)
+
+    equipes.sort(key=sort_key, reverse=True)
     return str(equipes[0].get("poule_id"))
 
 
