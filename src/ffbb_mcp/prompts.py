@@ -251,7 +251,7 @@ def analyser_match(match_id: str) -> str:
         f"Analyse le match FFBB id=`{mid}`.",
         _strategy(
             f"`ffbb_get(type='rencontre', id={mid})` → détails complets.",
-            "Si introuvable : `ffbb_search(type='organismes', query=<match_id>)` pour localiser.",
+            "Si introuvable : `ffbb_search(type='rencontres', query=<match_id>)` pour localiser.",
         ),
         "Présente :\n"
         "- Contexte : clubs, catégorie, compétition, phase\n"
