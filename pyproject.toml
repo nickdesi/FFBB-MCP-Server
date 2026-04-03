@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ffbb-mcp"
-version = "0.3.0"
+version = "0.3.1"
 description = "MCP Server for FFBB (Fédération Française de Basketball) data"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 dependencies = [
     "mcp[cli]>=1.8.0",
-    "ffbb-api-client-v3 @ git+https://github.com/nickdesi/FFBBApiClientV3.git",
+    "ffbb-api-client-v3 @ git+https://github.com/nickdesi/FFBBApiClientV3.git@ccd6da2",
     "anysqlite>=0.0.5",
     "uvicorn",
     "starlette",
