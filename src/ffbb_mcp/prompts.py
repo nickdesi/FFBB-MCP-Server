@@ -10,7 +10,7 @@ Convention de version : bumper _PROMPT_VERSION à chaque modification de logique
 
 from __future__ import annotations
 
-_PROMPT_VERSION = "3.2.0"
+_PROMPT_VERSION = "3.3.0"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # HELPERS INTERNES
@@ -91,10 +91,28 @@ _RULES_METIER = """\
 - **Live d'abord** : Pour tout score "en cours" ou "maintenant", appeler `ffbb_lives` EN PREMIER.
 - **Bilan** : Utiliser `bilan_total` retourné par `ffbb_team_summary` ou `ffbb_bilan`. \
 Ne jamais recalculer V/D à la main si ce champ est présent.
-- **Multi-engagements** : Si plusieurs engagements coexistent, appliquer le scoring de phases \
-pour identifier la phase active la plus haute.
 - **Saison courante** : Toutes les données correspondent à la saison active. \
 Ne mentionner une saison passée qu'après vérification explicite.\
+"""
+
+_RULES_CLASSEMENT = """\
+## 🏆 CLASSEMENT D'UNE ÉQUIPE
+
+TOUJOURS suivre cette séquence, sans exception :
+
+1. **ÉTAPE 1 — Tenter `ffbb_team_summary`** (organisme_id + categorie).
+   → Si succès : répondre directement.
+   → Si échec (équipe non résolue) : passer à l'étape 2.
+
+2. **ÉTAPE 2 — Appeler `ffbb_bilan`** (organisme_id + categorie).
+   → Lister toutes les phases disponibles avec leur `poule_id`.
+   → Sans précision de phase → prendre la phase au numéro le plus élevé (ex: Phase 3 > Phase 1).
+   → Avec précision (ex: "Phase 3") → matcher le nom de compétition ou le label.
+
+3. **ÉTAPE 3 — Appeler `ffbb_get(id=poule_id, type="poule")`**.
+   → Retourne le classement complet et fiable.
+
+⚠️ **INTERDICTION** : Ne jamais utiliser `ffbb_club(action='classement', phase=X)` pour résoudre une phase spécifique — non fiable.\
 """
 
 _RULES_PHASES = """\
@@ -114,7 +132,7 @@ Quand plusieurs engagements coexistent, retenir celui avec le score le plus éle
 """
 
 _SEQUENCE = """\
-## 🔁 SÉQUENCE DE RAISONNEMENT
+## 🔁 SÉQUENCE DE RAISONNEMENT GÉNÉRALE
 
 **Étape 0 — Cache** : L'`organisme_id` est-il connu dans la conversation ?
 - OUI → Sauter l'étape 1.
@@ -128,10 +146,9 @@ _SEQUENCE = """\
 → Lancer simultanément tous les appels sans dépendance entre eux.
 → Les appels dépendants d'un résultat précédent attendent leur prérequis.
 
-**Étape 3 — Résolution poule_id** (si classement demandé) :
-- A : `ffbb_team_summary(organisme_id, categorie, numero_equipe)` → `raw.phases[]` → `poule_id`.
-- B : `ffbb_club(action='classement', organisme_id, poule_id)` → classement complet.
-- *Raccourci* : `ffbb_club(action='classement', club_name=..., filtre=..., phase=...)` si disponible.
+**Étape 3 — Règle Spécifique** :
+- Pour un **Classement** → Appliquer strictement la section **## 🏆 CLASSEMENT D'UNE ÉQUIPE**.
+- Pour un **Bilan** → `ffbb_team_summary` ou `ffbb_bilan`.
 
 **Étape 4 — Réponse** : Citer explicitement les phases et compétitions prises en compte.\
 """
@@ -234,6 +251,7 @@ def expert_basket() -> str:
         _RULES_DISAMBIGUATION,
         _RULES_DISPLAY_MATCH,
         _RULES_METIER,
+        _RULES_CLASSEMENT,
         _RULES_PHASES,
         _SEQUENCE,
         _WORKFLOW,
