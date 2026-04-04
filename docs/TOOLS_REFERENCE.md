@@ -15,7 +15,7 @@ Le serveur a été refondu pour proposer des outils polyvalents qui réduisent l
 - **Arguments** :
   - `query` (string, requis) : Le texte à rechercher (nom de club, ville, nom de compétition, etc.).
   - `type` (enum, défaut: `"all"`) : Filtre le type de résultat.
-    - `all` : Cherche partout.
+    - `all` : Cherche partout (9 index Meilisearch).
     - `competitions` : Championnats et coupes.
     - `organismes` : Clubs, comités, ligues.
     - `rencontres` : Matchs spécifiques.
@@ -23,15 +23,31 @@ Le serveur a été refondu pour proposer des outils polyvalents qui réduisent l
     - `pratiques` : Types de jeu (5x5, 3x3).
     - `terrains` : Terrains extérieurs.
     - `tournois` : Événements ponctuels.
+    - `engagements` : Engagements d'équipes dans les compétitions *(nouveau v0.4.0)*.
+    - `formations` : Formations, stages et certifications *(nouveau v0.4.0)*.
   - `limit` (integer, défaut: `20`) : Nombre maximum de résultats (1-100).
+  - `filter_by` (string, optionnel) : Filtre Meilisearch natif appliqué aux résultats (ex: `codePostal = "63000"`). Permet de restreindre les résultats sur n'importe quel attribut filtrable de l'index ciblé. *(nouveau v0.4.0)*
+  - `sort` (list[string], optionnel) : Tri Meilisearch natif (ex: `["libelle:asc"]`). Permet de trier les résultats par un ou plusieurs attributs triables. *(nouveau v0.4.0)*
 
-- **Exemple d'appel** :
+- **Exemples d'appel** :
 
   ```json
   { "query": "Stade Clermontois", "type": "organismes" }
   ```
 
-- **Retour** : Une liste d'objets contenant au minimum un `id` technique et un `nom`.
+  ```json
+  { "query": "Clermont", "type": "engagements", "limit": 10 }
+  ```
+
+  ```json
+  { "query": "coach", "type": "formations", "limit": 5 }
+  ```
+
+  ```json
+  { "query": "Clermont", "type": "organismes", "filter_by": "codePostal = \"63000\"", "limit": 5 }
+  ```
+
+- **Retour** : Une liste d'objets contenant au minimum un `id` technique et un `nom`. Le contenu exact des champs varie selon le `type` d'index interrogé.
 
 ---
 

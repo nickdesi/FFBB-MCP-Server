@@ -88,6 +88,27 @@ Récemment refondu pour maximiser les performances des LLMs, le serveur propose 
 | `ffbb_lives` | Récupère tous les matchs actuellement en direct en France. | *Aucun* |
 | `ffbb_saisons` | Liste et détermine la saison FFBB en cours. | `active_only` |
 
+#### Détail de `ffbb_search` (v0.4.0)
+
+L'outil `ffbb_search` couvre désormais **9 index Meilisearch** et supporte le filtrage et tri natifs :
+
+| Type | Description |
+| --- | --- |
+| `all` | Recherche globale sur tous les index (défaut) |
+| `competitions` | Compétitions officielles |
+| `organismes` | Clubs, comités, ligues |
+| `rencontres` | Matchs et rencontres |
+| `salles` | Salles et gymnases |
+| `pratiques` | Lieux de pratique |
+| `terrains` | Terrains de basket |
+| `tournois` | Tournois |
+| `engagements` | **Engagements d'équipes** *(nouveau v0.4.0)* |
+| `formations` | **Formations et stages** *(nouveau v0.4.0)* |
+
+**Nouveaux paramètres v0.4.0 :**
+- `filter_by` *(optionnel)* — Filtre Meilisearch natif (ex: `codePostal = "63000"`)
+- `sort` *(optionnel)* — Tri Meilisearch natif (ex: `["libelle:asc"]`)
+
 ---
 
 ## 🏗️ Architecture Technique
