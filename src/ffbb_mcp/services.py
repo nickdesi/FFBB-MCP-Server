@@ -645,6 +645,8 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
         # module import time.
         from ffbb_api_client_v3.config import (
             MEILISEARCH_INDEX_COMPETITIONS,
+            MEILISEARCH_INDEX_ENGAGEMENTS,
+            MEILISEARCH_INDEX_FORMATIONS,
             MEILISEARCH_INDEX_ORGANISMES,
             MEILISEARCH_INDEX_PRATIQUES,
             MEILISEARCH_INDEX_RENCONTRES,
@@ -690,6 +692,16 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
             ),
             MultiSearchQuery(
                 index_uid=MEILISEARCH_INDEX_TOURNOIS,
+                q=normalized_query,
+                limit=secondary_limit,
+            ),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_ENGAGEMENTS,
+                q=normalized_query,
+                limit=secondary_limit,
+            ),
+            MultiSearchQuery(
+                index_uid=MEILISEARCH_INDEX_FORMATIONS,
                 q=normalized_query,
                 limit=secondary_limit,
             ),
@@ -1681,6 +1693,14 @@ async def search_terrains_service(nom: str, limit: int = 20) -> list[dict]:
 
 async def search_tournois_service(nom: str, limit: int = 20) -> list[dict]:
     return await _search_generic("tournois", "search_tournois_async", nom, limit)
+
+
+async def search_engagements_service(nom: str, limit: int = 20) -> list[dict]:
+    return await _search_generic("engagements", "search_engagements_async", nom, limit)
+
+
+async def search_formations_service(nom: str, limit: int = 20) -> list[dict]:
+    return await _search_generic("formations", "search_formations_async", nom, limit)
 
 
 async def ffbb_resolve_team_service(

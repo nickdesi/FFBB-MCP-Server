@@ -81,7 +81,7 @@ Récemment refondu pour maximiser les performances des LLMs, le serveur propose 
 
 | Outil | Description | Paramètres Clés |
 | ----- | ----------- | --------------- |
-| `ffbb_search` | Le moteur de recherche global (clubs, compétitions, salles, matchs). | `query`, `type`, `limit` |
+| `ffbb_search` | Le moteur de recherche global (clubs, compétitions, salles, matchs, engagements, formations). | `query`, `type`, `limit`, `filter_by`, `sort` |
 | `ffbb_resolve_team` | Résout et trouve l'ID/les infos exactes d'une équipe via une chaîne (ex: "U13F-2"). | `club_name`, `categorie` |
 | `ffbb_get` | Accès direct aux classements complets et matchs par ID technique. | `id`, `type` (poule, competition, organisme) |
 | `ffbb_club` | Explorer le planning complet, l'ensemble des équipes ou tous les classements d'un club. | `action` (calendrier, equipes, classement), `club_name` |

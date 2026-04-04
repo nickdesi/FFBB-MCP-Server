@@ -47,6 +47,8 @@ from .services import (
     multi_search_service,
     resolve_poule_id_service,
     search_competitions_service,
+    search_engagements_service,
+    search_formations_service,
     search_organismes_service,
     search_pratiques_service,
     search_rencontres_service,
@@ -292,10 +294,20 @@ async def ffbb_search(
             "pratiques",
             "terrains",
             "tournois",
+            "engagements",
+            "formations",
         ],
         Field(description="Type de données. 'all' cherche partout (défaut)."),
     ] = "all",
     limit: Annotated[int, Field(default=20, ge=1, le=100)] = 20,
+    filter_by: Annotated[
+        str | None,
+        Field(description="Filtre Meilisearch natif (ex: 'codePostal = \"63000\"')."),
+    ] = None,
+    sort: Annotated[
+        list[str] | None,
+        Field(description="Tri Meilisearch natif (ex: ['libelle:asc'])."),
+    ] = None,
 ) -> list[dict[str, Any]]:
     """Recherche FFBB — clubs, compétitions, matchs, salles, tournois, etc.
 
@@ -315,6 +327,8 @@ async def ffbb_search(
             "pratiques": search_pratiques_service,
             "terrains": search_terrains_service,
             "tournois": search_tournois_service,
+            "engagements": search_engagements_service,
+            "formations": search_formations_service,
         }
         return await dispatch[type](nom=query, limit=limit)
     except Exception as e:
