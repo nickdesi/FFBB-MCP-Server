@@ -196,6 +196,15 @@ def enrich_acronym_cache(official_name: str) -> None:
         logger.info("Acronyme auto-enrichi: %s → %s", initials, official_name)
 
 
+def _normalize_apostrophes(text: str) -> str:
+    """Normalise toutes les variantes typographiques d'apostrophe en apostrophe ASCII.
+
+    Variantes couvertes : \u2019 (U+2019), \u2018 (U+2018), \u201b (U+201B), \u0060 (backtick).
+    """
+    # Utilisation d'escapes Unicode explicites pour éviter toute ambiguïté d'encodage.
+    return re.sub("[\u2018\u2019\u201b\u0060]", "\u0027", text)
+
+
 def normalize_query(query: str) -> str:
     """Normalize a search query to replace common club abbreviations
     or alternative names with their official FFBB names.
@@ -205,6 +214,9 @@ def normalize_query(query: str) -> str:
     """
     if not query:
         return query
+
+    # 0. Normalisation des apostrophes typographiques → apostrophe ASCII
+    query = _normalize_apostrophes(query)
 
     # 1. Résolution d'acronyme en priorité
     resolved = resolve_acronym(query)

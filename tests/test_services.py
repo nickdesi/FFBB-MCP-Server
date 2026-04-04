@@ -809,3 +809,168 @@ class TestResolveTeamService:
         assert result.get("team") is None or result.get("team") == {}
         assert not result.get("candidates")
         assert "message" in result or "ambiguity" in result
+
+
+# ---------------------------------------------------------------------------
+# Tests — Bug 2 : fallback équipe sans numéro explicite
+# ---------------------------------------------------------------------------
+
+
+class TestEquipesClubFallbackNoNumero:
+    """Vérifie le fallback quand une équipe n'a pas de numero_equipe enregistré."""
+
+    def _make_org_mock_no_number(self, sexe="M", categorie_code="U11"):
+        """Organsime avec une seule équipe sans numero_equipe (None)."""
+        m = MagicMock()
+        m.model_dump = MagicMock(
+            return_value={
+                "id": 42,
+                "nom": "Club Solo",
+                "engagements": [
+                    {
+                        "id": "engA",
+                        "numeroEquipe": None,
+                        "idCompetition": {
+                            "nom": f"{categorie_code}{sexe}",
+                            "id": "cA",
+                            "sexe": sexe,
+                            "categorie": {"code": categorie_code},
+                            "competition_origine_niveau": 1,
+                        },
+                        "idPoule": {"id": "pA"},
+                    }
+                ],
+            }
+        )
+        return m
+
+    def _make_org_mock_empty_string_number(self):
+        """Organsime avec une seule équipe dont numero_equipe est une chaîne vide."""
+        m = MagicMock()
+        m.model_dump = MagicMock(
+            return_value={
+                "id": 43,
+                "nom": "Club Vide",
+                "engagements": [
+                    {
+                        "id": "engB",
+                        "numeroEquipe": "",
+                        "idCompetition": {
+                            "nom": "U13M",
+                            "id": "cB",
+                            "sexe": "M",
+                            "categorie": {"code": "U13"},
+                            "competition_origine_niveau": 1,
+                        },
+                        "idPoule": {"id": "pB"},
+                    }
+                ],
+            }
+        )
+        return m
+
+    @pytest.mark.asyncio
+    async def test_fallback_numero_none_returns_team_with_note(
+        self, patch_get_client, mock_client
+    ):
+        """Filtre 'U11M1' avec equipe sans numero → fallback + note."""
+        mock_client.get_organisme_async = AsyncMock(
+            return_value=self._make_org_mock_no_number()
+        )
+        result = await ffbb_equipes_club_service(organisme_id=42, filtre="U11M1")
+
+        assert len(result) == 1
+        assert result[0].get("note") == "équipe sans numéro explicite, numéro 1 implicite"
+        assert result[0].get("engagement_id") == "engA"
+
+    @pytest.mark.asyncio
+    async def test_fallback_empty_string_numero_returns_team_with_note(
+        self, patch_get_client, mock_client
+    ):
+        """Filtre 'U13M1' avec equipe dont numeroEquipe='' → team retournée avec note."""
+        mock_client.get_organisme_async = AsyncMock(
+            return_value=self._make_org_mock_empty_string_number()
+        )
+        result = await ffbb_equipes_club_service(organisme_id=43, filtre="U13M1")
+
+        # L'équipe doit être retournée (pas d'erreur) avec la note d'implicité
+        assert len(result) == 1
+        assert "error" not in result[0]
+        assert result[0].get("note") == "équipe sans numéro explicite, numéro 1 implicite"
+        assert result[0].get("engagement_id") == "engB"
+
+    @pytest.mark.asyncio
+    async def test_no_fallback_when_explicit_number_matches(
+        self, patch_get_client, mock_client
+    ):
+        """Quand le numéro explicite correspond, pas de fallback ni de note."""
+        m = MagicMock()
+        m.model_dump = MagicMock(
+            return_value={
+                "id": 44,
+                "nom": "Club Dual",
+                "engagements": [
+                    {
+                        "id": "eng1",
+                        "numeroEquipe": "1",
+                        "idCompetition": {
+                            "nom": "U11M",
+                            "id": "c1",
+                            "sexe": "M",
+                            "categorie": {"code": "U11"},
+                            "competition_origine_niveau": 1,
+                        },
+                        "idPoule": {"id": "p1"},
+                    },
+                    {
+                        "id": "eng2",
+                        "numeroEquipe": "2",
+                        "idCompetition": {
+                            "nom": "U11M",
+                            "id": "c1",
+                            "sexe": "M",
+                            "categorie": {"code": "U11"},
+                            "competition_origine_niveau": 1,
+                        },
+                        "idPoule": {"id": "p2"},
+                    },
+                ],
+            }
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=m)
+        result = await ffbb_equipes_club_service(organisme_id=44, filtre="U11M1")
+
+        assert len(result) == 1
+        assert result[0].get("engagement_id") == "eng1"
+        assert result[0].get("note") is None
+
+    @pytest.mark.asyncio
+    async def test_fallback_propagates_through_resolve_team(
+        self, patch_get_client, mock_client
+    ):
+        """ffbb_resolve_team_service résout une équipe sans numéro via le fallback."""
+        mock_client.get_organisme_async = AsyncMock(
+            return_value=self._make_org_mock_no_number()
+        )
+        result = await ffbb_resolve_team_service(
+            organisme_id=42, club_name=None, categorie="U11M1"
+        )
+
+        assert result.get("status") == "resolved"
+        assert result.get("team") is not None
+        team = result["team"]
+        assert team.get("note") == "équipe sans numéro explicite, numéro 1 implicite"
+
+    @pytest.mark.asyncio
+    async def test_fallback_wrong_category_still_returns_error(
+        self, patch_get_client, mock_client
+    ):
+        """Si la catégorie ne correspond pas, même le fallback échoue → error."""
+        mock_client.get_organisme_async = AsyncMock(
+            return_value=self._make_org_mock_no_number(categorie_code="U13")
+        )
+        result = await ffbb_equipes_club_service(organisme_id=42, filtre="U11M1")
+
+        assert len(result) == 1
+        assert "error" in result[0]
+

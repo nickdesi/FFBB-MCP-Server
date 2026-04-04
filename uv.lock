@@ -420,8 +420,8 @@ wheels = [
 
 [[package]]
 name = "ffbb-api-client-v3"
-version = "0.0.post1.dev101+g7b8629120"
-source = { git = "https://github.com/nickdesi/FFBBApiClientV3.git#7b86291201b2ae1b99c3d363322475d5810b5e5d" }
+version = "1.5.1"
+source = { git = "https://github.com/nickdesi/FFBBApiClientV3.git?rev=v1.5.1#2f76744b722be25532a037c977ef5cebdeb3f452" }
 dependencies = [
     { name = "hishel" },
     { name = "httpx" },
@@ -433,7 +433,7 @@ dependencies = [
 
 [[package]]
 name = "ffbb-mcp"
-version = "0.2.0"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "anysqlite" },
@@ -460,8 +460,8 @@ requires-dist = [
     { name = "anysqlite", specifier = ">=0.0.5" },
     { name = "cachetools", specifier = ">=5.3.0" },
     { name = "fastapi" },
-    { name = "ffbb-api-client-v3", git = "https://github.com/nickdesi/FFBBApiClientV3.git" },
-    { name = "mcp", extras = ["cli"], specifier = ">=1.0.0" },
+    { name = "ffbb-api-client-v3", git = "https://github.com/nickdesi/FFBBApiClientV3.git?rev=v1.5.1" },
+    { name = "mcp", extras = ["cli"], specifier = ">=1.8.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.7.0" },
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },

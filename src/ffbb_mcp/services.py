@@ -834,17 +834,24 @@ async def ffbb_equipes_club_service(
             continue
         if parsed_filter.sexe == "M" and (t["sexe"] or "").upper() == "F":
             continue
-        # Filtre numéro d'équipe
-        if (
-            parsed_filter.numero_equipe is not None
-            and t["numero_equipe"] is not None
-            and t["numero_equipe"] != str(parsed_filter.numero_equipe)
-        ):
-            continue
+        # Filtre numéro d'équipe — Bug 2 fix :
+        # Les équipes sans numéro explicite (None ou "") sont traitées comme
+        # "numéro 1 implicite" et passent à travers le filtre numérique.
+        if parsed_filter.numero_equipe is not None:
+            t_num = (t.get("numero_equipe") or "").strip()
+            if t_num and t_num != str(parsed_filter.numero_equipe):
+                continue
         filtered_teams.append(t)
 
+    # Post-traitement Bug 2 : annoter les équipes sans numéro explicite
+    # qui ont été retenues grâce au filtre numérique (numéro 1 implicite).
+    if parsed_filter.numero_equipe is not None:
+        for t in filtered_teams:
+            if not (t.get("numero_equipe") or "").strip():
+                t["note"] = "équipe sans numéro explicite, numéro 1 implicite"
+
     if not filtered_teams:
-        # Ambiguity Hinting: si aucun match mais filtre présent, on liste les options possibles
+        # Ambiguity Hinting: si aucun match, lister les options possibles
         suggestions = sorted(list({t["team_label"] for t in all_teams}))
         return [
             {
