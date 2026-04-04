@@ -1,3 +1,9 @@
 """FFBB MCP Server — Fédération Française de Basketball."""
 
-__version__ = "0.4.1"
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
+
+try:
+    __version__ = _pkg_version("ffbb-mcp")
+except PackageNotFoundError:
+    __version__ = "unknown"
