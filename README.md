@@ -14,7 +14,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python" alt="Python Version" />
-  <img src="https://img.shields.io/badge/MCP-Latest-orange?style=for-the-badge" alt="MCP Version" />
+  <img src="https://img.shields.io/badge/version-0.4.1-orange?style=for-the-badge" alt="Version" />
   <a href="https://smithery.ai/server/ffbb-mcp-server"><img src="https://img.shields.io/badge/Smithery-Supported-yellow?style=for-the-badge&logo=codeigniter" alt="Smithery Badge" /></a>
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
 </p>
@@ -140,6 +140,8 @@ Ce serveur expose des **Prompts** natifs pour donner instantanément de l'expert
 
 - **Mon IA ne trouve pas mon équipe locale :** Donnez-lui toujours le nom précis du club (ex: `Vichy` au lieu de `JA Vichy` si c'est ambigu) et utilisez **`ffbb_search`**.
 - **L'agent boucle sur des IDs introuvables :** Rappelez à l'agent d'utiliser `ffbb_bilan` avec le paramètre `club_name` pour qu'il fasse lui-même la résolution interne.
+- **Le club contient une apostrophe (ex: `Jeanne d'Arc`) :** ✅ Supporté depuis la **v0.4.1** — les apostrophes typographiques (`'`, `'`, `` ` ``) sont automatiquement normalisées avant la recherche.
+- **Mon club n'a qu'une seule équipe et elle n'a pas de numéro :** ✅ Supporté depuis la **v0.4.1** — une requête `U11M1` trouve désormais une équipe enregistrée sans numéro (numéro 1 implicite). Le champ `note` de l'équipe retournée l'indique explicitement.
 - **Erreurs 404 :** Assurez-vous d'utiliser le endpoint canonique exact `https://ffbb.desimone.fr/mcp`.
 - **Serveur inactif :** Vérifiez le Health Check `https://ffbb.desimone.fr/health`.
 

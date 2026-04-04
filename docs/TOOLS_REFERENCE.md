@@ -1,6 +1,15 @@
 # 📚 Référence Complète des Outils FFBB MCP
 
+> Version courante : **0.4.1**
+
 Ce document fournit une documentation technique exhaustive pour les outils exposés par le serveur FFBB MCP. Il est destiné aux développeurs et aux agents IA pour comprendre les capacités et les schémas de données du serveur.
+
+## ✨ Nouveautés v0.4.1
+
+| # | Correctif | Impact |
+|---|-----------|--------|
+| 1 | **Apostrophes typographiques** — `'`, `'`, `` ` `` et `‛` sont normalisées en apostrophe ASCII avant toute recherche. Les requêtes `Jeanne d'Arc Vichy` fonctionnent maintenant même avec une apostrophe copiée depuis Word ou iOS. | `ffbb_bilan`, `ffbb_resolve_team`, `ffbb_next_match`, `ffbb_last_result`, `ffbb_search` |
+| 2 | **Équipe sans numéro explicite** — quand un club n'a qu'une seule équipe enregistrée sans `numero_equipe`, une requête `U11M1` la retrouve désormais (numéro 1 implicite). Le champ `note` de l'objet équipe retourné le signale. | `ffbb_equipes_club`, `ffbb_bilan`, `ffbb_resolve_team`, `ffbb_next_match`, `ffbb_last_result` |
 
 ---
 
@@ -83,7 +92,7 @@ Le serveur a été refondu pour proposer des outils polyvalents qui réduisent l
 - **Sortie pour `action="equipes"`** : tableau d'objets avec, pour chaque équipe engagée :
   - `team_id` : identifiant stable de l'engagement (alias d'`engagement_id`).
   - `engagement_id` : identifiant FFBB brut de l'engagement.
-  - `numero_equipe` : numéro d'équipe dans la catégorie ("1", "2", ...), si disponible.
+  - `numero_equipe` : numéro d'équipe dans la catégorie ("1", "2", ...), ou `null` / `""` si le club n'a qu'une seule équipe sans numéro explicite.
   - `team_label` : label prêt à l'emploi pour les agents, ex: `"Stade Clermontois U11M1"`.
   - `phase_label` : libellé de phase si disponible (ex: `"Phase 1"`).
   - `nom_equipe` : nom du club.
@@ -92,6 +101,7 @@ Le serveur a été refondu pour proposer des outils polyvalents qui réduisent l
   - `sexe` : "M", "F" ou vide.
   - `categorie` : code de catégorie (ex: "U11").
   - `niveau` : niveau de la compétition (si fourni par l'API FFBB).
+  - `note` *(v0.4.1, optionnel)* : présent si l'équipe a été retournée via le fallback numéro implicite. Valeur : `"équipe sans numéro explicite, numéro 1 implicite"`.
 
 - **Exemple : Récupérer le calendrier des U13 masculins d'un club** :
 
@@ -178,7 +188,11 @@ la logique de désambiguïsation (U11M1, U13F-2, etc.).
 2. Si la catégorie ne précise **pas** le numéro d'équipe (ex: `"U11M"`) et que plusieurs
    équipes existent, le service tente de privilégier l'équipe n°1 (`numero_equipe == "1"`)
    ou les engagements sans `numero_equipe`.
-3. Si malgré tout plusieurs équipes restent candidates, `team` vaut `null` et
+3. *(v0.4.1)* Si un numéro est demandé (ex: `"U11M1"`) mais qu'aucune équipe ne l'a
+   **explicitement** en base (`numero_equipe` vide ou `null`), la première équipe
+   correspondant à la catégorie/sexe est retournée avec `note: "équipe sans numéro
+   explicite, numéro 1 implicite"` — comportement dit de **fallback numéro implicite**.
+4. Si malgré tout plusieurs équipes restent candidates, `team` vaut `null` et
    `ambiguity` explique qu'il faut demander à l'utilisateur de préciser le numéro
    d'équipe (1, 2, ...) ou la phase.
 
@@ -297,8 +311,12 @@ Le serveur ne se contente pas de données brutes, il guide l'IA via des prompts 
    - Si l’utilisateur donne une catégorie ambiguë (ex. `"U13"` sans préciser Masculin/Féminin ni le numéro d’équipe), demande toujours des précisions :
      - Genre : `M` ou `F` (ex. `U13M`, `U13F`).
      - Numéro d’équipe lorsqu’il y en a plusieurs (`U13M-1`, `U13M-2`, etc.).
-   - Ne sélectionne pas arbitrairement une équipe en cas d’ambiguïté : priorise la demande d’informations supplémentaires.
+   - Ne sélectionne pas arbitrairement une équipe en cas d’ambiguïté : priorise la demande d’informations supplémentaires.   - *(v0.4.1)* Si le club n'a qu'une seule équipe et qu'elle n'a pas de numéro en base, une requête `U11M1` la retrouve automatiquement. Le champ `note` de la réponse le confirme — pas besoin de retenter sans numéro.
 
+6. **Noms de clubs avec apostrophe**
+   - *(v0.4.1)* Les apostrophes typographiques (copiées depuis iOS, Word, etc.) sont
+     transparentes : `Jeanne d’Arc` et `Jeanne d'Arc` produisent le même résultat.
+   - Aucune action côté agent requise.
 6. **Répétition d’appels**
    - Répéter un même appel d’outil avec les mêmes paramètres est acceptable :
      - les résultats de recherche, bilans et détails sont mis en cache côté serveur MCP pour optimiser les performances.
