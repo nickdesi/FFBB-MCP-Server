@@ -1,8 +1,20 @@
 # 📚 Référence Complète des Outils FFBB MCP
 
-> Version courante : **0.4.1**
+> Version courante : **0.5.0**
 
 Ce document fournit une documentation technique exhaustive pour les outils exposés par le serveur FFBB MCP. Il est destiné aux développeurs et aux agents IA pour comprendre les capacités et les schémas de données du serveur.
+
+## ✨ Nouveautés v0.5.0
+
+| # | Amélioration | Impact |
+|---|-------------|--------|
+| 1 | **`ToolAnnotations` typée** — `_READONLY_ANNOTATIONS` passe d'un `dict` brut à un objet `ToolAnnotations` Pydantic. Sémantique stricte, auto-complétée, validée par le SDK. | Tous les outils |
+| 2 | **`title=` sur tous les 12 outils** — Chaque `@mcp.tool()` expose désormais un titre lisible (ex: `"Bilan complet toutes phases"`). Affiché dans les UI de clients MCP (Claude Desktop, Cursor, Smithery…). | Tous les outils |
+| 3 | **Progression (`Context`)** — `ffbb_bilan`, `ffbb_team_summary` et `ffbb_bilan_saison` émettent des `report_progress()` aux clients supportant les progress tokens. No-op si le client ne les supporte pas. | `ffbb_bilan`, `ffbb_team_summary`, `ffbb_bilan_saison` |
+| 4 | **`ffbb_version` enrichi** — Ajoute les champs `mcp_sdk_version` et `transport` au retour de l'outil de diagnostics. | `ffbb_version` |
+| 5 | **Correction hook pre-commit** — `.githooks/pre-commit` appelait `ruff format --fix` (invalide). Séparé en `ruff format` + `ruff check --fix`. | CI/CD |
+
+---
 
 ## ✨ Nouveautés v0.4.1
 
@@ -271,6 +283,33 @@ la logique de désambiguïsation (U11M1, U13F-2, etc.).
 
 - **Arguments** :
   - `active_only` (boolean, défaut: `false`) : Si `true`, ne retourne que la saison en cours (ex: 2024-2025).
+
+### `ffbb_version`
+
+**Description** : Retourne les informations de version et de configuration runtime du serveur. Utile pour le monitoring, le debug et la vérification de compatibilité.
+
+- **Arguments** : Aucun.
+
+- **Retour** :
+
+  ```jsonc
+  {
+    "package_version": "0.5.0",       // version du package ffbb-mcp
+    "mcp_sdk_version": "1.26.0",      // version du SDK MCP Python installé
+    "python_version": "3.14.2",       // version de l'interpréteur Python
+    "transport": "streamable-http",   // "streamable-http" ou "stdio"
+    "cache_ttls": {                   // TTL (secondes) de chaque cache service-level
+      "lives": 15,
+      "search": 3600,
+      "detail": 86400,
+      "calendrier": 30,
+      "bilan": 30,
+      "poule": 15
+    }
+  }
+  ```
+
+- **Variables d'env** : Les TTL de cache sont configurables via `FFBB_CACHE_TTL_LIVES`, `FFBB_CACHE_TTL_SEARCH`, `FFBB_CACHE_TTL_DETAIL`, `FFBB_CACHE_TTL_CALENDRIER`, `FFBB_CACHE_TTL_BILAN`, `FFBB_CACHE_TTL_POULE`.
 
 ---
 
