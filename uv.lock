@@ -420,8 +420,8 @@ wheels = [
 
 [[package]]
 name = "ffbb-api-client-v3"
-version = "1.5.1"
-source = { git = "https://github.com/nickdesi/FFBBApiClientV3.git?rev=v1.5.1#2f76744b722be25532a037c977ef5cebdeb3f452" }
+version = "1.5.3"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "hishel" },
     { name = "httpx" },
@@ -429,6 +429,10 @@ dependencies = [
     { name = "python-dateutil" },
     { name = "python-dotenv" },
     { name = "readme-renderer" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/34/28/0995c2a770683227ab7ef113261ecdb34303655d53a756f8f6029f281263/ffbb_api_client_v3-1.5.3.tar.gz", hash = "sha256:3f9e36f1838962f5e5ea85a66c79ca169cc5bb81b3f5eba0ec8d7df6c98084be", size = 24385607 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1f/ee/c7f215c74265057b9eff58730b1d395de424af3024cb79b2d9d720b5cc00/ffbb_api_client_v3-1.5.3-py3-none-any.whl", hash = "sha256:fcd438b740fea9e3f4bf8de61657f207614ebe060068dff880f4acc0f7687cca", size = 158280 },
 ]
 
 [[package]]
@@ -460,7 +464,7 @@ requires-dist = [
     { name = "anysqlite", specifier = ">=0.0.5" },
     { name = "cachetools", specifier = ">=5.3.0" },
     { name = "fastapi" },
-    { name = "ffbb-api-client-v3", git = "https://github.com/nickdesi/FFBBApiClientV3.git?rev=v1.5.1" },
+    { name = "ffbb-api-client-v3", specifier = ">=1.5.3" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.8.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.7.0" },
     { name = "pydantic", specifier = ">=2.12.5" },

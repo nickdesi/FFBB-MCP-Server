@@ -7,7 +7,8 @@ import random
 import re
 import time
 import traceback
-from datetime import datetime
+import unicodedata
+from datetime import datetime, timedelta
 from threading import RLock
 from typing import Any, TypeVar
 from zoneinfo import ZoneInfo
@@ -1571,29 +1572,9 @@ async def get_calendrier_club_service(
         tz = _PARIS_TZ
         now = datetime.now(tz)
 
-        def _parse_match_datetime(raw: str | None) -> datetime | None:
-            if not raw:
-                return None
-            # La plupart des dates FFBB sont au format ISO, on reste défensif.
-            try:
-                dt = datetime.fromisoformat(raw)
-            except Exception:
-                # Fallback: essayer sans timezone ou avec espace au lieu de T
-                for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
-                    try:
-                        dt = datetime.strptime(raw, fmt)
-                        break
-                    except Exception:
-                        dt = None
-            if dt is None:
-                return None
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=tz)
-            return dt.astimezone(tz)
-
         # Attacher un datetime parsé temporaire pour le tri
         for m in all_matches:
-            m["_dt"] = _parse_match_datetime(m.get("date"))
+            m["_dt"] = _parse_dt(m.get("date"))
 
         # Tri décroissant: du plus récent au plus ancien. Si la date manque, on met en fin.
         all_matches.sort(key=lambda x: (x["_dt"] is None, x["_dt"] or now), reverse=True)
@@ -1848,8 +1829,6 @@ async def ffbb_resolve_team_service(
 
 def _normalize_name(value: str) -> str:
     """Normalise un nom (strip, upper, supprime les accents)."""
-    import unicodedata
-
     if not value:
         return ""
     s = value.strip().upper()
@@ -2019,8 +1998,6 @@ async def ffbb_last_result_service(
     numero_equipe: int = 1,
     force_refresh: bool = False,
 ) -> dict:
-    from datetime import datetime, timedelta
-
     # 1. Résolution des organismes avec métadonnées (CENTRALISÉ)
     resolved_clubs, org_data = await _resolve_club_and_org(
         club_name=club_name,

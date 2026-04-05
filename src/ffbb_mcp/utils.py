@@ -1,3 +1,4 @@
+import re
 from typing import Any, NamedTuple
 
 
@@ -52,8 +53,6 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
     s = raw.strip().upper()
     if not s:
         return ParsedCategorie(categorie=None, sexe=None, numero_equipe=None)
-
-    import re
 
     # 1) Catégorie type Uxx
     cat_match = re.search(r"U(\d{2})", s)
