@@ -2017,34 +2017,40 @@ async def resolve_poule_id_service(
     if not equipes:
         return None
 
-    # Si une phase est spécifiée (ex: "phase 3")
+    # Si une phase est spécifiée (ex: "phase 3", "3", "p3")
     if phase_query:
-        target_phase = phase_query.lower().strip()
-        # Normalisation légère pour matcher "p3", "phase 3", "3"
+        target_phase = phase_query.strip()
         phase_num_match = re.search(r"(\d+)", target_phase)
-        phase_num = phase_num_match.group(1) if phase_num_match else target_phase
+        target_phase_int: int | None = (
+            int(phase_num_match.group(1)) if phase_num_match else None
+        )
 
         for e in equipes:
-            comp_name = (e.get("competition") or "").lower()
-            phase_label = (e.get("phase_label") or "").lower()
+            if target_phase_int is not None:
+                # Comparaison par numéro entier extrait via _extract_phase_num.
+                # Évite le faux-positif de "3" in "u13f phase 1" (bug sous-chaîne).
+                phase_in_label = _extract_phase_num(e.get("phase_label"))
+                phase_in_comp = _extract_phase_num(e.get("competition"))
+                if (
+                    phase_in_label == target_phase_int
+                    or phase_in_comp == target_phase_int
+                ):
+                    return str(e.get("poule_id"))
+            else:
+                # Requête non numérique : matching texte uniquement dans phase_label
+                phase_label = (e.get("phase_label") or "").lower()
+                if target_phase.lower() in phase_label:
+                    return str(e.get("poule_id"))
 
-            # On cherche le numéro de phase ou le label complet
-            if (
-                phase_num in comp_name
-                or phase_num in phase_label
-                or target_phase in comp_name
-                or target_phase in phase_label
-            ):
-                return str(e.get("poule_id"))
+        # Phase explicitement demandée mais non trouvée → ne pas silencieusement
+        # sélectionner la mauvaise poule via le tri par défaut : retourner None.
+        return None
 
-    # Par défaut (ou si phase non trouvée), on prend l'engagement avec la phase la plus avancée
-    # ou le niveau le plus élevé. On extrait le numéro de phase du label pour trier.
+    # Par défaut (no phase_query), on prend l'engagement avec la phase la plus avancée.
+    # On utilise _extract_phase_num pour éviter de confondre le numéro de catégorie
+    # (ex: 13 dans U13F) avec un numéro de phase.
     def sort_key(e: dict) -> tuple[int, int]:
-        label = str(e.get("phase_label") or e.get("competition") or "")
-        # Cherche le dernier numéro présent dans le titre s'il y a le mot phase ou simplement des chiffres
-        # La méthode la plus robuste (comme suggéré par l'utilisateur) est de chercher le dernier nombre
-        nums = re.findall(r"\d+", label)
-        phase_num = int(nums[-1]) if nums else 0
+        phase_num = _extract_phase_num(e.get("phase_label") or e.get("competition"))
         return (phase_num, e.get("niveau") or 0)
 
     equipes.sort(key=sort_key, reverse=True)

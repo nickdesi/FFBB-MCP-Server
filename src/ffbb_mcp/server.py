@@ -629,6 +629,17 @@ async def ffbb_club(
                     effective_poule_id = resolved_pid
 
             if not effective_poule_id:
+                if phase:
+                    return [
+                        {
+                            "error": (
+                                f"Aucune poule trouvée pour la phase '{phase}' "
+                                f"(filtre: '{filtre}'). "
+                                "Vérifie le numéro de phase ou utilise ffbb_club(action='equipes') "
+                                "pour lister les phases et poule_ids disponibles."
+                            )
+                        }
+                    ]
                 return [
                     {
                         "error": "poule_id requis pour action='classement' (auto-résolution échouée - indique la phase ou vérifie l'ID de poule)"
