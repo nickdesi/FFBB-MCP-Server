@@ -88,7 +88,9 @@ def _load_acronyms_cache() -> dict[str, str]:
                     )
                     return _acronyms_cache
             except (json.JSONDecodeError, OSError) as e:
-                logger.warning("Erreur lecture %s: %s — réinitialisation", _CACHE_FILE, e)
+                logger.warning(
+                    "Erreur lecture %s: %s — réinitialisation", _CACHE_FILE, e
+                )
 
         # Initialisation avec les valeurs par défaut
         _acronyms_cache = dict(_DEFAULT_ACRONYMS)

@@ -98,7 +98,6 @@ def _parse_dt(raw: str | None) -> datetime | None:
     return dt.astimezone(tz)
 
 
-
 def _notify_cache_hit(cache_name: str) -> None:
     if _cache_hit_hook is not None:
         try:
@@ -124,8 +123,12 @@ def _notify_cache_miss(cache_name: str) -> None:
 # (poules, calendriers, bilans) sont très courts (15-30s). La protection contre le burst
 # est assurée par le mécanisme de déduplication "inflight" (_dedupe_inflight).
 _LIVES_TTL = _read_positive_int_env("FFBB_CACHE_TTL_LIVES", 15)
-_SEARCH_TTL = _read_positive_int_env("FFBB_CACHE_TTL_SEARCH", 3600)  # La recherche change peu
-_DETAIL_TTL = _read_positive_int_env("FFBB_CACHE_TTL_DETAIL", 86400)  # 24h pour orga/saison
+_SEARCH_TTL = _read_positive_int_env(
+    "FFBB_CACHE_TTL_SEARCH", 3600
+)  # La recherche change peu
+_DETAIL_TTL = _read_positive_int_env(
+    "FFBB_CACHE_TTL_DETAIL", 86400
+)  # 24h pour orga/saison
 _CALENDRIER_TTL = _read_positive_int_env("FFBB_CACHE_TTL_CALENDRIER", 30)
 _BILAN_TTL = _read_positive_int_env("FFBB_CACHE_TTL_BILAN", 30)
 # TTL spécifique ultra-court pour les poules (scores + rencontres).
@@ -491,7 +494,9 @@ async def get_competition_service(competition_id: int | str) -> dict:
     return await _dedupe_inflight_detail(cache_key, _fetch, cache_name="competition")
 
 
-async def get_poule_service(poule_id: int | str, *, force_refresh: bool = False) -> dict:
+async def get_poule_service(
+    poule_id: int | str, *, force_refresh: bool = False
+) -> dict:
     poule_id_int = _coerce_numeric_id(poule_id, "poule_id")
     cache_key = f"poule:{poule_id_int}"
 
@@ -547,7 +552,9 @@ async def ffbb_get_classement_service(
     target_num: int | str | None = None,
 ) -> list[dict[str, Any]]:
     poule_id_int = _coerce_numeric_id(poule_id, "poule_id")
-    cache_key = f"classement:{poule_id_int}:{target_organisme_id or ''}:{target_num or ''}"
+    cache_key = (
+        f"classement:{poule_id_int}:{target_organisme_id or ''}:{target_num or ''}"
+    )
 
     if not force_refresh:
         cached = _cache_get(_cache_poule, cache_key, "classement")
@@ -567,7 +574,7 @@ async def ffbb_get_classement_service(
     raw = data.get("classements", data.get("classement", []))
     if not isinstance(raw, list):
         raw = []
-    
+
     flat: list[dict[str, Any]] = []
     target_org_str = str(target_organisme_id) if target_organisme_id else None
     target_num_str = str(target_num) if target_num else None
@@ -579,7 +586,7 @@ async def ffbb_get_classement_service(
         nom_equipe = eng.get("nom", "")
         # Identification du club via organisme_id ou rapprochement par nom (fallback)
         org_id = str(c.get("organisme_id") or eng.get("organisme_id") or "")
-        
+
         is_target = False
         if target_org_str and org_id == target_org_str:
             if target_num_str:
@@ -823,7 +830,6 @@ async def ffbb_equipes_club_service(
     assert parsed_filter is not None
     filtered_teams: list[dict[str, Any]] = []
     for t in all_teams:
-
         # Filtre catégorie (strict)
         if (
             parsed_filter.categorie
@@ -893,7 +899,7 @@ async def ffbb_next_match_service(
         return {
             "status": "not_found",
             "message": f"Club '{club_name or organisme_id}' introuvable.",
-            "club_resolu": None
+            "club_resolu": None,
         }
 
     # Si ambiguïté sur le club, on s'arrête là (sauf si un seul club matchait)
@@ -902,7 +908,7 @@ async def ffbb_next_match_service(
             "status": "ambiguous",
             "message": f"Plusieurs clubs correspondent à '{club_name}'. Précisez l'organisme_id.",
             "candidates": resolved_clubs,
-            "club_resolu": None
+            "club_resolu": None,
         }
 
     club_resolu = resolved_clubs[0]
@@ -912,46 +918,74 @@ async def ffbb_next_match_service(
     equipes = await ffbb_equipes_club_service(
         organisme_id=target_org_id, filtre=categorie, org_data=org_data
     )
-    
-    if not equipes or (isinstance(equipes, list) and len(equipes) == 1 and "error" in equipes[0]):
-        msg = equipes[0]["error"] if (equipes and "error" in equipes[0]) else f"Aucune équipe trouvée pour la catégorie '{categorie}'."
-        suggestions = equipes[0].get("suggested_teams") if (equipes and "suggested_teams" in equipes[0]) else []
+
+    if not equipes or (
+        isinstance(equipes, list) and len(equipes) == 1 and "error" in equipes[0]
+    ):
+        msg = (
+            equipes[0]["error"]
+            if (equipes and "error" in equipes[0])
+            else f"Aucune équipe trouvée pour la catégorie '{categorie}'."
+        )
+        suggestions = (
+            equipes[0].get("suggested_teams")
+            if (equipes and "suggested_teams" in equipes[0])
+            else []
+        )
         return {
             "status": "not_found",
             "message": msg,
             "club_resolu": club_resolu,
-            "candidates": suggestions
+            "candidates": suggestions,
         }
 
     # Filtrer par numéro d'équipe (LOGIQUE CORRIGÉE)
     # 1. On cherche le numéro exact si fourni
     if numero_equipe is not None:
         want = str(numero_equipe)
-        filtered = [e for e in equipes if (e.get("numero_equipe") or "").strip() == want]
-        
+        filtered = [
+            e for e in equipes if (e.get("numero_equipe") or "").strip() == want
+        ]
+
         # 2. Si non trouvé, on cherche l'équipe sans numéro ("")
         if not filtered:
-            filtered = [e for e in equipes if not (e.get("numero_equipe") or "").strip()]
-        
+            filtered = [
+                e for e in equipes if not (e.get("numero_equipe") or "").strip()
+            ]
+
         # 3. Si toujours rien, on retourne la liste des équipes disponibles
         if not filtered:
-            all_available = sorted(list({f"{e.get('team_label', categorie)} (n°{e.get('numero_equipe') or 'unique'})" for e in equipes}))
+            all_available = sorted(
+                list(
+                    {
+                        f"{e.get('team_label', categorie)} (n°{e.get('numero_equipe') or 'unique'})"
+                        for e in equipes
+                    }
+                )
+            )
             return {
                 "status": "not_found",
                 "message": f"Aucune équipe matchant '{categorie}' n°{numero_equipe} (ou unique) trouvée.",
                 "club_resolu": club_resolu,
-                "candidates": all_available
+                "candidates": all_available,
             }
         equipes = filtered
 
     poules_actives = [e["poule_id"] for e in equipes if e.get("poule_id")]
     if not poules_actives:
-        all_available_equipes = sorted(list({f"{e.get('team_label', categorie)} (n°{e.get('numero_equipe') or 'unique'})" for e in equipes}))
+        all_available_equipes = sorted(
+            list(
+                {
+                    f"{e.get('team_label', categorie)} (n°{e.get('numero_equipe') or 'unique'})"
+                    for e in equipes
+                }
+            )
+        )
         return {
-            "status": "not_found", 
+            "status": "not_found",
             "message": "Aucune poule active trouvée pour cette équipe.",
             "club_resolu": club_resolu,
-            "candidates": all_available_equipes
+            "candidates": all_available_equipes,
         }
 
     organisme_nom = club_resolu["nom"]
@@ -965,7 +999,7 @@ async def ffbb_next_match_service(
         my_eng = eq.get("engagement_id")
         if not poule_id:
             return []
-        
+
         poule = await get_poule_service(poule_id, force_refresh=force_refresh)
         upcoming_for_pool = []
         for m in poule.get("rencontres", []):
@@ -979,17 +1013,14 @@ async def ffbb_next_match_service(
             if str_my_eng and (str_my_eng in (id_eng1, id_eng2)):
                 is_my_team = True
             else:
-                is_my_team = (
-                    _match_team_name(
-                        str(m.get("nomEquipe1", "")),
-                        str(organisme_nom),
-                        numero_equipe_match,
-                    )
-                    or _match_team_name(
-                        str(m.get("nomEquipe2", "")),
-                        str(organisme_nom),
-                        numero_equipe_match,
-                    )
+                is_my_team = _match_team_name(
+                    str(m.get("nomEquipe1", "")),
+                    str(organisme_nom),
+                    numero_equipe_match,
+                ) or _match_team_name(
+                    str(m.get("nomEquipe2", "")),
+                    str(organisme_nom),
+                    numero_equipe_match,
                 )
 
             if not is_my_team:
@@ -1007,25 +1038,34 @@ async def ffbb_next_match_service(
             dt = _parse_dt(m.get("date_rencontre", m.get("date")))
             if dt is None:
                 dt = datetime.max.replace(tzinfo=tz)
-            
+
             upcoming_for_pool.append((dt, m, eq))
 
         return upcoming_for_pool
 
-    results = await asyncio.gather(*[_fetch_and_filter_next(e) for e in equipes], return_exceptions=True)
-    
+    results = await asyncio.gather(
+        *[_fetch_and_filter_next(e) for e in equipes], return_exceptions=True
+    )
+
     upcoming = []
     for res in results:
         if isinstance(res, list):
             upcoming.extend(res)
 
     if not upcoming:
-        all_available_equipes = sorted(list({f"{e.get('team_label', categorie)} (n°{e.get('numero_equipe') or 'unique'})" for e in equipes}))
+        all_available_equipes = sorted(
+            list(
+                {
+                    f"{e.get('team_label', categorie)} (n°{e.get('numero_equipe') or 'unique'})"
+                    for e in equipes
+                }
+            )
+        )
         return {
             "status": "no_upcoming_match",
             "message": "Aucun match à venir trouvé pour cette équipe.",
             "club_resolu": club_resolu,
-            "candidates": all_available_equipes
+            "candidates": all_available_equipes,
         }
 
     # PRIORISATION DES PHASES :
@@ -1037,10 +1077,10 @@ async def ffbb_next_match_service(
         if p_num not in phase_to_matches:
             phase_to_matches[p_num] = []
         phase_to_matches[p_num].append((dt, m, eq))
-    
+
     max_active_phase = max(phase_to_matches.keys())
     active_phase_matches = phase_to_matches[max_active_phase]
-    
+
     # On prend le match le plus proche (date ASC) dans cette phase la plus avancée
     active_phase_matches.sort(key=lambda x: x[0])
     next_dt, next_match, source_team = active_phase_matches[0]
@@ -1112,7 +1152,11 @@ async def ffbb_saison_bilan_service(
     )
     # Gestion du format d'erreur avec suggestions ( Ambiguity Hinting )
     if not equipes or (len(equipes) == 1 and "error" in equipes[0]):
-        error_msg = equipes[0]["error"] if equipes else f"Aucune équipe trouvée pour la catégorie '{categorie}'."
+        error_msg = (
+            equipes[0]["error"]
+            if equipes
+            else f"Aucune équipe trouvée pour la catégorie '{categorie}'."
+        )
         return {
             "status": "not_found",
             "message": error_msg,
@@ -1120,9 +1164,7 @@ async def ffbb_saison_bilan_service(
         }
 
     want_num = str(numero_equipe)
-    equipes = [
-        e for e in equipes if (e.get("numero_equipe") or "").strip() == want_num
-    ]
+    equipes = [e for e in equipes if (e.get("numero_equipe") or "").strip() == want_num]
     if not equipes:
         return {
             "status": "not_found",
@@ -1442,10 +1484,7 @@ async def get_calendrier_club_service(
     async def _fetch() -> list[dict]:
         # 1. Résoudre les organismes cibles (CENTRALISÉ)
         resolved_clubs, _ = await _resolve_club_and_org(
-            club_name=club_name,
-            organisme_id=organisme_id,
-            categorie=categorie,
-            limit=5
+            club_name=club_name, organisme_id=organisme_id, categorie=categorie, limit=5
         )
         target_org_ids = [str(c["organisme_id"]) for c in resolved_clubs]
 
@@ -1465,7 +1504,9 @@ async def get_calendrier_club_service(
         for res in eq_results:
             if isinstance(res, list):
                 # FILTRE: on ignore les dictionnaires d'erreur (Hinting) pour le traitement interne
-                equipes.extend([e for e in res if isinstance(e, dict) and "error" not in e])
+                equipes.extend(
+                    [e for e in res if isinstance(e, dict) and "error" not in e]
+                )
             elif isinstance(res, Exception):
                 logger.error("Erreur lors de la récupération des équipes: %s", res)
 
@@ -1565,7 +1606,9 @@ async def get_calendrier_club_service(
             m["_dt"] = _parse_dt(m.get("date"))
 
         # Tri décroissant: du plus récent au plus ancien. Si la date manque, on met en fin.
-        all_matches.sort(key=lambda x: (x["_dt"] is None, x["_dt"] or now), reverse=True)
+        all_matches.sort(
+            key=lambda x: (x["_dt"] is None, x["_dt"] or now), reverse=True
+        )
 
         # Déterminer played / futur
         played_indices: list[int] = []
@@ -1584,7 +1627,11 @@ async def get_calendrier_club_service(
                 played = False
             else:
                 # Fallback si joue absent : scores présents OU date passée
-                has_score = score1 not in (None, "", "None") or score2 not in (None, "", "None")
+                has_score = score1 not in (None, "", "None") or score2 not in (
+                    None,
+                    "",
+                    "None",
+                )
                 is_past = dt <= now if dt is not None else has_score
                 played = bool(has_score or is_past)
 
@@ -1637,8 +1684,6 @@ async def get_calendrier_club_service(
         make_coro=_fetch,
         cache_name="calendrier",
     )
-
-
 
 
 async def search_competitions_service(nom: str, limit: int = 20) -> list[dict]:
@@ -1711,9 +1756,7 @@ async def ffbb_resolve_team_service(
 
     # 1) Résoudre l'organisme avec métadonnées (CENTRALISÉ)
     resolved_clubs, _ = await _resolve_club_and_org(
-        club_name=club_name,
-        organisme_id=organisme_id,
-        categorie=categorie
+        club_name=club_name, organisme_id=organisme_id, categorie=categorie
     )
 
     if not resolved_clubs:
@@ -1722,7 +1765,7 @@ async def ffbb_resolve_team_service(
             "team": None,
             "candidates": [],
             "ambiguity": f"Club '{club_name or organisme_id}' introuvable",
-            "club_resolu": None
+            "club_resolu": None,
         }
 
     # Si ambiguïté club
@@ -1732,37 +1775,55 @@ async def ffbb_resolve_team_service(
             "team": None,
             "candidates": resolved_clubs,
             "ambiguity": f"Plusieurs clubs correspondent à '{club_name}'.",
-            "club_resolu": None
+            "club_resolu": None,
         }
 
     club_resolu = resolved_clubs[0]
     target_org_id = str(club_resolu["organisme_id"])
 
     # 2) Récupérer toutes les équipes candidates
-    equipes = await ffbb_equipes_club_service(organisme_id=target_org_id, filtre=categorie)
-    
-    if not equipes or (isinstance(equipes, list) and len(equipes) == 1 and "error" in equipes[0]):
-        msg = equipes[0]["error"] if (equipes and "error" in equipes[0]) else f"Aucune équipe trouvée pour la catégorie '{categorie}'."
-        suggestions = equipes[0].get("suggested_teams") if (equipes and "suggested_teams" in equipes[0]) else []
+    equipes = await ffbb_equipes_club_service(
+        organisme_id=target_org_id, filtre=categorie
+    )
+
+    if not equipes or (
+        isinstance(equipes, list) and len(equipes) == 1 and "error" in equipes[0]
+    ):
+        msg = (
+            equipes[0]["error"]
+            if (equipes and "error" in equipes[0])
+            else f"Aucune équipe trouvée pour la catégorie '{categorie}'."
+        )
+        suggestions = (
+            equipes[0].get("suggested_teams")
+            if (equipes and "suggested_teams" in equipes[0])
+            else []
+        )
         return {
             "status": "not_found",
             "team": None,
             "candidates": suggestions,
             "ambiguity": msg,
-            "club_resolu": club_resolu
+            "club_resolu": club_resolu,
         }
 
     # 3) Matching intelligent du numéro (LOGIQUE CORRIGÉE)
     candidates = equipes
     parsed = parse_categorie(categorie)
     target_num = str(parsed.numero_equipe) if parsed.numero_equipe else None
-    
+
     # On cherche d'abord le numéro exact
     if target_num:
-        matched = [e for e in candidates if (e.get("numero_equipe") or "").strip() == target_num]
+        matched = [
+            e
+            for e in candidates
+            if (e.get("numero_equipe") or "").strip() == target_num
+        ]
         if not matched:
             # Fallback sur équipe sans numéro
-            matched = [e for e in candidates if not (e.get("numero_equipe") or "").strip()]
+            matched = [
+                e for e in candidates if not (e.get("numero_equipe") or "").strip()
+            ]
         if matched:
             candidates = matched
 
@@ -1774,7 +1835,7 @@ async def ffbb_resolve_team_service(
             "team": None,
             "candidates": all_labels,
             "ambiguity": f"Aucun match exact pour '{categorie}'",
-            "club_resolu": club_resolu
+            "club_resolu": club_resolu,
         }
 
     if len(candidates) == 1:
@@ -1783,7 +1844,7 @@ async def ffbb_resolve_team_service(
             "team": candidates[0],
             "candidates": candidates,
             "ambiguity": None,
-            "club_resolu": club_resolu
+            "club_resolu": club_resolu,
         }
 
     # Si on a plusieurs candidats, on vérifie s'ils partagent tous le même numero_equipe.
@@ -1800,7 +1861,7 @@ async def ffbb_resolve_team_service(
             "team": candidates[-1],
             "candidates": candidates,
             "ambiguity": None,
-            "club_resolu": club_resolu
+            "club_resolu": club_resolu,
         }
 
     return {
@@ -1808,7 +1869,7 @@ async def ffbb_resolve_team_service(
         "team": None,
         "candidates": candidates,
         "ambiguity": f"Plusieurs équipes ({len(candidates)}) correspondent à '{categorie}'.",
-        "club_resolu": club_resolu
+        "club_resolu": club_resolu,
     }
 
 
@@ -1829,7 +1890,7 @@ async def _resolve_club_and_org(
     club_name: str | None,
     organisme_id: int | str | None,
     categorie: str | None = None,
-    limit: int = 5
+    limit: int = 5,
 ) -> tuple[list[dict[str, Any]], dict | None]:
     """Centralise la résolution d'un club vers une liste d'organismes candidats.
     Retourne (candidats, premier_org_data).
@@ -1844,11 +1905,13 @@ async def _resolve_club_and_org(
             org_info = await get_organisme_service(str(organisme_id))
             if org_info and isinstance(org_info, dict):
                 org_data = org_info
-                resolved.append({
-                    "nom": org_info.get("nom", ""),
-                    "organisme_id": org_info.get("id") or organisme_id,
-                    "code": org_info.get("code", ""),
-                })
+                resolved.append(
+                    {
+                        "nom": org_info.get("nom", ""),
+                        "organisme_id": org_info.get("id") or organisme_id,
+                        "code": org_info.get("code", ""),
+                    }
+                )
         except Exception:
             pass
     elif club_name:
@@ -1864,13 +1927,21 @@ async def _resolve_club_and_org(
             is_explicit_fem = "FEMININ" in name_norm
 
             if gender and not is_explicit_fem:
-                fem_orgs = [o for o in orgs if "FEMININ" in _normalize_name(str(o.get("nom", "")))]
-                gen_orgs = [o for o in orgs if "FEMININ" not in _normalize_name(str(o.get("nom", "")))]
+                fem_orgs = [
+                    o
+                    for o in orgs
+                    if "FEMININ" in _normalize_name(str(o.get("nom", "")))
+                ]
+                gen_orgs = [
+                    o
+                    for o in orgs
+                    if "FEMININ" not in _normalize_name(str(o.get("nom", "")))
+                ]
 
                 if gender == "F" and fem_orgs:
-                    orgs = fem_orgs # On priorise les clubs féminins
+                    orgs = fem_orgs  # On priorise les clubs féminins
                 elif gender == "M" and gen_orgs:
-                    orgs = gen_orgs # On priorise les clubs généraux/masculins
+                    orgs = gen_orgs  # On priorise les clubs généraux/masculins
 
         if orgs:
             # On récupère le détail du premier pour avoir les métadonnées riches
@@ -1884,11 +1955,13 @@ async def _resolve_club_and_org(
         for org in orgs:
             if isinstance(org, dict) and org.get("id"):
                 nom = org.get("nom", "")
-                resolved.append({
-                    "nom": nom,
-                    "organisme_id": org.get("id"),
-                    "code": org.get("code", ""),
-                })
+                resolved.append(
+                    {
+                        "nom": nom,
+                        "organisme_id": org.get("id"),
+                        "code": org.get("code", ""),
+                    }
+                )
                 # Enrichissement auto du cache d'acronymes
                 if nom:
                     enrich_acronym_cache(nom)
@@ -1935,15 +2008,12 @@ async def resolve_poule_id_service(
     phase_query: str | None = None,
 ) -> str | None:
     """Résout le poule_id d'une équipe pour une phase donnée (ex: 'phase 3').
-    
-    Si phase_query est None, retourne le poule_id de l'engagement le plus récent 
+
+    Si phase_query est None, retourne le poule_id de l'engagement le plus récent
     (plus haut niveau ou phase chronologique la plus avancée).
     """
     org_id_int = _coerce_numeric_id(organisme_id, "organisme_id")
-    equipes = await ffbb_equipes_club_service(
-        organisme_id=org_id_int, 
-        filtre=categorie
-    )
+    equipes = await ffbb_equipes_club_service(organisme_id=org_id_int, filtre=categorie)
     if not equipes:
         return None
 
@@ -1953,16 +2023,18 @@ async def resolve_poule_id_service(
         # Normalisation légère pour matcher "p3", "phase 3", "3"
         phase_num_match = re.search(r"(\d+)", target_phase)
         phase_num = phase_num_match.group(1) if phase_num_match else target_phase
-        
+
         for e in equipes:
             comp_name = (e.get("competition") or "").lower()
             phase_label = (e.get("phase_label") or "").lower()
-            
+
             # On cherche le numéro de phase ou le label complet
-            if (phase_num in comp_name or 
-                phase_num in phase_label or 
-                target_phase in comp_name or 
-                target_phase in phase_label):
+            if (
+                phase_num in comp_name
+                or phase_num in phase_label
+                or target_phase in comp_name
+                or target_phase in phase_label
+            ):
                 return str(e.get("poule_id"))
 
     # Par défaut (ou si phase non trouvée), on prend l'engagement avec la phase la plus avancée
@@ -1971,7 +2043,7 @@ async def resolve_poule_id_service(
         label = str(e.get("phase_label") or e.get("competition") or "")
         # Cherche le dernier numéro présent dans le titre s'il y a le mot phase ou simplement des chiffres
         # La méthode la plus robuste (comme suggéré par l'utilisateur) est de chercher le dernier nombre
-        nums = re.findall(r'\d+', label)
+        nums = re.findall(r"\d+", label)
         phase_num = int(nums[-1]) if nums else 0
         return (phase_num, e.get("niveau") or 0)
 
@@ -1989,16 +2061,14 @@ async def ffbb_last_result_service(
 ) -> dict:
     # 1. Résolution des organismes avec métadonnées (CENTRALISÉ)
     resolved_clubs, org_data = await _resolve_club_and_org(
-        club_name=club_name,
-        organisme_id=organisme_id,
-        categorie=categorie
+        club_name=club_name, organisme_id=organisme_id, categorie=categorie
     )
 
     if not resolved_clubs:
         return {
             "status": "not_found",
             "message": f"Club '{club_name or organisme_id}' introuvable.",
-            "club_resolu": None
+            "club_resolu": None,
         }
 
     # Si ambiguïté sur le club, on s'arrête là
@@ -2007,7 +2077,7 @@ async def ffbb_last_result_service(
             "status": "ambiguous",
             "message": f"Plusieurs clubs correspondent à '{club_name}'. Précisez l'organisme_id.",
             "candidates": resolved_clubs,
-            "club_resolu": None
+            "club_resolu": None,
         }
 
     club_resolu = resolved_clubs[0]
@@ -2017,30 +2087,51 @@ async def ffbb_last_result_service(
     equipes = await ffbb_equipes_club_service(
         organisme_id=target_org_id, filtre=categorie, org_data=org_data
     )
-    
-    if not equipes or (isinstance(equipes, list) and len(equipes) == 1 and "error" in equipes[0]):
-        msg = equipes[0]["error"] if (equipes and "error" in equipes[0]) else f"Aucune équipe trouvée pour la catégorie '{categorie}'."
-        suggestions = equipes[0].get("suggested_teams") if (equipes and "suggested_teams" in equipes[0]) else []
+
+    if not equipes or (
+        isinstance(equipes, list) and len(equipes) == 1 and "error" in equipes[0]
+    ):
+        msg = (
+            equipes[0]["error"]
+            if (equipes and "error" in equipes[0])
+            else f"Aucune équipe trouvée pour la catégorie '{categorie}'."
+        )
+        suggestions = (
+            equipes[0].get("suggested_teams")
+            if (equipes and "suggested_teams" in equipes[0])
+            else []
+        )
         return {
             "status": "no_result",
             "message": msg,
             "club_resolu": club_resolu,
-            "candidates": suggestions
+            "candidates": suggestions,
         }
 
     # Filtrer par numéro d'équipe (LOGIQUE CORRIGÉE)
     if numero_equipe is not None:
         want = str(numero_equipe)
-        filtered = [e for e in equipes if (e.get("numero_equipe") or "").strip() == want]
+        filtered = [
+            e for e in equipes if (e.get("numero_equipe") or "").strip() == want
+        ]
         if not filtered:
-             filtered = [e for e in equipes if not (e.get("numero_equipe") or "").strip()]
+            filtered = [
+                e for e in equipes if not (e.get("numero_equipe") or "").strip()
+            ]
         if not filtered:
-            all_available = sorted(list({f"{e.get('team_label', categorie)} (n°{e.get('numero_equipe') or 'unique'})" for e in equipes}))
+            all_available = sorted(
+                list(
+                    {
+                        f"{e.get('team_label', categorie)} (n°{e.get('numero_equipe') or 'unique'})"
+                        for e in equipes
+                    }
+                )
+            )
             return {
                 "status": "no_result",
                 "message": f"Aucune équipe matchant '{categorie}' n°{numero_equipe} (ou unique) trouvée.",
                 "club_resolu": club_resolu,
-                "candidates": all_available
+                "candidates": all_available,
             }
         equipes = filtered
 
@@ -2101,8 +2192,9 @@ async def ffbb_last_result_service(
         # Trie par date_rencontre pour prendre le plus récent
         # Chaque element est un tuple (match_dict, equipe_dict)
         active_phase_matches.sort(
-            key=lambda x: _parse_dt(x[0].get("date_rencontre", "") or "") or datetime.min.replace(tzinfo=_PARIS_TZ),
-            reverse=True
+            key=lambda x: _parse_dt(x[0].get("date_rencontre", "") or "")
+            or datetime.min.replace(tzinfo=_PARIS_TZ),
+            reverse=True,
         )
         return active_phase_matches[0][0]
 
@@ -2115,25 +2207,42 @@ async def ffbb_last_result_service(
         if len(date_str) >= 10:
             seuil_str = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
             if date_str[:10] < seuil_str:
-                logger.info(f"ffbb_last_result: match > 30 jours ({date_str[:10]} < {seuil_str}), force_refresh déclenché.")
+                logger.info(
+                    f"ffbb_last_result: match > 30 jours ({date_str[:10]} < {seuil_str}), force_refresh déclenché."
+                )
                 dernier_refresh = await _get_latest_match(True)
                 if dernier_refresh:
                     dernier = dernier_refresh
 
     if not dernier:
-        all_available_equipes = sorted(list({f"{e.get('team_label', categorie)} (n°{e.get('numero_equipe') or 'unique'})" for e in equipes}))
+        all_available_equipes = sorted(
+            list(
+                {
+                    f"{e.get('team_label', categorie)} (n°{e.get('numero_equipe') or 'unique'})"
+                    for e in equipes
+                }
+            )
+        )
         return {
             "status": "no_result",
             "message": "Aucun match joué trouvé.",
             "club_resolu": club_resolu,
-            "candidates": all_available_equipes
+            "candidates": all_available_equipes,
         }
 
     est_domicile = _match_team_name(
         str(dernier.get("nomEquipe1", "")), str(organisme_nom), numero_equipe_match
     )
-    score_nous = int(dernier["resultatEquipe1"]) if est_domicile else int(dernier["resultatEquipe2"])
-    score_eux  = int(dernier["resultatEquipe2"]) if est_domicile else int(dernier["resultatEquipe1"])
+    score_nous = (
+        int(dernier["resultatEquipe1"])
+        if est_domicile
+        else int(dernier["resultatEquipe2"])
+    )
+    score_eux = (
+        int(dernier["resultatEquipe2"])
+        if est_domicile
+        else int(dernier["resultatEquipe1"])
+    )
 
     return {
         "status": "ok",

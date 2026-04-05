@@ -64,9 +64,9 @@ async def test_ffbb_version_contract():
     cache_ttls = data.get("cache_ttls")
     assert isinstance(cache_ttls, dict), "cache_ttls doit être un dictionnaire"
     for key, value in cache_ttls.items():
-        assert isinstance(
-            value, numbers.Number
-        ), f"cache_ttls['{key}'] doit être numérique (secondes)"
+        assert isinstance(value, numbers.Number), (
+            f"cache_ttls['{key}'] doit être numérique (secondes)"
+        )
 
 
 @pytest.mark.asyncio

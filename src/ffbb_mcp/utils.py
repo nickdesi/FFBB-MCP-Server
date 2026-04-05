@@ -7,7 +7,7 @@ def serialize_model(obj: Any) -> Any:
     """Convertit un objet FFBB en dict JSON-serializable."""
     if obj is None:
         return None
-    if isinstance(obj, (str, int, float, bool)):
+    if isinstance(obj, str | int | float | bool):
         return obj
 
     # Let Pydantic do the heavy lifting natively in C/Rust (V2)
@@ -37,7 +37,7 @@ class ParsedCategorie(NamedTuple):
     """
 
     categorie: str | None  # ex: "U11", "U13", "SENIOR"
-    sexe: str | None       # "M", "F" ou None
+    sexe: str | None  # "M", "F" ou None
     numero_equipe: int | None
 
 
@@ -78,7 +78,7 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
     # Retirer le pattern Uxx du début, puis chercher un chiffre isolé restant
     remainder = s
     if cat_match:
-        remainder = s[cat_match.end():]
+        remainder = s[cat_match.end() :]
     # Chercher un chiffre libre (pas partie de Uxx) dans le reste
     num_match = re.search(r"(\d+)", remainder)
     if num_match:

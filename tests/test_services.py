@@ -345,8 +345,6 @@ class TestBilanService:
         mock_client.get_organisme_async.assert_awaited_once()
 
 
-
-
 # ---------------------------------------------------------------------------
 # Tests — get_calendrier_club_service
 # ---------------------------------------------------------------------------
@@ -556,11 +554,15 @@ class TestCalendrierClubService:
 
         # 0. Mock get_organisme (requis par _resolve_club_and_org)
         org_mock = MagicMock()
-        org_mock.model_dump = MagicMock(return_value={"id": 123, "nom": "Club", "engagements": []})
+        org_mock.model_dump = MagicMock(
+            return_value={"id": 123, "nom": "Club", "engagements": []}
+        )
         mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
 
         # 1. Mock ffbb_equipes_club_service pour renvoyer une equipe valable
-        async def _fake_equipes_club_service(organisme_id: int | str, filtre: str | None = None):
+        async def _fake_equipes_club_service(
+            organisme_id: int | str, filtre: str | None = None
+        ):
             return [
                 {
                     "engagement_id": 1001,
@@ -582,7 +584,7 @@ class TestCalendrierClubService:
             rencontres.append(
                 {
                     "id": i,
-                    "date_rencontre": f"2024-01-{i+1:02d}",
+                    "date_rencontre": f"2024-01-{i + 1:02d}",
                     "nomEquipe1": "CLERMONT",
                     "nomEquipe2": "AUTRE",
                     "resultatEquipe1": 50 + i,
@@ -784,9 +786,7 @@ class TestResolveTeamService:
         assert isinstance(result.get("candidates"), list)
 
     @pytest.mark.asyncio
-    async def test_not_found_when_no_matching_team(
-        self, patch_get_client, mock_client
-    ):
+    async def test_not_found_when_no_matching_team(self, patch_get_client, mock_client):
         """Aucune équipe ne matche -> status not_found et message explicite."""
 
         org_mock = MagicMock()
@@ -880,7 +880,9 @@ class TestEquipesClubFallbackNoNumero:
         result = await ffbb_equipes_club_service(organisme_id=42, filtre="U11M1")
 
         assert len(result) == 1
-        assert result[0].get("note") == "équipe sans numéro explicite, numéro 1 implicite"
+        assert (
+            result[0].get("note") == "équipe sans numéro explicite, numéro 1 implicite"
+        )
         assert result[0].get("engagement_id") == "engA"
 
     @pytest.mark.asyncio
@@ -896,7 +898,9 @@ class TestEquipesClubFallbackNoNumero:
         # L'équipe doit être retournée (pas d'erreur) avec la note d'implicité
         assert len(result) == 1
         assert "error" not in result[0]
-        assert result[0].get("note") == "équipe sans numéro explicite, numéro 1 implicite"
+        assert (
+            result[0].get("note") == "équipe sans numéro explicite, numéro 1 implicite"
+        )
         assert result[0].get("engagement_id") == "engB"
 
     @pytest.mark.asyncio
@@ -973,4 +977,3 @@ class TestEquipesClubFallbackNoNumero:
 
         assert len(result) == 1
         assert "error" in result[0]
-

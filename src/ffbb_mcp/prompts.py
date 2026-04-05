@@ -16,6 +16,7 @@ _PROMPT_VERSION = "3.3.0"
 # HELPERS INTERNES
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def _validate(**kwargs: str | int) -> None:
     """Lève ValueError si un argument obligatoire est vide, whitespace-only, None ou int invalide."""
     for name, value in kwargs.items():
@@ -244,53 +245,60 @@ _EXAMPLES = """\
 # FONCTIONS PURES — utilisées par le MCP et les tests unitaires
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def expert_basket() -> str:
     """Active l'assistant expert en basketball français (prompt système complet)."""
-    return "\n\n".join([
-        _INTRO,
-        _RULES_DISAMBIGUATION,
-        _RULES_DISPLAY_MATCH,
-        _RULES_METIER,
-        _RULES_CLASSEMENT,
-        _RULES_PHASES,
-        _SEQUENCE,
-        _WORKFLOW,
-        _GUARDRAILS,
-        _BEHAVIOR,
-        _EXAMPLES,
-    ])
+    return "\n\n".join(
+        [
+            _INTRO,
+            _RULES_DISAMBIGUATION,
+            _RULES_DISPLAY_MATCH,
+            _RULES_METIER,
+            _RULES_CLASSEMENT,
+            _RULES_PHASES,
+            _SEQUENCE,
+            _WORKFLOW,
+            _GUARDRAILS,
+            _BEHAVIOR,
+            _EXAMPLES,
+        ]
+    )
 
 
 def analyser_match(match_id: str) -> str:
     """Analyse un match spécifique à partir de son identifiant FFBB (entier ou string)."""
     _validate(match_id=match_id)
     mid = match_id.strip()
-    return "\n\n".join([
-        f"Analyse le match FFBB id=`{mid}`.",
-        _strategy(
-            f"`ffbb_get(type='rencontre', id={mid})` → détails complets.",
-            "Si introuvable : `ffbb_search(type='rencontres', query=<match_id>)` pour localiser.",
-        ),
-        "Présente :\n"
-        "- Contexte : clubs, catégorie, compétition, phase\n"
-        "- Enjeux identifiables (place en poule, derby, match décisif)\n"
-        "- Résultat ou score en cours (tableau domicile/extérieur obligatoire)",
-    ])
+    return "\n\n".join(
+        [
+            f"Analyse le match FFBB id=`{mid}`.",
+            _strategy(
+                f"`ffbb_get(type='rencontre', id={mid})` → détails complets.",
+                "Si introuvable : `ffbb_search(type='rencontres', query=<match_id>)` pour localiser.",
+            ),
+            "Présente :\n"
+            "- Contexte : clubs, catégorie, compétition, phase\n"
+            "- Enjeux identifiables (place en poule, derby, match décisif)\n"
+            "- Résultat ou score en cours (tableau domicile/extérieur obligatoire)",
+        ]
+    )
 
 
 def trouver_club(club_name: str, department: str = "") -> str:
     """Recherche un club FFBB et retourne ses informations détaillées."""
     _validate(club_name=club_name)
     loc = f" dans '{department.strip()}'" if department.strip() else ""
-    return "\n\n".join([
-        f"Trouve le club '{club_name.strip()}'{loc}.",
-        _strategy(
-            f"`ffbb_search(type='organismes', query='{club_name.strip()}')` → `organisme_id`.",
-            "`ffbb_get(type='organisme', id=<organisme_id>)` → détails complets.",
-            "`ffbb_club(action='equipes', organisme_id=<organisme_id>)` → engagements saison.",
-        ),
-        "Présente : nom officiel, adresse, et liste des équipes engagées cette saison.",
-    ])
+    return "\n\n".join(
+        [
+            f"Trouve le club '{club_name.strip()}'{loc}.",
+            _strategy(
+                f"`ffbb_search(type='organismes', query='{club_name.strip()}')` → `organisme_id`.",
+                "`ffbb_get(type='organisme', id=<organisme_id>)` → détails complets.",
+                "`ffbb_club(action='equipes', organisme_id=<organisme_id>)` → engagements saison.",
+            ),
+            "Présente : nom officiel, adresse, et liste des équipes engagées cette saison.",
+        ]
+    )
 
 
 def prochain_match(club_name: str, categorie: str = "", numero_equipe: int = 1) -> str:
@@ -299,32 +307,36 @@ def prochain_match(club_name: str, categorie: str = "", numero_equipe: int = 1) 
     equipe = f" — équipe {categorie.strip()}" if categorie.strip() else ""
     num = f", numero_equipe={numero_equipe}" if numero_equipe != 1 else ""
     cat_arg = f", categorie='{categorie.strip()}'{num}" if categorie.strip() else ""
-    return "\n\n".join([
-        f"Trouve le prochain match de '{club_name.strip()}'{equipe}.",
-        _strategy(
-            "`ffbb_search(type='organismes', query=<club_name>)` si `organisme_id` non caché.",
-            f"`ffbb_team_summary(organisme_id=...{cat_arg})` → champ `next_match` (Tier 1).",
-            f"`ffbb_next_match(organisme_id=...{cat_arg})` si `ffbb_team_summary` indisponible.",
-            "`ffbb_club(action='calendrier', organisme_id=...)` → filtrer à venir (Tier 3 uniquement).",
-        ),
-        "Retourne : date, heure, adversaire, lieu, statut domicile/extérieur.",
-    ])
+    return "\n\n".join(
+        [
+            f"Trouve le prochain match de '{club_name.strip()}'{equipe}.",
+            _strategy(
+                "`ffbb_search(type='organismes', query=<club_name>)` si `organisme_id` non caché.",
+                f"`ffbb_team_summary(organisme_id=...{cat_arg})` → champ `next_match` (Tier 1).",
+                f"`ffbb_next_match(organisme_id=...{cat_arg})` si `ffbb_team_summary` indisponible.",
+                "`ffbb_club(action='calendrier', organisme_id=...)` → filtrer à venir (Tier 3 uniquement).",
+            ),
+            "Retourne : date, heure, adversaire, lieu, statut domicile/extérieur.",
+        ]
+    )
 
 
 def classement_poule(competition_name: str) -> str:
     """Affiche le classement d'une compétition ou d'une poule FFBB."""
     _validate(competition_name=competition_name)
     name = competition_name.strip()
-    return "\n\n".join([
-        f"Affiche le classement de la compétition '{name}'.",
-        _strategy(
-            f"`ffbb_search(type='organismes', query='{name}')` → `competition_id`.",
-            "`ffbb_get(type='competition', id=<competition_id>)` → liste des poules.",
-            "`ffbb_get(type='poule', id=<poule_id>)` → classement complet.",
-        ),
-        "Présente sous forme de tableau : **Rang | Équipe | J | V | D | Pts**.\n"
-        "Mettre en évidence les positions de montée/descente si identifiables.",
-    ])
+    return "\n\n".join(
+        [
+            f"Affiche le classement de la compétition '{name}'.",
+            _strategy(
+                f"`ffbb_search(type='organismes', query='{name}')` → `competition_id`.",
+                "`ffbb_get(type='competition', id=<competition_id>)` → liste des poules.",
+                "`ffbb_get(type='poule', id=<poule_id>)` → classement complet.",
+            ),
+            "Présente sous forme de tableau : **Rang | Équipe | J | V | D | Pts**.\n"
+            "Mettre en évidence les positions de montée/descente si identifiables.",
+        ]
+    )
 
 
 def bilan_equipe(club_name: str, categorie: str, numero_equipe: int = 1) -> str:
@@ -332,18 +344,20 @@ def bilan_equipe(club_name: str, categorie: str, numero_equipe: int = 1) -> str:
     _validate(club_name=club_name, categorie=categorie, numero_equipe=numero_equipe)
     cn, cat = club_name.strip(), categorie.strip()
     num_label = f" (équipe n°{numero_equipe})" if numero_equipe != 1 else ""
-    return "\n\n".join([
-        f"Bilan complet '{cat}'{num_label} — club '{cn}' — saison actuelle, toutes phases.",
-        _strategy(
-            "`ffbb_search(type='organismes', query=<club_name>)` si `organisme_id` non caché.",
-            f"`ffbb_team_summary(organisme_id=..., categorie='{cat}', numero_equipe={numero_equipe})` → `bilan_total` (Tier 1).",
-            f"`ffbb_bilan(organisme_id=..., categorie='{cat}')` si détail par phase nécessaire.",
-            "`ffbb_club(action='calendrier', organisme_id=...)` → reconstruction manuelle (Tier 3 uniquement).",
-        ),
-        "**Format attendu :**\n"
-        "- Bilan total : matchs joués · victoires · défaites · ratio V/D\n"
-        "- Tableau par phase : Compétition | Rang | J | V | D | Pts",
-    ])
+    return "\n\n".join(
+        [
+            f"Bilan complet '{cat}'{num_label} — club '{cn}' — saison actuelle, toutes phases.",
+            _strategy(
+                "`ffbb_search(type='organismes', query=<club_name>)` si `organisme_id` non caché.",
+                f"`ffbb_team_summary(organisme_id=..., categorie='{cat}', numero_equipe={numero_equipe})` → `bilan_total` (Tier 1).",
+                f"`ffbb_bilan(organisme_id=..., categorie='{cat}')` si détail par phase nécessaire.",
+                "`ffbb_club(action='calendrier', organisme_id=...)` → reconstruction manuelle (Tier 3 uniquement).",
+            ),
+            "**Format attendu :**\n"
+            "- Bilan total : matchs joués · victoires · défaites · ratio V/D\n"
+            "- Tableau par phase : Compétition | Rang | J | V | D | Pts",
+        ]
+    )
 
 
 def scores_live(club_name: str = "") -> str:
@@ -352,27 +366,31 @@ def scores_live(club_name: str = "") -> str:
     steps = ["`ffbb_lives` → tous les matchs actifs (actualisation 30 s)."]
     if club_name.strip():
         steps.append(f"Filtrer les résultats pour '{club_name.strip()}' côté client.")
-    return "\n\n".join([
-        f"Affiche les scores en cours{filtre}.",
-        _strategy(*steps),
-        "Tableau domicile/extérieur pour chaque match en cours.\n"
-        "Si aucun match actif → indiquer clairement et proposer `ffbb_next_match` en alternative.",
-    ])
+    return "\n\n".join(
+        [
+            f"Affiche les scores en cours{filtre}.",
+            _strategy(*steps),
+            "Tableau domicile/extérieur pour chaque match en cours.\n"
+            "Si aucun match actif → indiquer clairement et proposer `ffbb_next_match` en alternative.",
+        ]
+    )
 
 
 def calendrier_equipe(club_name: str, categorie: str, numero_equipe: int = 1) -> str:
     """Affiche le calendrier complet d'une équipe pour la saison en cours."""
     _validate(club_name=club_name, categorie=categorie, numero_equipe=numero_equipe)
     cn, cat = club_name.strip(), categorie.strip()
-    return "\n\n".join([
-        f"Calendrier complet '{cat}' (n°{numero_equipe}) — club '{cn}'.",
-        _strategy(
-            "`ffbb_search(type='organismes', query=<club_name>)` si `organisme_id` non caché.",
-            f"`ffbb_club(action='calendrier', organisme_id=..., filtre='{cat}', numero_equipe={numero_equipe})`.",
-        ),
-        "Tableau chronologique : **Date | Heure | Domicile | Score | Extérieur | Statut**.\n"
-        "Séparer visuellement les matchs joués (✅) des matchs à venir (🕐).",
-    ])
+    return "\n\n".join(
+        [
+            f"Calendrier complet '{cat}' (n°{numero_equipe}) — club '{cn}'.",
+            _strategy(
+                "`ffbb_search(type='organismes', query=<club_name>)` si `organisme_id` non caché.",
+                f"`ffbb_club(action='calendrier', organisme_id=..., filtre='{cat}', numero_equipe={numero_equipe})`.",
+            ),
+            "Tableau chronologique : **Date | Heure | Domicile | Score | Extérieur | Statut**.\n"
+            "Séparer visuellement les matchs joués (✅) des matchs à venir (🕐).",
+        ]
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────

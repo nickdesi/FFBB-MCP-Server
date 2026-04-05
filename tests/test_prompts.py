@@ -68,7 +68,11 @@ class TestPrompts:
         # ffbb_bilan doit être mentionné comme super-outil
         assert "ffbb_bilan" in prompt
         # Le workflow Tier 1 doit mentionner les super-outils en premier
-        assert "Tier 1" in prompt or "super-outil" in prompt.lower() or "en premier" in prompt.lower()
+        assert (
+            "Tier 1" in prompt
+            or "super-outil" in prompt.lower()
+            or "en premier" in prompt.lower()
+        )
         # workflow club → équipes → poule toujours présent en Tier 2/3
         assert "ffbb_search(type='organismes'" in prompt or "ffbb_search" in prompt
         assert "ffbb_club(action='equipes'" in prompt

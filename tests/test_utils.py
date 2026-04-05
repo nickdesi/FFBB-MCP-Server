@@ -85,4 +85,3 @@ class TestNormalizeQueryApostrophe:
 
     def test_empty_string_unchanged(self):
         assert normalize_query("") == ""
-
