@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import datetime
 import logging
 import os
 import platform
@@ -130,15 +131,10 @@ def _get_logo_url() -> str:
 def _build_index_html() -> str:
     canonical_url = f"{_get_public_base_url()}/"
     logo_url = _get_logo_url()
-    # Titre et description orientés MCP, couvrant toutes les fonctionnalités (bilan, recherches, lives, etc.)
-    title = (
-        "FFBB MCP Server – Serveur MCP pour les données FFBB "
-        "(bilans, recherches clubs/salles, calendriers, résultats, classements, lives)"
-    )
+    title = "FFBB MCP Server – Données basketball français pour agents IA"
     description = (
-        "FFBB MCP Server est un serveur MCP pour accéder aux données FFBB : recherche de clubs, "
-        "compétitions, salles et terrains, bilans d’équipes, calendriers, résultats, classements "
-        "et scores live. Connectez vos agents IA au basket français."
+        "Serveur MCP officiel FFBB : bilans d'équipes, classements, calendriers, "
+        "résultats et scores live du basketball français. Connectez Claude, Gemini ou Cursor."
     )
 
     return f"""<!DOCTYPE html>
@@ -163,10 +159,12 @@ def _build_index_html() -> str:
         <meta property=\"og:description\" content=\"{description}\">
         <meta property=\"og:url\" content=\"{canonical_url}\">
         <meta property=\"og:image\" content=\"{logo_url}\">
-        <meta name=\"twitter:card\" content=\"summary\">
+        <meta property=\"og:image:alt\" content=\"Logo FFBB MCP Server \u2013 basketball fran\u00e7ais\">
+        <meta name=\"twitter:card\" content=\"summary_large_image\">
         <meta name=\"twitter:title\" content=\"{title}\">
         <meta name=\"twitter:description\" content=\"{description}\">
         <meta name=\"twitter:image\" content=\"{logo_url}\">
+        <meta name=\"twitter:image:alt\" content=\"Logo FFBB MCP Server \u2013 basketball fran\u00e7ais\">
         <!-- Données structurées SoftwareApplication -->
         <script type=\"application/ld+json\">{{
             \"@context\": \"https://schema.org\",
@@ -177,6 +175,11 @@ def _build_index_html() -> str:
             \"description\": \"{description}\",
             \"url\": \"{canonical_url}\",
             \"image\": \"{logo_url}\",
+            \"softwareVersion\": \"{_PACKAGE_VERSION}\",
+            \"license\": \"https://opensource.org/licenses/MIT\",
+            \"inLanguage\": \"fr\",
+            \"creator\": {{\"@type\": \"Person\", \"name\": \"nickdesi\", \"url\": \"https://github.com/nickdesi\"}},
+            \"offers\": {{\"@type\": \"Offer\", \"price\": \"0\", \"priceCurrency\": \"EUR\"}},
             \"sameAs\": [
                 \"https://github.com/nickdesi/FFBB-MCP-Server\",
                 \"https://smithery.ai/servers/nickdesi/mcpffbb\"
@@ -208,10 +211,12 @@ def _build_robots_txt() -> str:
 
 def _build_sitemap_xml() -> str:
     canonical_url = f"{_get_public_base_url()}/"
-    return f"""<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">
+    lastmod = datetime.date.today().isoformat()
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>{canonical_url}</loc>
+    <lastmod>{lastmod}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
