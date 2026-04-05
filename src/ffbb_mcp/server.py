@@ -4,11 +4,14 @@ import datetime
 import logging
 import os
 import platform
+from importlib.metadata import PackageNotFoundError as _PkgNotFound
+from importlib.metadata import version as _meta_version
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
+from mcp.types import ToolAnnotations
 from pydantic import Field
 from starlette.applications import Starlette
 from starlette.middleware.cors import CORSMiddleware
@@ -66,12 +69,19 @@ _REMOTE_LOGO_URL = (
 )
 _LOGO_PATH = Path(__file__).resolve().parents[2] / "assets" / "logo.webp"
 
-_READONLY_ANNOTATIONS = {
-    "readOnlyHint": True,
-    "destructiveHint": False,
-    "idempotentHint": True,
-    "openWorldHint": True,
-}
+_READONLY_ANNOTATIONS = ToolAnnotations(
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True,
+)
+
+def _sdk_version(package: str) -> str:
+    """Retourne la version installée d'un package Python (stdlib-only)."""
+    try:
+        return _meta_version(package)
+    except _PkgNotFound:
+        return "unknown"
 
 # ---------------------------------------------------------------------------
 # Initialisation FastMCP
@@ -265,16 +275,19 @@ async def index(request: Request) -> Response:
     return HTMLResponse(content=_build_index_html(), status_code=200)
 
 
-@mcp.tool(name="ffbb_version", annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="ffbb_version", title="Version et diagnostics serveur", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_version() -> dict[str, Any]:
     """Informations de version et configuration runtime du serveur FFBB MCP.
 
     Retourne une structure compacte et strictement typée, pratique pour les
     agents et les outils de supervision.
     """
+    mode = os.environ.get("MCP_MODE", "stdio").lower()
     return {
         "package_version": _PACKAGE_VERSION,
+        "mcp_sdk_version": _sdk_version("mcp"),
         "python_version": platform.python_version(),
+        "transport": "streamable-http" if mode in ("sse", "http", "streamable-http") else "stdio",
         "cache_ttls": get_cache_ttls(),
     }
 
@@ -284,7 +297,7 @@ async def ffbb_version() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(name="ffbb_search", annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="ffbb_search", title="Recherche FFBB unifiée", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_search(
     query: Annotated[
         str, Field(description="Texte libre (ex: 'Vichy', 'U13F Auvergne').")
@@ -345,7 +358,7 @@ async def ffbb_search(
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(name="ffbb_bilan", annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="ffbb_bilan", title="Bilan complet toutes phases", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_bilan(
     club_name: Annotated[
         str | None,
@@ -361,6 +374,7 @@ async def ffbb_bilan(
             description="Catégorie + genre + numéro équipe (ex: 'U11M1', 'U13F2', 'U15M', 'Senior')."
         ),
     ] = None,
+    ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Bilan complet d'une équipe toutes phases confondues en UN seul appel.
 
@@ -375,11 +389,16 @@ async def ffbb_bilan(
     - phases : détail par compétition/phase (position, V/D/N, paniers)
     """
     try:
-        return await ffbb_bilan_service(
+        if ctx:
+            await ctx.report_progress(0, total=3, message="Résolution du club…")
+        result = await ffbb_bilan_service(
             club_name=club_name,
             organisme_id=organisme_id,
             categorie=categorie,
         )
+        if ctx:
+            await ctx.report_progress(3, total=3, message="Bilan prêt.")
+        return result
     except Exception as e:
         raise handle_api_error(e) from e
 
@@ -389,7 +408,7 @@ async def ffbb_bilan(
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(name="ffbb_get", annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="ffbb_get", title="Ressource FFBB par identifiant", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_get(
     id: Annotated[
         int, Field(description="Identifiant numerique de la ressource FFBB.")
@@ -444,7 +463,7 @@ async def ffbb_get(
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(name="ffbb_club", annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="ffbb_club", title="Outils agrégés club", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_club(
     action: Annotated[
         Literal[
@@ -596,7 +615,7 @@ async def ffbb_club(
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(name="ffbb_lives", annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="ffbb_lives", title="Scores en direct", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_get_lives() -> list[dict[str, Any]]:
     """Matchs en cours (scores live, cache 30s). Retourne [] si aucun match."""
     try:
@@ -610,7 +629,7 @@ async def ffbb_get_lives() -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(name="ffbb_saisons", annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="ffbb_saisons", title="Liste des saisons FFBB", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_get_saisons(
     active_only: Annotated[
         bool, Field(description="True = saison active uniquement.")
@@ -628,7 +647,7 @@ async def ffbb_get_saisons(
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(name="ffbb_resolve_team", annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="ffbb_resolve_team", title="Résolution d’équipe", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_resolve_team(
     club_name: Annotated[
         str | None,
@@ -663,7 +682,7 @@ async def ffbb_resolve_team(
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(name="ffbb_team_summary", annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="ffbb_team_summary", title="Résumé complet d’équipe", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_team_summary(
     club_name: Annotated[
         str | None,
@@ -679,6 +698,7 @@ async def ffbb_team_summary(
             description="Catégorie + genre + numéro d'équipe (ex: 'U11M1', 'U13F2', 'U15M', 'Senior').",
         ),
     ] = None,
+    ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Résumé complet et agent-friendly pour une équipe.
 
@@ -694,6 +714,8 @@ async def ffbb_team_summary(
       - "Quel a été le dernier résultat de X ?".
     """
     try:
+        if ctx:
+            await ctx.report_progress(0, total=3, message="Résolution de l'équipe…")
         # Résoudre l'équipe d'abord pour obtenir organisme_id et catégorie
         resolve_result = await ffbb_resolve_team_service(
             club_name=club_name,
@@ -713,6 +735,9 @@ async def ffbb_team_summary(
 
         # last_result et next_match nécessitent organisme_id
         effective_org_id = resolved_org_id
+
+        if ctx:
+            await ctx.report_progress(1, total=3, message="Récupération bilan et matchs en parallèle…")
 
         # Lancer bilan + last_result + next_match en parallèle
         # On passe effective_org_id au lieu de club_name pour éviter une double résolution
@@ -748,6 +773,8 @@ async def ffbb_team_summary(
             last_match = None
             next_match = None
 
+        if ctx:
+            await ctx.report_progress(3, total=3, message="Résumé prêt.")
         return {
             "team": resolved_team or bilan.get("team"),
             "phase_courante": bilan.get("phase_courante"),
@@ -765,7 +792,7 @@ async def ffbb_team_summary(
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(name="ffbb_last_result", annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="ffbb_last_result", title="Dernier résultat d’équipe", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_last_result(
     categorie: Annotated[
         str,
@@ -812,7 +839,7 @@ async def ffbb_last_result(
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(name="ffbb_next_match", annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="ffbb_next_match", title="Prochain match d’équipe", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_next_match(
     categorie: Annotated[
         str, Field(description="Catégorie de l'équipe (ex: 'U11', 'U11M', 'U11F')")
@@ -857,7 +884,7 @@ async def ffbb_next_match(
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(name="ffbb_bilan_saison", annotations=_READONLY_ANNOTATIONS)
+@mcp.tool(name="ffbb_bilan_saison", title="Bilan détaillé de saison", annotations=_READONLY_ANNOTATIONS)
 async def ffbb_bilan_saison(
     organisme_id: Annotated[
         int | str,
@@ -880,6 +907,7 @@ async def ffbb_bilan_saison(
             )
         ),
     ],
+    ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Bilan détaillé de la saison pour une équipe précise (toutes phases).
 
@@ -899,11 +927,16 @@ async def ffbb_bilan_saison(
     Et fournit également un champ `bilan_total` qui cumule toutes les phases.
     """
     try:
-        return await ffbb_saison_bilan_service(
+        if ctx:
+            await ctx.report_progress(0, total=1, message="Calcul du bilan saison…")
+        result = await ffbb_saison_bilan_service(
             organisme_id=organisme_id,
             categorie=categorie,
             numero_equipe=numero_equipe,
         )
+        if ctx:
+            await ctx.report_progress(1, total=1, message="Bilan saison prêt.")
+        return result
     except Exception as e:
         logger.error("ffbb_bilan_saison failed: %s", e)
         return {"error": str(e)}
