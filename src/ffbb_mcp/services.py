@@ -9,7 +9,7 @@ import time
 import traceback
 import unicodedata
 from datetime import datetime, timedelta
-from threading import RLock
+from functools import lru_cache
 from typing import Any, TypeVar
 from zoneinfo import ZoneInfo
 
@@ -59,6 +59,7 @@ _cache_miss_hook: callable | None = record_cache_miss
 _PARIS_TZ = ZoneInfo("Europe/Paris")
 
 
+@lru_cache(maxsize=128)
 def _extract_phase_num(label: str | None) -> int:
     """Extrait le numéro de phase d'un libellé (ex: 'Phase 3' -> 3).
     Si non trouvé ou absent, retourne 1.
@@ -137,7 +138,6 @@ _cache_detail = TTLCache(maxsize=128, ttl=_DETAIL_TTL)
 _cache_calendrier = TTLCache(maxsize=64, ttl=_CALENDRIER_TTL)
 _cache_bilan = TTLCache(maxsize=64, ttl=_BILAN_TTL)
 _cache_poule = TTLCache(maxsize=128, ttl=_POULE_TTL)
-_cache_lock = RLock()
 _inflight_lock: asyncio.Lock | None = None
 _inflight_detail: dict[str, asyncio.Task[Any]] = {}
 _inflight_search: dict[str, asyncio.Task[Any]] = {}
@@ -1142,14 +1142,11 @@ async def ffbb_saison_bilan_service(
             "message": "Aucune poule associée à cette équipe.",
         }
 
-    semaphore = asyncio.Semaphore(_MAX_POULE_FETCH_CONCURRENCY)
-
     async def _fetch_poule(pid: str) -> dict[str, Any] | Exception:
-        async with semaphore:
-            try:
-                return await get_poule_service(pid)
-            except Exception as e:  # déjà normalisé par get_poule_service
-                return e
+        try:
+            return await get_poule_service(pid)
+        except Exception as e:  # déjà normalisé par get_poule_service
+            return e
 
     poules_raw = await asyncio.gather(
         *[_fetch_poule(pid) for pid in poule_ids], return_exceptions=True
@@ -1311,14 +1308,11 @@ async def ffbb_bilan_service(
             f"ffbb_bilan: equipes_count={len(equipes)} unique_poules={unique_poule_ids}"
         )
 
-        semaphore = asyncio.Semaphore(_MAX_POULE_FETCH_CONCURRENCY)
-
         async def _fetch_poule_bilan(pid: str) -> dict[str, Any] | Exception:
-            async with semaphore:
-                try:
-                    return await get_poule_service(pid)
-                except Exception as e:
-                    return e
+            try:
+                return await get_poule_service(pid)
+            except Exception as e:
+                return e
 
         poules_raw = await asyncio.gather(
             *[_fetch_poule_bilan(pid) for pid in unique_poule_ids],
@@ -1504,13 +1498,7 @@ async def get_calendrier_club_service(
             dict.fromkeys(str(e.get("poule_id")) for e in equipes if e.get("poule_id"))
         )
 
-        semaphore = asyncio.Semaphore(_MAX_POULE_FETCH_CONCURRENCY)
-
-        async def _fetch_poule(poule_id: str) -> dict[str, Any] | Exception:
-            async with semaphore:
-                return await get_poule_service(poule_id)
-
-        poule_tasks = [_fetch_poule(poule_id) for poule_id in unique_poule_ids]
+        poule_tasks = [get_poule_service(poule_id) for poule_id in unique_poule_ids]
         poules_data = await asyncio.gather(*poule_tasks, return_exceptions=True)
         poules_by_id = {
             poule_id: poule_data
@@ -1827,6 +1815,7 @@ async def ffbb_resolve_team_service(
 # --- Helpers d'identification d'equipe --------------------------------------
 
 
+@lru_cache(maxsize=512)
 def _normalize_name(value: str) -> str:
     """Normalise un nom (strip, upper, supprime les accents)."""
     if not value:

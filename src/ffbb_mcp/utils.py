@@ -1,4 +1,5 @@
 import re
+from functools import lru_cache
 from typing import Any, NamedTuple
 
 
@@ -40,6 +41,7 @@ class ParsedCategorie(NamedTuple):
     numero_equipe: int | None
 
 
+@lru_cache(maxsize=256)
 def parse_categorie(raw: str | None) -> ParsedCategorie:
     """Parse une chaîne de catégorie libre en composantes structurées.
 
