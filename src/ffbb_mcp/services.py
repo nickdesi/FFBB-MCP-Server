@@ -2192,8 +2192,10 @@ async def ffbb_last_result_service(
         # Trie par date_rencontre pour prendre le plus récent
         # Chaque element est un tuple (match_dict, equipe_dict)
         active_phase_matches.sort(
-            key=lambda x: _parse_dt(x[0].get("date_rencontre", "") or "")
-            or datetime.min.replace(tzinfo=_PARIS_TZ),
+            key=lambda x: (
+                _parse_dt(x[0].get("date_rencontre", "") or "")
+                or datetime.min.replace(tzinfo=_PARIS_TZ)
+            ),
             reverse=True,
         )
         return active_phase_matches[0][0]

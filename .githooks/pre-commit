@@ -3,11 +3,11 @@ set -euo pipefail
 
 # Format code with ruff (prefer venv binary if present)
 if [ -x ".venv/bin/ruff" ]; then
-  .venv/bin/ruff format --fix . || true
-  .venv/bin/ruff check .
+  .venv/bin/ruff format .
+  .venv/bin/ruff check --fix .
 elif command -v ruff >/dev/null 2>&1; then
-  ruff format --fix . || true
-  ruff check .
+  ruff format .
+  ruff check --fix .
 else
   echo "ruff not found; skipping formatting/check. Install ruff in .venv or globally." >&2
   exit 0
