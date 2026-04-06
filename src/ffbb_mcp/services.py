@@ -1875,6 +1875,54 @@ async def ffbb_resolve_team_service(
 
 # --- Helpers d'identification d'equipe --------------------------------------
 
+# Mots génériques qui n'identifient pas un club de manière distinctive.
+_GENERIC_CLUB_WORDS: frozenset[str] = frozenset(
+    [
+        "BASKET",
+        "BASKETBALL",
+        "BALL",
+        "CLUB",
+        "BC",
+        "BBC",
+        "ABC",
+        "BB",
+        "CB",
+        "SB",
+        "JS",
+        "AC",
+        "AS",
+        "US",
+        "FC",
+        "UNION",
+        "ASSOCIATION",
+        "SPORTING",
+        "SPORT",
+        "SPORTS",
+        "GARDE",
+        "ENTENTE",
+    ]
+)
+
+
+@lru_cache(maxsize=512)
+def _extract_club_key_word(club_name: str) -> str | None:
+    """Extrait le mot distinctif d'un nom de club en supprimant les termes génériques.
+
+    Exemple : 'Gerzat Basket' → 'GERZAT', 'BC Clermont' → 'CLERMONT'.
+    Retourne None si aucun mot distinctif d'au moins 4 caractères n'est trouvé,
+    ou si le mot distinctif coïncide avec le nom normalisé complet (aucun apport).
+    """
+    norm = _normalize_name(club_name)
+    words = norm.split()
+    key_words = [w for w in words if w not in _GENERIC_CLUB_WORDS and len(w) >= 4]
+    if not key_words:
+        return None
+    candidate = key_words[0]
+    # Inutile de chercher si le mot-clé représente déjà toute la requête normalisée
+    if candidate == norm:
+        return None
+    return candidate
+
 
 @lru_cache(maxsize=512)
 def _normalize_name(value: str) -> str:
@@ -1915,7 +1963,27 @@ async def _resolve_club_and_org(
         except Exception:
             pass
     elif club_name:
-        orgs = await search_organismes_service(nom=club_name, limit=limit)
+        # Recherche secondaire parallèle pour les ententes (ENT. CLUB_A / CLUB_B).
+        # Une entente est un organisme distinct dont le nom commence par "ENT." et
+        # contient le mot distinctif du club (ex: "Gerzat Basket" → "GERZAT").
+        key_word = _extract_club_key_word(club_name)
+        search_tasks: list[Any] = [
+            search_organismes_service(nom=club_name, limit=limit)
+        ]
+        if key_word:
+            search_tasks.append(
+                search_organismes_service(nom=key_word, limit=limit + 5)
+            )
+        search_results = await asyncio.gather(*search_tasks, return_exceptions=True)
+
+        orgs: list[dict] = (
+            search_results[0] if isinstance(search_results[0], list) else []
+        )
+        ent_orgs_raw: list[dict] = (
+            search_results[1]
+            if len(search_tasks) > 1 and isinstance(search_results[1], list)
+            else []
+        )
 
         # Application de la Règle 10 (Smart Resolution M/F)
         if len(orgs) > 1 and categorie:
@@ -1965,6 +2033,37 @@ async def _resolve_club_and_org(
                 # Enrichissement auto du cache d'acronymes
                 if nom:
                     enrich_acronym_cache(nom)
+
+        # Ajout des ententes associées issues de la recherche secondaire.
+        if key_word and ent_orgs_raw:
+            existing_ids = {str(r["organisme_id"]) for r in resolved}
+            key_word_norm = _normalize_name(key_word)
+            for ent_org in ent_orgs_raw:
+                if not isinstance(ent_org, dict):
+                    continue
+                oid = str(ent_org.get("id", ""))
+                if not oid or oid in existing_ids:
+                    continue
+                nom_norm = _normalize_name(str(ent_org.get("nom", "")))
+                # Inclure uniquement les ententes (nom commençant par "ENT.")
+                # qui contiennent le mot-clé distinctif du club recherché.
+                is_entente = nom_norm.startswith("ENT.") or nom_norm.startswith("ENT ")
+                if is_entente and key_word_norm in nom_norm:
+                    nom = ent_org.get("nom", "")
+                    resolved.append(
+                        {
+                            "nom": nom,
+                            "organisme_id": oid,
+                            "code": ent_org.get("code", ""),
+                        }
+                    )
+                    existing_ids.add(oid)
+                    logger.debug(
+                        "ffbb_resolve: entente détectée '%s' (id=%s) pour club_name='%s'",
+                        nom,
+                        oid,
+                        club_name,
+                    )
 
     return resolved, org_data
 

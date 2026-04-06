@@ -15,6 +15,7 @@ from ffbb_mcp.services import (
     _cache_lives,
     _cache_poule,
     _cache_search,
+    _extract_club_key_word,
     _inflight_bilan,
     _inflight_calendrier,
     _inflight_detail,
@@ -358,11 +359,14 @@ class TestCalendrierClubService:
         mock_client.search_organismes_async = AsyncMock(return_value=None)
 
         result_1 = await get_calendrier_club_service(club_name="club fantome")
+        call_count_after_first = mock_client.search_organismes_async.await_count
+
         result_2 = await get_calendrier_club_service(club_name="club fantome")
 
         assert result_1 == []
         assert result_2 == []
-        mock_client.search_organismes_async.assert_awaited_once()
+        # The second call should be served from cache — no additional API calls.
+        assert mock_client.search_organismes_async.await_count == call_count_after_first
 
     @pytest.mark.asyncio
     async def test_returns_empty_when_no_teams(self, patch_get_client, mock_client):
@@ -977,3 +981,180 @@ class TestEquipesClubFallbackNoNumero:
 
         assert len(result) == 1
         assert "error" in result[0]
+
+
+# ---------------------------------------------------------------------------
+# Tests — _extract_club_key_word
+# ---------------------------------------------------------------------------
+
+
+class TestExtractClubKeyWord:
+    """Tests unitaires pour l'extraction du mot distinctif d'un club."""
+
+    def test_basket_suffix_removed(self):
+        assert _extract_club_key_word("Gerzat Basket") == "GERZAT"
+
+    def test_basketball_suffix_removed(self):
+        assert _extract_club_key_word("Clermont Basketball") == "CLERMONT"
+
+    def test_bc_prefix_removed(self):
+        assert _extract_club_key_word("BC Aurillac") == "AURILLAC"
+
+    def test_full_name_no_generic_word(self):
+        # "Villeurbanne" alone: key word = "VILLEURBANNE" == normalized full name → None
+        result = _extract_club_key_word("Villeurbanne")
+        assert result is None
+
+    def test_multiple_words_returns_first_distinctive(self):
+        result = _extract_club_key_word("Gerzat Jules Verne Basket")
+        assert result == "GERZAT"
+
+    def test_only_generic_words_returns_none(self):
+        assert _extract_club_key_word("Club Basket Ball") is None
+
+    def test_short_word_ignored(self):
+        # "BC AB Gerzat": "BC" and "AB" are < 4 chars or generic, key word = "GERZAT"
+        assert _extract_club_key_word("BC AB Gerzat") == "GERZAT"
+
+    def test_empty_returns_none(self):
+        assert _extract_club_key_word("") is None
+
+
+# ---------------------------------------------------------------------------
+# Tests — _resolve_club_and_org entente detection
+# ---------------------------------------------------------------------------
+
+
+class TestResolveClubAndOrgEntente:
+    """Vérifie que _resolve_club_and_org inclut les ententes associées."""
+
+    @pytest.mark.asyncio
+    async def test_entente_included_in_resolved(self, patch_get_client, mock_client):
+        """Quand on cherche 'Gerzat Basket', l'entente ENT. GERZAT / JULES VERNE
+        doit être incluse dans les clubs résolus."""
+        from ffbb_mcp.services import _resolve_club_and_org
+
+        call_count = {"n": 0}
+
+        async def mock_search(nom, limit=20):
+            call_count["n"] += 1
+            nom_up = nom.upper()
+            if "BASKET" in nom_up:
+                return [{"id": 1001, "nom": "GERZAT BASKET", "code": ""}]
+            # Secondary search for key word "GERZAT"
+            return [
+                {"id": 1001, "nom": "GERZAT BASKET", "code": ""},
+                {"id": 1002, "nom": "ENT. GERZAT / JULES VERNE", "code": ""},
+            ]
+
+        org_mock = MagicMock()
+        org_mock.nom = "GERZAT BASKET"
+        org_mock.id = 1001
+        org_mock.code = ""
+        org_mock.model_dump = MagicMock(
+            return_value={"nom": "GERZAT BASKET", "id": 1001, "code": ""}
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        import ffbb_mcp.services as svc
+
+        original = svc.search_organismes_service
+        svc.search_organismes_service = mock_search
+        try:
+            resolved, _ = await _resolve_club_and_org(
+                club_name="Gerzat Basket",
+                organisme_id=None,
+                categorie=None,
+            )
+        finally:
+            svc.search_organismes_service = original
+
+        org_ids = [str(r["organisme_id"]) for r in resolved]
+        assert "1001" in org_ids, "Main club should be resolved"
+        assert "1002" in org_ids, "Entente ENT. GERZAT / JULES VERNE should be included"
+        assert call_count["n"] == 2, (
+            "Both primary and secondary searches should be called"
+        )
+
+    @pytest.mark.asyncio
+    async def test_non_entente_excluded_from_secondary(
+        self, patch_get_client, mock_client
+    ):
+        """Les clubs sans 'ENT.' dans le nom ne doivent pas être ajoutés via la
+        recherche secondaire (éviter les faux positifs)."""
+        from ffbb_mcp.services import _resolve_club_and_org
+
+        async def mock_search(nom, limit=20):
+            nom_up = nom.upper()
+            if "BASKET" in nom_up:
+                return [{"id": 1001, "nom": "GERZAT BASKET", "code": ""}]
+            return [
+                {"id": 1001, "nom": "GERZAT BASKET", "code": ""},
+                {"id": 1003, "nom": "GERZAT SPORT", "code": ""},  # no ENT.
+            ]
+
+        org_mock = MagicMock()
+        org_mock.nom = "GERZAT BASKET"
+        org_mock.id = 1001
+        org_mock.code = ""
+        org_mock.model_dump = MagicMock(
+            return_value={"nom": "GERZAT BASKET", "id": 1001, "code": ""}
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        import ffbb_mcp.services as svc
+
+        original = svc.search_organismes_service
+        svc.search_organismes_service = mock_search
+        try:
+            resolved, _ = await _resolve_club_and_org(
+                club_name="Gerzat Basket",
+                organisme_id=None,
+                categorie=None,
+            )
+        finally:
+            svc.search_organismes_service = original
+
+        org_ids = [str(r["organisme_id"]) for r in resolved]
+        assert "1001" in org_ids
+        assert "1003" not in org_ids, (
+            "Non-entente should NOT be added via secondary search"
+        )
+
+    @pytest.mark.asyncio
+    async def test_no_secondary_search_when_no_key_word(
+        self, patch_get_client, mock_client
+    ):
+        """Si aucun mot distinctif n'est extrait, la recherche secondaire ne doit
+        pas être déclenchée (ex : nom d'un seul mot non générique)."""
+        from ffbb_mcp.services import _resolve_club_and_org
+
+        call_count = {"n": 0}
+
+        async def mock_search(nom, limit=20):
+            call_count["n"] += 1
+            return [{"id": 9999, "nom": "VILLEURBANNE", "code": ""}]
+
+        org_mock = MagicMock()
+        org_mock.nom = "VILLEURBANNE"
+        org_mock.id = 9999
+        org_mock.code = ""
+        org_mock.model_dump = MagicMock(
+            return_value={"nom": "VILLEURBANNE", "id": 9999, "code": ""}
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        import ffbb_mcp.services as svc
+
+        original = svc.search_organismes_service
+        svc.search_organismes_service = mock_search
+        try:
+            resolved, _ = await _resolve_club_and_org(
+                club_name="Villeurbanne",
+                organisme_id=None,
+                categorie=None,
+            )
+        finally:
+            svc.search_organismes_service = original
+
+        assert call_count["n"] == 1, "Only one search should be called when no key word"
