@@ -10,7 +10,7 @@ Convention de version : bumper _PROMPT_VERSION à chaque modification de logique
 
 from __future__ import annotations
 
-_PROMPT_VERSION = "3.3.0"
+_PROMPT_VERSION = "3.4.0"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # HELPERS INTERNES
@@ -84,6 +84,61 @@ Convention FFBB : `equipe1` = 🏠 DOMICILE (gauche) · `equipe2` = ✈️ EXTÉ
 - Mettre en **gras** et 🟢 uniquement l'équipe gagnante, sans modifier sa colonne.
 - Score toujours dans l'ordre R1 – R2 (domicile – extérieur), jamais inversé.
 - `joue: 0` = à venir (pas de score) · `joue: 1` = terminé.\
+"""
+
+_RULES_DISPLAY_BILAN = """\
+## 📊 AFFICHAGE DU BILAN DE CLUB
+
+Utiliser **obligatoirement** le format ci-dessous pour tout bilan de club ou d'équipe.
+
+### En-tête
+```
+🏀 NOM DU CLUB — Bilan global
+Bilan toutes équipes confondues : {V} V / {D} D en {MJ} matchs — différentiel de paniers : {diff}
+```
+
+### Tableau par catégorie
+
+**Règles de construction :**
+1. Regrouper d'abord par catégorie (U9, U11M, U11F, …, SeniorF, SeniorM), puis par numéro d'équipe, puis par phase (Phase 1 → 2 → 3).
+2. Utiliser la structure `equipes_bilan` retournée par `ffbb_bilan` (keyed par numéro d'équipe) pour ne jamais mélanger les équipes.
+3. Pour chaque entrée, afficher :
+   - La **position** avec médaille si ≤ 3 : 🥇 1 · 🥈 2 · 🥉 3
+   - Le **différentiel** avec signe : `+62` en **gras** si positif, `-203` en normal si négatif
+   - Ajouter ✨ sur la ligne avec le meilleur diff positif du tableau (performance remarquable)
+
+**Format tableau :**
+| Catégorie / Compétition | Éq. | Pos. | MJ | V | D | ±pts |
+|:---|:---:|:---:|:---:|:---:|:---:|---:|
+| Dépt. Fém. Senior Div.2 | 1 | 5e | 8 | 0 | 8 | -410 |
+| Dépt. Fém. Senior Div.2 P2 | 1 | 5e | 6 | 0 | 6 | -203 |
+| Dépt. Fém. Senior Div.2 | 2 | 5e | 8 | 1 | 7 | -136 |
+| Dépt. Fém. Senior Div.2 P2 | 2 | 🥈 2 | 5 | **4** | 1 | **+62** ✨ |
+
+**Règles d'abréviation de compétition :**
+- Toujours abréger le nom de compétition pour la lisibilité en tableau.
+- Supprimer les articles, "Équipe", les mots redondants.
+- Ajouter `P2`/`P3` uniquement s'il y a plusieurs phases dans le tableau.
+- Exemples : `Départementale féminine seniors - Division 2 - Phase 2` → `Dépt. Fém. Senior Div.2 P2`
+
+**Icône de genre :**
+- 👧 pour toutes les catégories féminines (F dans le code ou "féminin/féminine" dans le nom)
+- 👦 pour toutes les catégories masculines
+- 🏀 pour mixte et seniors sans genre explicite
+
+### Bloc de faits marquants (obligatoire si ≥ 3 équipes)
+Après le tableau, toujours ajouter un bloc courts "Points forts / Points faibles" :
+```
+🌟 **Point fort** : [équipe avec le meilleur diff ou la meilleure position]
+⚠️ **Point faible** : [équipe avec le pire bilan]
+📈 **Progression** : [équipe ayant le plus progressé entre phases si observable]
+```
+
+### Règles strictes
+- Jamais de tableau sans colonne `Éq.` quand il y a plusieurs équipes dans la même catégorie.
+- Ne jamais tronquer les équipes ou les phases hors de la vue.
+- La colonne `±pts` doit être alignée à droite (`:---:`).
+- Ne pas recalculer le bilan total : utiliser `bilan_total` tel que retourné.\
 """
 
 _RULES_METIER = """\
@@ -253,6 +308,7 @@ def expert_basket() -> str:
             _INTRO,
             _RULES_DISAMBIGUATION,
             _RULES_DISPLAY_MATCH,
+            _RULES_DISPLAY_BILAN,
             _RULES_METIER,
             _RULES_CLASSEMENT,
             _RULES_PHASES,
@@ -353,9 +409,10 @@ def bilan_equipe(club_name: str, categorie: str, numero_equipe: int = 1) -> str:
                 f"`ffbb_bilan(organisme_id=..., categorie='{cat}')` si détail par phase nécessaire.",
                 "`ffbb_club(action='calendrier', organisme_id=...)` → reconstruction manuelle (Tier 3 uniquement).",
             ),
-            "**Format attendu :**\n"
-            "- Bilan total : matchs joués · victoires · défaites · ratio V/D\n"
-            "- Tableau par phase : Compétition | Rang | J | V | D | Pts",
+            "**Format attendu :** suivre strictement `## 📊 AFFICHAGE DU BILAN DE CLUB`.\n"
+            "- En-tête avec bilan global (V/D/MJ/diff)\n"
+            "- Tableau groupé par catégorie + numéro d'équipe + phase\n"
+            "- Bloc faits marquants si ≥ 3 équipes",
         ]
     )
 

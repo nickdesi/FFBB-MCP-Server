@@ -51,7 +51,7 @@ class TestPrompts:
         assert "U11M" in result
         assert "ffbb_search" in result
         assert "ffbb_club" in result
-        assert "bilan total" in result.lower()
+        assert "global" in result.lower()
 
     def test_bilan_equipe_prompt_mentions_ffbb_bilan_prioritaire(self):
         prompt = bilan_equipe("ASVEL", "U13M-1")
