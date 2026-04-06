@@ -66,7 +66,7 @@ logger = logging.getLogger("ffbb-mcp")
 _WEBSITE_DIR = Path(__file__).resolve().parents[2] / "website"
 _DEFAULT_PUBLIC_URL = "https://ffbb.desimone.fr"
 _REMOTE_LOGO_URL = (
-    "https://raw.githubusercontent.com/nickdesi/FFBB-MCP-Server/main/main/assets/logo.webp"
+    "https://raw.githubusercontent.com/nickdesi/FFBB-MCP-Server/main/assets/logo.webp"
 )
 _LOGO_PATH = _WEBSITE_DIR / "logo.webp"
 
