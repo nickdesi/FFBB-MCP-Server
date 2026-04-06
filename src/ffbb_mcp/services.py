@@ -1368,15 +1368,19 @@ async def ffbb_bilan_service(
         }
         logger.debug("ffbb_bilan: poules_map_keys=%s", list(poules_map.keys()))
 
-        # Map poule_id → engagement_ids du club + nom compétition
+        # Map poule_id → engagement_ids du club + nom compétition + numero_equipe
         poule_to_eng: dict[str, set[str]] = {}
         poule_to_comp: dict[str, str] = {}
+        eng_to_num: dict[str, str] = {}  # engagement_id → numero_equipe
         org_ids_str = set(target_org_ids)
         for e in equipes:
             pid = str(e.get("poule_id", ""))
             eid = str(e.get("engagement_id", ""))
+            num = str(e.get("numero_equipe") or "")
             if pid and eid:
                 poule_to_eng.setdefault(pid, set()).add(eid)
+                if num:
+                    eng_to_num[eid] = num
             if pid and e.get("competition"):
                 poule_to_comp[pid] = e["competition"]
 
@@ -1422,10 +1426,18 @@ async def ffbb_bilan_service(
                 pe = int(entry.get("paniers_encaisses") or 0)
                 diff = int(entry.get("difference") or 0)
 
+                # Résolution du numéro d'équipe : priorité au mapping issu de
+                # ffbb_equipes_club_service (le plus fiable), sinon lecture directe
+                # dans l'entrée de classement retournée par l'API (fallback propre).
+                num_equipe = eng_to_num.get(entry_eng_id) or str(
+                    eng.get("numero_equipe") or ""
+                )
+
                 phases.append(
                     {
                         "competition": poule_to_comp.get(pid, ""),
                         "poule_id": pid,
+                        "numero_equipe": num_equipe,
                         "position": entry.get("position"),
                         "match_joues": mj,
                         "gagnes": g,
@@ -1445,12 +1457,44 @@ async def ffbb_bilan_service(
                 totaux["paniers_encaisses"] += pe
                 totaux["difference"] += diff
 
-        phases.sort(key=lambda x: x["competition"])
+        # Tri déterministe : par compétition puis par numéro d'équipe pour que
+        # les phases d'une même équipe soient toujours regroupées dans l'ordre.
+        phases.sort(key=lambda x: (x["competition"], x["numero_equipe"] or ""))
+
+        # Structure groupée par numéro d'équipe pour éliminer toute ambiguïté
+        # lorsqu'un club engage plusieurs équipes dans la même catégorie.
+        equipes_bilan: dict[str, Any] = {}
+        for p in phases:
+            num = p["numero_equipe"] or "1"
+            if num not in equipes_bilan:
+                equipes_bilan[num] = {
+                    "numero_equipe": num,
+                    "bilan": {
+                        "match_joues": 0,
+                        "gagnes": 0,
+                        "perdus": 0,
+                        "nuls": 0,
+                        "paniers_marques": 0,
+                        "paniers_encaisses": 0,
+                        "difference": 0,
+                    },
+                    "phases": [],
+                }
+            equipes_bilan[num]["phases"].append(p)
+            b = equipes_bilan[num]["bilan"]
+            b["match_joues"] += p["match_joues"]
+            b["gagnes"] += p["gagnes"]
+            b["perdus"] += p["perdus"]
+            b["nuls"] += p["nuls"]
+            b["paniers_marques"] += p["paniers_marques"]
+            b["paniers_encaisses"] += p["paniers_encaisses"]
+            b["difference"] += p["difference"]
 
         return {
             "club": club_nom,
             "categorie": categorie or "",
             "bilan_total": totaux,
+            "equipes_bilan": equipes_bilan,
             "phases": phases,
         }
 

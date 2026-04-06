@@ -222,7 +222,9 @@ class TestBilanService:
         )
         return m
 
-    def _make_poule_mock(self, poule_id, engagement_id, org_id, gagnes, perdus, pm, pe):
+    def _make_poule_mock(
+        self, poule_id, engagement_id, org_id, gagnes, perdus, pm, pe, numero_equipe="1"
+    ):
         m = MagicMock()
         m.model_dump = MagicMock(
             return_value={
@@ -230,7 +232,10 @@ class TestBilanService:
                 "rencontres": [],
                 "classements": [
                     {
-                        "id_engagement": {"id": engagement_id, "numero_equipe": "1"},
+                        "id_engagement": {
+                            "id": engagement_id,
+                            "numero_equipe": numero_equipe,
+                        },
                         "organisme_id": org_id,
                         "position": 1,
                         "match_joues": gagnes + perdus,
@@ -312,6 +317,81 @@ class TestBilanService:
         assert result["bilan_total"]["paniers_encaisses"] == 140
         assert result["bilan_total"]["difference"] == 310
         assert len(result["phases"]) == 2
+
+    @pytest.mark.asyncio
+    async def test_numero_equipe_present_in_phases(self, patch_get_client, mock_client):
+        """Lors de 2 équipes dans la même catégorie, chaque phase contient
+        le bon numero_equipe (1 ou 2) pour permettre l'attribution sans ambiguïté."""
+        org_mock = self._make_org_mock(
+            org_id="9326",
+            nom="GERZAT BASKET",
+            engagements=[
+                {
+                    "id": "engA",
+                    "numeroEquipe": "1",
+                    "idCompetition": {
+                        "nom": "DF2 Phase 1",
+                        "id": "c1",
+                        "sexe": "F",
+                        "categorie": {"code": "senior"},
+                        "competition_origine_niveau": 1,
+                    },
+                    "idPoule": {"id": "2001"},
+                },
+                {
+                    "id": "engB",
+                    "numeroEquipe": "2",
+                    "idCompetition": {
+                        "nom": "DF2 Phase 1",
+                        "id": "c1",
+                        "sexe": "F",
+                        "categorie": {"code": "senior"},
+                        "competition_origine_niveau": 1,
+                    },
+                    "idPoule": {"id": "2002"},
+                },
+            ],
+        )
+        poule1 = self._make_poule_mock(
+            "2001",
+            "engA",
+            "9326",
+            gagnes=1,
+            perdus=7,
+            pm=283,
+            pe=419,
+            numero_equipe="1",
+        )
+        poule2 = self._make_poule_mock(
+            "2002",
+            "engB",
+            "9326",
+            gagnes=0,
+            perdus=8,
+            pm=223,
+            pe=633,
+            numero_equipe="2",
+        )
+
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+        mock_client.get_poule_async = AsyncMock(side_effect=[poule1, poule2])
+
+        result = await ffbb_bilan_service(organisme_id=9326, categorie="SeniorF")
+
+        phases = result["phases"]
+        assert len(phases) == 2
+
+        phase_by_poule = {p["poule_id"]: p for p in phases}
+        assert phase_by_poule["2001"]["numero_equipe"] == "1"
+        assert phase_by_poule["2002"]["numero_equipe"] == "2"
+
+        # La structure groupée doit isoler les deux équipes sans ambiguïté
+        equipes_bilan = result["equipes_bilan"]
+        assert set(equipes_bilan.keys()) == {"1", "2"}
+        assert equipes_bilan["1"]["bilan"]["gagnes"] == 1
+        assert equipes_bilan["2"]["bilan"]["gagnes"] == 0
+        assert equipes_bilan["1"]["bilan"]["perdus"] == 7
+        assert equipes_bilan["2"]["bilan"]["perdus"] == 8
 
     @pytest.mark.asyncio
     async def test_uses_cache_on_second_call(self, patch_get_client, mock_client):
