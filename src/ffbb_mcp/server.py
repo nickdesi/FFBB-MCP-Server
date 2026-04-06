@@ -63,11 +63,12 @@ from .services import (
 
 logger = logging.getLogger("ffbb-mcp")
 
+_WEBSITE_DIR = Path(__file__).resolve().parents[2] / "website"
 _DEFAULT_PUBLIC_URL = "https://ffbb.desimone.fr"
 _REMOTE_LOGO_URL = (
-    "https://raw.githubusercontent.com/nickdesi/FFBB-MCP-Server/main/assets/logo.webp"
+    "https://raw.githubusercontent.com/nickdesi/FFBB-MCP-Server/main/main/assets/logo.webp"
 )
-_LOGO_PATH = Path(__file__).resolve().parents[2] / "assets" / "logo.webp"
+_LOGO_PATH = _WEBSITE_DIR / "logo.webp"
 
 _READONLY_ANNOTATIONS = ToolAnnotations(
     readOnlyHint=True,
@@ -84,6 +85,8 @@ def _sdk_version(package: str) -> str:
     except _PkgNotFound:
         return "unknown"
 
+
+# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 # Initialisation FastMCP
@@ -141,79 +144,15 @@ def _get_logo_url() -> str:
 
 
 def _build_index_html() -> str:
-    canonical_url = f"{_get_public_base_url()}/"
-    logo_url = _get_logo_url()
-    title = "FFBB MCP Server – Données basketball français pour agents IA"
-    description = (
-        "Serveur MCP officiel FFBB : bilans d'équipes, classements, calendriers, "
-        "résultats et scores live du basketball français. Connectez Claude, Gemini ou Cursor."
-    )
-
-    return f"""<!DOCTYPE html>
-    <html lang=\"fr\" class=\"bg-gray-900 text-white\">
-    <head>
-        <meta charset=\"UTF-8\">
-        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
-        <title>{title}</title>
-        <meta name=\"description\" content=\"{description}\">
-        <meta name=\"robots\" content=\"index, follow\">
-        <meta name=\"theme-color\" content=\"#111827\">
-        <meta name=\"application-name\" content=\"FFBB MCP Server\">
-        <link rel=\"canonical\" href=\"{canonical_url}\">
-        <!-- Favicon basé sur le logo -->
-        <link rel=\"icon\" type=\"image/webp\" href=\"{logo_url}\">
-        <link rel=\"apple-touch-icon\" href=\"{logo_url}\">
-        <!-- Open Graph / Twitter -->
-        <meta property=\"og:locale\" content=\"fr_FR\">
-        <meta property=\"og:type\" content=\"website\">
-        <meta property=\"og:site_name\" content=\"FFBB MCP Server\">
-        <meta property=\"og:title\" content=\"{title}\">
-        <meta property=\"og:description\" content=\"{description}\">
-        <meta property=\"og:url\" content=\"{canonical_url}\">
-        <meta property=\"og:image\" content=\"{logo_url}\">
-        <meta property=\"og:image:alt\" content=\"Logo FFBB MCP Server \u2013 basketball fran\u00e7ais\">
-        <meta name=\"twitter:card\" content=\"summary_large_image\">
-        <meta name=\"twitter:title\" content=\"{title}\">
-        <meta name=\"twitter:description\" content=\"{description}\">
-        <meta name=\"twitter:image\" content=\"{logo_url}\">
-        <meta name=\"twitter:image:alt\" content=\"Logo FFBB MCP Server \u2013 basketball fran\u00e7ais\">
-        <!-- Données structurées SoftwareApplication -->
-        <script type=\"application/ld+json\">{{
-            \"@context\": \"https://schema.org\",
-            \"@type\": \"SoftwareApplication\",
-            \"name\": \"FFBB MCP Server\",
-            \"applicationCategory\": \"DeveloperApplication\",
-            \"operatingSystem\": \"macOS, Windows, Linux\",
-            \"description\": \"{description}\",
-            \"url\": \"{canonical_url}\",
-            \"image\": \"{logo_url}\",
-            \"softwareVersion\": \"{_PACKAGE_VERSION}\",
-            \"license\": \"https://opensource.org/licenses/MIT\",
-            \"inLanguage\": \"fr\",
-            \"creator\": {{\"@type\": \"Person\", \"name\": \"nickdesi\", \"url\": \"https://github.com/nickdesi\"}},
-            \"offers\": {{\"@type\": \"Offer\", \"price\": \"0\", \"priceCurrency\": \"EUR\"}},
-            \"sameAs\": [
-                \"https://github.com/nickdesi/FFBB-MCP-Server\",
-                \"https://smithery.ai/servers/nickdesi/mcpffbb\"
-            ]
-        }}</script>
-        <script src=\"https://cdn.tailwindcss.com\"></script>
-    </head>
-    <body class=\"flex flex-col items-center justify-center min-h-screen p-4 text-center\">
-        <img src=\"{logo_url}\" alt=\"FFBB MCP Server logo\" class=\"max-w-xs mb-8 rounded-xl shadow-2xl hover:scale-105 transition-transform duration-300\">
-        <h1 class=\"text-4xl md:text-6xl font-extrabold mb-4 bg-gradient-to-r from-orange-400 to-red-500 text-transparent bg-clip-text\">FFBB MCP Server</h1>
-        <p class=\"text-xl text-gray-300 max-w-2xl mb-8\">
-            FFBB MCP Server est un serveur MCP dédié aux données de la Fédération Française de BasketBall (FFBB).<br/>
-            Recherchez clubs, compétitions, salles et terrains, générez des bilans d’équipes,
-            explorez calendriers, résultats, classements et scores live du basket français directement depuis vos agents IA.
-        </p>
-        <div class=\"flex flex-wrap justify-center gap-4\">
-            <a href=\"https://github.com/nickdesi/FFBB-MCP-Server\" target=\"_blank\" rel=\"noreferrer\" class=\"px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-white font-semibold transition-colors\">GitHub</a>
-            <a href=\"https://smithery.ai/servers/nickdesi/mcpffbb\" target=\"_blank\" rel=\"noreferrer\" class=\"px-6 py-3 bg-[#e2693e] hover:bg-[#c95d37] rounded-lg text-white font-semibold transition-colors\">Disponible sur Smithery</a>
-        </div>
-        <div class=\"mt-12 text-gray-500 text-sm\">Statut : <span class=\"text-green-400\">En ligne</span></div>
-    </body>
-    </html>"""
+    index_path = _WEBSITE_DIR / "index.html"
+    if index_path.exists():
+        try:
+            return index_path.read_text(encoding="utf-8")
+        except Exception as e:
+            logger.error(f"Failed to read index.html: {e}")
+    
+    # Fallback minimal au cas où le fichier est manquant
+    return "<html><body><h1>FFBB MCP Server</h1><p>Site en maintenance.</p></body></html>"
 
 
 def _build_robots_txt() -> str:
@@ -260,6 +199,14 @@ async def logo(request: Request) -> Response:
 @mcp.custom_route("/favicon.ico", methods=["GET"])
 async def favicon(request: Request) -> Response:
     return _logo_response()
+
+
+@mcp.custom_route("/css/style.css", methods=["GET"])
+async def style_css(request: Request) -> Response:
+    css_path = _WEBSITE_DIR / "css" / "style.css"
+    if css_path.exists():
+        return FileResponse(css_path, media_type="text/css")
+    return Response("/* CSS non trouvé */", status_code=404)
 
 
 @mcp.custom_route("/robots.txt", methods=["GET"])

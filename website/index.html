@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FFBB MCP Server — Connectez vos agents IA au basketball français</title>
+    <meta name="description" content="FFBB MCP Server est un serveur Model Context Protocol (MCP) pour accéder aux données FFBB en temps réel : bilans d'équipes, calendriers, résultats, classements et lives.">
+    <meta name="robots" content="index, follow">
+    <meta name="theme-color" content="#0a0a0a">
+    <link rel="stylesheet" href="css/style.css">
+    
+    <!-- Open Graph / Social Media -->
+    <meta property="og:title" content="FFBB MCP Server">
+    <meta property="og:description" content="Accédez aux données FFBB en temps réel via vos agents IA (Claude, Cursor, ...)">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://ffbb.desimone.fr/">
+    <meta property="og:image" content="logo.webp">
+    
+    <link rel="icon" type="image/webp" href="logo.webp">
+    
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "FFBB MCP Server",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "macOS, Windows, Linux",
+        "description": "Serveur MCP pour accéder aux données de la Fédération Française de BasketBall.",
+        "url": "https://ffbb.desimone.fr",
+        "image": "https://ffbb.desimone.fr/logo.webp",
+        "sameAs": [
+            "https://github.com/nickdesi/FFBB-MCP-Server",
+            "https://smithery.ai/servers/nickdesi/mcpffbb"
+        ]
+    }
+    </script>
+</head>
+<body>
+    <div class="bg-glow">
+        <div class="glow-orb glow-1"></div>
+        <div class="glow-orb glow-2"></div>
+    </div>
+
+    <div class="container">
+        <!-- Hero Section -->
+        <header class="hero">
+            <img src="logo.webp" alt="FFBB Logo" class="hero-logo">
+            <div class="badge">Disponible sur Smithery</div>
+            <h1 class="hero-title">Le basketball français dans votre <span style="color: var(--accent-orange);">IA générative</span></h1>
+            <p class="hero-subtitle">
+                Connectez vos agents Claude, Cursor ou ChatGPT aux données live de la FFBB via le serveur MCP le plus performant.
+            </p>
+            <div class="cta-group">
+                <a href="https://github.com/nickdesi/FFBB-MCP-Server" class="btn btn-primary">
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+                    Voir sur GitHub
+                </a>
+                <a href="#integration" class="btn btn-secondary">Installation</a>
+            </div>
+        </header>
+
+        <!-- Features Section -->
+        <section class="features">
+            <div class="section-label">
+                <div class="badge">Fonctionnalités</div>
+                <h2 style="font-size: 2.5rem; margin-top: 12px;">Une API unifiée pour l'IA</h2>
+            </div>
+            <div class="features-grid">
+                <article class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Bilan complet</h3>
+                    <p>Obtenez le bilan complet d'une équipe toutes phases confondues par son nom ou son ID en un seul appel.</p>
+                </article>
+                <article class="feature-card">
+                    <div class="feature-icon">🔍</div>
+                    <h3>Recherche intelligente</h3>
+                    <p>Recherchez n'importe quel club, salle, compétition ou terrain avec une tolérance aux erreurs de frappe.</p>
+                </article>
+                <article class="feature-card">
+                    <div class="feature-icon">⏱️</div>
+                    <h3>Scores Live</h3>
+                    <p>Accédez aux scores en direct des matchs en cours pour ne rien rater de l'action FFBB.</p>
+                </article>
+                <article class="feature-card">
+                    <div class="feature-icon">🗓️</div>
+                    <h3>Prochain Match</h3>
+                    <p>Planifiez l'avenir en récupérant instantanément le prochain rendez-vous d'une équipe précise.</p>
+                </article>
+                <article class="feature-card">
+                    <div class="feature-icon">📈</div>
+                    <h3>Classements & Poules</h3>
+                    <p>Visualisez les classements complets et les détails des poules pour une analyse approfondie.</p>
+                </article>
+                <article class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Optimisé FastMCP</h3>
+                    <p>Conçu avec FastMCP pour une intégration native et ultra-rapide avec l'écosystème Model Context Protocol.</p>
+                </article>
+            </div>
+        </section>
+
+        <!-- Integration Section -->
+        <section id="integration" class="integration">
+            <div class="section-label">
+                <div class="badge">Configuration</div>
+                <h2 style="font-size: 2.5rem; margin-top: 12px;">Intégration en 30 secondes</h2>
+                <p style="color: var(--text-secondary); margin-top: 16px;">Ajoutez le serveur à votre configuration MCP habituelle (Claude Desktop ou Cursor).</p>
+            </div>
+            
+            <div class="code-terminal">
+                <div class="terminal-header">
+                    <div class="dot dot-red"></div>
+                    <div class="dot dot-yellow"></div>
+                    <div class="dot dot-green"></div>
+                </div>
+                <div class="terminal-body">
+                    <pre><code><span class="code-comment">// Dans votre fichier configuration mcp.json</span>
+{
+  <span class="code-keyword">"mcpServers"</span>: {
+    <span class="code-keyword">"ffbb"</span>: {
+      <span class="code-keyword">"command"</span>: <span class="code-string">"npx"</span>,
+      <span class="code-keyword">"args"</span>: [<span class="code-string">"-y"</span>, <span class="code-string">"@smithery/sdk-mcp-ffbb-api-client"</span>]
+    }
+  }
+}</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer style="padding: 60px 0; border-top: 1px solid var(--border-card); text-align: center; color: var(--text-secondary);">
+            <p>&copy; 2026 Nicolas De Simone — FFBB MCP Server</p>
+            <div style="margin-top: 24px;">
+                <a href="https://github.com/nickdesi/FFBB-MCP-Server" style="color: var(--text-secondary); margin: 0 12px; text-decoration: none;">GitHub</a>
+                <a href="https://smithery.ai/servers/nickdesi/mcpffbb" style="color: var(--text-secondary); margin: 0 12px; text-decoration: none;">Smithery</a>
+                <a href="https://nickdesi.github.io/FFBBApiClientV3/" style="color: var(--accent-orange); margin: 0 12px; text-decoration: none; font-weight: 600;">API V3 Publique &rarr;</a>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>
