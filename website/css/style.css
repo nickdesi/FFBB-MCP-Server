@@ -127,7 +127,6 @@ h1, h2, h3 {
     margin-bottom: 32px;
     border-radius: var(--radius-lg);
     box-shadow: 0 0 40px var(--accent-orange-glow);
-    animation: floating 8s ease-in-out infinite;
 }
 
 .badge {
