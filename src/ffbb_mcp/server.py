@@ -61,9 +61,21 @@ from .services import (
     search_tournois_service,
 )
 
-logger = logging.getLogger("ffbb-mcp")
+def _find_website_dir() -> Path:
+    """Détecte le dossier website/ en local ou en production."""
+    # 1. Mode repo (src/ffbb_mcp/server.py -> ../../website)
+    repo_path = Path(__file__).resolve().parents[2] / "website"
+    if repo_path.exists():
+        return repo_path
+    # 2. Mode package (par exemple si website/ est copié au même niveau que src/)
+    pkg_path = Path(__file__).resolve().parent / "website"
+    if pkg_path.exists():
+        return pkg_path
+    # 3. Fallback sur le dossier de travail courant
+    return Path.cwd() / "website"
 
-_WEBSITE_DIR = Path(__file__).resolve().parents[2] / "website"
+
+_WEBSITE_DIR = _find_website_dir()
 _DEFAULT_PUBLIC_URL = "https://ffbb.desimone.fr"
 _REMOTE_LOGO_URL = (
     "https://raw.githubusercontent.com/nickdesi/FFBB-MCP-Server/main/assets/logo.webp"

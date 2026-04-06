@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
 COPY assets/ ./assets/
+COPY website/ ./website/
 
 # Mettre à jour pip puis installer le package et ses dépendances
 RUN python -m pip install --upgrade pip setuptools wheel && \
