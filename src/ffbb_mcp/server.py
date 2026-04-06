@@ -61,6 +61,7 @@ from .services import (
     search_tournois_service,
 )
 
+
 def _find_website_dir() -> Path:
     """Détecte le dossier website/ en local ou en production."""
     # 1. Mode repo (src/ffbb_mcp/server.py -> ../../website)
@@ -81,6 +82,8 @@ _REMOTE_LOGO_URL = (
     "https://raw.githubusercontent.com/nickdesi/FFBB-MCP-Server/main/assets/logo.webp"
 )
 _LOGO_PATH = _WEBSITE_DIR / "logo.webp"
+
+logger = logging.getLogger("ffbb-mcp")
 
 _READONLY_ANNOTATIONS = ToolAnnotations(
     readOnlyHint=True,
@@ -162,9 +165,11 @@ def _build_index_html() -> str:
             return index_path.read_text(encoding="utf-8")
         except Exception as e:
             logger.error(f"Failed to read index.html: {e}")
-    
+
     # Fallback minimal au cas où le fichier est manquant
-    return "<html><body><h1>FFBB MCP Server</h1><p>Site en maintenance.</p></body></html>"
+    return (
+        "<html><body><h1>FFBB MCP Server</h1><p>Site en maintenance.</p></body></html>"
+    )
 
 
 def _build_robots_txt() -> str:

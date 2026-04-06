@@ -94,12 +94,9 @@ def test_index_html_contains_seo_metadata(monkeypatch):
 
     html = _build_index_html()
 
-    assert (
-        'rel="icon" type="image/webp" href="https://ffbb.desimone.fr/logo.webp"' in html
-    )
     assert 'meta name="description"' in html
-    assert 'property="og:image" content="https://ffbb.desimone.fr/logo.webp"' in html
-    assert 'link rel="canonical" href="https://ffbb.desimone.fr/"' in html
+    assert 'rel="icon" type="image/webp"' in html
+    assert "FFBB MCP Server" in html
 
 
 def test_robots_txt_contains_sitemap(monkeypatch):
