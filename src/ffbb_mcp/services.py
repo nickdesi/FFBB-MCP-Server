@@ -615,10 +615,19 @@ async def ffbb_get_classement_service(
 
 
 async def _search_generic(
-    operation: str, method_name: str, query: str, limit: int = 20
+    operation: str,
+    method_name: str,
+    query: str,
+    limit: int = 20,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
 ) -> list[dict]:
     normalized_query = normalize_query(query)
-    cache_key = f"search:{operation}:{normalized_query}:{limit}"
+    filter_part = filter_by or ""
+    sort_part = ",".join(sort) if sort else ""
+    cache_key = (
+        f"search:{operation}:{normalized_query}:{limit}:{filter_part}:{sort_part}"
+    )
 
     async def _fetch() -> list[dict]:
         # Lazy import to avoid heavy ffbb_api_client_v3 initialization at
@@ -626,9 +635,15 @@ async def _search_generic(
 
         client = await get_client_async()
         method = getattr(client, method_name)
+        call_kwargs: dict[str, Any] = {}
+        if filter_by:
+            call_kwargs["filter_by"] = filter_by
+        if sort:
+            call_kwargs["sort"] = sort
         results = await _with_ffbb_semaphore(
             _safe_call_with_inflight(
-                f"Search {operation}: {query}", lambda: method(normalized_query)
+                f"Search {operation}: {query}",
+                lambda: method(normalized_query, **call_kwargs),
             )
         )
         if not results or not results.hits:
@@ -1262,28 +1277,6 @@ async def ffbb_saison_bilan_service(
     }
 
 
-# Dans ffbb_bilan_service, on garde _safe_call encapsulé mais on limite les appels
-# directs supplémentaires dans _fetch_poule_bilan :
-#
-# async def _fetch_poule_bilan(pid: str) -> dict[str, Any] | Exception:
-#     async with semaphore:
-#         try:
-#             return await get_poule_service(pid)
-#         except McpError:
-#             try:
-#                 client = await get_client_async()
-#                 poule = await _with_ffbb_semaphore(
-#                     _safe_call(
-#                         f"Poule {pid}", lambda: client.get_poule_async(poule_id=pid)
-#                     )
-#                 )
-#                 return serialize_model(poule) or {}
-#             except Exception as e:
-#                 return e
-
-
-# De même, get_calendrier_club_service utilise déjà get_poule_service qui
-# bénéficie désormais du sémaphore global.
 async def ffbb_bilan_service(
     club_name: str | None = None,
     organisme_id: int | str | None = None,
@@ -1293,7 +1286,7 @@ async def ffbb_bilan_service(
     Bilan complet d'une équipe toutes phases confondues en un seul appel.
     Workflow interne : search → equipes → poules (parallèle) → agrégation V/D/N + paniers.
     """
-    cache_key = f"bilan:{organisme_id or ''}:{(club_name or '').lower().strip()}:{categorie or ''}"
+    cache_key = f"bilan:{organisme_id or ''}:{_normalize_name(club_name or '')}:{categorie or ''}"
 
     async def _fetch() -> dict[str, Any]:
         # 1. Résoudre l'organisme_id (CENTRALISÉ)
@@ -1730,42 +1723,103 @@ async def get_calendrier_club_service(
     )
 
 
-async def search_competitions_service(nom: str, limit: int = 20) -> list[dict]:
+async def search_competitions_service(
+    nom: str,
+    limit: int = 20,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
+) -> list[dict]:
     return await _search_generic(
-        "competitions", "search_competitions_async", nom, limit
+        "competitions", "search_competitions_async", nom, limit, filter_by, sort
     )
 
 
-async def search_organismes_service(nom: str, limit: int = 20) -> list[dict]:
-    return await _search_generic("organismes", "search_organismes_async", nom, limit)
+async def search_organismes_service(
+    nom: str,
+    limit: int = 20,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
+) -> list[dict]:
+    return await _search_generic(
+        "organismes", "search_organismes_async", nom, limit, filter_by, sort
+    )
 
 
-async def search_salles_service(nom: str, limit: int = 20) -> list[dict]:
-    return await _search_generic("salles", "search_salles_async", nom, limit)
+async def search_salles_service(
+    nom: str,
+    limit: int = 20,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
+) -> list[dict]:
+    return await _search_generic(
+        "salles", "search_salles_async", nom, limit, filter_by, sort
+    )
 
 
-async def search_rencontres_service(nom: str, limit: int = 20) -> list[dict]:
-    return await _search_generic("rencontres", "search_rencontres_async", nom, limit)
+async def search_rencontres_service(
+    nom: str,
+    limit: int = 20,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
+) -> list[dict]:
+    return await _search_generic(
+        "rencontres", "search_rencontres_async", nom, limit, filter_by, sort
+    )
 
 
-async def search_pratiques_service(nom: str, limit: int = 20) -> list[dict]:
-    return await _search_generic("pratiques", "search_pratiques_async", nom, limit)
+async def search_pratiques_service(
+    nom: str,
+    limit: int = 20,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
+) -> list[dict]:
+    return await _search_generic(
+        "pratiques", "search_pratiques_async", nom, limit, filter_by, sort
+    )
 
 
-async def search_terrains_service(nom: str, limit: int = 20) -> list[dict]:
-    return await _search_generic("terrains", "search_terrains_async", nom, limit)
+async def search_terrains_service(
+    nom: str,
+    limit: int = 20,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
+) -> list[dict]:
+    return await _search_generic(
+        "terrains", "search_terrains_async", nom, limit, filter_by, sort
+    )
 
 
-async def search_tournois_service(nom: str, limit: int = 20) -> list[dict]:
-    return await _search_generic("tournois", "search_tournois_async", nom, limit)
+async def search_tournois_service(
+    nom: str,
+    limit: int = 20,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
+) -> list[dict]:
+    return await _search_generic(
+        "tournois", "search_tournois_async", nom, limit, filter_by, sort
+    )
 
 
-async def search_engagements_service(nom: str, limit: int = 20) -> list[dict]:
-    return await _search_generic("engagements", "search_engagements_async", nom, limit)
+async def search_engagements_service(
+    nom: str,
+    limit: int = 20,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
+) -> list[dict]:
+    return await _search_generic(
+        "engagements", "search_engagements_async", nom, limit, filter_by, sort
+    )
 
 
-async def search_formations_service(nom: str, limit: int = 20) -> list[dict]:
-    return await _search_generic("formations", "search_formations_async", nom, limit)
+async def search_formations_service(
+    nom: str,
+    limit: int = 20,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
+) -> list[dict]:
+    return await _search_generic(
+        "formations", "search_formations_async", nom, limit, filter_by, sort
+    )
 
 
 async def ffbb_resolve_team_service(
@@ -2384,15 +2438,26 @@ async def ffbb_last_result_service(
     est_domicile = _match_team_name(
         str(dernier.get("nomEquipe1", "")), str(organisme_nom), numero_equipe_match
     )
-    score_nous = (
-        int(dernier["resultatEquipe1"])
-        if est_domicile
-        else int(dernier["resultatEquipe2"])
+
+    def _safe_int(val: Any) -> int | None:
+        """Convertit un score API en int, retourne None si absent/invalide."""
+        if val is None or val in ("", "None"):
+            return None
+        try:
+            return int(val)
+        except (TypeError, ValueError):
+            return None
+
+    score_nous_raw = (
+        dernier["resultatEquipe1"] if est_domicile else dernier["resultatEquipe2"]
     )
-    score_eux = (
-        int(dernier["resultatEquipe2"])
-        if est_domicile
-        else int(dernier["resultatEquipe1"])
+    score_eux_raw = (
+        dernier["resultatEquipe2"] if est_domicile else dernier["resultatEquipe1"]
+    )
+    score_nous = _safe_int(score_nous_raw)
+    score_eux = _safe_int(score_eux_raw)
+    victoire = (
+        score_nous is not None and score_eux is not None and score_nous > score_eux
     )
 
     return {
@@ -2404,5 +2469,5 @@ async def ffbb_last_result_service(
         "score_domicile": dernier.get("resultatEquipe1"),
         "exterieur": dernier.get("nomEquipe2", ""),
         "score_exterieur": dernier.get("resultatEquipe2"),
-        "victoire": score_nous > score_eux,
+        "victoire": victoire,
     }

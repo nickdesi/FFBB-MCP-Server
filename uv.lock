@@ -403,22 +403,6 @@ wheels = [
 ]
 
 [[package]]
-name = "fastapi"
-version = "0.135.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "annotated-doc" },
-    { name = "pydantic" },
-    { name = "starlette" },
-    { name = "typing-extensions" },
-    { name = "typing-inspection" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e7/7b/f8e0211e9380f7195ba3f3d40c292594fd81ba8ec4629e3854c353aaca45/fastapi-0.135.1.tar.gz", hash = "sha256:d04115b508d936d254cea545b7312ecaa58a7b3a0f84952535b4c9afae7668cd", size = 394962 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e4/72/42e900510195b23a56bde950d26a51f8b723846bfcaa0286e90287f0422b/fastapi-0.135.1-py3-none-any.whl", hash = "sha256:46e2fc5745924b7c840f71ddd277382af29ce1cdb7d5eab5bf697e3fb9999c9e", size = 116999 },
-]
-
-[[package]]
 name = "ffbb-api-client-v3"
 version = "1.5.3"
 source = { registry = "https://pypi.org/simple" }
@@ -442,7 +426,6 @@ source = { editable = "." }
 dependencies = [
     { name = "anysqlite" },
     { name = "cachetools" },
-    { name = "fastapi" },
     { name = "ffbb-api-client-v3" },
     { name = "mcp", extra = ["cli"] },
     { name = "pydantic" },
@@ -463,7 +446,6 @@ dev = [
 requires-dist = [
     { name = "anysqlite", specifier = ">=0.0.5" },
     { name = "cachetools", specifier = ">=5.3.0" },
-    { name = "fastapi" },
     { name = "ffbb-api-client-v3", specifier = ">=1.5.3" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.8.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.7.0" },

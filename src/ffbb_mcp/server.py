@@ -324,7 +324,9 @@ async def ffbb_search(
             "engagements": search_engagements_service,
             "formations": search_formations_service,
         }
-        return await dispatch[type](nom=query, limit=limit)
+        return await dispatch[type](
+            nom=query, limit=limit, filter_by=filter_by, sort=sort
+        )
     except Exception as e:
         raise handle_api_error(e) from e
 
@@ -693,9 +695,12 @@ async def ffbb_resolve_team(
     DOIT etre utilise avant `ffbb_next_match` ou `ffbb_last_result` si l'agent
     ne connait pas le numero d'equipe exact ou si la categorie est ambiguë (ex: 'U11M').
     """
-    return await ffbb_resolve_team_service(
-        club_name=club_name, organisme_id=organisme_id, categorie=categorie
-    )
+    try:
+        return await ffbb_resolve_team_service(
+            club_name=club_name, organisme_id=organisme_id, categorie=categorie
+        )
+    except Exception as e:
+        raise handle_api_error(e) from e
 
 
 # ---------------------------------------------------------------------------
@@ -810,7 +815,6 @@ async def ffbb_team_summary(
             "last_match": last_match,
             "next_match": next_match,
             "summary": bilan.get("bilan_total"),
-            "raw": bilan,
         }
     except Exception as e:
         raise handle_api_error(e) from e
@@ -854,7 +858,8 @@ async def ffbb_last_result(
 
     if club_name is None and organisme_id is None:
         return {
-            "error": "Veuillez fournir club_name ou organisme_id pour trouver l'équipe."
+            "status": "error",
+            "message": "Veuillez fournir club_name ou organisme_id pour trouver l'équipe.",
         }
 
     return await ffbb_last_result_service(
@@ -978,8 +983,7 @@ async def ffbb_bilan_saison(
             await ctx.report_progress(1, total=1, message="Bilan saison prêt.")
         return result
     except Exception as e:
-        logger.error("ffbb_bilan_saison failed: %s", e)
-        return {"error": str(e)}
+        raise handle_api_error(e) from e
 
 
 # ---------------------------------------------------------------------------
@@ -1044,7 +1048,7 @@ def main() -> None:
         # Headers : Content-Type, Accept, Mcp-Session-Id, MCP-Protocol-Version obligatoires
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=["*"],
+            allow_origins=_allowed_origins,
             allow_methods=["GET", "POST", "OPTIONS", "DELETE"],
             allow_headers=[
                 "Content-Type",

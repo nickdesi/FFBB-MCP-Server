@@ -4,7 +4,7 @@ Client FFBB avec gestion automatique du cycle de vie des tokens.
 Le singleton FFBBClientFactory gère :
 - L'initialisation paresseuse du client FFBB
 - Le rafraîchissement proactif des tokens avant expiration
-- Le cache SQLite pour les réponses API (TTL 30 min)
+- Le cache mémoire (30s) pour éviter les doublons réseau concurrents
 """
 
 import asyncio
@@ -21,7 +21,12 @@ logger = logging.getLogger("ffbb-mcp")
 # Durée de vie des tokens en secondes.
 # Les tokens FFBB expirent à ~30 min ; on rafraîchit à 25 min par sécurité.
 _TOKEN_TTL_SECONDS: int = 25 * 60
-_CACHE_TTL_SECONDS: int = 30 * 60
+# Cache HTTP court (mémoire) : les données live (poules, calendriers) sont gérées
+# par le TTLCache du service layer. Ce cache HTTP évite les doublons d'appel
+# réseau strictement concurrents, mais ne doit pas masquer des données stales.
+_CACHE_TTL_SECONDS: int = (
+    30  # 30 secondes — aligné sur le TTL le plus court du service layer
+)
 
 
 class FFBBClientFactory:
@@ -53,9 +58,11 @@ class FFBBClientFactory:
         # On force use_cache=True pour le token manager
         tokens = TokenManager.get_tokens(use_cache=True)
 
-        # Configuration explicite en SQLite avec un TTL de 30 minutes
+        # Cache mémoire court (30s) pour éviter les doublons réseau stricts.
+        # On n'utilise pas SQLite car les données live (poules, scores) doivent
+        # être rafraîchies au rythme du service layer (force_refresh compris).
         cache_config = CacheConfig(
-            backend="sqlite", enabled=True, expire_after=_CACHE_TTL_SECONDS
+            backend="memory", enabled=True, expire_after=_CACHE_TTL_SECONDS
         )
         cache_manager = CacheManager(config=cache_config)
 
@@ -65,7 +72,7 @@ class FFBBClientFactory:
             cached_session=cache_manager.session,
             async_cached_session=cache_manager.async_session,
         )
-        logger.info("Client FFBB initialisé avec succès (Cache: SQLite).")
+        logger.info("Client FFBB initialisé avec succès (Cache: mémoire 30s).")
         return client
 
     @classmethod
