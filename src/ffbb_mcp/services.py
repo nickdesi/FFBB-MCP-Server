@@ -119,9 +119,9 @@ def _notify_cache_miss(cache_name: str) -> None:
 # ---------------------------------------------------------------------------
 
 # TTL configurables via variables d'environnement pour affiner par type de données.
-# Pour garantir une fraîcheur "temps réel" (toujours à jour), les TTL des données dynamiques
-# (poules, calendriers, bilans) sont très courts (15-30s). La protection contre le burst
-# est assurée par le mécanisme de déduplication "inflight" (_dedupe_inflight).
+# Les données vraiment temps-réel (lives, poules) ont des TTL courts (15s).
+# Les données qui ne changent qu'après des matchs joués (bilans, calendriers) ont des TTL longs.
+# La protection contre le burst est assurée par le mécanisme de déduplication "inflight" (_dedupe_inflight).
 _LIVES_TTL = _read_positive_int_env("FFBB_CACHE_TTL_LIVES", 15)
 _SEARCH_TTL = _read_positive_int_env(
     "FFBB_CACHE_TTL_SEARCH", 3600
@@ -129,8 +129,12 @@ _SEARCH_TTL = _read_positive_int_env(
 _DETAIL_TTL = _read_positive_int_env(
     "FFBB_CACHE_TTL_DETAIL", 86400
 )  # 24h pour orga/saison
-_CALENDRIER_TTL = _read_positive_int_env("FFBB_CACHE_TTL_CALENDRIER", 30)
-_BILAN_TTL = _read_positive_int_env("FFBB_CACHE_TTL_BILAN", 30)
+_CALENDRIER_TTL = _read_positive_int_env(
+    "FFBB_CACHE_TTL_CALENDRIER", 300
+)  # 5min — calendrier rarement mis à jour
+_BILAN_TTL = _read_positive_int_env(
+    "FFBB_CACHE_TTL_BILAN", 3600
+)  # 1h — bilan change seulement après matchs joués (1-2×/semaine), pas en temps réel
 # TTL spécifique ultra-court pour les poules (scores + rencontres).
 _POULE_TTL = _read_positive_int_env("FFBB_CACHE_TTL_POULE", 15)
 
@@ -1150,7 +1154,11 @@ async def ffbb_next_match_service(
 
 
 async def ffbb_saison_bilan_service(
-    *, organisme_id: int | str, categorie: str, numero_equipe: int
+    *,
+    organisme_id: int | str,
+    categorie: str,
+    numero_equipe: int,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
     """Service interne pour ffbb_bilan_saison.
 
@@ -1159,6 +1167,9 @@ async def ffbb_saison_bilan_service(
     Contrairement à ffbb_bilan_service (qui part d'un club_name ou d'une
     catégorie globale), cette fonction travaille à partir d'une équipe
     identifiée sans ambiguïté.
+
+    Args:
+        force_refresh: Si True, bypass le cache pour obtenir des données fraîches.
     """
     org_id_int = _coerce_numeric_id(organisme_id, "organisme_id")
     equipes = await ffbb_equipes_club_service(
@@ -1201,7 +1212,7 @@ async def ffbb_saison_bilan_service(
 
     async def _fetch_poule(pid: str) -> dict[str, Any] | Exception:
         try:
-            return await get_poule_service(pid)
+            return await get_poule_service(pid, force_refresh=force_refresh)
         except Exception as e:  # déjà normalisé par get_poule_service
             return e
 
@@ -1281,10 +1292,14 @@ async def ffbb_bilan_service(
     club_name: str | None = None,
     organisme_id: int | str | None = None,
     categorie: str | None = None,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
     """
     Bilan complet d'une équipe toutes phases confondues en un seul appel.
     Workflow interne : search → equipes → poules (parallèle) → agrégation V/D/N + paniers.
+
+    Args:
+        force_refresh: Si True, bypass le cache pour obtenir des données fraîches.
     """
     cache_key = f"bilan:{organisme_id or ''}:{_normalize_name(club_name or '')}:{categorie or ''}"
 
@@ -1490,6 +1505,13 @@ async def ffbb_bilan_service(
             "equipes_bilan": equipes_bilan,
             "phases": phases,
         }
+
+    # Force refresh : bypass le cache et appel direct
+    if force_refresh:
+        logger.debug(f"force_refresh=True, bypass cache pour {cache_key}")
+        result = await _fetch()
+        _cache_set(_cache_bilan, cache_key, result, "bilan")
+        return result
 
     return await _dedupe_inflight(
         cache=_cache_bilan,

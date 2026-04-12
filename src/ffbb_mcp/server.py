@@ -356,6 +356,12 @@ async def ffbb_bilan(
             description="Catégorie + genre + numéro équipe (ex: 'U11M1', 'U13F2', 'U15M', 'Senior')."
         ),
     ] = None,
+    force_refresh: Annotated[
+        bool,
+        Field(
+            description="Si True, contourne le cache pour récupérer des données fraîches."
+        ),
+    ] = False,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Bilan complet d'une équipe toutes phases confondues en UN seul appel.
@@ -377,6 +383,7 @@ async def ffbb_bilan(
             club_name=club_name,
             organisme_id=organisme_id,
             categorie=categorie,
+            force_refresh=force_refresh,
         )
         if ctx:
             await ctx.report_progress(3, total=3, message="Bilan prêt.")
@@ -952,6 +959,12 @@ async def ffbb_bilan_saison(
             )
         ),
     ],
+    force_refresh: Annotated[
+        bool,
+        Field(
+            description="Si True, contourne le cache pour récupérer des données fraîches."
+        ),
+    ] = False,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Bilan détaillé de la saison pour une équipe précise (toutes phases).
@@ -978,6 +991,7 @@ async def ffbb_bilan_saison(
             organisme_id=organisme_id,
             categorie=categorie,
             numero_equipe=numero_equipe,
+            force_refresh=force_refresh,
         )
         if ctx:
             await ctx.report_progress(1, total=1, message="Bilan saison prêt.")
