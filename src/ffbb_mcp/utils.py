@@ -89,19 +89,56 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
 
     return ParsedCategorie(categorie=categorie, sexe=sexe, numero_equipe=numero_equipe)
 
-def prune_payload(obj: Any) -> Any:
-    """Réduit agressivement la taille des payloads JSON en supprimant
-    les valeurs vides (None, listes vides, dictionnaires vides).
-    Utilisé pour optimiser le contexte (ZipAI directives).
+def prune_payload(obj: Any, depth: int = 0) -> Any:
+    """Réduit agressivement la taille des payloads JSON (ZipAI Surgical Logic).
+    - Supprime les valeurs vides (None, [], {}).
+    - Limite les dictionnaires à ~10 clés non-essentielles.
+    - Limite les listes à 25 éléments maximum.
     """
+    # Profondeur max pour éviter toute boucle infinie théorique
+    if depth > 10:
+        return "<max depth reached>"
+
     if isinstance(obj, dict):
+        # 1. Nettoyage récursif
         cleaned = {
-            k: prune_payload(v)
+            k: prune_payload(v, depth + 1)
             for k, v in obj.items()
             if v is not None and v != [] and v != {}
         }
+        
+        # 2. Élagage chirurgical si trop de clés
+        # On préserve toujours les clés "essentielles" pour l'agent
+        essential_keys = {"id", "name", "type", "libelle", "status", "date", "heure", "score", "equipe", "equipe_domicile", "equipe_exterieur", "club", "categorie", "position", "bilan_total"}
+        
+        if len(cleaned) > 15:
+            sorted_keys = sorted(cleaned.keys())
+            kept_keys = {k for k in sorted_keys if k in essential_keys}
+            other_keys = [k for k in sorted_keys if k not in essential_keys]
+            
+            # On garde les clés essentielles + les 10 premières autres
+            for k in other_keys[:10]:
+                kept_keys.add(k)
+            
+            pruned = {k: cleaned[k] for k in kept_keys}
+            if len(other_keys) > 10:
+                pruned["_omitted_count"] = len(other_keys) - 10
+            return pruned
         return cleaned
+
     elif isinstance(obj, list):
-        cleaned_list = [prune_payload(item) for item in obj]
-        return [item for item in cleaned_list if item is not None and item != {} and item != []]
+        # 1. Limitation de taille (ZipAI Surgical)
+        limit = 25
+        truncated = obj[:limit]
+        
+        # 2. Nettoyage récursif
+        cleaned_list = [prune_payload(item, depth + 1) for item in truncated]
+        final_list = [item for item in cleaned_list if item is not None and item != {} and item != []]
+        
+        if len(obj) > limit:
+            # On ne peut pas facilement ajouter un champ à une liste sans casser le schéma, 
+            # mais l'agent verra la troncature.
+            pass
+        return final_list
+
     return obj

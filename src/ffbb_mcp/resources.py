@@ -17,8 +17,9 @@ def register_resources(mcp):
         from .services import get_saisons_service, handle_api_error
 
         try:
+            from .utils import prune_payload
             data = await get_saisons_service()
-            return json.dumps(data, default=str)
+            return json.dumps(prune_payload(data), default=str)
         except Exception as e:
             raise handle_api_error(e) from e
 
@@ -28,8 +29,9 @@ def register_resources(mcp):
         from .services import get_competition_service, handle_api_error
 
         try:
+            from .utils import prune_payload
             data = await get_competition_service(competition_id)
-            return json.dumps(data, default=str)
+            return json.dumps(prune_payload(data), default=str)
         except Exception as e:
             raise handle_api_error(e) from e
 
@@ -39,8 +41,9 @@ def register_resources(mcp):
         from .services import get_poule_service, handle_api_error
 
         try:
+            from .utils import prune_payload
             data = await get_poule_service(poule_id)
-            return json.dumps(data, default=str)
+            return json.dumps(prune_payload(data), default=str)
         except Exception as e:
             raise handle_api_error(e) from e
 
@@ -50,7 +53,8 @@ def register_resources(mcp):
         from .services import get_organisme_service, handle_api_error
 
         try:
+            from .utils import prune_payload
             data = await get_organisme_service(organisme_id)
-            return json.dumps(data, default=str)
+            return json.dumps(prune_payload(data), default=str)
         except Exception as e:
             raise handle_api_error(e) from e
