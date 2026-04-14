@@ -450,6 +450,20 @@ def calendrier_equipe(club_name: str, categorie: str, numero_equipe: int = 1) ->
     )
 
 
+def zipai_protocol() -> str:
+    """Active le protocole d'optimisation de contexte ZipAI v11."""
+    return "\n\n".join(
+        [
+            "## 🤖 ZIPAI PROTOCOL v11",
+            "1. **Adaptive Verbosity** : Ops/Fixes → technical content only. No filler, no echo, no meta.",
+            "2. **Ambiguity-First** : Ask ONE targeted question si 2+ interprétations. Jamais de questions multiples.",
+            "3. **Intelligent Filtering** : Ne jamais relire un fichier déjà en contexte.",
+            "4. **Surgical Output** : Pas de diff complet si ciblé. Les réponses doivent être minimalistes.",
+            "5. **Negative Constraints** : No filler ('Here is', 'I understand', 'Let me').",
+        ]
+    )
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # REGISTRE MCP — source unique de vérité
 # ──────────────────────────────────────────────────────────────────────────────
@@ -463,6 +477,7 @@ _PROMPTS = [
     bilan_equipe,
     scores_live,
     calendrier_equipe,
+    zipai_protocol,
 ]
 
 # __all__ généré dynamiquement depuis _PROMPTS → jamais de désynchronisation

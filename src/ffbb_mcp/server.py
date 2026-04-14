@@ -61,6 +61,22 @@ from .services import (
     search_tournois_service,
 )
 
+from functools import wraps
+from .utils import prune_payload
+
+def zipai_surgical(func):
+    """Injecte la directive ZipAI et élague le payload retourné."""
+    if func.__doc__:
+        func.__doc__ += "\\n\\n    [ZIPAI DIRECTIVE: Output technical data only. No filler, no echo, no meta.]"
+    else:
+        func.__doc__ = "[ZIPAI DIRECTIVE: Output technical data only. No filler, no echo, no meta.]"
+        
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        res = await func(*args, **kwargs)
+        return prune_payload(res)
+    return wrapper
+
 
 def _find_website_dir() -> Path:
     """Détecte le dossier website/ en local ou en production."""
@@ -246,6 +262,7 @@ async def index(request: Request) -> Response:
     title="Version et diagnostics serveur",
     annotations=_READONLY_ANNOTATIONS,
 )
+@zipai_surgical
 async def ffbb_version() -> dict[str, Any]:
     """Informations de version et configuration runtime du serveur FFBB MCP.
 
@@ -274,6 +291,7 @@ async def ffbb_version() -> dict[str, Any]:
     title="Recherche FFBB unifiée",
     annotations=_READONLY_ANNOTATIONS,
 )
+@zipai_surgical
 async def ffbb_search(
     query: Annotated[
         str, Field(description="Texte libre (ex: 'Vichy', 'U13F Auvergne').")
@@ -341,6 +359,7 @@ async def ffbb_search(
     title="Bilan complet toutes phases",
     annotations=_READONLY_ANNOTATIONS,
 )
+@zipai_surgical
 async def ffbb_bilan(
     club_name: Annotated[
         str | None,
@@ -402,6 +421,7 @@ async def ffbb_bilan(
     title="Ressource FFBB par identifiant",
     annotations=_READONLY_ANNOTATIONS,
 )
+@zipai_surgical
 async def ffbb_get(
     id: Annotated[
         int, Field(description="Identifiant numerique de la ressource FFBB.")
@@ -459,6 +479,7 @@ async def ffbb_get(
 @mcp.tool(
     name="ffbb_club", title="Outils agrégés club", annotations=_READONLY_ANNOTATIONS
 )
+@zipai_surgical
 async def ffbb_club(
     action: Annotated[
         Literal[
@@ -638,6 +659,7 @@ async def ffbb_club(
 @mcp.tool(
     name="ffbb_lives", title="Scores en direct", annotations=_READONLY_ANNOTATIONS
 )
+@zipai_surgical
 async def ffbb_get_lives() -> list[dict[str, Any]]:
     """Matchs en cours (scores live, cache 30s). Retourne [] si aucun match."""
     try:
@@ -656,6 +678,7 @@ async def ffbb_get_lives() -> list[dict[str, Any]]:
     title="Liste des saisons FFBB",
     annotations=_READONLY_ANNOTATIONS,
 )
+@zipai_surgical
 async def ffbb_get_saisons(
     active_only: Annotated[
         bool, Field(description="True = saison active uniquement.")
@@ -678,6 +701,7 @@ async def ffbb_get_saisons(
     title="Résolution d’équipe",
     annotations=_READONLY_ANNOTATIONS,
 )
+@zipai_surgical
 async def ffbb_resolve_team(
     club_name: Annotated[
         str | None,
@@ -720,6 +744,7 @@ async def ffbb_resolve_team(
     title="Résumé complet d’équipe",
     annotations=_READONLY_ANNOTATIONS,
 )
+@zipai_surgical
 async def ffbb_team_summary(
     club_name: Annotated[
         str | None,
@@ -837,6 +862,7 @@ async def ffbb_team_summary(
     title="Dernier résultat d’équipe",
     annotations=_READONLY_ANNOTATIONS,
 )
+@zipai_surgical
 async def ffbb_last_result(
     categorie: Annotated[
         str,
@@ -888,6 +914,7 @@ async def ffbb_last_result(
     title="Prochain match d’équipe",
     annotations=_READONLY_ANNOTATIONS,
 )
+@zipai_surgical
 async def ffbb_next_match(
     categorie: Annotated[
         str, Field(description="Catégorie de l'équipe (ex: 'U11', 'U11M', 'U11F')")
@@ -937,6 +964,7 @@ async def ffbb_next_match(
     title="Bilan détaillé de saison",
     annotations=_READONLY_ANNOTATIONS,
 )
+@zipai_surgical
 async def ffbb_bilan_saison(
     organisme_id: Annotated[
         int | str,

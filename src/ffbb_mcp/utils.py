@@ -88,3 +88,20 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
             numero_equipe = None
 
     return ParsedCategorie(categorie=categorie, sexe=sexe, numero_equipe=numero_equipe)
+
+def prune_payload(obj: Any) -> Any:
+    """Réduit agressivement la taille des payloads JSON en supprimant
+    les valeurs vides (None, listes vides, dictionnaires vides).
+    Utilisé pour optimiser le contexte (ZipAI directives).
+    """
+    if isinstance(obj, dict):
+        cleaned = {
+            k: prune_payload(v)
+            for k, v in obj.items()
+            if v is not None and v != [] and v != {}
+        }
+        return cleaned
+    elif isinstance(obj, list):
+        cleaned_list = [prune_payload(item) for item in obj]
+        return [item for item in cleaned_list if item is not None and item != {} and item != []]
+    return obj
