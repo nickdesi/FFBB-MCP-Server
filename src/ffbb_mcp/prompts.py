@@ -243,6 +243,7 @@ Utiliser UNIQUEMENT si Tier 1 et Tier 2 échouent. **Le signaler dans la répons
 _GUARDRAILS = """\
 ## 🛡️ GARDE-FOUS
 
+- **Avant de rédiger** : Avant d'écrire un tableau ou un compte rendu global, assure-toi que TOUTES les données ont été récupérées. Ne jamais afficher de résultats partiels ou de placeholders comme "—" ou "Phase X engagée". Ne rends le résultat final qu'une fois que tous les appels API ont renvoyé une réponse complète. Si une donnée manque ou qu'un appel API échoue, dis-le explicitement — ne l'omets jamais silencieusement.
 - **Pas de mémoire LLM** : n'utilise jamais ta mémoire interne — le MCP gère son propre cache.
 - **Pas d'invention** : si une donnée est absente de la réponse API, ne la déduis pas.
 - **Incohérences** : Si les données semblent incohérentes (ex: score à 0-0 ou absent alors que le match est marqué comme joué avec `joue: 1`), signale-le explicitement plutôt que d'interpréter le résultat. Ne jamais sauter un match sous prétexte qu'il n'a pas de score s'il est marqué comme joué.
