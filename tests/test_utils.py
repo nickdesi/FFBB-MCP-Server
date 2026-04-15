@@ -1,5 +1,5 @@
 from ffbb_mcp.aliases import _normalize_apostrophes, normalize_query
-from ffbb_mcp.utils import serialize_model, prune_payload
+from ffbb_mcp.utils import prune_payload, serialize_model
 
 
 def test_serialize_simple_types():
@@ -86,11 +86,17 @@ class TestNormalizeQueryApostrophe:
     def test_empty_string_unchanged(self):
         assert normalize_query("") == ""
 
+
 class TestPrunePayload:
     """Vérifie le fonctionnement de l'élagage chirurgical ZipAI."""
 
     def test_prune_simple_dict(self):
-        data = {"id": 1, "name": "Vichy", "description": "Un club de basket", "extra": "data"}
+        data = {
+            "id": 1,
+            "name": "Vichy",
+            "description": "Un club de basket",
+            "extra": "data",
+        }
         pruned = prune_payload(data)
         # Champs standards préservés
         assert pruned["id"] == 1
@@ -104,12 +110,12 @@ class TestPrunePayload:
         data = {f"field_{i}": i for i in range(20)}
         data["id"] = "fixed"
         data["name"] = "fixed_name"
-        
+
         pruned = prune_payload(data)
         assert pruned["id"] == "fixed"
         assert pruned["name"] == "fixed_name"
         # Le nombre total de champs doit être limité (~10 + standards)
-        assert len(pruned) <= 15 
+        assert len(pruned) <= 15
 
     def test_prune_list_limit(self):
         data = [{"index": i, "id": i} for i in range(50)]
@@ -119,17 +125,11 @@ class TestPrunePayload:
         assert pruned[0]["id"] == 0
 
     def test_prune_recursive(self):
-        data = {
-            "id": 1,
-            "sub": {
-                "id": 2,
-                "deep": {f"f{i}": i for i in range(20)}
-            }
-        }
+        data = {"id": 1, "sub": {"id": 2, "deep": {f"f{i}": i for i in range(20)}}}
         pruned = prune_payload(data)
         assert pruned["sub"]["id"] == 2
-        assert len(pruned["sub"]["deep"]) <= 12 # 10 standard + margin
-    
+        assert len(pruned["sub"]["deep"]) <= 12  # 10 standard + margin
+
     def test_prune_non_dict(self):
         assert prune_payload(123) == 123
         assert prune_payload("hello") == "hello"
