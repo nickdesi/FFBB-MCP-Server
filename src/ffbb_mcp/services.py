@@ -595,7 +595,7 @@ async def ffbb_get_classement_service(
         if target_org_str and org_id == target_org_str:
             if target_num_str:
                 num_equipe = str(eng.get("numero_equipe") or "")
-                if num_equipe == target_num_str:
+                if num_equipe == target_num_str or not num_equipe:
                     is_target = True
             else:
                 is_target = True
@@ -848,21 +848,31 @@ async def ffbb_equipes_club_service(
             continue
         if parsed_filter.sexe == "M" and (t["sexe"] or "").upper() == "F":
             continue
-        # Filtre numéro d'équipe — Bug 2 fix :
-        # Les équipes sans numéro explicite (None ou "") sont traitées comme
-        # "numéro 1 implicite" et passent à travers le filtre numérique.
-        if parsed_filter.numero_equipe is not None:
-            t_num = (t.get("numero_equipe") or "").strip()
-            if t_num and t_num != str(parsed_filter.numero_equipe):
-                continue
         filtered_teams.append(t)
 
-    # Post-traitement Bug 2 : annoter les équipes sans numéro explicite
-    # qui ont été retenues grâce au filtre numérique (numéro 1 implicite).
     if parsed_filter.numero_equipe is not None:
-        for t in filtered_teams:
-            if not (t.get("numero_equipe") or "").strip():
-                t["note"] = "équipe sans numéro explicite, numéro 1 implicite"
+        want_num = str(parsed_filter.numero_equipe)
+        exact_matches = [
+            t
+            for t in filtered_teams
+            if (t.get("numero_equipe") or "").strip() == want_num
+        ]
+
+        if exact_matches:
+            filtered_teams = exact_matches
+        else:
+            # Fallback to teams with no explicit numero_equipe
+            empty_num_matches = [
+                t for t in filtered_teams if not (t.get("numero_equipe") or "").strip()
+            ]
+            if empty_num_matches:
+                filtered_teams = empty_num_matches
+                for t in filtered_teams:
+                    t["note"] = (
+                        "équipe sans numéro explicite, correspond potentiellement à ce numéro"
+                    )
+            else:
+                filtered_teams = []  # No match at all
 
     if not filtered_teams:
         # Ambiguity Hinting: si aucun match, lister les options possibles
@@ -1178,8 +1188,16 @@ async def ffbb_saison_bilan_service(
         }
 
     want_num = str(numero_equipe)
-    equipes = [e for e in equipes if (e.get("numero_equipe") or "").strip() == want_num]
-    if not equipes:
+    filtered_equipes = [
+        e for e in equipes if (e.get("numero_equipe") or "").strip() == want_num
+    ]
+    if not filtered_equipes:
+        # Fallback to team with empty numero_equipe (often implicitly team 1)
+        filtered_equipes = [
+            e for e in equipes if not (e.get("numero_equipe") or "").strip()
+        ]
+
+    if not filtered_equipes:
         return {
             "status": "not_found",
             "message": (
@@ -1187,6 +1205,7 @@ async def ffbb_saison_bilan_service(
                 f"categorie={categorie!r}, numero_equipe={numero_equipe}."
             ),
         }
+    equipes = filtered_equipes
 
     # Plusieurs phases possibles pour la même équipe : on les garde toutes.
     poule_ids = list(

@@ -4,6 +4,7 @@ import datetime
 import logging
 import os
 import platform
+from functools import wraps
 from importlib.metadata import PackageNotFoundError as _PkgNotFound
 from importlib.metadata import version as _meta_version
 from pathlib import Path
@@ -60,9 +61,8 @@ from .services import (
     search_terrains_service,
     search_tournois_service,
 )
-
-from functools import wraps
 from .utils import prune_payload
+
 
 def zipai_surgical(func):
     """Injecte la directive ZipAI et élague le payload retourné."""
@@ -70,11 +70,12 @@ def zipai_surgical(func):
         func.__doc__ += "\\n\\n    [ZIPAI DIRECTIVE: Output technical data only. No filler, no echo, no meta.]"
     else:
         func.__doc__ = "[ZIPAI DIRECTIVE: Output technical data only. No filler, no echo, no meta.]"
-        
+
     @wraps(func)
     async def wrapper(*args, **kwargs):
         res = await func(*args, **kwargs)
         return prune_payload(res)
+
     return wrapper
 
 

@@ -21,8 +21,8 @@ logger = logging.getLogger("ffbb-mcp")
 # ---------------------------------------------------------------------------
 
 CLUB_ALIASES = {
-    "jav": "jeanne d'arc vichy",
-    "ja vichy": "jeanne d'arc vichy",
+    "jav": "jeanne d'arc de vichy",
+    "ja vichy": "jeanne d'arc de vichy",
     "scba": "stade clermontois basket auvergne",
     "scbf": "stade clermontois basket feminin",
     "asvel": "lyon villeurbanne",

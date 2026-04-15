@@ -965,7 +965,8 @@ class TestEquipesClubFallbackNoNumero:
 
         assert len(result) == 1
         assert (
-            result[0].get("note") == "équipe sans numéro explicite, numéro 1 implicite"
+            result[0].get("note")
+            == "équipe sans numéro explicite, correspond potentiellement à ce numéro"
         )
         assert result[0].get("engagement_id") == "engA"
 
@@ -983,7 +984,8 @@ class TestEquipesClubFallbackNoNumero:
         assert len(result) == 1
         assert "error" not in result[0]
         assert (
-            result[0].get("note") == "équipe sans numéro explicite, numéro 1 implicite"
+            result[0].get("note")
+            == "équipe sans numéro explicite, correspond potentiellement à ce numéro"
         )
         assert result[0].get("engagement_id") == "engB"
 
@@ -1047,7 +1049,10 @@ class TestEquipesClubFallbackNoNumero:
         assert result.get("status") == "resolved"
         assert result.get("team") is not None
         team = result["team"]
-        assert team.get("note") == "équipe sans numéro explicite, numéro 1 implicite"
+        assert (
+            team.get("note")
+            == "équipe sans numéro explicite, correspond potentiellement à ce numéro"
+        )
 
     @pytest.mark.asyncio
     async def test_fallback_wrong_category_still_returns_error(
