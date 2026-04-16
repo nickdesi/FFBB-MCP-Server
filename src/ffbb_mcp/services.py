@@ -575,7 +575,7 @@ async def ffbb_get_classement_service(
     if not poule:
         return []
     data = serialize_model(poule)
-    raw = data.get("classements", data.get("classement", []))
+    raw = data.get("classements", data.get("classement", [])) or []
     if not isinstance(raw, list):
         raw = []
 
@@ -1019,7 +1019,7 @@ async def ffbb_next_match_service(
 
         poule = await get_poule_service(poule_id, force_refresh=force_refresh)
         upcoming_for_pool = []
-        for m in poule.get("rencontres", []):
+        for m in poule.get("rencontres", []) or []:
             eng1 = m.get("idEngagementEquipe1")
             eng2 = m.get("idEngagementEquipe2")
             id_eng1 = str(eng1.get("id") if isinstance(eng1, dict) else eng1)
@@ -1415,7 +1415,7 @@ async def ffbb_bilan_service(
             if not isinstance(poule_data, dict):
                 continue
             eng_ids_here = poule_to_eng.get(pid, set())
-            for entry in poule_data.get("classements", []):
+            for entry in poule_data.get("classements", []) or []:
                 if not isinstance(entry, dict):
                     continue
                 eng = entry.get("id_engagement", {}) or {}
@@ -1625,7 +1625,7 @@ async def get_calendrier_club_service(
             ):
                 continue
 
-            for match in poule_data.get("rencontres", []):
+            for match in poule_data.get("rencontres", []) or []:
                 if not isinstance(match, dict):
                     continue
                 match_id = match.get("id")
