@@ -118,10 +118,10 @@ class TestPrunePayload:
         assert len(pruned) <= 15
 
     def test_prune_list_limit(self):
-        data = [{"index": i, "id": i} for i in range(50)]
+        data = [{"index": i, "id": i} for i in range(150)]
         pruned = prune_payload(data)
         assert isinstance(pruned, list)
-        assert len(pruned) <= 25  # Limite par défaut
+        assert len(pruned) <= 100  # Limite par défaut
         assert pruned[0]["id"] == 0
 
     def test_prune_recursive(self):

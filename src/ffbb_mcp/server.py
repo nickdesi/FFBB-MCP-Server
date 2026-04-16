@@ -138,10 +138,18 @@ mcp = FastMCP(
         "Pour le prochain match d'une équipe précise, utiliser ffbb_next_match(organisme_id=..., categorie=..., numero_equipe=...). "
         "⚠️ Les données FFBB sont TOUJOURS live — ne jamais chercher en mémoire/cache avant d'appeler l'API. "
         "Autres outils : ffbb_search → trouver un club/compétition. "
-        "ffbb_get(type='poule') → classement + matchs d'une poule précise. "
-        "ffbb_club(action='calendrier') → dernier recours si aucun poule_id disponible. "
-        "Règles : catégorie sans genre → demander M ou F. Plusieurs équipes même catégorie → demander laquelle."
+        "ffbb_get(type='poule') → idéal pour LE CLASSEMENT uniquement. "
+        "ffbb_club(action='calendrier') → calendrier exhaustif (pas de troncature). "
+        "Règles : catégorie sans genre → demander M ou F. Plusieurs équipes même catégorie → demander laquelle.\n\n"
+        "## Règle : Matchs restants d'une équipe\n"
+        "Pour répondre à 'combien de matchs restent-il à [équipe] ?', NE PAS se contenter de ffbb_get(type='poule') "
+        "car les données peuvent être tronquées (_omitted_count > 0).\n"
+        "Workflow obligatoire :\n"
+        "1. ffbb_team_summary → identifier poule_id, dernière journée jouée.\n"
+        "2. ffbb_club(action='calendrier', filtre='<categorie>') → calendrier complet du club, "
+        "puis filtrer les rencontres non jouées."
     ),
+
     dependencies=["mcp", "ffbb-api-client-v3"],
     # Streamable HTTP transport (MCP spec 2025-11-25)
     # stateless_http=True → pas de session persistante (scalabilité horizontale)
@@ -448,8 +456,11 @@ async def ffbb_get(
     """Recupere une ressource FFBB par identifiant.
 
     - `type="competition"` equivaut a `get_competition`.
-    - `type="poule"` charge la poule (classements + rencontres) via l'API FFBB.
+    - `type="poule"` charge la poule (classements + rencontres).
     - `type="organisme"` charge les details d'un club.
+
+    ⚠️ Attention: `type="poule"` peut être tronqué si la poule est grande.
+    Pour un calendrier exhaustif, préférez `ffbb_club(action="calendrier")`.
 
     Avertissement: ne pas utiliser pour obtenir un score ou un prochain match.
     Utiliser `ffbb_last_result` et `ffbb_next_match` a la place.
@@ -546,6 +557,9 @@ async def ffbb_club(
     ] = False,
 ) -> list[dict[str, Any]]:
     """Outils agreges autour d'un club (calendrier, equipes, classement).
+
+    ⚡ `action="calendrier"` est l'outil le plus fiable pour obtenir TOUTES les rencontres
+    passées et futures d'une équipe/catégorie, sans les limitations de `ffbb_get(poule)`.
 
     Avertissement: ne pas utiliser pour obtenir un score ou un prochain match
     d'une equipe specifique. Utiliser `ffbb_last_result` et `ffbb_next_match` a la place.
