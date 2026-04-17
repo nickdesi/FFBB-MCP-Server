@@ -949,6 +949,11 @@ async def ffbb_next_match(
 ) -> dict[str, Any]:
     """Prochain match à jouer pour une équipe précise.
 
+    ⚠️ ATTENTION LLM : Cet outil retourne STRICTEMENT LE PROCHAIN MATCH UNIQUE.
+    Ne l'utilise JAMAIS si l'utilisateur demande "les prochains matchs" au pluriel.
+    Pour toute requête au pluriel, utilise OBLIGATOIREMENT `ffbb_club(action="calendrier")`
+    et filtre les résultats toi-même.
+
     Recommendation LLM : Si la categorie est imprécise ou sans numéro (ex: 'U11M'),
     appeler d'abord `ffbb_resolve_team` pour obtenir le `numero_equipe` reel.
     """
