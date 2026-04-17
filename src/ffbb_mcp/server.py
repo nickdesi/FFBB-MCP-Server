@@ -536,6 +536,15 @@ async def ffbb_club(
             )
         ),
     ] = None,
+    numero_equipe: Annotated[
+        int | None,
+        Field(
+            description=(
+                "Numéro d'équipe facultatif (ex: 1, 2, 3). "
+                "Utilisé avec action='calendrier' pour ne récupérer que les matchs de cette équipe précise."
+            )
+        ),
+    ] = None,
     phase: Annotated[
         str | None,
         Field(
@@ -605,6 +614,7 @@ async def ffbb_club(
                 club_name=club_name,
                 organisme_id=target_org_id,
                 categorie=filtre,
+                numero_equipe=numero_equipe,
                 force_refresh=force_refresh,
             )
         elif action == "equipes":
