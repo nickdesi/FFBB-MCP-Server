@@ -1564,6 +1564,7 @@ async def get_calendrier_club_service(
     club_name: str | None = None,
     organisme_id: int | str | None = None,
     categorie: str | None = None,
+    numero_equipe: int | None = None,
     *,
     force_refresh: bool = False,
 ) -> list[dict]:
@@ -1576,7 +1577,7 @@ async def get_calendrier_club_service(
     - Agrégation des rencontres
     - Troncature éventuelle si trop de matchs (FFBB_MAX_CALENDAR_MATCHES)
     """
-    cache_key = f"calendrier:{organisme_id or ''}:{(club_name or '').lower().strip()}:{categorie or ''}"
+    cache_key = f"calendrier:{organisme_id or ''}:{(club_name or '').lower().strip()}:{categorie or ''}:{numero_equipe or ''}"
 
     async def _fetch() -> list[dict]:
         # 1. Résoudre les organismes cibles (CENTRALISÉ)
@@ -1606,6 +1607,16 @@ async def get_calendrier_club_service(
                 )
             elif isinstance(res, Exception):
                 logger.error("Erreur lors de la récupération des équipes: %s", res)
+
+        # Filtrage par numero_equipe si fourni
+        if numero_equipe is not None:
+            equipes = [
+                e
+                for e in equipes
+                if str(e.get("nom", "")).endswith(f"- {numero_equipe}")
+                or f" - {numero_equipe} " in str(e.get("nom", ""))
+                or f"-{numero_equipe} " in str(e.get("nom", ""))
+            ]
 
         if not equipes:
             return []

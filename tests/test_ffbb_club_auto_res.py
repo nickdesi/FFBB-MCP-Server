@@ -69,3 +69,27 @@ async def test_ffbb_club_resolution_failure():
 
         assert "error" in result[0]
         assert "Aucun club trouvé" in result[0]["error"]
+
+
+@pytest.mark.asyncio
+async def test_ffbb_club_calendrier_with_numero_equipe():
+    # Verify that the numero_equipe parameter is properly passed down
+    with patch("ffbb_mcp.server.get_calendrier_club_service") as mock_cal_service:
+        # Mocking to return an empty list just to test the argument passing
+        mock_cal_service.return_value = []
+
+        await ffbb_club(
+            action="calendrier",
+            club_name="Stade Clermontois",
+            organisme_id=123,
+            filtre="U11M",
+            numero_equipe=1,
+        )
+
+        mock_cal_service.assert_called_once_with(
+            club_name="Stade Clermontois",
+            organisme_id=123,
+            categorie="U11M",
+            numero_equipe=1,
+            force_refresh=False,
+        )
