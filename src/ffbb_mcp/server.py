@@ -149,7 +149,6 @@ mcp = FastMCP(
         "2. ffbb_club(action='calendrier', filtre='<categorie>') → calendrier complet du club, "
         "puis filtrer les rencontres non jouées."
     ),
-
     dependencies=["mcp", "ffbb-api-client-v3"],
     # Streamable HTTP transport (MCP spec 2025-11-25)
     # stateless_http=True → pas de session persistante (scalabilité horizontale)
