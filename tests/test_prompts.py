@@ -90,3 +90,9 @@ class TestPrompts:
         assert "🟢" in prompt
         assert "score" in prompt.lower()
         assert "domicile" in prompt.lower() and "extérieur" in prompt.lower()
+
+    def test_expert_basket_pluriel(self):
+        prompt = expert_basket()
+        assert "Question au pluriel" in prompt
+        assert "quels sont les prochains matchs" in prompt
+        assert "calendrier" in prompt
