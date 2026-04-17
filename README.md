@@ -72,23 +72,23 @@ Récemment refondu pour maximiser les performances des LLMs, le serveur propose 
 
 | Outil | Description | Paramètres Clés |
 | ----- | ----------- | --------------- |
-| ⚡ **`ffbb_bilan`** | Obtenir le bilan complet de A à Z (toutes phases) d'une équipe, ses classements & résultats en 1 appel. | `club_name` ou `organisme_id`, `categorie` (ex: U11M1) |
-| ⚡ **`ffbb_team_summary`** | Le résumé parfait pour un agent : bilan, phase courante, dernier match joué et prochain match. | `club_name` ou `organisme_id`, `categorie` |
-| 🏀 **`ffbb_last_result`** | Le score et détail du tout dernier match joué par l'équipe. | `categorie`, `club_name`, `numero_equipe` |
-| 🗓️ **`ffbb_next_match`** | Les infos du prochain match officiel à venir (adversaire, date, salle). | `categorie`, `club_name`, `numero_equipe` |
+| ⚡ **`ffbb_bilan`** | Obtenir le bilan complet de A à Z (toutes phases) d'une équipe, ses classements & résultats en 1 appel. | `club_name`, `categorie`, `force_refresh` |
+| ⚡ **`ffbb_team_summary`** | Le résumé parfait pour un agent : bilan, phase courante, dernier match joué et prochain match. | `club_name`, `categorie` |
+| 🏀 **`ffbb_last_result`** | Le score et détail du tout dernier match joué par l'équipe. | `categorie`, `club_name`, `force_refresh` |
+| 🗓️ **`ffbb_next_match`** | Les infos du prochain match officiel à venir (adversaire, date, salle). | `categorie`, `club_name`, `force_refresh` |
 
 ### 🔍 Outils d'Exploration & Data Brute
 
 | Outil | Description | Paramètres Clés |
 | ----- | ----------- | --------------- |
-| `ffbb_search` | Le moteur de recherche global (clubs, compétitions, salles, matchs, engagements, formations). | `query`, `type`, `limit`, `filter_by`, `sort` |
-| `ffbb_resolve_team` | Résout et trouve l'ID/les infos exactes d'une équipe via une chaîne (ex: «U13F-2»). | `club_name`, `categorie` |
-| `ffbb_get` | Accès direct aux classements complets et matchs par ID technique. | `id`, `type` (poule, competition, organisme) |
-| `ffbb_club` | Explorer le planning complet, l'ensemble des équipes ou tous les classements d'un club. | `action` (calendrier, equipes, classement), `club_name` |
-| `ffbb_bilan_saison` | Bilan détaillé toutes phases pour une équipe précise identifiée par `organisme_id` + `categorie` + `numero_equipe`. | `organisme_id`, `categorie`, `numero_equipe` |
+| `ffbb_search` | Le moteur de recherche global (clubs, compétitions, salles, matchs, engagements, formations). | `query`, `type`, `limit` |
+| `ffbb_resolve_team` | Résout et trouve l'ID/les infos exactes d'une équipe via une chaîne (ex: «U11M1»). | `club_name`, `categorie` |
+| `ffbb_get` | Accès direct aux classements complets et matchs par ID technique. | `id`, `type`, `force_refresh` |
+| `ffbb_club` | Explorer le planning complet, l'ensemble des équipes ou tous les classements d'un club. | `action`, `club_name`, `force_refresh` |
+| `ffbb_bilan_saison` | Bilan détaillé toutes phases pour une équipe précise. | `organisme_id`, `force_refresh` |
 | `ffbb_lives` | Récupère tous les matchs actuellement en direct en France. | *Aucun* |
 | `ffbb_saisons` | Liste et détermine la saison FFBB en cours. | `active_only` |
-| `ffbb_version` | Diagnostics runtime : version du package, du SDK MCP, transport actif, TTLs de cache. | *Aucun* |
+| `ffbb_version` | Diagnostics runtime : version, transport, TTLs de cache actifs. | *Aucun* |
 
 #### Détail de `ffbb_search` (v0.4.0)
 
@@ -124,7 +124,9 @@ flowchart LR
 
 - **Transport :** Streamable HTTP (spec MCP 2025-11-25) — endpoint unique `/mcp` acceptant POST (JSON-RPC) et GET (SSE optionnel).
 - **Réduction de contexte :** Le `Service Layer` consolide de nombreux micro-appels FFBB en réponses JSON concises, économisant massivement les tokens de votre LLM.
-- **Performances & Temps réel :** Les données dynamiques (scores, classements, calendriers) ont un cache ultra-court (15-30 secondes) **garantissant des données "toujours à jour"**. La protection contre les abus (anti-burst) est gérée par une déduplication en un seul vol (inflight request deduplication) couplée à un rate-limiter strict. L'outil `ffbb_club` auto-résout désormais les `poule_id` pour les classements par phase (ex: "phase 3") et met en avant l'équipe concernée.
+- **Cache Intelligent Multi-niveaux :** Un système de TTL dynamique s'adapte au calendrier (mercredi/weekend live, périodes de saisies tardives, hors-saison) pour garantir une fraîcheur maximale (15s en live) tout en optimisant les performances hors match (jusqu'à 24h).
+- **Anti-Burst & Déduplication :** Protection contre les abus via une déduplication des requêtes en vol couplée à un rate-limiter strict.
+- **Auto-résolution :** L'outil `ffbb_club` auto-résout désormais les `poule_id` pour les classements par phase et met en avant l'équipe concernée.
 
 ---
 
