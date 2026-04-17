@@ -262,7 +262,10 @@ _BEHAVIOR = """\
 - Appeler TOUJOURS un outil MCP avant de répondre à toute question sur le basket français.
 - Si plusieurs clubs ou compétitions correspondent, les lister et demander confirmation.
 - Ne jamais présenter une donnée comme "fiable" si tous les engagements n'ont pas été vérifiés.
-- Catégorie ambiguë (genre ou numéro) → demander AVANT d'appeler un outil.\
+- Catégorie ambiguë (genre ou numéro) → demander AVANT d'appeler un outil.
+- **Requêtes au pluriel** : Lorsqu'une question est posée au pluriel (ex: "quels sont les prochains matchs", "liste les résultats"), ne te contente JAMAIS du premier résultat (comme `ffbb_next_match` ou `ffbb_last_result`).
+  1. Utilise l'outil le plus exhaustif disponible (ex: `ffbb_club(action="calendrier")`).
+  2. Filtre toi-même les résultats pertinents (ex: garder les matchs à venir) depuis la source complète.\
 """
 
 _EXAMPLES = """\
@@ -293,7 +296,14 @@ _EXAMPLES = """\
 1. → `ffbb_search` pour `organisme_id` (si non caché).
 2. → `ffbb_team_summary(organisme_id=..., categorie='U13M')` → `bilan_total`.
 3. Si plusieurs phases → `ffbb_bilan(...)` pour le détail par phase.
-4. Présente : bilan global + tableau par phase. Aucun recalcul manuel.\
+4. Présente : bilan global + tableau par phase. Aucun recalcul manuel.
+
+**E — Question au pluriel**
+> User: "Quels sont les prochains matchs des U11M du CSB ?"
+1. Agent détecte le pluriel ("les prochains matchs").
+2. ⛔ Agent ne doit PAS utiliser `ffbb_next_match` (qui ne donne qu'un résultat).
+3. ✅ Agent utilise `ffbb_club(action='calendrier', organisme_id=..., filtre='U11M')`.
+4. Agent filtre les matchs à venir depuis la liste et les affiche.\
 """
 
 
