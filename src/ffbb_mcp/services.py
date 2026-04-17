@@ -13,12 +13,13 @@ from functools import lru_cache
 from typing import Any, TypeVar
 from zoneinfo import ZoneInfo
 
-from cachetools import TTLCache
+from cachetools import TLRUCache, TTLCache
 from httpx import HTTPStatusError
 from mcp.shared.exceptions import ErrorData, McpError
 from mcp.types import INTERNAL_ERROR
 
 from .aliases import enrich_acronym_cache, normalize_query
+from .cache_strategy import get_poule_ttl, get_static_ttl
 from .client import get_client_async
 from .metrics import (
     dec_inflight,
@@ -118,33 +119,45 @@ def _notify_cache_miss(cache_name: str) -> None:
 # Cache service-level (en mémoire, complémentaire au cache SQLite HTTP)
 # ---------------------------------------------------------------------------
 
+
 # TTL configurables via variables d'environnement pour affiner par type de données.
 # Les données vraiment temps-réel (lives, poules) ont des TTL courts (15s).
 # Les données qui ne changent qu'après des matchs joués (bilans, calendriers) ont des TTL longs.
 # La protection contre le burst est assurée par le mécanisme de déduplication "inflight" (_dedupe_inflight).
-_LIVES_TTL = _read_positive_int_env("FFBB_CACHE_TTL_LIVES", 15)
-_SEARCH_TTL = _read_positive_int_env(
-    "FFBB_CACHE_TTL_SEARCH", 3600
-)  # La recherche change peu
-_DETAIL_TTL = _read_positive_int_env(
-    "FFBB_CACHE_TTL_DETAIL", 86400
-)  # 24h pour orga/saison
-_CALENDRIER_TTL = _read_positive_int_env(
-    "FFBB_CACHE_TTL_CALENDRIER", 300
-)  # 5min — calendrier rarement mis à jour
-_BILAN_TTL = _read_positive_int_env(
-    "FFBB_CACHE_TTL_BILAN", 3600
-)  # 1h — bilan change seulement après matchs joués (1-2×/semaine), pas en temps réel
-# TTL spécifique ultra-court pour les poules (scores + rencontres).
-_POULE_TTL = _read_positive_int_env("FFBB_CACHE_TTL_POULE", 15)
+def _ttu_bilan(k, v, now):
+    return now + _read_positive_int_env("FFBB_CACHE_TTL_BILAN", get_static_ttl("bilan"))
 
-_cache_lives = TTLCache(maxsize=1, ttl=_LIVES_TTL)
-_cache_search = TTLCache(maxsize=256, ttl=_SEARCH_TTL)
-# Cache de détail générique (organismes, saisons, compétitions, poules/classements si non surchargés)
-_cache_detail = TTLCache(maxsize=128, ttl=_DETAIL_TTL)
-_cache_calendrier = TTLCache(maxsize=64, ttl=_CALENDRIER_TTL)
-_cache_bilan = TTLCache(maxsize=64, ttl=_BILAN_TTL)
-_cache_poule = TTLCache(maxsize=128, ttl=_POULE_TTL)
+
+def _ttu_poule(k, v, now):
+    # Retrieve ttl from the wrapped object, fallback to default get_static_ttl
+    ttl = (
+        v.get("_ttl", get_static_ttl("poule"))
+        if isinstance(v, dict)
+        else get_static_ttl("poule")
+    )
+    return now + ttl
+
+
+_cache_lives = TTLCache(
+    maxsize=1,
+    ttl=_read_positive_int_env("FFBB_CACHE_TTL_LIVES", get_static_ttl("lives")),
+)
+_cache_search = TTLCache(
+    maxsize=256,
+    ttl=_read_positive_int_env("FFBB_CACHE_TTL_SEARCH", get_static_ttl("search")),
+)
+_cache_detail = TTLCache(
+    maxsize=128,
+    ttl=_read_positive_int_env("FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")),
+)
+_cache_calendrier = TTLCache(
+    maxsize=64,
+    ttl=_read_positive_int_env(
+        "FFBB_CACHE_TTL_CALENDRIER", get_static_ttl("calendrier")
+    ),
+)
+_cache_bilan = TLRUCache(maxsize=64, ttu=_ttu_bilan)
+_cache_poule = TLRUCache(maxsize=128, ttu=_ttu_poule)
 _inflight_lock: asyncio.Lock | None = None
 _inflight_detail: dict[str, asyncio.Task[Any]] = {}
 _inflight_search: dict[str, asyncio.Task[Any]] = {}
@@ -173,8 +186,8 @@ def get_cache_ttls() -> dict[str, int]:
         "search": int(_cache_search.ttl),
         "detail": int(_cache_detail.ttl),
         "calendrier": int(_cache_calendrier.ttl),
-        "bilan": int(_cache_bilan.ttl),
-        "poule": int(_cache_poule.ttl),
+        "bilan": get_static_ttl("bilan"),
+        "poule": get_static_ttl("poule"),
     }
 
 
@@ -192,7 +205,7 @@ async def _with_ffbb_semaphore(coro):
         return await coro
 
 
-def _cache_get(cache: TTLCache, key: Any, cache_name: str) -> Any | None:
+def _cache_get(cache: TTLCache | TLRUCache, key: Any, cache_name: str) -> Any | None:
     """Wrapper centralisé pour lire un cache avec metrics hit/miss.
 
     Ce helper évite de dupliquer la logique de notification et permet de
@@ -207,7 +220,9 @@ def _cache_get(cache: TTLCache, key: Any, cache_name: str) -> Any | None:
     return value
 
 
-def _cache_set(cache: TTLCache, key: Any, value: Any, cache_name: str) -> None:
+def _cache_set(
+    cache: TTLCache | TLRUCache, key: Any, value: Any, cache_name: str
+) -> None:
     cache[key] = value
     # Le miss correspondant a déjà été enregistré dans _cache_get.
 
@@ -411,7 +426,7 @@ async def _dedupe_inflight_detail(
 
 async def _dedupe_inflight(
     *,
-    cache: TTLCache | None,
+    cache: TTLCache | TLRUCache | None,
     cache_key: str,
     inflight_map: dict[str, asyncio.Task[Any]],
     make_coro,
@@ -516,18 +531,24 @@ async def get_poule_service(
             ),
         )
         data = serialize_model(poule) or {}
-        # On met à jour explicitement le cache dédié très court pour les poules.
-        _cache_set(_cache_poule, cache_key, data, "poule")
-        return data
+
+        # Calculate dynamic TTL
+        ttl = await get_poule_ttl(poule_id_int, get_lives_service)
+        return {"_ttl": ttl, "data": data}
 
     # On utilise toujours le mécanisme de déduplication pour éviter de frapper
     # l'API FFBB plusieurs fois pour la même poule en parallèle.
-    return await _dedupe_inflight(
+    result = await _dedupe_inflight(
         cache=_cache_poule,
         cache_key=cache_key,
         inflight_map=_inflight_poule,
         make_coro=_fetch,
         cache_name="poule",
+    )
+    return (
+        result.get("data", result)
+        if isinstance(result, dict) and "_ttl" in result
+        else result
     )
 
 
@@ -563,7 +584,11 @@ async def ffbb_get_classement_service(
     if not force_refresh:
         cached = _cache_get(_cache_poule, cache_key, "classement")
         if cached is not None:
-            return cached
+            return (
+                cached["data"]
+                if isinstance(cached, dict) and "data" in cached
+                else cached
+            )
 
     client = await get_client_async()
     poule = await _with_ffbb_semaphore(
@@ -614,7 +639,10 @@ async def ffbb_get_classement_service(
                 "paniers_encaisses": c.get("paniers_encaisses") or 0,
             }
         )
-    _cache_set(_cache_poule, cache_key, flat, "classement")
+    # Calculate dynamic TTL using same logic as poule since it caches in _cache_poule
+    ttl = await get_poule_ttl(poule_id_int, get_lives_service)
+    wrapped_flat = {"_ttl": ttl, "data": flat}
+    _cache_set(_cache_poule, cache_key, wrapped_flat, "classement")
     return flat
 
 
@@ -1035,12 +1063,12 @@ async def ffbb_next_match_service(
                     str(m.get("nomEquipe1", "")),
                     organisme_nom_norm,
                     numero_equipe_match,
-                    is_organisme_nom_normalized=True
+                    is_organisme_nom_normalized=True,
                 ) or _match_team_name(
                     str(m.get("nomEquipe2", "")),
                     organisme_nom_norm,
                     numero_equipe_match,
-                    is_organisme_nom_normalized=True
+                    is_organisme_nom_normalized=True,
                 )
 
             if not is_my_team:
@@ -2199,8 +2227,10 @@ async def _resolve_club_and_org(
 
 
 def _match_team_name(
-    nom_equipe_rencontre: str, organisme_nom: str, numero_equipe: int | None,
-    is_organisme_nom_normalized: bool = False
+    nom_equipe_rencontre: str,
+    organisme_nom: str,
+    numero_equipe: int | None,
+    is_organisme_nom_normalized: bool = False,
 ) -> bool:
     """Retourne True si nom_equipe_rencontre correspond a l'equipe du club.
 
@@ -2212,7 +2242,9 @@ def _match_team_name(
     """
 
     nom_norm = _normalize_name(nom_equipe_rencontre)
-    club_norm = organisme_nom if is_organisme_nom_normalized else _normalize_name(organisme_nom)
+    club_norm = (
+        organisme_nom if is_organisme_nom_normalized else _normalize_name(organisme_nom)
+    )
     if not nom_norm or not club_norm:
         return False
     if club_norm not in nom_norm:
