@@ -1776,7 +1776,8 @@ async def get_calendrier_club_service(
                 "total_initial": len(all_matches),
                 "limite_appliquee": max_matches,
             }
-            return truncated + [warning]
+            truncated.append(warning)
+            return truncated
 
         return effective
 
