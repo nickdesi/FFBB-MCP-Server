@@ -5,3 +5,7 @@
 ## 2024-05-18 - [JSON Serialization Performance]
 **Learning:** In heavily recursive JSON serialization functions (like `serialize_model`), calling `hasattr()` on native collections (dicts, lists) introduces significant overhead because `hasattr` internally handles `AttributeError` exceptions when the attribute doesn't exist. Python's internal exception handling is relatively slow.
 **Action:** Always place `isinstance(obj, dict)` and `isinstance(obj, list)` checks BEFORE `hasattr` checks when traversing standard data structures. Also, when checking for primitives, prefer `isinstance(obj, str | int | float | bool)` over strict `type(obj) in (...)` to ensure data integrity for subclasses (like `IntEnum`), even if strict type checking is marginally faster.
+
+## 2026-04-18 - [API Payload inconsistencies]
+**Learning:** The FFBB API response structure can be inconsistent. In the `engagements` list fetched for a club, the `nom` attribute may unexpectedly be `None` for some teams. Logic strictly relying on string parsing of `nom` will fail silently or filter out valid results.
+**Action:** Always rely on structured fields like `numero_equipe` primarily, and use string parsing only as a fallback. Ensure that `None` values are safely handled by using `.get("key", "")` before attempting string operations.
