@@ -22,7 +22,7 @@ Ce projet utilise `uv` pour une gestion ultra-rapide des dépendances.
     # .\.venv\Scripts\activate  # Windows
 
     # Installer en mode éditable avec les outils de dev
-    uv pip install -e ".[dev]"
+    uv sync
     ```
 
 ## 📏 Standards de Qualité
@@ -62,3 +62,10 @@ Avant de pousser vos changements :
 
 ---
 *Ensemble, codons le futur du basket français !* 🏀
+
+## Gestion des Dépendances
+
+Nous utilisons `uv` pour gérer les dépendances. Le fichier `uv.lock` garantit la reproductibilité.
+
+- **Mettre à jour les dépendances** : `uv lock --upgrade`
+- **Ajouter une dépendance** : `uv add <package>`

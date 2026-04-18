@@ -1,5 +1,5 @@
 startCommand:
-  type: stdio
+  type: sse
   config: ffbb-mcp
 configSchema:
   type: object
