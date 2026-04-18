@@ -124,9 +124,15 @@ def _sdk_version(package: str) -> str:
 # Initialisation FastMCP
 # ---------------------------------------------------------------------------
 
-_allowed_hosts = os.environ.get("ALLOWED_HOSTS", "*").split(",")
-_allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
-_dns_protection = os.environ.get("ENABLE_DNS_PROTECTION", "false").lower() == "true"
+_allowed_hosts = [
+    h.strip()
+    for h in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    if h.strip()
+]
+_allowed_origins = [
+    o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()
+]
+_dns_protection = os.environ.get("ENABLE_DNS_PROTECTION", "true").lower() == "true"
 
 mcp = FastMCP(
     "FFBB MCP Server",
