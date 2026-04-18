@@ -8,8 +8,6 @@ Architecture :
 Convention de version : bumper _PROMPT_VERSION à chaque modification de logique métier.
 """
 
-from __future__ import annotations
-
 _PROMPT_VERSION = "3.4.0"
 
 # ──────────────────────────────────────────────────────────────────────────────
