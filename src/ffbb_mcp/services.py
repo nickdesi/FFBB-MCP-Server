@@ -246,6 +246,30 @@ def _coerce_numeric_id(value: int | str, label: str) -> int:
         ) from e
 
 
+_BILAN_STAT_FIELDS: tuple[str, ...] = (
+    "match_joues",
+    "gagnes",
+    "perdus",
+    "nuls",
+    "paniers_marques",
+    "paniers_encaisses",
+    "difference",
+)
+
+
+def _new_bilan_totals() -> dict[str, int]:
+    return dict.fromkeys(_BILAN_STAT_FIELDS, 0)
+
+
+def _extract_and_accumulate_bilan(
+    entry: dict[str, Any], totaux: dict[str, int]
+) -> dict[str, int]:
+    stats = {f: int(entry.get(f) or 0) for f in _BILAN_STAT_FIELDS}
+    for f, v in stats.items():
+        totaux[f] += v
+    return stats
+
+
 # ---------------------------------------------------------------------------
 # Gestion d'erreurs
 # ---------------------------------------------------------------------------
@@ -1269,15 +1293,7 @@ async def ffbb_saison_bilan_service(
 
     # Agrégation par phase
     phases: list[dict[str, Any]] = []
-    totaux = {
-        "match_joues": 0,
-        "gagnes": 0,
-        "perdus": 0,
-        "nuls": 0,
-        "paniers_marques": 0,
-        "paniers_encaisses": 0,
-        "difference": 0,
-    }
+    totaux = _new_bilan_totals()
 
     club_nom = equipes[0].get("nom_equipe", "")
 
@@ -1289,35 +1305,15 @@ async def ffbb_saison_bilan_service(
             if entry_eng_id not in {str(e["engagement_id"]) for e in equipes}:
                 continue
 
-            mj = int(entry.get("match_joues") or 0)
-            g = int(entry.get("gagnes") or 0)
-            d = int(entry.get("perdus") or 0)
-            n = int(entry.get("nuls") or 0)
-            pm = int(entry.get("paniers_marques") or 0)
-            pe = int(entry.get("paniers_encaisses") or 0)
-            diff = int(entry.get("difference") or 0)
-
-            phase = {
-                "competition": poule_data.get("nom", ""),
-                "poule_id": pid,
-                "position": entry.get("position"),
-                "match_joues": mj,
-                "gagnes": g,
-                "perdus": d,
-                "nuls": n,
-                "paniers_marques": pm,
-                "paniers_encaisses": pe,
-                "difference": diff,
-            }
-            phases.append(phase)
-
-            totaux["match_joues"] += mj
-            totaux["gagnes"] += g
-            totaux["perdus"] += d
-            totaux["nuls"] += n
-            totaux["paniers_marques"] += pm
-            totaux["paniers_encaisses"] += pe
-            totaux["difference"] += diff
+            stats = _extract_and_accumulate_bilan(entry, totaux)
+            phases.append(
+                {
+                    "competition": poule_data.get("nom", ""),
+                    "poule_id": pid,
+                    "position": entry.get("position"),
+                    **stats,
+                }
+            )
 
     phases.sort(key=lambda x: x["competition"])
 
@@ -1436,15 +1432,7 @@ async def ffbb_bilan_service(
 
         # 4. Agréger par phase
         phases: list[dict[str, Any]] = []
-        totaux = {
-            "match_joues": 0,
-            "gagnes": 0,
-            "perdus": 0,
-            "nuls": 0,
-            "paniers_marques": 0,
-            "paniers_encaisses": 0,
-            "difference": 0,
-        }
+        totaux = _new_bilan_totals()
 
         for pid, poule_data in poules_map.items():
             if not isinstance(poule_data, dict):
@@ -1468,13 +1456,7 @@ async def ffbb_bilan_service(
                 else:
                     continue
 
-                mj = int(entry.get("match_joues") or 0)
-                g = int(entry.get("gagnes") or 0)
-                d = int(entry.get("perdus") or 0)
-                n = int(entry.get("nuls") or 0)
-                pm = int(entry.get("paniers_marques") or 0)
-                pe = int(entry.get("paniers_encaisses") or 0)
-                diff = int(entry.get("difference") or 0)
+                stats = _extract_and_accumulate_bilan(entry, totaux)
 
                 # Résolution du numéro d'équipe : priorité au mapping issu de
                 # ffbb_equipes_club_service (le plus fiable), sinon lecture directe
@@ -1489,23 +1471,9 @@ async def ffbb_bilan_service(
                         "poule_id": pid,
                         "numero_equipe": num_equipe,
                         "position": entry.get("position"),
-                        "match_joues": mj,
-                        "gagnes": g,
-                        "perdus": d,
-                        "nuls": n,
-                        "paniers_marques": pm,
-                        "paniers_encaisses": pe,
-                        "difference": diff,
+                        **stats,
                     }
                 )
-
-                totaux["match_joues"] += mj
-                totaux["gagnes"] += g
-                totaux["perdus"] += d
-                totaux["nuls"] += n
-                totaux["paniers_marques"] += pm
-                totaux["paniers_encaisses"] += pe
-                totaux["difference"] += diff
 
         # Tri déterministe : par compétition puis par numéro d'équipe pour que
         # les phases d'une même équipe soient toujours regroupées dans l'ordre.
@@ -1519,26 +1487,13 @@ async def ffbb_bilan_service(
             if num not in equipes_bilan:
                 equipes_bilan[num] = {
                     "numero_equipe": num,
-                    "bilan": {
-                        "match_joues": 0,
-                        "gagnes": 0,
-                        "perdus": 0,
-                        "nuls": 0,
-                        "paniers_marques": 0,
-                        "paniers_encaisses": 0,
-                        "difference": 0,
-                    },
+                    "bilan": _new_bilan_totals(),
                     "phases": [],
                 }
             equipes_bilan[num]["phases"].append(p)
             b = equipes_bilan[num]["bilan"]
-            b["match_joues"] += p["match_joues"]
-            b["gagnes"] += p["gagnes"]
-            b["perdus"] += p["perdus"]
-            b["nuls"] += p["nuls"]
-            b["paniers_marques"] += p["paniers_marques"]
-            b["paniers_encaisses"] += p["paniers_encaisses"]
-            b["difference"] += p["difference"]
+            for f in _BILAN_STAT_FIELDS:
+                b[f] += p[f]
 
         return {
             "club": club_nom,
