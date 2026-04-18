@@ -186,8 +186,8 @@ def get_cache_ttls() -> dict[str, int]:
         "search": int(_cache_search.ttl),
         "detail": int(_cache_detail.ttl),
         "calendrier": int(_cache_calendrier.ttl),
-        "bilan": get_static_ttl("bilan"),
-        "poule": get_static_ttl("poule"),
+        "bilan": _read_positive_int_env("FFBB_CACHE_TTL_BILAN", get_static_ttl("bilan")),
+        "poule": _read_positive_int_env("FFBB_CACHE_TTL_POULE", get_static_ttl("poule")),
     }
 
 
