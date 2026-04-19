@@ -99,9 +99,7 @@ async def measure(iterations: int = 100):
     try:
         services._cache_detail.clear()
 
-
         services._inflight_detail.clear()
-
 
     except Exception:
         pass

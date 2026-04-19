@@ -1086,6 +1086,7 @@ def main() -> None:
         app = create_app(mcp, _allowed_origins)
 
         import uvicorn
+
         uvicorn.run(app, host=host, port=port, log_level="info")
     else:
         logger.info("Démarrage MCP FFBB en mode stdio...")
