@@ -1885,6 +1885,41 @@ async def ffbb_resolve_team_service(
             )
         )
 
+    # Si aucune catégorie, on résout juste l'organisme
+    if not categorie:
+        resolved_clubs, _ = await _resolve_club_and_org(
+            club_name=club_name, organisme_id=organisme_id
+        )
+        if not resolved_clubs:
+            return {
+                "status": "not_found",
+                "team": None,
+                "candidates": [],
+                "ambiguity": f"Club '{club_name or organisme_id}' introuvable",
+                "club_resolu": None,
+            }
+        if len(resolved_clubs) > 1 and not organisme_id:
+            return {
+                "status": "ambiguous",
+                "team": None,
+                "candidates": resolved_clubs,
+                "ambiguity": f"Plusieurs clubs correspondent à '{club_name}'.",
+                "club_resolu": None,
+            }
+
+        club_resolu = resolved_clubs[0]
+        # Return all teams of this club
+        equipes = await ffbb_equipes_club_service(
+            organisme_id=str(club_resolu["organisme_id"])
+        )
+        return {
+            "status": "resolved_club_only",
+            "team": None,
+            "candidates": equipes,
+            "ambiguity": None,
+            "club_resolu": club_resolu,
+        }
+
     # 1) Résoudre l'organisme avec métadonnées (CENTRALISÉ)
     resolved_clubs, _ = await _resolve_club_and_org(
         club_name=club_name, organisme_id=organisme_id, categorie=categorie

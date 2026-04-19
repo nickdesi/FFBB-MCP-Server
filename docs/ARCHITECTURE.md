@@ -13,7 +13,7 @@ Nous utilisons le framework `mcp.server.fastmcp` pour simplifier la définition 
 Le serveur supporte deux modes d'exposition :
 
 - **Stdio** : Utilisé pour l'exécution locale (via `uvx`). Communication via stdin/stdout.
-- **Streamable HTTP** (spec MCP 2025-11-25) : Utilisé pour le déploiement cloud (Coolify). Endpoint unique `/mcp` acceptant `POST` (JSON-RPC) et `GET` (SSE server-to-client optionnel). Transport configuré via `MCP_MODE=sse`.
+- **Streamable HTTP** (spec MCP 2025-11-25) : Utilisé pour le déploiement cloud (Coolify). Endpoint unique `/mcp` acceptant `POST` (JSON-RPC) et `GET` (Server-to-client optionnel). Transport configuré via `MCP_MODE=http`.
 
 ### 3. Service Layer (`services.py`)
 
@@ -52,10 +52,10 @@ sequenceDiagram
 
 ## 🌐 Déploiement Streamable HTTP
 
-En mode `sse` (ou `http`/`streamable-http`), le serveur configure FastMCP pour exposer le transport **Streamable HTTP** (spec 2025-11-25) sur l'endpoint unique `/mcp` :
+En mode `http` (ou `streamable-http`), le serveur configure FastMCP pour exposer le transport **Streamable HTTP** (spec 2025-11-25) sur l'endpoint unique `/mcp` :
 
 - `POST /mcp` → JSON-RPC (initialize, tools/call…) — **obligatoire**
-- `GET /mcp` → SSE server-to-client — optionnel
+- `GET /mcp` → Server-to-client stream — optionnel
 
 D'autres routes annexes (`/health`, `/metrics`, `/`) sont également exposées par l'application.
 

@@ -122,7 +122,7 @@ flowchart LR
     C <-->|"Client API V3"| D[("FFBB API Officielle")]
 ```
 
-- **Transport :** Streamable HTTP (spec MCP 2025-11-25) — endpoint unique `/mcp` acceptant POST (JSON-RPC) et GET (SSE optionnel).
+- **Transport :** Streamable HTTP (spec MCP 2025-11-25) — endpoint unique `/mcp` acceptant POST (JSON-RPC) et GET.
 - **Réduction de contexte :** Le `Service Layer` consolide de nombreux micro-appels FFBB en réponses JSON concises, économisant massivement les tokens de votre LLM.
 - **Cache Intelligent Multi-niveaux :** Un système de TTL dynamique s'adapte au calendrier (mercredi/weekend live, périodes de saisies tardives, hors-saison) pour garantir une fraîcheur maximale (15s en live) tout en optimisant les performances hors match (jusqu'à 24h).
 - **Anti-Burst & Déduplication :** Protection contre les abus via une déduplication des requêtes en vol couplée à un rate-limiter strict.

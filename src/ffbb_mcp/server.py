@@ -59,11 +59,7 @@ from .utils import prune_payload
 
 
 def zipai_surgical(func: Any) -> Any:
-    """Injecte la directive ZipAI et élague le payload retourné."""
-    if func.__doc__:
-        func.__doc__ += "\\n\\n    [ZIPAI DIRECTIVE: Output technical data only. No filler, no echo, no meta.]"
-    else:
-        func.__doc__ = "[ZIPAI DIRECTIVE: Output technical data only. No filler, no echo, no meta.]"
+    """Élague le payload retourné (la directive ZipAI est passée en instruction globale)."""
 
     @wraps(func)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -135,6 +131,7 @@ mcp: FastMCP = FastMCP(
         "ffbb_get(type='poule') → idéal pour LE CLASSEMENT uniquement. "
         "ffbb_club(action='calendrier') → calendrier exhaustif (pas de troncature). "
         "Règles : catégorie sans genre → demander M ou F. Plusieurs équipes même catégorie → demander laquelle.\n\n"
+        "[ZIPAI DIRECTIVE: Output technical data only. No filler, no echo, no meta.]\n"
         "## Règle : Matchs restants d'une équipe\n"
         "Pour répondre à 'combien de matchs restent-il à [équipe] ?', NE PAS se contenter de ffbb_get(type='poule') "
         "car les données peuvent être tronquées (_omitted_count > 0).\n"
@@ -463,12 +460,27 @@ async def ffbb_get(
             return await get_competition_service(competition_id=id)
         elif type == "poule":
             poule_data = await get_poule_service(id, force_refresh=force_refresh)
-            return {
+
+            res = {
                 "id": poule_data.get("id"),
                 "nom": poule_data.get("libelle"),
                 "classements": poule_data.get("classements", []),
                 "rencontres": poule_data.get("rencontres", []),
             }
+            if res.get("rencontres"):
+                max_limit = int(os.environ.get("FFBB_MAX_CALENDAR_MATCHES", "300"))
+                total_matches = len(res["rencontres"])
+                if total_matches > max_limit:
+                    res["rencontres"] = res["rencontres"][:max_limit]
+                    res["_truncated"] = True
+                    res["_omitted_count"] = total_matches - max_limit
+                    res["_total"] = total_matches
+                    res["rencontres"].append(
+                        {
+                            "warning": f"Résultat tronqué. Seulement {max_limit} rencontres sur {total_matches} affichées."
+                        }
+                    )
+            return res
         elif type == "organisme":
             return await get_organisme_service(organisme_id=id)
         return {"error": f"Type inconnu: {type}"}
@@ -730,14 +742,14 @@ async def ffbb_resolve_team(
         Field(description="ID FFBB du club (alternative plus rapide à club_name)."),
     ] = None,
     categorie: Annotated[
-        str,
+        str | None,
         Field(
             description=(
                 "Catégorie + genre + numéro d'équipe (ex: 'U11M1', 'U13F2', 'U15M'). "
-                "Utilise les mêmes conventions que ffbb_bilan."
+                "Optionnel (toutes équipes si vide)."
             ),
         ),
-    ] = "U11M1",
+    ] = None,
 ) -> dict[str, Any]:
     """Identifie une equipe unique (Pivot central).
 
