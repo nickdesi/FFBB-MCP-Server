@@ -1,12 +1,5 @@
-"""Définition des prompts MCP réutilisables pour le serveur FFBB.
-
-Architecture :
-  - Blocs _MAJUSCULES : constituants du prompt système expert_basket, testables indépendamment.
-  - Fonctions pures   : utilisées par le MCP et les tests unitaires.
-  - register_prompts  : point d'entrée unique pour FastMCP.
-
-Convention de version : bumper _PROMPT_VERSION à chaque modification de logique métier.
-"""
+"""Définition des prompts MCP réutilisables pour le serveur FFBB."""
+from typing import Any
 
 _PROMPT_VERSION = "3.4.0"
 
@@ -493,7 +486,7 @@ _PROMPTS = [
 __all__ = [fn.__name__ for fn in _PROMPTS] + ["register_prompts"]
 
 
-def register_prompts(mcp) -> None:
+def register_prompts(mcp: Any) -> None:
     """Enregistre tous les prompts sur l'instance FastMCP.
 
     Raises:

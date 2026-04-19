@@ -58,7 +58,7 @@ from .services import (
 from .utils import prune_payload
 
 
-def zipai_surgical(func):
+def zipai_surgical(func: Any) -> Any:
     """Injecte la directive ZipAI et élague le payload retourné."""
     if func.__doc__:
         func.__doc__ += "\\n\\n    [ZIPAI DIRECTIVE: Output technical data only. No filler, no echo, no meta.]"
@@ -66,7 +66,7 @@ def zipai_surgical(func):
         func.__doc__ = "[ZIPAI DIRECTIVE: Output technical data only. No filler, no echo, no meta.]"
 
     @wraps(func)
-    async def wrapper(*args, **kwargs):
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
         res = await func(*args, **kwargs)
         return prune_payload(res)
 
@@ -122,7 +122,7 @@ _allowed_hosts = os.environ.get("ALLOWED_HOSTS", "*").split(",")
 _allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
 _dns_protection = os.environ.get("ENABLE_DNS_PROTECTION", "false").lower() == "true"
 
-mcp = FastMCP(
+mcp: FastMCP = FastMCP(
     "FFBB MCP Server",
     instructions=(
         "Données FFBB (basketball français). "
@@ -216,27 +216,27 @@ def _logo_response() -> Response:
     return RedirectResponse(_REMOTE_LOGO_URL)
 
 
-@mcp.custom_route("/health", methods=["GET"])
+@mcp.custom_route("/health", methods=["GET"])  # type: ignore[untyped-decorator]
 async def health(request: Request) -> Response:
     return JSONResponse({"status": "ok", "service": "ffbb-mcp"})
 
 
-@mcp.custom_route("/metrics", methods=["GET"])
+@mcp.custom_route("/metrics", methods=["GET"])  # type: ignore[untyped-decorator]
 async def metrics(request: Request) -> Response:
     return PlainTextResponse(generate_prometheus_metrics())
 
 
-@mcp.custom_route("/logo.webp", methods=["GET"])
+@mcp.custom_route("/logo.webp", methods=["GET"])  # type: ignore[untyped-decorator]
 async def logo(request: Request) -> Response:
     return _logo_response()
 
 
-@mcp.custom_route("/favicon.ico", methods=["GET"])
+@mcp.custom_route("/favicon.ico", methods=["GET"])  # type: ignore[untyped-decorator]
 async def favicon(request: Request) -> Response:
     return _logo_response()
 
 
-@mcp.custom_route("/css/style.css", methods=["GET"])
+@mcp.custom_route("/css/style.css", methods=["GET"])  # type: ignore[untyped-decorator]
 async def style_css(request: Request) -> Response:
     css_path = _WEBSITE_DIR / "css" / "style.css"
     if css_path.exists():
@@ -244,17 +244,17 @@ async def style_css(request: Request) -> Response:
     return Response("/* CSS non trouvé */", status_code=404)
 
 
-@mcp.custom_route("/robots.txt", methods=["GET"])
+@mcp.custom_route("/robots.txt", methods=["GET"])  # type: ignore[untyped-decorator]
 async def robots_txt(request: Request) -> Response:
     return PlainTextResponse(_build_robots_txt())
 
 
-@mcp.custom_route("/sitemap.xml", methods=["GET"])
+@mcp.custom_route("/sitemap.xml", methods=["GET"])  # type: ignore[untyped-decorator]
 async def sitemap_xml(request: Request) -> Response:
     return Response(_build_sitemap_xml(), media_type="application/xml")
 
 
-@mcp.custom_route("/", methods=["GET"])
+@mcp.custom_route("/", methods=["GET"])  # type: ignore[untyped-decorator]
 async def index(request: Request) -> Response:
     return HTMLResponse(content=_build_index_html(), status_code=200)
 
@@ -383,7 +383,7 @@ async def ffbb_bilan(
             description="Si True, contourne le cache pour récupérer des données fraîches."
         ),
     ] = False,
-    ctx: Context[Any] | None = None,
+    ctx: Context[Any, Any, Any] | None = None,
 ) -> dict[str, Any]:
     """Bilan complet d'une équipe toutes phases confondues en UN seul appel.
 
@@ -638,7 +638,7 @@ async def ffbb_club(
                     target_org_id, filtre, phase_query=phase
                 )
                 if resolved_pid:
-                    effective_poule_id = resolved_pid
+                    effective_poule_id = int(resolved_pid)
 
             if not effective_poule_id:
                 if phase:
@@ -778,7 +778,7 @@ async def ffbb_team_summary(
             description="Catégorie + genre + numéro d'équipe (ex: 'U11M1', 'U13F2', 'U15M', 'Senior').",
         ),
     ] = None,
-    ctx: Context[Any] | None = None,
+    ctx: Context[Any, Any, Any] | None = None,
 ) -> dict[str, Any]:
     """Résumé complet et agent-friendly pour une équipe.
 
@@ -1016,7 +1016,7 @@ async def ffbb_bilan_saison(
             description="Si True, contourne le cache pour récupérer des données fraîches."
         ),
     ] = False,
-    ctx: Context[Any] | None = None,
+    ctx: Context[Any, Any, Any] | None = None,
 ) -> dict[str, Any]:
     """Bilan détaillé de la saison pour une équipe précise (toutes phases).
 

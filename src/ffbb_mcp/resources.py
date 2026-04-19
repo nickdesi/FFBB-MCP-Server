@@ -1,9 +1,10 @@
 """Définition des Resources MCP (Endpoints URI)."""
 
 import json
+from typing import Any
 
 
-def register_resources(mcp):
+def register_resources(mcp: Any) -> None:
     """Enregistre les ressources sur l'instance FastMCP."""
 
     # FIX: toutes les resources passent désormais par le service layer
