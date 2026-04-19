@@ -20,14 +20,15 @@ def _read_positive_int_env(key: str, default: int) -> int:
     return default
 
 
-
 def _ttu_bilan(_key: Any, value: Any, now: float) -> float:
     return now + get_static_ttl("bilan")
+
 
 def _ttu_poule(_key: Any, value: Any, now: float) -> float:
     if isinstance(value, dict) and "ttl" in value:
         return now + float(value["ttl"])
     return now + get_static_ttl("rencontre")
+
 
 @dataclass
 class _ServiceState:
@@ -43,16 +44,34 @@ class _ServiceState:
 
     # Caches in-memory globaux
     cache_lives: TTLCache[Any, Any] = field(
-        default_factory=lambda: TTLCache(maxsize=128, ttl=_read_positive_int_env("FFBB_CACHE_TTL_LIVES", get_static_ttl("lives")))
+        default_factory=lambda: TTLCache(
+            maxsize=128,
+            ttl=_read_positive_int_env("FFBB_CACHE_TTL_LIVES", get_static_ttl("lives")),
+        )
     )
     cache_search: TTLCache[Any, Any] = field(
-        default_factory=lambda: TTLCache(maxsize=256, ttl=_read_positive_int_env("FFBB_CACHE_TTL_SEARCH", get_static_ttl("search")))
+        default_factory=lambda: TTLCache(
+            maxsize=256,
+            ttl=_read_positive_int_env(
+                "FFBB_CACHE_TTL_SEARCH", get_static_ttl("search")
+            ),
+        )
     )
     cache_detail: TTLCache[Any, Any] = field(
-        default_factory=lambda: TTLCache(maxsize=128, ttl=_read_positive_int_env("FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")))
+        default_factory=lambda: TTLCache(
+            maxsize=128,
+            ttl=_read_positive_int_env(
+                "FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")
+            ),
+        )
     )
     cache_calendrier: TTLCache[Any, Any] = field(
-        default_factory=lambda: TTLCache(maxsize=64, ttl=_read_positive_int_env("FFBB_CACHE_TTL_CALENDRIER", get_static_ttl("rencontre")))
+        default_factory=lambda: TTLCache(
+            maxsize=64,
+            ttl=_read_positive_int_env(
+                "FFBB_CACHE_TTL_CALENDRIER", get_static_ttl("rencontre")
+            ),
+        )
     )
     cache_bilan: TLRUCache[Any, Any] = field(
         default_factory=lambda: TLRUCache(maxsize=64, ttu=_ttu_bilan)
@@ -61,7 +80,9 @@ class _ServiceState:
         default_factory=lambda: TLRUCache(maxsize=128, ttu=_ttu_poule)
     )
 
+
 state = _ServiceState()
+
 
 def reset_service_state() -> None:
     global state

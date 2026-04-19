@@ -95,9 +95,7 @@ async def workload(iterations: int = 20):
     try:
         services._cache_detail.clear()
 
-
         services._inflight_detail.clear()
-
 
     except Exception:
         pass

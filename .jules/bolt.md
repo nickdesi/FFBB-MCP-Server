@@ -9,3 +9,7 @@
 ## 2026-04-18 - [API Payload inconsistencies]
 **Learning:** The FFBB API response structure can be inconsistent. In the `engagements` list fetched for a club, the `nom` attribute may unexpectedly be `None` for some teams. Logic strictly relying on string parsing of `nom` will fail silently or filter out valid results.
 **Action:** Always rely on structured fields like `numero_equipe` primarily, and use string parsing only as a fallback. Ensure that `None` values are safely handled by using `.get("key", "")` before attempting string operations.
+
+## 2024-05-25 - [Type Checking Optimization for Serialization]
+**Learning:** `type(obj) is ...` is measurably faster than `isinstance(obj, ...)` in Python because it avoids traversing the Method Resolution Order (MRO) for inheritance. In heavily recursive serialization functions (like `serialize_model`), introducing a "fast path" with exact type checks for standard JSON primitives (`str`, `int`, `float`, `bool`, `dict`, `list`) can yield a significant ~3x speedup.
+**Action:** Use `type(obj) is ...` fast paths in critical data transformation/serialization functions to handle standard data types, while retaining `isinstance` as a fallback to ensure support for sub-classes (like `IntEnum` or custom collections).

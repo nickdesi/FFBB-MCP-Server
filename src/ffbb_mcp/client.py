@@ -17,7 +17,6 @@ Le singleton FFBBClientFactory gère :
 """
 
 
-
 logger = logging.getLogger("ffbb-mcp")
 
 # Durée de vie des tokens en secondes.

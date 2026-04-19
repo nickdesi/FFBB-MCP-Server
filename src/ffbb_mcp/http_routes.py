@@ -80,8 +80,6 @@ async def index(request: Request) -> Response:
     )
 
 
-
-
 def register_http_routes(mcp: FastMCP) -> None:
     """Enregistre toutes les routes HTTP custom sur le serveur FastMCP."""
     mcp.custom_route("/health", methods=["GET"])(health)

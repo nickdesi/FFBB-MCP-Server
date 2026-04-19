@@ -1573,7 +1573,8 @@ async def get_calendrier_club_service(
             equipes = [
                 e
                 for e in equipes
-                if str(e.get("numero_equipe", "")) == str(numero_equipe) or str(e.get("nom", "")).endswith(f"- {numero_equipe}")
+                if str(e.get("numero_equipe", "")) == str(numero_equipe)
+                or str(e.get("nom", "")).endswith(f"- {numero_equipe}")
                 or f" - {numero_equipe} " in str(e.get("nom", ""))
                 or f"-{numero_equipe} " in str(e.get("nom", ""))
             ]
