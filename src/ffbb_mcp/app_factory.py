@@ -52,7 +52,7 @@ def create_app(mcp: FastMCP, allowed_origins: list[str]) -> Starlette:
 
     from starlette.middleware.base import BaseHTTPMiddleware
 
-    class RequestIdMiddleware(BaseHTTPMiddleware):  # type: ignore[misc]
+    class RequestIdMiddleware(BaseHTTPMiddleware):
         async def dispatch(self, request: Any, call_next: Any) -> Any:
             request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
             response = await call_next(request)

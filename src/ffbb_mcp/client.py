@@ -81,7 +81,7 @@ class FFBBClientFactory:
         """Retourne le client FFBB en asynchrone, en le créant ou rafraîchissant si nécessaire."""
         # Première vérification rapide sans lock
         if not cls._is_token_expired():
-            return cls._instance
+            return cls._instance  # type: ignore
 
         # FIX: création lazy du Lock dans la running loop courante
         if cls._init_lock is None:
@@ -102,7 +102,7 @@ class FFBBClientFactory:
                     )
                     logger.error(traceback.format_exc())
                     raise
-            return cls._instance
+            return cls._instance  # type: ignore
 
     @classmethod
     def reset(cls) -> None:
