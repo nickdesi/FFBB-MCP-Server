@@ -13,3 +13,6 @@
 ## 2024-05-25 - [Type Checking Optimization for Serialization]
 **Learning:** `type(obj) is ...` is measurably faster than `isinstance(obj, ...)` in Python because it avoids traversing the Method Resolution Order (MRO) for inheritance. In heavily recursive serialization functions (like `serialize_model`), introducing a "fast path" with exact type checks for standard JSON primitives (`str`, `int`, `float`, `bool`, `dict`, `list`) can yield a significant ~3x speedup.
 **Action:** Use `type(obj) is ...` fast paths in critical data transformation/serialization functions to handle standard data types, while retaining `isinstance` as a fallback to ensure support for sub-classes (like `IntEnum` or custom collections).
+## 2025-04-19 - [CI Troubleshooting]
+**Learning:** Duplicate arguments defined in pytest CLI vs pytest config (e.g. `--cov=ffbb_mcp`) can cause fatal test failures in newer pytest versions when invoked via CI. Furthermore, CI actions must be updated to existing major versions (e.g., `actions/checkout@v6` -> `v4`).
+**Action:** Always verify action versions and pytest argument combinations locally before pushing.

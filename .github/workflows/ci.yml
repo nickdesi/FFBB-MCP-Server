@@ -37,7 +37,7 @@ jobs:
       run: uv run mypy src
 
     - name: Test with Pytest
-      run: uv run pytest --cov=ffbb_mcp --cov-fail-under=65
+      run: uv run pytest
 
   audit:
     runs-on: ubuntu-latest
