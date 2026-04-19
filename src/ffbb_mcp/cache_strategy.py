@@ -9,7 +9,7 @@ MATCH_WINDOWS = [
 ]
 
 
-def is_in_match_window(now: datetime = None) -> bool:
+def is_in_match_window(now: datetime | None = None) -> bool:
     now = now or datetime.now()
     for weekday, h_start, h_end in MATCH_WINDOWS:
         if now.weekday() == weekday and h_start <= now.hour < h_end:
@@ -17,7 +17,7 @@ def is_in_match_window(now: datetime = None) -> bool:
     return False
 
 
-def is_post_match_cooling(now: datetime = None) -> bool:
+def is_post_match_cooling(now: datetime | None = None) -> bool:
     """Lendemain ou soirée après fermeture de fenêtre live."""
     now = now or datetime.now()
     wd, h = now.weekday(), now.hour

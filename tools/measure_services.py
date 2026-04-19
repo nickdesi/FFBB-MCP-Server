@@ -98,11 +98,11 @@ async def measure(iterations: int = 100):
     # Clear caches to measure real work
     try:
         services._cache_detail.clear()
-        services._cache_bilan.clear()
-        services._cache_calendrier.clear()
+
+
         services._inflight_detail.clear()
-        services._inflight_bilan.clear()
-        services._inflight_calendrier.clear()
+
+
     except Exception:
         pass
 

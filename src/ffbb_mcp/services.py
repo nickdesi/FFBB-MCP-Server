@@ -18,17 +18,18 @@ from httpx import HTTPStatusError
 from mcp.shared.exceptions import ErrorData, McpError
 from mcp.types import INTERNAL_ERROR
 
-from .aliases import enrich_acronym_cache, normalize_query
-from .cache_strategy import get_poule_ttl, get_static_ttl
-from .client import get_client_async
-from .metrics import (
+from ffbb_mcp._state import state
+from ffbb_mcp.aliases import enrich_acronym_cache, normalize_query
+from ffbb_mcp.cache_strategy import get_poule_ttl, get_static_ttl
+from ffbb_mcp.client import get_client_async
+from ffbb_mcp.metrics import (
     dec_inflight,
     inc_inflight,
     record_cache_hit,
     record_cache_miss,
     record_call,
 )
-from .utils import ParsedCategorie, parse_categorie, serialize_model
+from ffbb_mcp.utils import ParsedCategorie, parse_categorie, serialize_model
 
 logger = logging.getLogger("ffbb-mcp")
 
@@ -138,32 +139,32 @@ def _ttu_poule(k, v, now):
     return now + ttl
 
 
-_cache_lives = TTLCache(
+state.cache_lives = TTLCache(
     maxsize=1,
     ttl=_read_positive_int_env("FFBB_CACHE_TTL_LIVES", get_static_ttl("lives")),
 )
-_cache_search = TTLCache(
+state.cache_search = TTLCache(
     maxsize=256,
     ttl=_read_positive_int_env("FFBB_CACHE_TTL_SEARCH", get_static_ttl("search")),
 )
-_cache_detail = TTLCache(
+state.cache_detail = TTLCache(
     maxsize=128,
     ttl=_read_positive_int_env("FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")),
 )
-_cache_calendrier = TTLCache(
+state.cache_calendrier = TTLCache(
     maxsize=64,
     ttl=_read_positive_int_env(
         "FFBB_CACHE_TTL_CALENDRIER", get_static_ttl("calendrier")
     ),
 )
-_cache_bilan = TLRUCache(maxsize=64, ttu=_ttu_bilan)
-_cache_poule = TLRUCache(maxsize=128, ttu=_ttu_poule)
+state.cache_bilan = TLRUCache(maxsize=64, ttu=_ttu_bilan)
+state.cache_poule = TLRUCache(maxsize=128, ttu=_ttu_poule)
 _inflight_lock: asyncio.Lock | None = None
-_inflight_detail: dict[str, asyncio.Task[Any]] = {}
-_inflight_search: dict[str, asyncio.Task[Any]] = {}
-_inflight_calendrier: dict[str, asyncio.Task[Any]] = {}
-_inflight_bilan: dict[str, asyncio.Task[Any]] = {}
-_inflight_poule: dict[str, asyncio.Task[Any]] = {}
+state.inflight_detail: dict[str, asyncio.Task[Any]] = {}
+state.inflight_search: dict[str, asyncio.Task[Any]] = {}
+state.inflight_calendrier: dict[str, asyncio.Task[Any]] = {}
+state.inflight_bilan: dict[str, asyncio.Task[Any]] = {}
+state.inflight_poule: dict[str, asyncio.Task[Any]] = {}
 
 
 def _get_inflight_lock() -> asyncio.Lock:
@@ -182,10 +183,10 @@ def get_cache_ttls() -> dict[str, int]:
     """
 
     return {
-        "lives": int(_cache_lives.ttl),
-        "search": int(_cache_search.ttl),
-        "detail": int(_cache_detail.ttl),
-        "calendrier": int(_cache_calendrier.ttl),
+        "lives": int(state.cache_lives.ttl),
+        "search": int(state.cache_search.ttl),
+        "detail": int(state.cache_detail.ttl),
+        "calendrier": int(state.cache_calendrier.ttl),
         "bilan": _read_positive_int_env(
             "FFBB_CACHE_TTL_BILAN", get_static_ttl("bilan")
         ),
@@ -444,9 +445,9 @@ async def _dedupe_inflight_detail(
 ) -> Any:
     """Déduplique les appels concurrents sur la même clé de détail."""
     return await _dedupe_inflight(
-        cache=_cache_detail,
+        cache=state.cache_detail,
         cache_key=cache_key,
-        inflight_map=_inflight_detail,
+        inflight_map=state.inflight_detail,
         make_coro=make_coro,
         cache_name=cache_name,
     )
@@ -489,7 +490,7 @@ async def _dedupe_inflight(
 
 
 async def get_lives_service() -> list[dict]:
-    cached = _cache_get(_cache_lives, "lives", "lives")
+    cached = _cache_get(state.cache_lives, "lives", "lives")
     if cached is not None:
         logger.debug("Cache hit: lives")
         return cached
@@ -502,13 +503,13 @@ async def get_lives_service() -> list[dict]:
     )
     lives_list = lives if isinstance(lives, list) else []
     result = [serialize_model(live) for live in lives_list]
-    _cache_set(_cache_lives, "lives", result, "lives")
+    _cache_set(state.cache_lives, "lives", result, "lives")
     return result
 
 
 async def get_saisons_service(active_only: bool = False) -> list[dict]:
     cache_key = f"saisons:{active_only}"
-    cached = _cache_get(_cache_detail, cache_key, "saisons")
+    cached = _cache_get(state.cache_detail, cache_key, "saisons")
     if cached is not None:
         return cached
 
@@ -520,7 +521,7 @@ async def get_saisons_service(active_only: bool = False) -> list[dict]:
     )
     saisons_list = saisons if isinstance(saisons, list) else []
     result = [serialize_model(s) for s in saisons_list]
-    _cache_set(_cache_detail, cache_key, result, "saisons")
+    _cache_set(state.cache_detail, cache_key, result, "saisons")
     return result
 
 
@@ -548,7 +549,7 @@ async def get_poule_service(
     cache_key = f"poule:{poule_id_int}"
 
     if force_refresh:
-        _cache_poule.pop(cache_key, None)
+        state.cache_poule.pop(cache_key, None)
 
     async def _fetch() -> dict:
         client = await get_client_async()
@@ -567,9 +568,9 @@ async def get_poule_service(
     # On utilise toujours le mécanisme de déduplication pour éviter de frapper
     # l'API FFBB plusieurs fois pour la même poule en parallèle.
     result = await _dedupe_inflight(
-        cache=_cache_poule,
+        cache=state.cache_poule,
         cache_key=cache_key,
-        inflight_map=_inflight_poule,
+        inflight_map=state.inflight_poule,
         make_coro=_fetch,
         cache_name="poule",
     )
@@ -610,7 +611,7 @@ async def ffbb_get_classement_service(
     )
 
     if not force_refresh:
-        cached = _cache_get(_cache_poule, cache_key, "classement")
+        cached = _cache_get(state.cache_poule, cache_key, "classement")
         if cached is not None:
             return (
                 cached["data"]
@@ -667,10 +668,10 @@ async def ffbb_get_classement_service(
                 "paniers_encaisses": c.get("paniers_encaisses") or 0,
             }
         )
-    # Calculate dynamic TTL using same logic as poule since it caches in _cache_poule
+    # Calculate dynamic TTL using same logic as poule since it caches in state.cache_poule
     ttl = await get_poule_ttl(poule_id_int, get_lives_service)
     wrapped_flat = {"_ttl": ttl, "data": flat}
-    _cache_set(_cache_poule, cache_key, wrapped_flat, "classement")
+    _cache_set(state.cache_poule, cache_key, wrapped_flat, "classement")
     return flat
 
 
@@ -711,9 +712,9 @@ async def _search_generic(
         return [serialize_model(hit) for hit in results.hits[:limit]]
 
     return await _dedupe_inflight(
-        cache=_cache_search,
+        cache=state.cache_search,
         cache_key=cache_key,
-        inflight_map=_inflight_search,
+        inflight_map=state.inflight_search,
         make_coro=_fetch,
         cache_name="search",
     )
@@ -799,9 +800,9 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
         return output
 
     return await _dedupe_inflight(
-        cache=_cache_search,
+        cache=state.cache_search,
         cache_key=cache_key,
-        inflight_map=_inflight_search,
+        inflight_map=state.inflight_search,
         make_coro=_fetch,
         cache_name="search",
     )
@@ -1507,13 +1508,13 @@ async def ffbb_bilan_service(
     if force_refresh:
         logger.debug(f"force_refresh=True, bypass cache pour {cache_key}")
         result = await _fetch()
-        _cache_set(_cache_bilan, cache_key, result, "bilan")
+        _cache_set(state.cache_bilan, cache_key, result, "bilan")
         return result
 
     return await _dedupe_inflight(
-        cache=_cache_bilan,
+        cache=state.cache_bilan,
         cache_key=cache_key,
-        inflight_map=_inflight_bilan,
+        inflight_map=state.inflight_bilan,
         make_coro=_fetch,
         cache_name="bilan",
     )
@@ -1743,12 +1744,12 @@ async def get_calendrier_club_service(
     # force_refresh contourne le cache de calendrier, mais continue de bénéficier
     # de la déduplication inflight.
     if force_refresh:
-        _cache_calendrier.pop(cache_key, None)
+        state.cache_calendrier.pop(cache_key, None)
 
     return await _dedupe_inflight(
-        cache=_cache_calendrier,
+        cache=state.cache_calendrier,
         cache_key=cache_key,
-        inflight_map=_inflight_calendrier,
+        inflight_map=state.inflight_calendrier,
         make_coro=_fetch,
         cache_name="calendrier",
     )

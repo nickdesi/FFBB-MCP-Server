@@ -1,3 +1,12 @@
+import asyncio
+import logging
+import os
+import time
+import traceback
+
+from ffbb_api_client_v3 import FFBBAPIClientV3, TokenManager
+from ffbb_api_client_v3.utils.cache_manager import CacheConfig, CacheManager
+
 """
 Client FFBB avec gestion automatique du cycle de vie des tokens.
 
@@ -7,14 +16,7 @@ Le singleton FFBBClientFactory gère :
 - Le cache mémoire (30s) pour éviter les doublons réseau concurrents
 """
 
-import asyncio
-import logging
-import os
-import time
-import traceback
 
-from ffbb_api_client_v3 import FFBBAPIClientV3, TokenManager
-from ffbb_api_client_v3.utils.cache_manager import CacheConfig, CacheManager
 
 logger = logging.getLogger("ffbb-mcp")
 
@@ -53,7 +55,7 @@ class FFBBClientFactory:
         logger.info("Initialisation du client FFBB...")
         # FIX: logger.debug au lieu de logger.info — ce log se déclenche
         # toutes les 25 min en prod lors du refresh de token, c'est du niveau debug.
-        logger.debug(f"CWD: {os.getcwd()}")
+        logger.debug("CWD: %s", os.getcwd())
 
         # On force use_cache=True pour le token manager
         tokens = TokenManager.get_tokens(use_cache=True)

@@ -1,5 +1,4 @@
 import asyncio
-import contextlib
 import datetime
 import logging
 import os
@@ -14,9 +13,6 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 from pydantic import Field
-from starlette.applications import Starlette
-from starlette.middleware.cors import CORSMiddleware
-from starlette.middleware.gzip import GZipMiddleware
 from starlette.requests import Request
 from starlette.responses import (
     FileResponse,
@@ -26,8 +22,6 @@ from starlette.responses import (
     RedirectResponse,
     Response,
 )
-from starlette.routing import Mount
-from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from . import __version__ as _PACKAGE_VERSION
 from .metrics import generate_prometheus_metrics
@@ -1084,61 +1078,14 @@ def main() -> None:
             f"Démarrage MCP FFBB en mode Streamable HTTP sur {host}:{port}/mcp ..."
         )
 
-        # Transport Streamable HTTP — spec MCP 2025-11-25
-        # Un endpoint unique /mcp accepte GET et POST
-        # GET /mcp  → SSE server-to-client (optionnel, 405 si non supporté)
-        # POST /mcp → JSON-RPC (initialize, tools/call, etc.)
         mcp.settings.streamable_http_path = "/mcp"
+        from ffbb_mcp.app_factory import create_app
+        from ffbb_mcp.http_routes import register_http_routes
 
-        # Lifespan requis pour gérer le session_manager du transport Streamable HTTP
-        @contextlib.asynccontextmanager
-        async def lifespan(app: Starlette):
-            async with mcp.session_manager.run():
-                yield
-
-        # streamable_http_app() retourne une Starlette app avec TOUTES les routes :
-        #   - /mcp  → endpoint MCP Streamable HTTP (GET + POST)
-        #   - /health, /metrics, /logo.webp, /, etc. → custom routes
-        # On la monte à la racine pour préserver tous les chemins.
-        mcp_app = mcp.streamable_http_app()
-
-        # Création de l'application Starlette racine avec lifespan
-        app = Starlette(
-            debug=False,
-            routes=[Mount("/", app=mcp_app)],
-            lifespan=lifespan,
-        )
-        app.router.redirect_slashes = False
-
-        # Middleware pour gérer les headers de proxy (X-Forwarded-Proto pour HTTPS)
-        # Indispensable pour que le serveur sache qu'il est en HTTPS derrière Nginx
-        app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
-
-        # Middleware CORS — spec 2025-11-25 :
-        # Methods : GET, POST, OPTIONS obligatoires
-        # Headers : Content-Type, Accept, Mcp-Session-Id, MCP-Protocol-Version obligatoires
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=_allowed_origins,
-            allow_methods=["GET", "POST", "OPTIONS", "DELETE"],
-            allow_headers=[
-                "Content-Type",
-                "Accept",
-                "Authorization",
-                "Mcp-Session-Id",
-                "MCP-Protocol-Version",
-                "X-Forwarded-For",
-                "X-Forwarded-Proto",
-                "X-Real-IP",
-            ],
-            expose_headers=["Content-Type", "Mcp-Session-Id"],
-        )
-
-        # Middleware GZip pour compresser les réponses JSON volumineuses
-        app.add_middleware(GZipMiddleware, minimum_size=1000)
+        register_http_routes(mcp)
+        app = create_app(mcp, _allowed_origins)
 
         import uvicorn
-
         uvicorn.run(app, host=host, port=port, log_level="info")
     else:
         logger.info("Démarrage MCP FFBB en mode stdio...")

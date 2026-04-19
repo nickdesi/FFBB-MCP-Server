@@ -1,17 +1,12 @@
-FROM python:3.11-slim
+# Stage 1: Build dependencies
+FROM python:3.11-slim as builder
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
-# MCP_MODE=sse → désormais déclenche le transport Streamable HTTP (spec 2025-11-25)
-# Valeur conservée pour la rétrocompatibilité avec Coolify / les scripts existants
-ENV MCP_MODE=sse
-ENV PORT=9123
-ENV HOST=0.0.0.0
+WORKDIR /build
 
-WORKDIR /app
-
-# Installer Git (nécessaire pour installer la dépendance git referenced in pyproject)
+# Installer Git
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 
 # Copier sources
@@ -20,12 +15,40 @@ COPY src/ ./src/
 COPY assets/ ./assets/
 COPY website/ ./website/
 
-# Mettre à jour pip puis installer le package et ses dépendances
+# Créer venv et installer
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 RUN python -m pip install --upgrade pip setuptools wheel && \
-	python -m pip install --no-cache-dir -e .
+    python -m pip install --no-cache-dir .
 
-# Exposer le port configuré
+# Stage 2: Runtime
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV MCP_MODE=sse
+ENV PORT=9123
+ENV HOST=0.0.0.0
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Créer un utilisateur non-root
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+WORKDIR /app
+
+# Copier venv
+COPY --from=builder /opt/venv /opt/venv
+
+# Copier les statiques (utilisés par le code)
+COPY assets/ ./assets/
+COPY website/ ./website/
+
+RUN chown -R appuser:appuser /app
+USER appuser
+
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD python -c "import urllib.request, sys; sys.exit(0) if urllib.request.urlopen('http://localhost:9123/health').getcode() == 200 else sys.exit(1)"
+
 EXPOSE 9123
 
-# Commande de lancement (utilise l'entry-point défini dans pyproject.toml)
 CMD ["ffbb-mcp"]

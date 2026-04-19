@@ -49,7 +49,7 @@ def test_get_cache_ttls_bilan_override(mock_get_static):
 @patch("ffbb_mcp.services.get_static_ttl")
 def test_get_cache_ttls_lives_report(mock_get_static):
     # This just ensures we are reporting what's in the cache object for lives
-    from ffbb_mcp.services import _cache_lives
+    from ffbb_mcp._state import state
 
     ttls = get_cache_ttls()
-    assert ttls["lives"] == int(_cache_lives.ttl)
+    assert ttls["lives"] == int(state.cache_lives.ttl)

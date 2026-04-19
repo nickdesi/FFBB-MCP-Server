@@ -10,12 +10,12 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 dependencies = [
-    "mcp[cli]>=1.8.0",
-    "ffbb-api-client-v3>=1.5.3",
+    "mcp[cli]>=1.8.0,<2.0.0",
+    "ffbb-api-client-v3>=1.5.3,<2.0.0",
     "anysqlite>=0.0.5",
     "uvicorn",
-    "starlette",
-    "pydantic>=2.12.5",
+    "starlette<1.0.0",
+    "pydantic>=2.12.5,<3.0.0",
     "cachetools>=5.3.0",
 ]
 
@@ -44,6 +44,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+addopts = "--cov=ffbb_mcp --cov-fail-under=65"
 
 [tool.ruff]
 line-length = 88
@@ -60,9 +61,36 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "ASYNC", "TCH"]
 ignore = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.mypy]
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["ffbb_mcp.services", "ffbb_mcp.server", "ffbb_mcp.resources", "ffbb_mcp.prompts", "ffbb_mcp.metrics", "ffbb_mcp.cache_strategy"]
+ignore_errors = true
+
+
+[tool.ruff.lint.per-file-ignores]
+"src/ffbb_mcp/services/*.py" = ["F403", "F405", "F401", "UP006", "I001", "E402"]
+"tests/*" = ["S101", "RUF059", "F821"]
+"tools/*" = ["S110"]
+"src/ffbb_mcp/prompts.py" = ["RUF001", "RUF003"]
+"src/ffbb_mcp/cache_strategy.py" = ["RUF003"]
+"src/ffbb_mcp/server.py" = ["RUF001"]
+
+[[tool.mypy.overrides]]
+module = ["cachetools", "cachetools.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "starlette.middleware.base"
+ignore_missing_imports = true

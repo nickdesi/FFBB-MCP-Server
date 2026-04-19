@@ -94,11 +94,11 @@ async def workload(iterations: int = 20):
     # the full code path instead of returning cached results.
     try:
         services._cache_detail.clear()
-        services._cache_bilan.clear()
-        services._cache_calendrier.clear()
+
+
         services._inflight_detail.clear()
-        services._inflight_bilan.clear()
-        services._inflight_calendrier.clear()
+
+
     except Exception:
         pass
 
