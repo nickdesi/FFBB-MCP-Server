@@ -30,6 +30,7 @@ dev = [
     "pytest-cov>=4.1.0",
     "ruff>=0.3.0",
     "pre-commit>=3.7.0",
+    "mypy>=1.0.0",
 ]
 
 [project.scripts]
@@ -88,7 +89,7 @@ ignore_errors = true
 "src/ffbb_mcp/server.py" = ["RUF001"]
 
 [[tool.mypy.overrides]]
-module = ["cachetools", "cachetools.*"]
+module = ["cachetools"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

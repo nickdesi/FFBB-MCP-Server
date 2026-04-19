@@ -16,3 +16,6 @@
 ## 2025-04-19 - [CI Troubleshooting]
 **Learning:** Duplicate arguments defined in pytest CLI vs pytest config (e.g. `--cov=ffbb_mcp`) can cause fatal test failures in newer pytest versions when invoked via CI. Furthermore, CI actions must be updated to existing major versions (e.g., `actions/checkout@v6` -> `v4`).
 **Action:** Always verify action versions and pytest argument combinations locally before pushing.
+## 2026-04-19 - [CI Troubleshooting - Mypy configuration]
+**Learning:** Adding a typecheck step (`mypy src`) in CI workflow without actually adding `mypy` as a dependency in the project's development dependencies (e.g., `pyproject.toml` `dev` extra) causes the CI step to fail with a `No such file or directory (os error 2)` error. Also, type errors may surface in CI if `mypy` hasn't been successfully run on the latest codebase.
+**Action:** When adding static analysis steps to CI workflows, ensure the respective tool is present in the dependency manifest. Additionally, run the static analysis tool locally before committing to fix any newly revealed type errors.

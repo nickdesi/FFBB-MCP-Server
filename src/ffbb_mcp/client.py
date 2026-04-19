@@ -80,7 +80,7 @@ class FFBBClientFactory:
     async def get_client_async(cls) -> FFBBAPIClientV3:
         """Retourne le client FFBB en asynchrone, en le créant ou rafraîchissant si nécessaire."""
         # Première vérification rapide sans lock
-        if not cls._is_token_expired():
+        if not cls._is_token_expired() and cls._instance is not None:
             return cls._instance
 
         # FIX: création lazy du Lock dans la running loop courante
@@ -102,6 +102,8 @@ class FFBBClientFactory:
                     )
                     logger.error(traceback.format_exc())
                     raise
+            if cls._instance is None:
+                raise RuntimeError("Failed to initialize FFBBAPIClientV3")
             return cls._instance
 
     @classmethod
