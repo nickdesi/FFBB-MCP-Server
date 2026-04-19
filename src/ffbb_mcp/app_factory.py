@@ -1,5 +1,6 @@
 import contextlib
 import logging
+from collections.abc import AsyncGenerator
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -14,7 +15,7 @@ logger = logging.getLogger("ffbb-mcp")
 
 def create_app(mcp: FastMCP, allowed_origins: list[str]) -> Starlette:
     @contextlib.asynccontextmanager
-    async def lifespan(app: Starlette) -> Any:
+    async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
         async with mcp.session_manager.run():
             yield
 

@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 dependencies = [
-    "mcp[cli]>=1.8.0,<2.0.0",
+    "mcp[cli]>=1.8.0",
     "ffbb-api-client-v3>=1.5.3,<2.0.0",
     "anysqlite>=0.0.5",
     "uvicorn",
@@ -75,7 +75,7 @@ warn_unused_configs = true
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["ffbb_mcp.services", "ffbb_mcp.server", "ffbb_mcp.resources", "ffbb_mcp.prompts", "ffbb_mcp.metrics", "ffbb_mcp.cache_strategy"]
+module = ["ffbb_mcp.services", "ffbb_mcp.resources", "ffbb_mcp.prompts", "ffbb_mcp.metrics", "ffbb_mcp.cache_strategy"]
 ignore_errors = true
 
 

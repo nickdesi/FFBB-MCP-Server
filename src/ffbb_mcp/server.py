@@ -383,7 +383,7 @@ async def ffbb_bilan(
             description="Si True, contourne le cache pour récupérer des données fraîches."
         ),
     ] = False,
-    ctx: Context | None = None,
+    ctx: Context[Any] | None = None,
 ) -> dict[str, Any]:
     """Bilan complet d'une équipe toutes phases confondues en UN seul appel.
 
@@ -778,7 +778,7 @@ async def ffbb_team_summary(
             description="Catégorie + genre + numéro d'équipe (ex: 'U11M1', 'U13F2', 'U15M', 'Senior').",
         ),
     ] = None,
-    ctx: Context | None = None,
+    ctx: Context[Any] | None = None,
 ) -> dict[str, Any]:
     """Résumé complet et agent-friendly pour une équipe.
 
@@ -1016,7 +1016,7 @@ async def ffbb_bilan_saison(
             description="Si True, contourne le cache pour récupérer des données fraîches."
         ),
     ] = False,
-    ctx: Context | None = None,
+    ctx: Context[Any] | None = None,
 ) -> dict[str, Any]:
     """Bilan détaillé de la saison pour une équipe précise (toutes phases).
 
