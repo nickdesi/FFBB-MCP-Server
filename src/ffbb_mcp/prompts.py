@@ -2,7 +2,7 @@
 
 from typing import Any
 
-_PROMPT_VERSION = "3.4.0"
+_PROMPT_VERSION = "3.5.0"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # HELPERS INTERNES
@@ -153,14 +153,47 @@ TOUJOURS suivre cette séquence, sans exception :
    → Si échec (équipe non résolue) : passer à l'étape 2.
 
 2. **ÉTAPE 2 — Appeler `ffbb_bilan`** (organisme_id + categorie).
-   → Lister toutes les phases disponibles avec leur `poule_id`.
+   → Lister toutes les phases disponibles with their `poule_id`.
    → Sans précision de phase → prendre la phase au numéro le plus élevé (ex: Phase 3 > Phase 1).
-   → Avec précision (ex: "Phase 3") → matcher le nom de compétition ou le label.
+   → With précision (ex: "Phase 3") → matcher le nom de compétition ou le label.
 
 3. **ÉTAPE 3 — Appeler `ffbb_get(id=poule_id, type="poule")`**.
    → Retourne le classement complet et fiable.
 
 ⚠️ **INTERDICTION** : Ne jamais utiliser `ffbb_club(action='classement', phase=X)` pour résoudre une phase spécifique — non fiable.\
+"""
+
+
+_RULES_TEAM_REPORT = """\
+## 📊 RÈGLES POUR LES BILANS D'ÉQUIPES
+
+### 1. Appels MCP obligatoires (Séquence de chaînage)
+Pour tout bilan détaillé, toujours chaîner ces 3 appels dans l'ordre :
+1. `ffbb_bilan` → bilan global + détail par phases.
+2. `ffbb_team_summary` → dernier match joué + prochain match + contexte équipe.
+3. `ffbb_club(action="calendrier")` → tous les scores match par match (base pour calculs).
+
+### 2. Calculs enrichis via code execution
+À partir du calendrier complet, utiliser obligatoirement `execute_code` pour calculer :
+- Moyennes PM/PE par phase (et non uniquement les totaux).
+- Ratio PM/PE global (ex: ×2,57).
+- Plus grosse victoire (score + adversaire + date).
+- Match le plus serré (score + adversaire + date).
+- Record de points marqués / record de défense (min encaissé).
+- Comparaison domicile vs extérieur (PM moy, PE moy).
+
+### 3. Interprétation des données
+- Ne jamais conclure à une "montée en puissance" sur la base des totaux (qui augmentent mécaniquement). Utiliser exclusivement les MOYENNES.
+- **Catégorie U11** : Les scores sont cappés (~40 pts d'écart). Ne pas sur-interpréter les gros écarts. Signaler les écarts > 42 pts comme potentiellement hors-norme.
+- **Géographie** : Ne jamais inférer la ville ou le département d'un club s'il n'est pas explicitement retourné par le MCP (rester factuel).
+
+### 4. Structure du rendu final (Ordre strict)
+1. **Bilan global** (Tableau : MJ, V/D, PM/PE/Diff, Ratio, Moyennes).
+2. **Détail par phase** (Tableau avec moyennes par match et position).
+3. **Records de la saison** (Plus grosse victoire, match serré, min encaissé).
+4. **Domicile vs Extérieur** (Tableau comparatif).
+5. **Calendrier détaillé** (Focus sur la phase courante).
+6. **Prochain match** (Date, heure, adversaire, lieu).\
 """
 
 _RULES_PHASES = """\
@@ -312,6 +345,7 @@ def expert_basket() -> str:
             _RULES_DISAMBIGUATION,
             _RULES_DISPLAY_MATCH,
             _RULES_DISPLAY_BILAN,
+            _RULES_TEAM_REPORT,
             _RULES_METIER,
             _RULES_CLASSEMENT,
             _RULES_PHASES,
@@ -408,14 +442,14 @@ def bilan_equipe(club_name: str, categorie: str, numero_equipe: int = 1) -> str:
             f"Bilan complet '{cat}'{num_label} — club '{cn}' — saison actuelle, toutes phases.",
             _strategy(
                 "`ffbb_search(type='organismes', query=<club_name>)` si `organisme_id` non caché.",
-                f"`ffbb_team_summary(organisme_id=..., categorie='{cat}', numero_equipe={numero_equipe})` → `bilan_total` (Tier 1).",
-                f"`ffbb_bilan(organisme_id=..., categorie='{cat}')` si détail par phase nécessaire.",
-                "`ffbb_club(action='calendrier', organisme_id=...)` → reconstruction manuelle (Tier 3 uniquement).",
+                f"`ffbb_bilan(organisme_id=..., categorie='{cat}')` → détail par phases (Tier 1).",
+                f"`ffbb_team_summary(organisme_id=..., categorie='{cat}', numero_equipe={numero_equipe})` → dernier/prochain match (Tier 2).",
+                f"`ffbb_club(action='calendrier', organisme_id=..., filtre='{cat}')` → scores match par match (Tier 3).",
             ),
-            "**Format attendu :** suivre strictement `## 📊 AFFICHAGE DU BILAN DE CLUB`.\n"
-            "- En-tête avec bilan global (V/D/MJ/diff)\n"
-            "- Tableau groupé par catégorie + numéro d'équipe + phase\n"
-            "- Bloc faits marquants si ≥ 3 équipes",
+            "**Format attendu :** suivre strictement `## 📊 RÈGLES POUR LES BILANS D'ÉQUIPES`.\n"
+            "1. Utiliser `execute_code` pour les moyennes, records et ratios PM/PE.\n"
+            "2. Présenter le bilan global, le détail par phase, les records, et le comparatif dom/ext.\n"
+            "3. Ajouter le calendrier détaillé et le prochain match.",
         ]
     )
 
