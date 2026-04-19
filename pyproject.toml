@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ffbb-mcp"
-version = "0.5.0"
+version = "1.0.0"
 description = "MCP Server for FFBB (Fédération Française de Basketball) data"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -88,7 +88,7 @@ ignore_errors = true
 "src/ffbb_mcp/server.py" = ["RUF001"]
 
 [[tool.mypy.overrides]]
-module = ["cachetools", "cachetools.*"]
+module = ["cachetools"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
