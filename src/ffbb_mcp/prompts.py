@@ -1,4 +1,5 @@
 """Définition des prompts MCP réutilisables pour le serveur FFBB."""
+
 from typing import Any
 
 _PROMPT_VERSION = "3.4.0"
