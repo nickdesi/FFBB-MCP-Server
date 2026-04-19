@@ -25,7 +25,7 @@ from starlette.responses import (
 
 from . import __version__ as _PACKAGE_VERSION
 from .metrics import generate_prometheus_metrics
-from .prompts import register_prompts
+from .prompts import ROUTING_PROMPT, register_prompts
 from .resources import register_resources
 from .services import (
     ffbb_bilan_service,
@@ -121,7 +121,7 @@ _dns_protection = os.environ.get("ENABLE_DNS_PROTECTION", "false").lower() == "t
 mcp: FastMCP = FastMCP(
     "FFBB MCP Server",
     instructions=(
-        "Données FFBB (basketball français). "
+        ROUTING_PROMPT + "\n\n" + "Données FFBB (basketball français). "
         "⚡ OUTIL PRIORITAIRE pour tout bilan/résultats/classement : ffbb_bilan(club_name=..., categorie=...) "
         "→ 1 seul appel, retourne tout (toutes phases agrégées). "
         "Pour le bilan détaillé d'une équipe précise (U11M1, etc.), utiliser ffbb_bilan_saison(organisme_id=..., categorie=..., numero_equipe=...). "
@@ -572,6 +572,10 @@ async def ffbb_club(
 ) -> list[dict[str, Any]]:
     """Outils agreges autour d'un club (calendrier, equipes, classement).
 
+    ✅ Outil de référence pour toute demande au pluriel :
+    "matchs restants", "derniers matchs à jouer", "prochaines journées",
+    "calendrier de fin de saison".
+
     ⚡ `action="calendrier"` est l'outil le plus fiable pour obtenir TOUTES les rencontres
     passées et futures d'une équipe/catégorie, sans les limitations de `ffbb_get(poule)`.
 
@@ -964,6 +968,10 @@ async def ffbb_next_match(
     ] = False,
 ) -> dict[str, Any]:
     """Prochain match à jouer pour une équipe précise.
+
+    ⚠️ SINGULIER UNIQUEMENT. Si la demande est au pluriel
+    ("matchs restants", "derniers matchs à jouer", "calendrier"),
+    utiliser ffbb_club(action="calendrier") à la place.
 
     ⚠️ ATTENTION LLM : Cet outil retourne STRICTEMENT LE PROCHAIN MATCH UNIQUE.
     Ne l'utilise JAMAIS si l'utilisateur demande "les prochains matchs" au pluriel.
