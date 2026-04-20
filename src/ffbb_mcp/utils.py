@@ -57,6 +57,12 @@ class ParsedCategorie(NamedTuple):
     numero_equipe: int | None
 
 
+_CAT_PATTERN = re.compile(r"U(\d{2})")
+_M_PATTERN = re.compile(r"\bM\b|U\d{2}M|MASC")
+_F_PATTERN = re.compile(r"\bF\b|U\d{2}F|FÉM|FEM")
+_NUM_PATTERN = re.compile(r"(\d+)")
+
+
 @lru_cache(maxsize=256)
 def parse_categorie(raw: str | None) -> ParsedCategorie:
     """Parse une chaîne de catégorie libre en composantes structurées.
@@ -73,7 +79,7 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
         return ParsedCategorie(categorie=None, sexe=None, numero_equipe=None)
 
     # 1) Catégorie type Uxx
-    cat_match = re.search(r"U(\d{2})", s)
+    cat_match = _CAT_PATTERN.search(s)
     categorie: str | None = None
     if cat_match:
         categorie = f"U{cat_match.group(1)}"
@@ -82,9 +88,9 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
 
     # 2) Sexe (M/F) — on évite de matcher le M de "U11M" si déjà capturé
     sexe: str | None = None
-    if re.search(r"\bM\b", s) or re.search(r"U\d{2}M", s) or "MASC" in s:
+    if _M_PATTERN.search(s):
         sexe = "M"
-    if re.search(r"\bF\b", s) or re.search(r"U\d{2}F", s) or "FÉM" in s or "FEM" in s:
+    if _F_PATTERN.search(s):
         sexe = "F"
 
     # 3) Numéro d'équipe (chiffre final non lié à Uxx)
@@ -96,7 +102,7 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
     if cat_match:
         remainder = s[cat_match.end() :]
     # Chercher un chiffre libre (pas partie de Uxx) dans le reste
-    num_match = re.search(r"(\d+)", remainder)
+    num_match = _NUM_PATTERN.search(remainder)
     if num_match:
         try:
             numero_equipe = int(num_match.group(1))

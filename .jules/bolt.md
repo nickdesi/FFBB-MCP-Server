@@ -16,3 +16,7 @@
 ## 2025-04-19 - [CI Troubleshooting]
 **Learning:** Duplicate arguments defined in pytest CLI vs pytest config (e.g. `--cov=ffbb_mcp`) can cause fatal test failures in newer pytest versions when invoked via CI. Furthermore, CI actions must be updated to existing major versions (e.g., `actions/checkout@v6` -> `v4`).
 **Action:** Always verify action versions and pytest argument combinations locally before pushing.
+
+## 2024-04-20 - [Performance] Regex compilation overhead in cache miss scenarios
+**Learning:** In highly cached functions (like `parse_categorie` decorated with `lru_cache`), the overhead of dynamically compiling regular expressions using `re.search()` with string literals dominates the execution time during cache misses. This becomes relevant when the cache is small compared to the input space, or when handling cold-start requests. Python's internal regex caching limits its effectiveness in complex or varied patterns.
+**Action:** Always pre-compile regular expressions at the module level using `re.compile()` for functions that will be called frequently, even if they are memoized. This halved the uncached execution time of string parsing logic in this codebase.
