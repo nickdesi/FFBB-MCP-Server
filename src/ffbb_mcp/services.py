@@ -611,7 +611,7 @@ async def ffbb_get_classement_service(
     )
 
     if not force_refresh:
-        cached = _cache_get(state.cache_poule, cache_key, "classement")
+        cached = _cache_get(state.cache_classement, cache_key, "classement")
         if cached is not None:
             return (
                 cached["data"]
@@ -668,10 +668,10 @@ async def ffbb_get_classement_service(
                 "paniers_encaisses": c.get("paniers_encaisses") or 0,
             }
         )
-    # Calculate dynamic TTL using same logic as poule since it caches in state.cache_poule
+    # Calculate dynamic TTL using same logic as poule since it caches in state.cache_classement
     ttl = await get_poule_ttl(poule_id_int, get_lives_service)
     wrapped_flat = {"_ttl": ttl, "data": flat}
-    _cache_set(state.cache_poule, cache_key, wrapped_flat, "classement")
+    _cache_set(state.cache_classement, cache_key, wrapped_flat, "classement")
     return flat
 
 
