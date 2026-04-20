@@ -51,7 +51,7 @@ class FFBBClientFactory:
     @classmethod
     def _create_client(cls) -> FFBBAPIClientV3:
         """Crée une nouvelle instance du client avec des tokens frais. Synchrone."""
-        logger.info("Initialisation du client FFBB...")
+        logger.debug("Initialisation du client FFBB...")
         # FIX: logger.debug au lieu de logger.info — ce log se déclenche
         # toutes les 25 min en prod lors du refresh de token, c'est du niveau debug.
         logger.debug("CWD: %s", os.getcwd())

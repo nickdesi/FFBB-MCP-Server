@@ -167,7 +167,7 @@ def prune_payload(obj: Any, depth: int = 0) -> Any:
 
     elif isinstance(obj, list):
         # 1. Limitation de taille (ZipAI Surgical)
-        limit = 100
+        limit = 25
         truncated = obj[:limit]
 
         # 2. Nettoyage récursif

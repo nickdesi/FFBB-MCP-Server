@@ -43,45 +43,13 @@ class _ServiceState:
     inflight_search: dict[str, asyncio.Task[Any]] = field(default_factory=dict)
 
     # Caches in-memory globaux
-    cache_lives: TTLCache[Any, Any] = field(
-        default_factory=lambda: TTLCache(
-            maxsize=128,
-            ttl=_read_positive_int_env("FFBB_CACHE_TTL_LIVES", get_static_ttl("lives")),
-        )
-    )
-    cache_search: TTLCache[Any, Any] = field(
-        default_factory=lambda: TTLCache(
-            maxsize=256,
-            ttl=_read_positive_int_env(
-                "FFBB_CACHE_TTL_SEARCH", get_static_ttl("search")
-            ),
-        )
-    )
-    cache_detail: TTLCache[Any, Any] = field(
-        default_factory=lambda: TTLCache(
-            maxsize=128,
-            ttl=_read_positive_int_env(
-                "FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")
-            ),
-        )
-    )
-    cache_calendrier: TTLCache[Any, Any] = field(
-        default_factory=lambda: TTLCache(
-            maxsize=64,
-            ttl=_read_positive_int_env(
-                "FFBB_CACHE_TTL_CALENDRIER", get_static_ttl("rencontre")
-            ),
-        )
-    )
-    cache_bilan: TLRUCache[Any, Any] = field(
-        default_factory=lambda: TLRUCache(maxsize=64, ttu=_ttu_bilan)
-    )
-    cache_classement: TLRUCache[Any, Any] = field(
-        default_factory=lambda: TLRUCache(maxsize=128, ttu=_ttu_poule)
-    )
-    cache_poule: TLRUCache[Any, Any] = field(
-        default_factory=lambda: TLRUCache(maxsize=256, ttu=_ttu_poule)
-    )
+    cache_lives: TTLCache[Any, Any] | None = None
+    cache_search: TTLCache[Any, Any] | None = None
+    cache_detail: TTLCache[Any, Any] | None = None
+    cache_calendrier: TTLCache[Any, Any] | None = None
+    cache_bilan: TLRUCache[Any, Any] | None = None
+    cache_classement: TLRUCache[Any, Any] | None = None
+    cache_poule: TLRUCache[Any, Any] | None = None
 
 
 state = _ServiceState()
@@ -98,10 +66,17 @@ def reset_service_state() -> None:
     state.inflight_poule.clear()
     state.inflight_detail.clear()
     state.inflight_search.clear()
-    state.cache_lives.clear()
-    state.cache_search.clear()
-    state.cache_detail.clear()
-    state.cache_calendrier.clear()
-    state.cache_bilan.clear()
-    state.cache_classement.clear()
-    state.cache_poule.clear()
+    if state.cache_lives is not None:
+        state.cache_lives.clear()
+    if state.cache_search is not None:
+        state.cache_search.clear()
+    if state.cache_detail is not None:
+        state.cache_detail.clear()
+    if state.cache_calendrier is not None:
+        state.cache_calendrier.clear()
+    if state.cache_bilan is not None:
+        state.cache_bilan.clear()
+    if state.cache_classement is not None:
+        state.cache_classement.clear()
+    if state.cache_poule is not None:
+        state.cache_poule.clear()
