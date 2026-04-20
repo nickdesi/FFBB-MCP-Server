@@ -6,12 +6,12 @@
     <title>FFBB MCP Server — Connectez vos agents IA au basketball français</title>
     <meta name="description" content="FFBB MCP Server est un serveur Model Context Protocol (MCP) pour accéder aux données FFBB en temps réel : bilans d'équipes, calendriers, résultats, classements et lives.">
     <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://ffbb.desimone.fr/" />
     <meta name="theme-color" content="#0a0a0a">
     <!-- Preconnect for fonts perf -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="css/style.css">
-    
+    <link rel="stylesheet" href="css/style.css">    
     <!-- Open Graph / Social Media -->
     <meta property="og:title" content="FFBB MCP Server">
     <meta property="og:description" content="Accédez aux données FFBB en temps réel via vos agents IA (Claude, Cursor, ...)">
@@ -25,16 +25,59 @@
     <script type="application/ld+json">
     {
         "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "FFBB MCP Server",
-        "applicationCategory": "DeveloperApplication",
-        "operatingSystem": "macOS, Windows, Linux",
-        "description": "Serveur MCP pour accéder aux données de la Fédération Française de BasketBall.",
-        "url": "https://ffbb.desimone.fr",
-        "image": "https://ffbb.desimone.fr/logo.webp",
-        "sameAs": [
-            "https://github.com/nickdesi/FFBB-MCP-Server",
-            "https://smithery.ai/servers/nickdesi/mcpffbb"
+        "@graph": [
+            {
+                "@type": "SoftwareApplication",
+                "name": "FFBB MCP Server",
+                "applicationCategory": "DeveloperApplication",
+                "operatingSystem": "macOS, Windows, Linux",
+                "description": "Serveur MCP pour accéder aux données de la Fédération Française de BasketBall.",
+                "url": "https://ffbb.desimone.fr",
+                "image": "https://ffbb.desimone.fr/logo.webp",
+                "datePublished": "2025-01-01T00:00:00Z",
+                "dateModified": "2026-04-20T17:00:00Z",
+                "author": {
+                    "@type": "Person",
+                    "name": "Nicolas De Simone",
+                    "url": "https://github.com/nickdesi",
+                    "description": "Développeur Python spécialisé dans l'écosystème open source pour la FFBB."
+                },
+                "sameAs": [
+                    "https://github.com/nickdesi/FFBB-MCP-Server",
+                    "https://smithery.ai/servers/nickdesi/mcpffbb",
+                    "https://nickdesi.github.io/FFBBApiClientV3/",
+                    "https://pypi.org/project/FFBBApiClientV3/"
+                ]
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "Comment interroger l'API FFBB avec Claude ou cursor ?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Il suffit de configurer FFBB MCP Server dans votre client IA avec le type HTTP Streamable et l'URL https://ffbb.desimone.fr/mcp. Votre agent saura ensuite automatiquement quels outils utiliser pour chercher un club, récupérer un calendrier ou un classement."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "Mon club de basket est introuvable, pourquoi ?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Utilisez le nom précis (ex: Vichy) et l'outil ffbb_search. Le serveur MCP supporte la tolérance aux erreurs et résout automatiquement les IDs."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "Les scores et données FFBB sont-ils en temps réel ?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Oui, le cache est dynamique et se rafraîchit en temps réel (15 secondes) pendant les fenêtres de matchs (LIVE) et jusqu'à 24h hors saison pour économiser la bande passante."
+                        }
+                    }
+                ]
+            }
         ]
     }
     </script>
@@ -207,13 +250,40 @@ npx -y @smithery/cli@latest install @nickdesi/mcpffbb \
             </div>
         </section>
 
+        <!-- FAQ Section (GEO Optimized) -->
+        <section id="faq" class="features" style="margin-top: 4rem;">
+            <div class="section-label">
+                <div class="badge">Questions fréquentes</div>
+                <h2 class="section-title">FAQ : API FFBB & Intégration IA</h2>
+                <p class="section-subtitle">Les réponses aux questions les plus courantes sur le serveur et la data.</p>
+            </div>
+            <div class="features-grid" style="grid-template-columns: 1fr; max-width: 800px; margin: 0 auto; gap: 1.5rem;">
+                <article class="feature-card" style="text-align: left; padding: 1.5rem;">
+                    <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Comment interroger l'API FFBB avec l'IA ?</h3>
+                    <p>Il suffit de configurer <strong>FFBB MCP Server</strong> dans votre client (Claude, Cursor, etc.) avec l'URL <code>https://ffbb.desimone.fr/mcp</code>. L'agent utilisera automatiquement l'intelligence métier intégrée pour comprendre les catégories, rechercher les clubs et récupérer les plannings et classements sans effort supplémentaire.</p>
+                </article>
+                <article class="feature-card" style="text-align: left; padding: 1.5rem;">
+                    <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Mon club de basket est introuvable, que faire ?</h3>
+                    <p>Si l'agent échoue avec un nom générique, utilisez un mot-clé précis (ex: "Vichy"). L'outil <code>ffbb_search</code> est tolérant aux fautes de frappe et aux cas complexes, incluant les noms avec des apostrophes (ex: "Jeanne d'Arc") ou les équipes uniques sans numéro apparent impliqué (ex: "U11M" devient automatiquement "U11M1").</p>
+                </article>
+                <article class="feature-card" style="text-align: left; padding: 1.5rem;">
+                    <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Les données et scores sont-ils en temps réel ?</h3>
+                    <p>Totalement. Une stratégie de cache dynamique est implémentée pour garantir une fraîcheur maximale (<strong>15 secondes de TTL</strong>) lors des périodes de matchs Live, garantissant des scores de basket en temps réel, tout en préservant l'API officielle hors saison.</p>
+                </article>
+            </div>
+        </section>
+
         <!-- Footer -->
         <footer class="site-footer">
-            <p>&copy; 2025 Nicolas De Simone — FFBB MCP Server</p>
-            <nav class="footer-nav" aria-label="Liens du pied de page">
-                <a href="https://github.com/nickdesi/FFBB-MCP-Server" class="footer-link">GitHub</a>
-                <a href="https://smithery.ai/servers/nickdesi/mcpffbb" class="footer-link">Smithery</a>
-                <a href="https://nickdesi.github.io/FFBBApiClientV3/" class="footer-link footer-link-accent">API V3 Publique &rarr;</a>
+            <p>&copy; 2026 Nicolas De Simone — Développeur écosystème de données FFBB</p>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;">
+                Dernière mise à jour du contenu : 20 Avril 2026 <span aria-hidden="true">•</span> 
+                Propulsé par la logique métier de <a href="https://pypi.org/project/FFBBApiClientV3/" target="_blank" rel="noopener" style="color: inherit; text-decoration: underline;">FFBBApiClientV3 sur PyPI</a>
+            </p>
+            <nav class="footer-nav" aria-label="Liens du pied de page" style="margin-top: 1.5rem;">
+                <a href="https://github.com/nickdesi/FFBB-MCP-Server" class="footer-link">GitHub FFBB MCP</a>
+                <a href="https://smithery.ai/servers/nickdesi/mcpffbb" class="footer-link">Smithery Registry</a>
+                <a href="https://nickdesi.github.io/FFBBApiClientV3/" class="footer-link footer-link-accent">Documentation FFBBApiClientV3 &rarr;</a>
             </nav>
         </footer>
     </div>

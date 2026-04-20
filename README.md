@@ -19,6 +19,10 @@
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
 </p>
 
+<p align="center">
+  <em>Dernière mise à jour : 20 Avril 2026 • Propulsé par <a href="https://pypi.org/project/FFBBApiClientV3/">FFBBApiClientV3</a></em>
+</p>
+
 ---
 
 ## 🌟 Aperçu
@@ -140,7 +144,7 @@ Ce serveur expose des **Prompts** natifs pour donner instantanément de l'expert
 
 ---
 
-## 🔧 Dépannage & FAQ
+## 🔧 FAQ : Comment intégrer et dépanner l'API FFBB avec l'IA ?
 
 - **Mon IA ne trouve pas mon équipe locale :** Donnez-lui toujours le nom précis du club (ex: `Vichy` au lieu de `JA Vichy` si c'est ambigu) et utilisez **`ffbb_search`**.
 - **L'agent boucle sur des IDs introuvables :** Rappelez à l'agent d'utiliser `ffbb_bilan` avec le paramètre `club_name` pour qu'il fasse lui-même la résolution interne.
