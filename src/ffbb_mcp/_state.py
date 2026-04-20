@@ -25,8 +25,8 @@ def _ttu_bilan(_key: Any, value: Any, now: float) -> float:
 
 
 def _ttu_poule(_key: Any, value: Any, now: float) -> float:
-    if isinstance(value, dict) and "ttl" in value:
-        return now + float(value["ttl"])
+    if isinstance(value, dict) and "_ttl" in value:
+        return now + float(value["_ttl"])
     return now + get_static_ttl("rencontre")
 
 
@@ -76,8 +76,11 @@ class _ServiceState:
     cache_bilan: TLRUCache[Any, Any] = field(
         default_factory=lambda: TLRUCache(maxsize=64, ttu=_ttu_bilan)
     )
-    cache_poule: TLRUCache[Any, Any] = field(
+    cache_classement: TLRUCache[Any, Any] = field(
         default_factory=lambda: TLRUCache(maxsize=128, ttu=_ttu_poule)
+    )
+    cache_poule: TLRUCache[Any, Any] = field(
+        default_factory=lambda: TLRUCache(maxsize=256, ttu=_ttu_poule)
     )
 
 
@@ -100,4 +103,5 @@ def reset_service_state() -> None:
     state.cache_detail.clear()
     state.cache_calendrier.clear()
     state.cache_bilan.clear()
+    state.cache_classement.clear()
     state.cache_poule.clear()
