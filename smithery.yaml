@@ -10,26 +10,36 @@ configSchema:
   required:
     - ALLOWED_HOSTS
     - ALLOWED_ORIGINS
-    - ENABLE_DNS_PROTECTION
-    - MCP_MODE
   properties:
     ALLOWED_HOSTS:
       type: string
-      description: Comma-separated list of allowed hosts for security.
+      title: "Allowed Hosts"
+      description: "Comma-separated list of allowed hostnames for DNS rebinding protection. Example: 'localhost,ffbb.desimone.fr'"
       default: "localhost,127.0.0.1,ffbb.desimone.fr"
     ALLOWED_ORIGINS:
       type: string
-      description: Comma-separated list of allowed origins for CORS.
+      title: "Allowed CORS Origins"
+      description: "Comma-separated list of browser origins allowed to access the MCP server. Example: 'https://ffbb.desimone.fr'"
       default: "http://localhost:5173,http://localhost:8000,https://ffbb.desimone.fr"
     ENABLE_DNS_PROTECTION:
       type: boolean
-      description: Enable DNS rebinding protection. Set to true for production.
+      title: "Enable DNS Rebinding Protection"
+      description: "Security feature to prevent DNS rebinding attacks. Set to true for production."
       default: true
     PUBLIC_URL:
       type: string
-      description: Optional public URL of the MCP server (used for proxying).
+      title: "Public Server URL"
+      description: "The full URL where the server is publicly reachable. Used for metadata and proxy links."
       default: "https://ffbb.desimone.fr"
     MCP_MODE:
       type: string
-      description: "Mode d'exécution du serveur MCP : 'sse' active le transport Streamable HTTP (spec 2025-11-25), 'stdio' pour usage local."
+      title: "MCP Transport Mode"
+      description: "Select the MCP communication protocol: 'sse' for HTTP-based streaming (production) or 'stdio' for CLI usage."
       default: "sse"
+      enum: ["sse", "stdio", "http"]
+
+exampleConfig:
+  ALLOWED_HOSTS: "localhost,ffbb.desimone.fr"
+  ALLOWED_ORIGINS: "https://ffbb.desimone.fr"
+  ENABLE_DNS_PROTECTION: true
+  MCP_MODE: "sse"
