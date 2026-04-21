@@ -170,9 +170,28 @@ def prune_payload(obj: Any, depth: int = 0) -> Any:
             "categorie",
             "position",
             "bilan_total",
+            # Classement
+            "points",
+            "match_joues",
+            "gagnes",
+            "perdus",
+            "nuls",
+            "difference",
+            "paniers_marques",
+            "paniers_encaisses",
+            "is_target",
+            "logo_url",
+            "point_initiaux",
+            "penalites_arbitrage",
+            "penalites_entraineur",
+            "penalites_diverses",
+            "nombre_forfaits",
+            "nombre_defauts",
+            "quotient",
+            "hors_classement",
         }
 
-        if len(cleaned) > 15:
+        if len(cleaned) > 50:
             sorted_keys = sorted(cleaned.keys())
             kept_keys = {k for k in sorted_keys if k in essential_keys}
             other_keys = [k for k in sorted_keys if k not in essential_keys]
