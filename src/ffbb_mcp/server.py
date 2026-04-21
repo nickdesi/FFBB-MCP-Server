@@ -55,7 +55,7 @@ from .services import (
     search_terrains_service,
     search_tournois_service,
 )
-from .utils import prune_payload
+from .utils import format_team_name, prune_payload
 
 
 def zipai_surgical(func: Any) -> Any:
@@ -464,11 +464,33 @@ async def ffbb_get(
         elif type == "poule":
             poule_data = await get_poule_service(id, force_refresh=force_refresh)
 
+            # Formatage des noms d'équipes dans les classements
+            classements = poule_data.get("classements", [])
+            formatted_classements = []
+            for c in (classements or []):
+                eng = c.get("id_engagement", {}) or {}
+                nom = eng.get("nom", "")
+                num = eng.get("numero_equipe")
+                c["equipe"] = format_team_name(nom, num)
+                formatted_classements.append(c)
+
+            # Formatage des noms d'équipes dans les rencontres
+            rencontres = poule_data.get("rencontres", [])
+            formatted_rencontres = []
+            for m in (rencontres or []):
+                eng1 = m.get("idEngagementEquipe1", {}) or {}
+                eng2 = m.get("idEngagementEquipe2", {}) or {}
+                num1 = eng1.get("numeroEquipe") if isinstance(eng1, dict) else None
+                num2 = eng2.get("numeroEquipe") if isinstance(eng2, dict) else None
+                m["nomEquipe1"] = format_team_name(m.get("nomEquipe1", ""), num1)
+                m["nomEquipe2"] = format_team_name(m.get("nomEquipe2", ""), num2)
+                formatted_rencontres.append(m)
+
             res = {
                 "id": poule_data.get("id"),
                 "nom": poule_data.get("libelle"),
-                "classements": poule_data.get("classements", []),
-                "rencontres": poule_data.get("rencontres", []),
+                "classements": formatted_classements,
+                "rencontres": formatted_rencontres,
             }
             if res.get("rencontres"):
                 max_limit = int(os.environ.get("FFBB_MAX_CALENDAR_MATCHES", "300"))

@@ -30,7 +30,7 @@ from ffbb_mcp.metrics import (
     record_cache_miss,
     record_call,
 )
-from ffbb_mcp.utils import ParsedCategorie, parse_categorie, serialize_model
+from ffbb_mcp.utils import ParsedCategorie, format_team_name, parse_categorie, serialize_model
 
 logger = logging.getLogger("ffbb-mcp")
 
@@ -657,7 +657,7 @@ async def ffbb_get_classement_service(
         flat.append(
             {
                 "position": c.get("position"),
-                "equipe": nom_equipe,
+                "equipe": format_team_name(nom_equipe, num_equipe),
                 "points": c.get("points"),
                 "match_joues": c.get("match_joues"),
                 "gagnes": c.get("gagnes"),
@@ -877,7 +877,7 @@ async def ffbb_equipes_club_service(
             "numero_equipe": numero_equipe,
             "team_label": cat_label or team_label,
             "phase_label": phase_label,
-            "nom_equipe": club_nom,
+            "nom_equipe": format_team_name(club_nom, num_suffix),
             "competition": nom_comp,
             "competition_id": comp.get("id"),
             "poule_id": poule.get("id"),
@@ -1168,8 +1168,10 @@ async def ffbb_next_match_service(
     id_eng2 = eng2.get("id") if isinstance(eng2, dict) else eng2
     my_eng = source_team.get("engagement_id")
 
-    eq1_name = next_match.get("nomEquipe1", next_match.get("nom_equipe1", ""))
-    eq2_name = next_match.get("nomEquipe2", next_match.get("nom_equipe2", ""))
+    num1 = eng1.get("numeroEquipe") if isinstance(eng1, dict) else None
+    num2 = eng2.get("numeroEquipe") if isinstance(eng2, dict) else None
+    eq1_name = format_team_name(next_match.get("nomEquipe1", next_match.get("nom_equipe1", "")), num1)
+    eq2_name = format_team_name(next_match.get("nomEquipe2", next_match.get("nom_equipe2", "")), num2)
 
     if my_eng and id_eng1 and str(my_eng) == str(id_eng1):
         adversaire = eq2_name
@@ -1644,8 +1646,13 @@ async def get_calendrier_club_service(
                 # Seule la déduplication par match_id est nécessaire.
                 seen_match_ids.add(match_id)
 
-                eq1 = match.get("nomEquipe1", match.get("nom_equipe1", ""))
-                eq2 = match.get("nomEquipe2", match.get("nom_equipe2", ""))
+                eng1 = match.get("idEngagementEquipe1")
+                eng2 = match.get("idEngagementEquipe2")
+                num1 = eng1.get("numeroEquipe") if isinstance(eng1, dict) else None
+                num2 = eng2.get("numeroEquipe") if isinstance(eng2, dict) else None
+
+                eq1 = format_team_name(match.get("nomEquipe1", match.get("nom_equipe1", "")), num1)
+                eq2 = format_team_name(match.get("nomEquipe2", match.get("nom_equipe2", "")), num2)
                 score1 = match.get("resultatEquipe1", match.get("resultat_equipe1"))
                 score2 = match.get("resultatEquipe2", match.get("resultat_equipe2"))
                 date_match = match.get("date_rencontre", match.get("date", ""))
@@ -2533,14 +2540,19 @@ async def ffbb_last_result_service(
         score_nous is not None and score_eux is not None and score_nous > score_eux
     )
 
+    eng1 = dernier.get("idEngagementEquipe1")
+    eng2 = dernier.get("idEngagementEquipe2")
+    num1 = eng1.get("numeroEquipe") if isinstance(eng1, dict) else None
+    num2 = eng2.get("numeroEquipe") if isinstance(eng2, dict) else None
+
     return {
         "status": "ok",
         "club_resolu": club_resolu,
         "date": dernier.get("date_rencontre", ""),
         "journee": dernier.get("numeroJournee"),
-        "domicile": dernier.get("nomEquipe1", ""),
+        "domicile": format_team_name(dernier.get("nomEquipe1", ""), num1),
         "score_domicile": dernier.get("resultatEquipe1"),
-        "exterieur": dernier.get("nomEquipe2", ""),
+        "exterieur": format_team_name(dernier.get("nomEquipe2", ""), num2),
         "score_exterieur": dernier.get("resultatEquipe2"),
         "victoire": victoire,
     }

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 from functools import lru_cache
 from typing import Any, NamedTuple
@@ -110,6 +112,26 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
             numero_equipe = None
 
     return ParsedCategorie(categorie=categorie, sexe=sexe, numero_equipe=numero_equipe)
+
+
+def format_team_name(name: str | None, number: int | str | None) -> str:
+    """Formate le nom d'équipe avec son numéro si > 1.
+
+    Exemple : "CS PONT DU CHATEAU", 2 -> "CS PONT DU CHATEAU - 2"
+    """
+    if not name:
+        return ""
+    if not number:
+        return name
+
+    try:
+        num_int = int(number)
+        if num_int > 1:
+            return f"{name} - {num_int}"
+    except (ValueError, TypeError):
+        pass
+
+    return name
 
 
 def prune_payload(obj: Any, depth: int = 0) -> Any:
