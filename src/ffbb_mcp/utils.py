@@ -177,13 +177,13 @@ def prune_payload(obj: Any, depth: int = 0) -> Any:
             kept_keys = {k for k in sorted_keys if k in essential_keys}
             other_keys = [k for k in sorted_keys if k not in essential_keys]
 
-            # On garde les clés essentielles + les 10 premières autres
-            for k in other_keys[:10]:
+            # On garde les clés essentielles + les 25 premières autres
+            for k in other_keys[:25]:
                 kept_keys.add(k)
 
             pruned = {k: cleaned[k] for k in kept_keys}
-            if len(other_keys) > 10:
-                pruned["_omitted_count"] = len(other_keys) - 10
+            if len(other_keys) > 25:
+                pruned["_omitted_count"] = len(other_keys) - 25
             return pruned
         return cleaned
 
