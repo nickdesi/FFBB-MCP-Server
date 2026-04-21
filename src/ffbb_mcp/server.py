@@ -500,13 +500,14 @@ async def ffbb_get(
             }
             if res.get("rencontres"):
                 max_limit = int(os.environ.get("FFBB_MAX_CALENDAR_MATCHES", "300"))
-                total_matches = len(res["rencontres"])
+                total_matches = len(res.get("rencontres") or [])
                 if total_matches > max_limit:
-                    res["rencontres"] = res["rencontres"][:max_limit]
+                    rencontres_list: list = (res.get("rencontres") or [])[:max_limit]
+                    res["rencontres"] = rencontres_list
                     res["_truncated"] = True
                     res["_omitted_count"] = total_matches - max_limit
                     res["_total"] = total_matches
-                    res["rencontres"].append(
+                    rencontres_list.append(
                         {
                             "warning": f"Résultat tronqué. Seulement {max_limit} rencontres sur {total_matches} affichées."
                         }

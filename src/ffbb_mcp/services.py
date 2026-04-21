@@ -1540,7 +1540,8 @@ async def ffbb_bilan_service(
     # Force refresh : bypass le cache et appel direct
     if force_refresh:
         logger.debug(f"force_refresh=True, bypass cache pour {cache_key}")
-        state.cache_bilan.pop(cache_key, None)
+        if state.cache_bilan is not None:
+            state.cache_bilan.pop(cache_key, None)
 
     return await _dedupe_inflight(
         cache=state.cache_bilan,
