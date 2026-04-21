@@ -7,6 +7,7 @@ from mcp.server.fastmcp import FastMCP
 from starlette.applications import Starlette
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
+from starlette.responses import JSONResponse
 from starlette.routing import Mount
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
@@ -56,7 +57,17 @@ def create_app(mcp: FastMCP, allowed_origins: list[str]) -> Starlette:
     class RequestIdMiddleware(BaseHTTPMiddleware):
         async def dispatch(self, request: Any, call_next: Any) -> Any:
             request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
-            response = await call_next(request)
+            try:
+                response = await call_next(request)
+                if response is None:
+                    raise RuntimeError("No response returned from application.")
+            except Exception as e:
+                logger.error(f"Middleware error: {e}")
+                response = JSONResponse(
+                    {"error": "Internal Server Error", "request_id": request_id},
+                    status_code=500,
+                )
+
             response.headers["X-Request-ID"] = request_id
             return response
 
