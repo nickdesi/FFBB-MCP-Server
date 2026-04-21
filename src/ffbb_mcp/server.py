@@ -3,6 +3,7 @@ import datetime
 import logging
 import os
 import platform
+import urllib.parse
 from functools import wraps
 from importlib.metadata import PackageNotFoundError as _PkgNotFound
 from importlib.metadata import version as _meta_version
@@ -114,9 +115,32 @@ def _sdk_version(package: str) -> str:
 # Initialisation FastMCP
 # ---------------------------------------------------------------------------
 
-_allowed_hosts = os.environ.get("ALLOWED_HOSTS", "*").split(",")
-_allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
-_dns_protection = os.environ.get("ENABLE_DNS_PROTECTION", "true").lower() == "true"
+_allowed_hosts_raw = os.environ.get("ALLOWED_HOSTS", "*")
+_allowed_origins_raw = os.environ.get("ALLOWED_ORIGINS", "*")
+_allowed_hosts = [h.strip() for h in _allowed_hosts_raw.split(",") if h.strip()]
+_allowed_origins = [o.strip() for o in _allowed_origins_raw.split(",") if o.strip()]
+
+_public_url = os.environ.get("PUBLIC_URL", _DEFAULT_PUBLIC_URL).strip()
+try:
+    _parsed_url = urllib.parse.urlparse(_public_url)
+    _public_host = _parsed_url.hostname
+except Exception:
+    _public_host = "ffbb.desimone.fr"
+
+# Ajout automatique de l'hôte public par défaut
+if _public_host and _public_host not in _allowed_hosts and "*" not in _allowed_hosts:
+    _allowed_hosts.append(_public_host)
+
+# On ajoute localhost par défaut si pas de wildcard
+if "*" not in _allowed_hosts and "localhost" not in _allowed_hosts:
+    _allowed_hosts.append("localhost")
+
+_dns_protection_env = os.environ.get("ENABLE_DNS_PROTECTION")
+if _dns_protection_env is not None:
+    _dns_protection = _dns_protection_env.lower() == "true"
+else:
+    # Désactivation automatique si wildcard présent (non supporté par le SDK MCP v1.x)
+    _dns_protection = "*" not in _allowed_hosts and "*" not in _allowed_origins
 
 mcp: FastMCP = FastMCP(
     "FFBB MCP Server",
