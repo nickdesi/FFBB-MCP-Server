@@ -8,6 +8,7 @@ import re
 import time
 import traceback
 import unicodedata
+from collections.abc import Callable, Coroutine  # noqa: TC003
 from datetime import datetime, timedelta
 from functools import lru_cache
 from typing import Any, TypeVar
@@ -54,8 +55,8 @@ _ffbb_semaphore = asyncio.Semaphore(_MAX_CONCURRENT_FFBB)
 
 # Hooks simples pour les metrics de cache. Ils sont no-op par défaut et peuvent
 # être surchargés depuis metrics.py via une fonction d'initialisation.
-_cache_hit_hook: callable | None = record_cache_hit
-_cache_miss_hook: callable | None = record_cache_miss
+_cache_hit_hook: Callable[..., None] | None = record_cache_hit
+_cache_miss_hook: Callable[..., None] | None = record_cache_miss
 
 
 _PARIS_TZ = ZoneInfo("Europe/Paris")
@@ -159,12 +160,13 @@ state.cache_calendrier = TTLCache(
 )
 state.cache_bilan = TLRUCache(maxsize=64, ttu=_ttu_bilan)
 state.cache_poule = TLRUCache(maxsize=128, ttu=_ttu_poule)
+state.cache_classement = TLRUCache(maxsize=128, ttu=_ttu_poule)
 _inflight_lock: asyncio.Lock | None = None
-state.inflight_detail: dict[str, asyncio.Task[Any]] = {}
-state.inflight_search: dict[str, asyncio.Task[Any]] = {}
-state.inflight_calendrier: dict[str, asyncio.Task[Any]] = {}
-state.inflight_bilan: dict[str, asyncio.Task[Any]] = {}
-state.inflight_poule: dict[str, asyncio.Task[Any]] = {}
+state.inflight_detail = {}
+state.inflight_search = {}
+state.inflight_calendrier = {}
+state.inflight_bilan = {}
+state.inflight_poule = {}
 
 
 def _get_inflight_lock() -> asyncio.Lock:
@@ -183,10 +185,10 @@ def get_cache_ttls() -> dict[str, int]:
     """
 
     return {
-        "lives": int(state.cache_lives.ttl),
-        "search": int(state.cache_search.ttl),
-        "detail": int(state.cache_detail.ttl),
-        "calendrier": int(state.cache_calendrier.ttl),
+        "lives": int(state.cache_lives.ttl) if state.cache_lives else 0,
+        "search": int(state.cache_search.ttl) if state.cache_search else 0,
+        "detail": int(state.cache_detail.ttl) if state.cache_detail else 0,
+        "calendrier": int(state.cache_calendrier.ttl) if state.cache_calendrier else 0,
         "bilan": _read_positive_int_env(
             "FFBB_CACHE_TTL_BILAN", get_static_ttl("bilan")
         ),
@@ -210,13 +212,16 @@ async def _with_ffbb_semaphore(coro):
         return await coro
 
 
-def _cache_get(cache: TTLCache | TLRUCache, key: Any, cache_name: str) -> Any | None:
+def _cache_get(
+    cache: TTLCache | TLRUCache | None, key: Any, cache_name: str
+) -> Any | None:
     """Wrapper centralisé pour lire un cache avec metrics hit/miss.
 
     Ce helper évite de dupliquer la logique de notification et permet de
     garder une sémantique uniforme sur tous les caches du module.
     """
-
+    if cache is None:
+        return None
     value = cache.get(key)
     if value is not None:
         _notify_cache_hit(cache_name)
@@ -226,9 +231,10 @@ def _cache_get(cache: TTLCache | TLRUCache, key: Any, cache_name: str) -> Any | 
 
 
 def _cache_set(
-    cache: TTLCache | TLRUCache, key: Any, value: Any, cache_name: str
+    cache: TTLCache | TLRUCache | None, key: Any, value: Any, cache_name: str
 ) -> None:
-    cache[key] = value
+    if hasattr(cache, "__setitem__"):
+        cache[key] = value  # type: ignore[index]
     # Le miss correspondant a déjà été enregistré dans _cache_get.
 
 
@@ -329,7 +335,7 @@ def handle_api_error(e: Exception) -> McpError:
 
 async def _safe_call(
     operation_name: str,
-    coro,
+    coro: Callable[[], Coroutine[Any, Any, Any]],
     *,
     retries: int = 3,
     base_delay: float = 0.5,
@@ -342,17 +348,11 @@ async def _safe_call(
     """
     logger.info(f"Début exécution: {operation_name}")
 
-    # Si une factory est fournie, l'utiliser pour créer des coroutines fraîches par tentative.
-    if callable(coro):
-        make_coro = coro
-    else:
-        # coroutine à usage unique passée ; l'envelopper dans une factory qui la retourne une fois
-        single = coro
-
-        def _once():
-            return single
-
-        make_coro = _once
+    if not callable(coro):
+        raise ValueError(
+            f"'_safe_call' expects a callable factory (e.g. lambda: coro()), got {type(coro)}."
+        )
+    make_coro = coro
 
     last_exc: Exception | None = None
     for attempt in range(1, max(1, retries) + 1):
@@ -548,7 +548,7 @@ async def get_poule_service(
     poule_id_int = _coerce_numeric_id(poule_id, "poule_id")
     cache_key = f"poule:{poule_id_int}"
 
-    if force_refresh:
+    if force_refresh and state.cache_poule is not None:
         state.cache_poule.pop(cache_key, None)
 
     async def _fetch() -> dict:
@@ -828,7 +828,7 @@ async def ffbb_equipes_club_service(
     """
     # Réutilise org_data si fourni, sinon récupère via get_organisme_service
     data = (
-        org_data if org_data is not None else await get_organisme_service(organisme_id)
+        org_data if org_data is not None else await get_organisme_service(organisme_id)  # type: ignore
     )
     if not data:
         return []
@@ -1287,10 +1287,10 @@ async def ffbb_saison_bilan_service(
         *[_fetch_poule(pid) for pid in poule_ids], return_exceptions=True
     )
     poules_map: dict[str, dict[str, Any]] = {
-        pid: pd
+        pid: pd  # type: ignore
         for pid, pd in zip(poule_ids, poules_raw, strict=False)
         if not isinstance(pd, Exception) and pd
-    }
+    }  # type: ignore
 
     # Agrégation par phase
     phases: list[dict[str, Any]] = []
@@ -1409,10 +1409,10 @@ async def ffbb_bilan_service(
         )
         logger.debug("ffbb_bilan: poules_raw=%s", poules_raw)
         poules_map: dict[str, dict[str, Any]] = {
-            pid: pd
+            pid: pd  # type: ignore
             for pid, pd in zip(unique_poule_ids, poules_raw, strict=False)
             if not isinstance(pd, Exception) and pd
-        }
+        }  # type: ignore
         logger.debug("ffbb_bilan: poules_map_keys=%s", list(poules_map.keys()))
 
         # Map poule_id → engagement_ids du club + nom compétition + numero_equipe
@@ -1744,7 +1744,7 @@ async def get_calendrier_club_service(
 
     # force_refresh contourne le cache de calendrier, mais continue de bénéficier
     # de la déduplication inflight.
-    if force_refresh:
+    if force_refresh and state.cache_calendrier is not None:
         state.cache_calendrier.pop(cache_key, None)
 
     return await _dedupe_inflight(
@@ -2092,12 +2092,12 @@ def _extract_club_key_word(club_name: str) -> str | None:
 
 @lru_cache(maxsize=512)
 def _normalize_name(value: str) -> str:
-    """Normalise un nom (strip, upper, supprime les accents)."""
+    """Normalise un nom (strip, upper, supprime les accents sans perdre de caractères)."""
     if not value:
         return ""
     s = value.strip().upper()
     s = unicodedata.normalize("NFD", s)
-    return s.encode("ascii", "ignore").decode("utf-8")
+    return "".join(c for c in s if unicodedata.category(c) not in ("Mn", "So"))
 
 
 async def _resolve_club_and_org(

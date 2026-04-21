@@ -34,7 +34,7 @@ mémorisé et réutilisé pour tous les appels suivants concernant ce club.
 
 NE JAMAIS repasser par `club_name` si l'`organisme_id` est déjà connu.
 
-Référence des clubs fréquents (à utiliser directement) :
+Référence des clubs fréquents (à utiliser comme hints, ces IDs peuvent changer) :
   - Stade Clermontois Basket Auvergne → organisme_id: 9326
   - Stade Clermontois Basket Féminin  → organisme_id: 9269
   - Gerzat Basket                     → organisme_id: 9282

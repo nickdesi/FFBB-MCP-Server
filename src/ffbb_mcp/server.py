@@ -834,6 +834,9 @@ async def ffbb_team_summary(
         # last_result et next_match nécessitent organisme_id
         effective_org_id = resolved_org_id
 
+        if not effective_org_id:
+            return {"error": "Impossible de résoudre le club"}
+
         if ctx:
             await ctx.report_progress(
                 1, total=3, message="Récupération bilan et matchs en parallèle…"
@@ -1100,9 +1103,7 @@ def main() -> None:
 
         mcp.settings.streamable_http_path = "/mcp"
         from ffbb_mcp.app_factory import create_app
-        from ffbb_mcp.http_routes import register_http_routes
 
-        register_http_routes(mcp)
         app = create_app(mcp, _allowed_origins)
 
         import uvicorn
