@@ -655,7 +655,9 @@ async def ffbb_get_classement_service(
             else:
                 is_target = True
 
-        logo_id = (eng.get("logo") or {}).get("id")
+        # Priorité 1 : organisme_logo_id (champ direct, toujours renseigné)
+        # Priorité 2 : logo dans id_engagement (fallback si API change)
+        logo_id = c.get("organisme_logo_id") or (eng.get("logo") or {}).get("id")
         logo_url = (
             f"https://api.ffbb.com/assets/{logo_id}?height=220&fit=contain&format=avif"
             if logo_id
