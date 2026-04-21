@@ -472,6 +472,17 @@ async def ffbb_get(
                 nom = eng.get("nom", "")
                 num = eng.get("numero_equipe")
                 c["equipe"] = format_team_name(nom, num)
+                logo_id = (eng.get("logo") or {}).get("id")
+                c["logo_url"] = (
+                    f"https://api.ffbb.com/assets/{logo_id}?height=220&fit=contain&format=avif"
+                    if logo_id else None
+                )
+                for field in ("nuls", "point_initiaux", "penalites_arbitrage",
+                              "penalites_entraineur", "penalites_diverses",
+                              "nombre_forfaits", "nombre_defauts", "quotient",
+                              "hors_classement"):
+                    if field not in c:
+                        c[field] = c.get(field)
                 formatted_classements.append(c)
 
             # Formatage des noms d'équipes dans les rencontres
