@@ -1,3 +1,7 @@
+runtime: container
+build:
+  dockerfile: Dockerfile
+  dockerBuildPath: .
 startCommand:
   type: streamable-http
   config: ffbb-mcp
