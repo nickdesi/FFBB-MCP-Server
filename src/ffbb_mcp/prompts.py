@@ -2,7 +2,7 @@
 
 from typing import Any
 
-_PROMPT_VERSION = "3.6.0"
+_PROMPT_VERSION = "3.7.0"
 
 ROUTING_PROMPT = """\
 ## RÈGLES DE ROUTAGE DES OUTILS FFBB
@@ -217,8 +217,16 @@ Ne jamais recalculer V/D à la main si ce champ est présent.
 Ne mentionner une saison passée qu'après vérification explicite.\
 """
 
+# FIX: fusion des deux anciens blocs classement en un seul cohérent.
+# Avantages :
+#   - supprime la redondance de titre entre les deux sections
+#   - évite la confusion LLM sur "quelle règle prime ?"
+#   - corrige le champ fantôme `forfaits` (absent de l'API FFBB / services.py)
+#   - corrige les fragments anglais ("with their", "With précision")
 _RULES_CLASSEMENT = """\
-## 🏆 CLASSEMENT D'UNE ÉQUIPE
+## 🏆 CLASSEMENT D'UNE ÉQUIPE — WORKFLOW ET AFFICHAGE
+
+### Partie 1 — Workflow (quelle séquence d'appels ?)
 
 TOUJOURS suivre cette séquence, sans exception :
 
@@ -227,16 +235,42 @@ TOUJOURS suivre cette séquence, sans exception :
    → Si échec (équipe non résolue) : passer à l'étape 2.
 
 2. **ÉTAPE 2 — Appeler `ffbb_bilan`** (organisme_id + categorie).
-   → Lister toutes les phases disponibles with their `poule_id`.
+   → Lister toutes les phases disponibles avec leur `poule_id`.
    → Sans précision de phase → prendre la phase au numéro le plus élevé (ex: Phase 3 > Phase 1).
-   → With précision (ex: "Phase 3") → matcher le nom de compétition ou le label.
+   → Avec précision (ex: "Phase 3") → matcher le nom de compétition ou le label.
 
 3. **ÉTAPE 3 — Appeler `ffbb_get(id=poule_id, type="poule")`**.
    → Retourne le classement complet et fiable.
 
-⚠️ **INTERDICTION** : Ne jamais utiliser `ffbb_club(action='classement', phase=X)` pour résoudre une phase spécifique — non fiable.\
-"""
+⚠️ **INTERDICTION** : Ne jamais passer `phase=X` à `ffbb_club(action='classement')` pour
+résoudre une phase spécifique — non fiable. L'appel automagique sans paramètre de phase
+(`ffbb_club(action='classement')`) reste valide en Tier 1.
 
+---
+
+### Partie 2 — Affichage (comment présenter le classement ?)
+
+**SOURCE DE VÉRITÉ** : Utiliser exclusivement les champs retournés par l'API.
+**INTERDICTION FORMELLE** de recalculer les points (PTS) ou la différence à partir des scores.
+
+**Format de tableau obligatoire** (colonnes issues de `ffbb_get_classement_service`) :
+
+| Rang | Équipe | PTS | J | G | P | M | E | Diff |
+|:---:|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| {position} | {equipe} | {points} | {match_joues} | {gagnes} | {perdus} | {paniers_marques} | {paniers_encaisses} | {difference} |
+
+**Légende des colonnes :**
+- **Rang** : Position (médaille 🥇/🥈/🥉 si top 3)
+- **PTS** : Points de classement FFBB officiels
+- **J / G / P** : Matchs joués / gagnés / perdus
+- **M / E** : Paniers marqués / encaissés
+- **Diff** : Différence de paniers (PM - PE)
+
+**Règles de mise en forme :**
+- **Équipe cible** : Si la requête concerne une équipe précise, mettre toute sa ligne en **gras** et ajouter 🎯.
+- **Incohérence** : Si G + P ≠ J, ajouter : "⚠️ *Données en cours de synchronisation par la FFBB*".
+- **Tri** : Respecter l'ordre `Rang` retourné par l'API, jamais recalculé.\
+"""
 
 _RULES_TEAM_REPORT = """\
 ## 📊 RÈGLES POUR LES BILANS D'ÉQUIPES
@@ -318,7 +352,7 @@ _WORKFLOW = """\
 | Bilan global + dernier/prochain match | `ffbb_team_summary` |
 | Bilan saison toutes phases | `ffbb_bilan` |
 | Bilan filtré par numéro d'équipe | `ffbb_bilan_saison` |
-| Classement automagique | `ffbb_club(action='classement')` |
+| Classement automagique (sans phase précise) | `ffbb_club(action='classement')` |
 | Dernier score joué | `ffbb_last_result` |
 | Prochain match | `ffbb_next_match` |
 | Scores en cours (live) | `ffbb_lives` — actualisation 30 s |
@@ -327,7 +361,7 @@ _WORKFLOW = """\
 
 | Besoin | Outil |
 |:---|:---|
-| Classement d'une poule précise | `ffbb_get(type='poule', id=…)` |
+| Classement d'une poule précise (avec poule_id connu) | `ffbb_get(type='poule', id=…)` |
 | Détails d'une compétition | `ffbb_get(type='competition', id=…)` |
 | Équipes engagées d'un club | `ffbb_club(action='equipes', organisme_id=…)` |
 | Recherche générale | `ffbb_search(type='organismes', query=…)` |
@@ -373,7 +407,7 @@ _EXAMPLES = """\
 **A — Ambiguïté de club (Résolution automatique)**
 > User: "Prochain match U11M du Stade Clermontois."
 1. Agent extrait le genre Masculin (M) depuis "U11M".
-2. `ffbb_search(type='organismes', query='Stade Clermontois')` retourne 2 candidats : 
+2. `ffbb_search(type='organismes', query='Stade Clermontois')` retourne 2 candidats :
    - Basket Auvergne
    - Basket Féminin
 3. Agent écarte "Basket Féminin" car le genre cherché est M.
@@ -409,8 +443,14 @@ _EXAMPLES = """\
 1. Agent détecte le pluriel ("les prochains matchs").
 2. ⛔ Agent ne doit PAS utiliser `ffbb_next_match` (qui ne donne qu'un résultat).
 3. ✅ Agent utilise `ffbb_club(action='calendrier', organisme_id=..., filtre='U11M')`.
-4. Agent filtre les matchs à venir depuis la liste et les affiche.\
+4. Agent filtre les matchs à venir depuis la liste et les affiche.
 
+**G — Classement d'une poule**
+> User: "Classement de la poule U11M1 du CSB ?"
+1. → `ffbb_team_summary(organisme_id=9326, categorie='U11M')` → récupère `poule_id`.
+2. → `ffbb_get(type='poule', id=<poule_id>)` → classement complet.
+3. Affiche le tableau avec colonnes Rang/Équipe/PTS/J/G/P/M/E/Diff.
+4. Mettre la ligne du CSB en **gras** + 🎯.\
 """
 
 
@@ -429,7 +469,7 @@ def expert_basket() -> str:
             _RULES_DISPLAY_BILAN,
             _RULES_TEAM_REPORT,
             _RULES_METIER,
-            _RULES_CLASSEMENT,
+            _RULES_CLASSEMENT,  # workflow + affichage fusionnés en un seul bloc
             _RULES_PHASES,
             _SEQUENCE,
             _WORKFLOW,
@@ -504,11 +544,13 @@ def classement_poule(competition_name: str) -> str:
         [
             f"Affiche le classement de la compétition '{name}'.",
             _strategy(
-                f"`ffbb_search(type='organismes', query='{name}')` → `competition_id`.",
+                # FIX: type='competitions' (pas 'organismes') pour chercher une compétition
+                f"`ffbb_search(type='competitions', query='{name}')` → `competition_id`.",
                 "`ffbb_get(type='competition', id=<competition_id>)` → liste des poules.",
                 "`ffbb_get(type='poule', id=<poule_id>)` → classement complet.",
             ),
-            "Présente sous forme de tableau : **Rang | Équipe | J | V | D | Pts**.\n"
+            "Présente le classement selon le format **## 🏆 CLASSEMENT D'UNE ÉQUIPE — WORKFLOW ET AFFICHAGE**.\n"
+            "Colonnes obligatoires : **Rang | Équipe | PTS | J | G | P | M | E | Diff**.\n"
             "Mettre en évidence les positions de montée/descente si identifiables.",
         ]
     )
