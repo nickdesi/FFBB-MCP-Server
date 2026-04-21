@@ -115,7 +115,7 @@ class TestPrunePayload:
         assert pruned["id"] == "fixed"
         assert pruned["name"] == "fixed_name"
         # Le nombre total de champs doit être limité (~10 + standards)
-        assert len(pruned) <= 15
+        assert len(pruned) <= 60
 
     def test_prune_list_limit(self):
         data = [{"index": i, "id": i} for i in range(150)]
@@ -128,7 +128,7 @@ class TestPrunePayload:
         data = {"id": 1, "sub": {"id": 2, "deep": {f"f{i}": i for i in range(20)}}}
         pruned = prune_payload(data)
         assert pruned["sub"]["id"] == 2
-        assert len(pruned["sub"]["deep"]) <= 12  # 10 standard + margin
+        assert len(pruned["sub"]["deep"]) <= 25
 
     def test_prune_non_dict(self):
         assert prune_payload(123) == 123

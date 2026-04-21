@@ -20,3 +20,11 @@
 ## 2024-04-20 - [Performance] Regex compilation overhead in cache miss scenarios
 **Learning:** In highly cached functions (like `parse_categorie` decorated with `lru_cache`), the overhead of dynamically compiling regular expressions using `re.search()` with string literals dominates the execution time during cache misses. This becomes relevant when the cache is small compared to the input space, or when handling cold-start requests. Python's internal regex caching limits its effectiveness in complex or varied patterns.
 **Action:** Always pre-compile regular expressions at the module level using `re.compile()` for functions that will be called frequently, even if they are memoized. This halved the uncached execution time of string parsing logic in this codebase.
+
+## 2024-04-21 - [API Design] Defensive defaults and no-op loops
+**Learning:** Adding empty defensive loops or fallbacks like `c[field] = c.get(field)` when dealing with external API responses is an anti-pattern. If a field is missing, it's missing, and assigning `None` manually using `c.get()` is equivalent to not assigning it at all since Python/JSON dumps natively ignore absent keys unless explicitly requested via `setdefault`. Such loops add noise and confusion.
+**Action:** Let missing fields be missing. Use `setdefault` only if the downstream logic explicitly requires the key to exist with a default value.
+
+## 2024-04-21 - [Caching Strategy] `force_refresh` bypassing deduplication
+**Learning:** Bypassing the cache dynamically (e.g. `force_refresh=True`) shouldn't also bypass the inflight deduplication mechanism (`_dedupe_inflight`). If multiple clients request a refresh simultaneously and the request isn't deduplicated, it will result in thunderous API calls to the source, potentially breaking rate limits.
+**Action:** When implementing `force_refresh`, only clear the local cached key (e.g., `cache.pop(key, None)`), but let the request flow through the inflight deduplication logic as normal.

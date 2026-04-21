@@ -30,7 +30,12 @@ from ffbb_mcp.metrics import (
     record_cache_miss,
     record_call,
 )
-from ffbb_mcp.utils import ParsedCategorie, format_team_name, parse_categorie, serialize_model
+from ffbb_mcp.utils import (
+    ParsedCategorie,
+    format_team_name,
+    parse_categorie,
+    serialize_model,
+)
 
 logger = logging.getLogger("ffbb-mcp")
 
@@ -140,6 +145,9 @@ def _ttu_poule(k, v, now):
     return now + ttl
 
 
+# TTL des caches froids : le TTL est calculé une seule fois à l'initialisation (au chargement du module).
+# Changer la variable d'environnement à chaud n'aura pas d'effet sur ces caches. C'est le comportement intentionnel
+# pour éviter des ré-évaluations constantes pour des données relativement statiques ou basées sur un restart du serveur.
 state.cache_lives = TTLCache(
     maxsize=1,
     ttl=_read_positive_int_env("FFBB_CACHE_TTL_LIVES", get_static_ttl("lives")),
@@ -1189,8 +1197,12 @@ async def ffbb_next_match_service(
 
     num1 = eng1.get("numeroEquipe") if isinstance(eng1, dict) else None
     num2 = eng2.get("numeroEquipe") if isinstance(eng2, dict) else None
-    eq1_name = format_team_name(next_match.get("nomEquipe1", next_match.get("nom_equipe1", "")), num1)
-    eq2_name = format_team_name(next_match.get("nomEquipe2", next_match.get("nom_equipe2", "")), num2)
+    eq1_name = format_team_name(
+        next_match.get("nomEquipe1", next_match.get("nom_equipe1", "")), num1
+    )
+    eq2_name = format_team_name(
+        next_match.get("nomEquipe2", next_match.get("nom_equipe2", "")), num2
+    )
 
     if my_eng and id_eng1 and str(my_eng) == str(id_eng1):
         adversaire = eq2_name
@@ -1528,9 +1540,7 @@ async def ffbb_bilan_service(
     # Force refresh : bypass le cache et appel direct
     if force_refresh:
         logger.debug(f"force_refresh=True, bypass cache pour {cache_key}")
-        result = await _fetch()
-        _cache_set(state.cache_bilan, cache_key, result, "bilan")
-        return result
+        state.cache_bilan.pop(cache_key, None)
 
     return await _dedupe_inflight(
         cache=state.cache_bilan,
@@ -1670,8 +1680,12 @@ async def get_calendrier_club_service(
                 num1 = eng1.get("numeroEquipe") if isinstance(eng1, dict) else None
                 num2 = eng2.get("numeroEquipe") if isinstance(eng2, dict) else None
 
-                eq1 = format_team_name(match.get("nomEquipe1", match.get("nom_equipe1", "")), num1)
-                eq2 = format_team_name(match.get("nomEquipe2", match.get("nom_equipe2", "")), num2)
+                eq1 = format_team_name(
+                    match.get("nomEquipe1", match.get("nom_equipe1", "")), num1
+                )
+                eq2 = format_team_name(
+                    match.get("nomEquipe2", match.get("nom_equipe2", "")), num2
+                )
                 score1 = match.get("resultatEquipe1", match.get("resultat_equipe1"))
                 score2 = match.get("resultatEquipe2", match.get("resultat_equipe2"))
                 date_match = match.get("date_rencontre", match.get("date", ""))
@@ -2260,6 +2274,7 @@ async def _resolve_club_and_org(
     return resolved, org_data
 
 
+@lru_cache(maxsize=256)
 def _match_team_name(
     nom_equipe_rencontre: str,
     organisme_nom: str,
