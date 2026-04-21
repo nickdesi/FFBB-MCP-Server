@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <em>Dernière mise à jour : 20 Avril 2026 • Propulsé par <a href="https://pypi.org/project/FFBBApiClientV3/">FFBBApiClientV3</a></em>
+  <em>Dernière mise à jour : 21 Avril 2026 • Propulsé par <a href="https://pypi.org/project/FFBBApiClientV3/">FFBBApiClientV3</a></em>
 </p>
 
 ---
@@ -94,7 +94,7 @@ Récemment refondu pour maximiser les performances des LLMs, le serveur propose 
 | `ffbb_saisons` | Liste et détermine la saison FFBB en cours. | `active_only` |
 | `ffbb_version` | Diagnostics runtime : version, transport, TTLs de cache actifs. | *Aucun* |
 
-#### Détail de `ffbb_search` (v0.4.0)
+#### Détail de `ffbb_search`
 
 L'outil `ffbb_search` couvre désormais **9 index Meilisearch** et supporte le filtrage et tri natifs :
 
@@ -108,10 +108,10 @@ L'outil `ffbb_search` couvre désormais **9 index Meilisearch** et supporte le f
 | `pratiques` | Lieux de pratique |
 | `terrains` | Terrains de basket |
 | `tournois` | Tournois |
-| `engagements` | **Engagements d'équipes** *(nouveau v0.4.0)* |
-| `formations` | **Formations et stages** *(nouveau v0.4.0)* |
+| `engagements` | **Engagements d'équipes** |
+| `formations` | **Formations et stages** |
 
-**Nouveaux paramètres v0.4.0 :**
+**Nouveaux paramètres :**
 - `filter_by` *(optionnel)* — Filtre Meilisearch natif (ex: `codePostal = "63000"`)
 - `sort` *(optionnel)* — Tri Meilisearch natif (ex: `["libelle:asc"]`)
 
@@ -149,8 +149,8 @@ Ce serveur expose des **Prompts** natifs pour donner instantanément de l'expert
 - **Mon IA ne trouve pas mon équipe locale :** Donnez-lui toujours le nom précis du club (ex: `Vichy` au lieu de `JA Vichy` si c'est ambigu) et utilisez **`ffbb_search`**.
 - **L'agent boucle sur des IDs introuvables :** Rappelez à l'agent d'utiliser `ffbb_bilan` avec le paramètre `club_name` pour qu'il fasse lui-même la résolution interne.
 - **Progrès sur les appels lents :** Les outils `ffbb_bilan`, `ffbb_team_summary` et `ffbb_bilan_saison` émettent maintenant des notifications de progression aux clients qui les supportent (Claude Desktop, Cursor…). Aucun changement d'API nécessaire.
-- **Le club contient une apostrophe (ex: `Jeanne d'Arc`) :** ✅ Supporté depuis la **v0.4.1** — les apostrophes typographiques (`'`, `'`, `` ` ``) sont automatiquement normalisées avant la recherche.
-- **Mon club n'a qu'une seule équipe et elle n'a pas de numéro :** ✅ Supporté depuis la **v0.4.1** — une requête `U11M1` trouve désormais une équipe enregistrée sans numéro (numéro 1 implicite). Le champ `note` de l'équipe retournée l'indique explicitement.
+- **Le club contient une apostrophe (ex: `Jeanne d'Arc`) :** ✅ Supporté nativement — les apostrophes typographiques (`'`, `'`, `` ` ``) sont automatiquement normalisées avant la recherche.
+- **Mon club n'a qu'une seule équipe et elle n'a pas de numéro :** ✅ Supporté nativement — une requête `U11M1` trouve désormais une équipe enregistrée sans numéro (numéro 1 implicite). Le champ `note` de l'équipe retournée l'indique explicitement.
 - **Erreurs 404 :** Assurez-vous d'utiliser le endpoint canonique exact `https://ffbb.desimone.fr/mcp`.
 - **Serveur inactif :** Vérifiez le Health Check `https://ffbb.desimone.fr/health`.
 
