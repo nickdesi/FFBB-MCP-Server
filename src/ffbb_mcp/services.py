@@ -655,6 +655,13 @@ async def ffbb_get_classement_service(
             else:
                 is_target = True
 
+        logo_id = (eng.get("logo") or {}).get("id")
+        logo_url = (
+            f"https://api.ffbb.com/assets/{logo_id}?height=220&fit=contain&format=avif"
+            if logo_id
+            else None
+        )
+
         flat.append(
             {
                 "position": c.get("position"),
@@ -667,6 +674,15 @@ async def ffbb_get_classement_service(
                 "is_target": is_target,
                 "paniers_marques": c.get("paniers_marques") or 0,
                 "paniers_encaisses": c.get("paniers_encaisses") or 0,
+                "logo_url": logo_url,
+                "point_initiaux": c.get("point_initiaux"),
+                "penalites_arbitrage": c.get("penalites_arbitrage"),
+                "penalites_entraineur": c.get("penalites_entraineur"),
+                "penalites_diverses": c.get("penalites_diverses"),
+                "nombre_forfaits": c.get("nombre_forfaits"),
+                "nombre_defauts": c.get("nombre_defauts"),
+                "quotient": c.get("quotient"),
+                "hors_classement": c.get("hors_classement"),
             }
         )
     # Calculate dynamic TTL using same logic as poule since it caches in state.cache_classement
