@@ -212,13 +212,16 @@ async def _with_ffbb_semaphore(coro):
         return await coro
 
 
-def _cache_get(cache: TTLCache | TLRUCache, key: Any, cache_name: str) -> Any | None:
+def _cache_get(
+    cache: TTLCache | TLRUCache | None, key: Any, cache_name: str
+) -> Any | None:
     """Wrapper centralisé pour lire un cache avec metrics hit/miss.
 
     Ce helper évite de dupliquer la logique de notification et permet de
     garder une sémantique uniforme sur tous les caches du module.
     """
-
+    if cache is None:
+        return None
     value = cache.get(key)
     if value is not None:
         _notify_cache_hit(cache_name)
@@ -228,9 +231,10 @@ def _cache_get(cache: TTLCache | TLRUCache, key: Any, cache_name: str) -> Any | 
 
 
 def _cache_set(
-    cache: TTLCache | TLRUCache, key: Any, value: Any, cache_name: str
+    cache: TTLCache | TLRUCache | None, key: Any, value: Any, cache_name: str
 ) -> None:
-    cache[key] = value
+    if hasattr(cache, "__setitem__"):
+        cache[key] = value  # type: ignore[index]
     # Le miss correspondant a déjà été enregistré dans _cache_get.
 
 
@@ -544,7 +548,7 @@ async def get_poule_service(
     poule_id_int = _coerce_numeric_id(poule_id, "poule_id")
     cache_key = f"poule:{poule_id_int}"
 
-    if force_refresh:
+    if force_refresh and state.cache_poule is not None:
         state.cache_poule.pop(cache_key, None)
 
     async def _fetch() -> dict:
@@ -824,7 +828,7 @@ async def ffbb_equipes_club_service(
     """
     # Réutilise org_data si fourni, sinon récupère via get_organisme_service
     data = (
-        org_data if org_data is not None else await get_organisme_service(organisme_id)
+        org_data if org_data is not None else await get_organisme_service(organisme_id)  # type: ignore
     )
     if not data:
         return []
@@ -1283,10 +1287,10 @@ async def ffbb_saison_bilan_service(
         *[_fetch_poule(pid) for pid in poule_ids], return_exceptions=True
     )
     poules_map: dict[str, dict[str, Any]] = {
-        pid: pd
+        pid: pd  # type: ignore
         for pid, pd in zip(poule_ids, poules_raw, strict=False)
         if not isinstance(pd, Exception) and pd
-    }
+    }  # type: ignore
 
     # Agrégation par phase
     phases: list[dict[str, Any]] = []
@@ -1405,10 +1409,10 @@ async def ffbb_bilan_service(
         )
         logger.debug("ffbb_bilan: poules_raw=%s", poules_raw)
         poules_map: dict[str, dict[str, Any]] = {
-            pid: pd
+            pid: pd  # type: ignore
             for pid, pd in zip(unique_poule_ids, poules_raw, strict=False)
             if not isinstance(pd, Exception) and pd
-        }
+        }  # type: ignore
         logger.debug("ffbb_bilan: poules_map_keys=%s", list(poules_map.keys()))
 
         # Map poule_id → engagement_ids du club + nom compétition + numero_equipe
@@ -1740,7 +1744,7 @@ async def get_calendrier_club_service(
 
     # force_refresh contourne le cache de calendrier, mais continue de bénéficier
     # de la déduplication inflight.
-    if force_refresh:
+    if force_refresh and state.cache_calendrier is not None:
         state.cache_calendrier.pop(cache_key, None)
 
     return await _dedupe_inflight(
