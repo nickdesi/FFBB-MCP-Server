@@ -25,7 +25,7 @@ def main():
     version = version_match.group(1)
 
     # Current dates
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     iso_date = now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     months_fr = [
@@ -60,7 +60,7 @@ def main():
     # Update Footer date
     # Handle the non-breaking spaces or regular spaces accurately
     content = re.sub(
-        r"(Dernière mise à jour du contenu\s*:\s*)[0-9]+\s+[A-Za-zûé]+\s+[0-9]+",
+        r"(Dernière mise à jour du contenu\s*:\s*)[0-9]+\s+[\wÀ-ÿ]+\s+[0-9]+",
         f"\\g<1>{nice_date}",
         content,
     )
@@ -70,11 +70,26 @@ def main():
         r'(<div class="badge">V)[^ ]+( Stable</div>)', f"\\g<1>{version}\\g<2>", content
     )
 
-    # Save
+    # Save index.html
     index_path.write_text(content, "utf-8")
     print(
         f"Successfully updated index.html with version {version} and date {nice_date}"
     )
+
+    # Update sitemap.xml
+    sitemap_path = root_dir / "website" / "sitemap.xml"
+    if sitemap_path.exists():
+        sitemap_content = sitemap_path.read_text("utf-8")
+        # Update lastmod
+        sitemap_content = re.sub(
+            r"(<lastmod>)[^<]+(</lastmod>)",
+            f"\\g<1>{now.strftime('%Y-%m-%d')}\\g<2>",
+            sitemap_content,
+        )
+        sitemap_path.write_text(sitemap_content, "utf-8")
+        print(f"Successfully updated sitemap.xml with date {now.strftime('%Y-%m-%d')}")
+    else:
+        print("Warning: sitemap.xml not found")
 
 
 if __name__ == "__main__":
