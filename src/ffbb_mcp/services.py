@@ -642,14 +642,15 @@ async def ffbb_get_classement_service(
             continue
         eng = c.get("id_engagement", {}) or {}
         nom_equipe = eng.get("nom", "")
+        num_equipe = eng.get("numero_equipe")
         # Identification du club via organisme_id ou rapprochement par nom (fallback)
         org_id = str(c.get("organisme_id") or eng.get("organisme_id") or "")
 
         is_target = False
         if target_org_str and org_id == target_org_str:
             if target_num_str:
-                num_equipe = str(eng.get("numero_equipe") or "")
-                if num_equipe == target_num_str or not num_equipe:
+                curr_num = str(num_equipe or "")
+                if curr_num == target_num_str or not curr_num:
                     is_target = True
             else:
                 is_target = True
