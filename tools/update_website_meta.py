@@ -1,7 +1,8 @@
-import re
 import datetime
-from pathlib import Path
+import re
 import sys
+from pathlib import Path
+
 
 def main():
     root_dir = Path(__file__).parent.parent
