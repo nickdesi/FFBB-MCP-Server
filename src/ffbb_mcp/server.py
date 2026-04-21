@@ -522,19 +522,21 @@ async def ffbb_get(
                 "classements": formatted_classements,
                 "rencontres": formatted_rencontres,
             }
-            if res.get("rencontres"):
+            if formatted_rencontres:
                 max_limit = int(os.environ.get("FFBB_MAX_CALENDAR_MATCHES", "300"))
-                total_matches = len(res["rencontres"])
+                total_matches = len(formatted_rencontres)
                 if total_matches > max_limit:
-                    res["rencontres"] = res["rencontres"][:max_limit]
-                    res["_truncated"] = True
-                    res["_omitted_count"] = total_matches - max_limit
-                    res["_total"] = total_matches
-                    res["rencontres"].append(
+                    # Troncature pour protéger les performances du client (limite configurable)
+                    truncated_rencontres = formatted_rencontres[:max_limit]
+                    truncated_rencontres.append(
                         {
                             "warning": f"Résultat tronqué. Seulement {max_limit} rencontres sur {total_matches} affichées."
                         }
                     )
+                    res["rencontres"] = truncated_rencontres
+                    res["_truncated"] = True
+                    res["_omitted_count"] = total_matches - max_limit
+                    res["_total"] = total_matches
             return res
         elif type == "organisme":
             return await get_organisme_service(organisme_id=id)
