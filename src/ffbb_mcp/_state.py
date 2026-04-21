@@ -5,8 +5,6 @@ from typing import Any
 
 from cachetools import TLRUCache, TTLCache
 
-from ffbb_mcp.cache_strategy import get_static_ttl
-
 
 def _read_positive_int_env(key: str, default: int) -> int:
     val_str = os.environ.get(key)
@@ -18,16 +16,6 @@ def _read_positive_int_env(key: str, default: int) -> int:
         except ValueError:
             pass
     return default
-
-
-def _ttu_bilan(_key: Any, value: Any, now: float) -> float:
-    return now + get_static_ttl("bilan")
-
-
-def _ttu_poule(_key: Any, value: Any, now: float) -> float:
-    if isinstance(value, dict) and "_ttl" in value:
-        return now + float(value["_ttl"])
-    return now + get_static_ttl("rencontre")
 
 
 @dataclass

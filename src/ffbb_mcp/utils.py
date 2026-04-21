@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 from functools import lru_cache
 from typing import Any, NamedTuple
@@ -208,7 +209,7 @@ def prune_payload(obj: Any, depth: int = 0) -> Any:
 
     elif isinstance(obj, list):
         # 1. Limitation de taille (ZipAI Surgical)
-        limit = 25
+        limit = int(os.environ.get("FFBB_MCP_PRUNE_LIMIT", "50"))
         truncated = obj[:limit]
 
         # 2. Nettoyage récursif

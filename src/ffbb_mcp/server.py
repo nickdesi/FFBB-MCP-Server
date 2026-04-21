@@ -116,7 +116,7 @@ def _sdk_version(package: str) -> str:
 
 _allowed_hosts = os.environ.get("ALLOWED_HOSTS", "*").split(",")
 _allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
-_dns_protection = os.environ.get("ENABLE_DNS_PROTECTION", "false").lower() == "true"
+_dns_protection = os.environ.get("ENABLE_DNS_PROTECTION", "true").lower() == "true"
 
 mcp: FastMCP = FastMCP(
     "FFBB MCP Server",
@@ -467,7 +467,7 @@ async def ffbb_get(
             # Formatage des noms d'équipes dans les classements
             classements = poule_data.get("classements", [])
             formatted_classements = []
-            for c in (classements or []):
+            for c in classements or []:
                 eng = c.get("id_engagement", {}) or {}
                 nom = eng.get("nom", "")
                 num = eng.get("numero_equipe")
@@ -475,20 +475,15 @@ async def ffbb_get(
                 logo_id = (eng.get("logo") or {}).get("id")
                 c["logo_url"] = (
                     f"https://api.ffbb.com/assets/{logo_id}?height=220&fit=contain&format=avif"
-                    if logo_id else None
+                    if logo_id
+                    else None
                 )
-                for field in ("nuls", "point_initiaux", "penalites_arbitrage",
-                              "penalites_entraineur", "penalites_diverses",
-                              "nombre_forfaits", "nombre_defauts", "quotient",
-                              "hors_classement"):
-                    if field not in c:
-                        c[field] = c.get(field)
                 formatted_classements.append(c)
 
             # Formatage des noms d'équipes dans les rencontres
             rencontres = poule_data.get("rencontres", [])
             formatted_rencontres = []
-            for m in (rencontres or []):
+            for m in rencontres or []:
                 eng1 = m.get("idEngagementEquipe1", {}) or {}
                 eng2 = m.get("idEngagementEquipe2", {}) or {}
                 num1 = eng1.get("numeroEquipe") if isinstance(eng1, dict) else None
