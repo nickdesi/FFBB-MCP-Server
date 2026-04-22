@@ -193,10 +193,11 @@ def get_cache_ttls() -> dict[str, int]:
     """
 
     return {
-        "lives": int(state.cache_lives.ttl) if state.cache_lives else 0,
-        "search": int(state.cache_search.ttl) if state.cache_search else 0,
-        "detail": int(state.cache_detail.ttl) if state.cache_detail else 0,
-        "calendrier": int(state.cache_calendrier.ttl) if state.cache_calendrier else 0,
+        # Return -1 if uninitialized to distinguish from an actual 0 TTL
+        "lives": int(state.cache_lives.ttl) if state.cache_lives else -1,
+        "search": int(state.cache_search.ttl) if state.cache_search else -1,
+        "detail": int(state.cache_detail.ttl) if state.cache_detail else -1,
+        "calendrier": int(state.cache_calendrier.ttl) if state.cache_calendrier else -1,
         "bilan": _read_positive_int_env(
             "FFBB_CACHE_TTL_BILAN", get_static_ttl("bilan")
         ),
@@ -1529,10 +1530,19 @@ async def ffbb_bilan_service(
             for f in _BILAN_STAT_FIELDS:
                 b[f] += p[f]
 
+        # Identifier la phase la plus récente pour l'équipe principale
+        phase_courante = None
+        if phases:
+            target_phases = [
+                p for p in phases if str(p.get("numero_equipe", "1")) == "1"
+            ]
+            phase_courante = target_phases[-1] if target_phases else phases[-1]
+
         return {
             "club": club_nom,
             "categorie": categorie or "",
             "bilan_total": totaux,
+            "phase_courante": phase_courante,
             "equipes_bilan": equipes_bilan,
             "phases": phases,
         }

@@ -146,15 +146,7 @@ mcp: FastMCP = FastMCP(
     "FFBB MCP Server",
     instructions=(
         ROUTING_PROMPT + "\n\n" + "Données FFBB (basketball français). "
-        "⚡ OUTIL PRIORITAIRE pour tout bilan/résultats/classement : ffbb_bilan(club_name=..., categorie=...) "
-        "→ 1 seul appel, retourne tout (toutes phases agrégées). "
-        "Pour le bilan détaillé d'une équipe précise (U11M1, etc.), utiliser ffbb_bilan_saison(organisme_id=..., categorie=..., numero_equipe=...). "
-        "Pour le prochain match d'une équipe précise, utiliser ffbb_next_match(organisme_id=..., categorie=..., numero_equipe=...). "
-        "⚠️ Les données FFBB sont TOUJOURS live — ne jamais chercher en mémoire/cache avant d'appeler l'API. "
-        "Autres outils : ffbb_search → trouver un club/compétition. "
-        "ffbb_get(type='poule') → idéal pour LE CLASSEMENT uniquement (SUIVRE RÈGLE ABSOLUE). "
-        "ffbb_club(action='calendrier') → calendrier exhaustif (pas de troncature). "
-        "Règles : catégorie sans genre → demander M ou F. Plusieurs équipes même catégorie → demander laquelle.\n\n"
+        ""
         "[ZIPAI DIRECTIVE: Output technical data only. No filler, no echo, no meta.]\n"
         "## RÈGLE ABSOLUE — CLASSEMENT POULE\n"
         "Suivre strictement le format de tableau et les colonnes définis dans le prompt expert `expert_basket` (Rang, Équipe, PTS, J, G, P, M, E, Diff). "
