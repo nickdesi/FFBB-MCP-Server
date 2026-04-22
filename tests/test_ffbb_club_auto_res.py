@@ -25,11 +25,6 @@ async def test_ffbb_club_equipes_auto_resolution():
         mock_equipes.assert_called_once_with(organisme_id=123, filtre=None)
         assert result == [{"id": "team1", "nom": "U11M1"}]
 
-
-@pytest.mark.asyncio
-async def test_ffbb_club_classement_auto_resolution_full_chain():
-    """Vérifie le chaînage complet : Nom Club -> ID Club -> ID Poule -> Classement."""
-
     mock_search = AsyncMock(return_value=[{"id": 123, "nom": "Stade Clermontois"}])
     mock_resolve_poule = AsyncMock(return_value=456)
     mock_classement = AsyncMock(

@@ -221,9 +221,9 @@ def prune_payload(obj: Any, depth: int = 0) -> Any:
         ]
 
         if len(obj) > limit:
-            # On ne peut pas facilement ajouter un champ à une liste sans casser le schéma,
-            # mais l'agent verra la troncature.
-            pass
+            # On ajoute un champ _omitted_count à la fin de la liste pour prévenir l'agent
+            final_list.append({"_omitted_count": len(obj) - limit})
+
         return final_list
 
     return obj

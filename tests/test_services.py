@@ -1,7 +1,7 @@
 """Tests unitaires des services FFBB (avec mocks, sans appel réseau)."""
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from ffbb_api_client_v3.models.multi_search_results import MultiSearchResult
@@ -1224,3 +1224,52 @@ class TestResolveClubAndOrgEntente:
             svc.search_organismes_service = original
 
         assert call_count["n"] == 1, "Only one search should be called when no key word"
+
+
+# Tests for _resolve_club_and_org M/F filtering
+
+
+@pytest.mark.asyncio
+async def test_resolve_club_and_org_mf_filtering():
+    """Vérifie le filtrage M/F (Règle 10) dans _resolve_club_and_org."""
+    from ffbb_mcp.services import _resolve_club_and_org
+
+    mock_search = AsyncMock(
+        return_value=[
+            {"id": 1, "nom": "Stade Clermontois Basket Féminin"},
+            {"id": 2, "nom": "Stade Clermontois Basket Auvergne"},
+        ]
+    )
+    mock_get = AsyncMock(
+        return_value={
+            "id": 2,
+            "nom": "Stade Clermontois Basket Auvergne",
+            "engagements": [],
+        }
+    )
+
+    with (
+        patch("ffbb_mcp.services.search_organismes_service", mock_search),
+        patch("ffbb_mcp.services.get_organisme_service", mock_get),
+    ):
+        # Test 1: Catégorie M should filter out "Féminin"
+        resolved, _ = await _resolve_club_and_org(
+            club_name="Stade Clermontois", organisme_id=None, categorie="U11M"
+        )
+        assert len(resolved) == 1
+        assert resolved[0]["organisme_id"] == 2
+
+        # Test 2: Catégorie F should filter out the M counterpart (or select Féminin)
+        mock_get_f = AsyncMock(
+            return_value={
+                "id": 1,
+                "nom": "Stade Clermontois Basket Féminin",
+                "engagements": [],
+            }
+        )
+        with patch("ffbb_mcp.services.get_organisme_service", mock_get_f):
+            resolved_f, _ = await _resolve_club_and_org(
+                club_name="Stade Clermontois", organisme_id=None, categorie="U11F"
+            )
+            assert len(resolved_f) == 1
+            assert resolved_f[0]["organisme_id"] == 1
