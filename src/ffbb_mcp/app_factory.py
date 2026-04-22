@@ -59,10 +59,14 @@ def create_app(mcp: FastMCP, allowed_origins: list[str]) -> Starlette:
             request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
             try:
                 response = await call_next(request)
-                if response is None:
-                    raise RuntimeError("No response returned from application.")
             except Exception as e:
-                logger.error(f"Middleware error: {e}")
+                # Don't log broken pipes or client disconnects as errors
+                err_str = str(e).lower()
+                if any(x in err_str for x in ["broken pipe", "connection closed", "client disconnected"]):
+                    logger.debug(f"Client disconnected: {e}")
+                else:
+                    logger.error(f"Middleware error on {request.url.path}: {e}", exc_info=True)
+                
                 response = JSONResponse(
                     {"error": "Internal Server Error", "request_id": request_id},
                     status_code=500,
