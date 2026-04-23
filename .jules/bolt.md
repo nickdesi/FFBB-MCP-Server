@@ -28,3 +28,7 @@
 ## 2024-04-21 - [Caching Strategy] `force_refresh` bypassing deduplication
 **Learning:** Bypassing the cache dynamically (e.g. `force_refresh=True`) shouldn't also bypass the inflight deduplication mechanism (`_dedupe_inflight`). If multiple clients request a refresh simultaneously and the request isn't deduplicated, it will result in thunderous API calls to the source, potentially breaking rate limits.
 **Action:** When implementing `force_refresh`, only clear the local cached key (e.g., `cache.pop(key, None)`), but let the request flow through the inflight deduplication logic as normal.
+
+## 2024-05-26 - [Performance] Hoisting static data structures in recursive functions
+**Learning:** Defining static data structures (like a `set` for key lookups) locally inside a frequently called, heavily recursive function (like `prune_payload`) causes significant performance overhead due to redundant memory allocations and initialization on every stack frame.
+**Action:** Always hoist static, immutable lookups to module-level constants (e.g., using `frozenset`) to avoid redefining them during execution. This single change yielded a measurable speedup without sacrificing readability.

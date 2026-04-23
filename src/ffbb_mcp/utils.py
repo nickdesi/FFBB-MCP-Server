@@ -135,6 +135,45 @@ def format_team_name(name: str | None, number: int | str | None) -> str:
     return name
 
 
+_ESSENTIAL_KEYS = frozenset(
+    {
+        "id",
+        "name",
+        "type",
+        "libelle",
+        "status",
+        "date",
+        "heure",
+        "score",
+        "equipe",
+        "equipe_domicile",
+        "equipe_exterieur",
+        "club",
+        "categorie",
+        "position",
+        "bilan_total",
+        "points",
+        "match_joues",
+        "gagnes",
+        "perdus",
+        "nuls",
+        "difference",
+        "paniers_marques",
+        "paniers_encaisses",
+        "is_target",
+        "logo_url",
+        "point_initiaux",
+        "penalites_arbitrage",
+        "penalites_entraineur",
+        "penalites_diverses",
+        "nombre_forfaits",
+        "nombre_defauts",
+        "quotient",
+        "hors_classement",
+    }
+)
+
+
 def prune_payload(obj: Any, depth: int = 0) -> Any:
     """Réduit agressivement la taille des payloads JSON (ZipAI Surgical Logic).
     - Supprime les valeurs vides (None, [], {}).
@@ -154,48 +193,10 @@ def prune_payload(obj: Any, depth: int = 0) -> Any:
         }
 
         # 2. Élagage chirurgical si trop de clés
-        # On préserve toujours les clés "essentielles" pour l'agent
-        essential_keys = {
-            "id",
-            "name",
-            "type",
-            "libelle",
-            "status",
-            "date",
-            "heure",
-            "score",
-            "equipe",
-            "equipe_domicile",
-            "equipe_exterieur",
-            "club",
-            "categorie",
-            "position",
-            "bilan_total",
-            # Classement
-            "points",
-            "match_joues",
-            "gagnes",
-            "perdus",
-            "nuls",
-            "difference",
-            "paniers_marques",
-            "paniers_encaisses",
-            "is_target",
-            "logo_url",
-            "point_initiaux",
-            "penalites_arbitrage",
-            "penalites_entraineur",
-            "penalites_diverses",
-            "nombre_forfaits",
-            "nombre_defauts",
-            "quotient",
-            "hors_classement",
-        }
-
         if len(cleaned) > 50:
             sorted_keys = sorted(cleaned.keys())
-            kept_keys = {k for k in sorted_keys if k in essential_keys}
-            other_keys = [k for k in sorted_keys if k not in essential_keys]
+            kept_keys = {k for k in sorted_keys if k in _ESSENTIAL_KEYS}
+            other_keys = [k for k in sorted_keys if k not in _ESSENTIAL_KEYS]
 
             # On garde les clés essentielles + les 25 premières autres
             for k in other_keys[:25]:
