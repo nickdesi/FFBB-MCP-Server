@@ -387,6 +387,11 @@ _GUARDRAILS = """\
 - **Échec Tier 1** : signale-le explicitement. Ne bascule pas silencieusement sur Tier 3.
 - **Timeout / erreur réseau** : informer l'utilisateur et proposer une alternative (retry ou Tier 2).
 - **Ambiguïté persistante** : proposer plusieurs hypothèses ou demander une clarification.
+- **Phase terminée — interdiction d'inférence** : Ne jamais conclure qu'une phase est terminée \
+à partir du seul champ `match_joues` d'un classement. \
+Toujours vérifier explicitement qu'aucune rencontre dans `rencontres` n'a `joue: 0` pour l'équipe \
+concernée avant d'écrire "phase terminée", "tous les matchs sont joués" ou toute formulation équivalente. \
+Si `rencontres_restantes_par_equipe` est présent dans la réponse de la poule, s'y fier en priorité.
 - **Singulier vs Pluriel** : Pour "prochain match" (singulier), utiliser `ffbb_next_match`. Pour "prochains matchs" (pluriel), utiliser OBLIGATOIREMENT `ffbb_club(action="calendrier")` et filtrer. Ne jamais utiliser un outil singulier pour une demande plurielle.\
 """
 

@@ -570,6 +570,29 @@ async def get_poule_service(
         )
         data = serialize_model(poule) or {}
 
+        # Enrichissement : rencontres non jouées (joue=0) groupées par équipe.
+        # Permet au LLM de savoir sans ambiguïté si une phase est terminée
+        # pour une équipe donnée, sans inférer depuis match_joues du classement.
+        rencontres = data.get("rencontres", []) or []
+        restantes_par_equipe: dict[str, list[dict]] = {}
+        for r in rencontres:
+            if r.get("joue") not in (0, "0"):
+                continue
+            for side in ("nomEquipe1", "nomEquipe2"):
+                nom = r.get(side, "")
+                if nom:
+                    restantes_par_equipe.setdefault(nom, []).append(
+                        {
+                            "id": r.get("id"),
+                            "date": r.get("date_rencontre"),
+                            "domicile": r.get("nomEquipe1"),
+                            "exterieur": r.get("nomEquipe2"),
+                            "journee": r.get("numeroJournee"),
+                        }
+                    )
+        data["rencontres_restantes_par_equipe"] = restantes_par_equipe
+        data["phase_terminee"] = len(restantes_par_equipe) == 0
+
         # Calculate dynamic TTL
         ttl = await get_poule_ttl(poule_id_int, get_lives_service)
         return {"_ttl": ttl, "data": data}
