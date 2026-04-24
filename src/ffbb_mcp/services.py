@@ -583,6 +583,18 @@ async def get_poule_service(
         make_coro=_fetch,
         cache_name="poule",
     )
+    # PATCH 2: tri par date/heure
+    if isinstance(result, dict) and "data" in result:
+        rencontres = result["data"].get("rencontres", [])
+        if rencontres:
+            # On trie sur (date, heure) ; on gère les None
+            rencontres.sort(
+                key=lambda r: (
+                    r.get("date_reelle") or "9999",
+                    r.get("heure_reelle") or "9999",
+                )
+            )
+
     return (
         result.get("data", result)
         if isinstance(result, dict) and "_ttl" in result

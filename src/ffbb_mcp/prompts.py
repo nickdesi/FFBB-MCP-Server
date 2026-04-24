@@ -386,7 +386,8 @@ _GUARDRAILS = """\
 - **Données partielles** : précise ce qui est confirmé et ce qui reste inconnu.
 - **Échec Tier 1** : signale-le explicitement. Ne bascule pas silencieusement sur Tier 3.
 - **Timeout / erreur réseau** : informer l'utilisateur et proposer une alternative (retry ou Tier 2).
-- **Ambiguïté persistante** : proposer plusieurs hypothèses ou demander une clarification.\
+- **Ambiguïté persistante** : proposer plusieurs hypothèses ou demander une clarification.
+- **Singulier vs Pluriel** : Pour "prochain match" (singulier), utiliser `ffbb_next_match`. Pour "prochains matchs" (pluriel), utiliser OBLIGATOIREMENT `ffbb_club(action="calendrier")` et filtrer. Ne jamais utiliser un outil singulier pour une demande plurielle.\
 """
 
 _BEHAVIOR = """\
