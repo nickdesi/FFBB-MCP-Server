@@ -16,11 +16,12 @@
   <img src="https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python" alt="Python Version" />
   <img src="https://img.shields.io/badge/version-1.0.0-green?style=for-the-badge" alt="Version" />
   <a href="https://smithery.ai/server/ffbb-mcp-server"><img src="https://img.shields.io/badge/Smithery-Supported-yellow?style=for-the-badge&logo=codeigniter" alt="Smithery Badge" /></a>
+  <img src="https://img.shields.io/github/actions/workflow/status/nickdesi/FFBB-MCP-Server/bump-ffbb-client.yml?label=auto-sync&style=for-the-badge" alt="Auto-sync" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
 </p>
 
 <p align="center">
-  <em>Dernière mise à jour : 21 Avril 2026 • Propulsé par <a href="https://pypi.org/project/FFBBApiClientV3/">FFBBApiClientV3</a></em>
+  <em>Dernière mise à jour : 24 Avril 2026 • Propulsé par <a href="https://pypi.org/project/ffbb-api-client-v3/">ffbb-api-client-v3 v1.6.0</a></em>
 </p>
 
 ---
@@ -31,8 +32,8 @@ Le serveur **FFBB MCP** est la **première et unique référence mondiale** perm
 
 Il permet aux assistants IA (Claude, Gemini, Cursor) de naviguer intelligemment dans tout l'écosystème du basket français : des ligues nationales aux championnats régionaux et départementaux, avec une compréhension logique métier inégalée (résolution de noms de clubs ambigus, gestion des phases et poules, etc.).
 
-> **L'instance publique canonique :**  
-> 👉 `https://ffbb.desimone.fr/mcp`  
+> **L'instance publique canonique :**
+> 👉 `https://ffbb.desimone.fr/mcp`
 > Tous les clients IA doivent pointer vers cette URL. Transport : **Streamable HTTP** (spec MCP 2025-11-25).
 
 ---
@@ -96,7 +97,7 @@ Récemment refondu pour maximiser les performances des LLMs, le serveur propose 
 
 #### Détail de `ffbb_search`
 
-L'outil `ffbb_search` couvre désormais **9 index Meilisearch** et supporte le filtrage et tri natifs :
+L'outil `ffbb_search` couvre **9 index Meilisearch** et supporte le filtrage et tri natifs :
 
 | Type | Description |
 | --- | --- |
@@ -111,9 +112,29 @@ L'outil `ffbb_search` couvre désormais **9 index Meilisearch** et supporte le f
 | `engagements` | **Engagements d'équipes** |
 | `formations` | **Formations et stages** |
 
-**Nouveaux paramètres :**
+**Paramètres de filtrage :**
 - `filter_by` *(optionnel)* — Filtre Meilisearch natif (ex: `codePostal = "63000"`)
 - `sort` *(optionnel)* — Tri Meilisearch natif (ex: `["libelle:asc"]`)
+
+---
+
+## 🔄 Synchronisation automatique avec FFBBApiClientV3
+
+Ce serveur est **automatiquement synchronisé** avec les releases de [FFBBApiClientV3](https://github.com/nickdesi/FFBBApiClientV3) :
+
+```
+FFBBApiClientV3 : git tag v1.x.x
+        │
+        ▼
+  publish.yml publie sur PyPI
+        │
+        ▼  repository_dispatch
+  bump-ffbb-client.yml
+  └── uv lock --upgrade-package ffbb-api-client-v3
+  └── Ouvre une PR auto "chore: bump v1.x.x→v1.y.y"
+```
+
+Un fallback quotidien à **07:00 UTC** vérifie et ouvre automatiquement une PR si une nouvelle version PyPI est disponible.
 
 ---
 
@@ -123,14 +144,14 @@ L'outil `ffbb_search` couvre désormais **9 index Meilisearch** et supporte le f
 flowchart LR
     A["Agent IA\nClaude / Cursor"] -->|"Streamable HTTP\nPOST /mcp"| B("FastMCP Server\nffbb.desimone.fr")
     B -->|"Logique Métier & Cache"| C{"Services\nUnifiés"}
-    C <-->|"Client API V3"| D[("FFBB API Officielle")]
+    C <-->|"ffbb-api-client-v3 v1.6.0"| D[("FFBB API Officielle")]
 ```
 
 - **Transport :** Streamable HTTP (spec MCP 2025-11-25) — endpoint unique `/mcp` acceptant POST (JSON-RPC) et GET.
 - **Réduction de contexte :** Le `Service Layer` consolide de nombreux micro-appels FFBB en réponses JSON concises, économisant massivement les tokens de votre LLM.
 - **Cache Intelligent Multi-niveaux :** Un système de TTL dynamique s'adapte au calendrier (mercredi/weekend live, périodes de saisies tardives, hors-saison) pour garantir une fraîcheur maximale (15s en live) tout en optimisant les performances hors match (jusqu'à 24h).
 - **Anti-Burst & Déduplication :** Protection contre les abus via une déduplication des requêtes en vol couplée à un rate-limiter strict.
-- **Auto-résolution :** L'outil `ffbb_club` auto-résout désormais les `poule_id` pour les classements par phase et met en avant l'équipe concernée.
+- **Auto-résolution :** L'outil `ffbb_club` auto-résout les `poule_id` pour les classements par phase et met en avant l'équipe concernée.
 
 ---
 
@@ -138,18 +159,18 @@ flowchart LR
 
 Ce serveur expose des **Prompts** natifs pour donner instantanément de l'expertise métier à votre agent :
 
-- 🎓 `expert_basket` : Injecte les règles métier complexes de la FFBB à votre agent (catégories, désambiguïsation, [règles de navigation multi-phases](docs/rules_ffbb.md), utilisation optimale des outils unifiés). **Fortement recommandé.**
+- 🎓 `expert_basket` : Injecte les règles métier complexes de la FFBB à votre agent (catégories, désambiguaïsation, [règles de navigation multi-phases](docs/rules_ffbb.md), utilisation optimale des outils unifiés). **Fortement recommandé.**
 - 📈 `bilan_equipe` : Prompt guidé pour sortir un rapport exhaustif d'une équipe.
-- 🏟️ `analyser_match` / `prochain_match` : Workflows en 1 clic pour décortiquer une rencontre spécifique.
+- 🏙️ `analyser_match` / `prochain_match` : Workflows en 1 clic pour décortiquer une rencontre spécifique.
 
 ---
 
-## 🔧 FAQ : Comment intégrer et dépanner l'API FFBB avec l'IA ?
+## 🔧 FAQ : Comment intégrer et dépannner l'API FFBB avec l'IA ?
 
 - **Mon IA ne trouve pas mon équipe locale :** Donnez-lui toujours le nom précis du club (ex: `Vichy` au lieu de `JA Vichy` si c'est ambigu) et utilisez **`ffbb_search`**.
 - **L'agent boucle sur des IDs introuvables :** Rappelez à l'agent d'utiliser `ffbb_bilan` avec le paramètre `club_name` pour qu'il fasse lui-même la résolution interne.
 - **Progrès sur les appels lents :** Les outils `ffbb_bilan`, `ffbb_team_summary` et `ffbb_bilan_saison` émettent maintenant des notifications de progression aux clients qui les supportent (Claude Desktop, Cursor…). Aucun changement d'API nécessaire.
-- **Le club contient une apostrophe (ex: `Jeanne d'Arc`) :** ✅ Supporté nativement — les apostrophes typographiques (`'`, `'`, `` ` ``) sont automatiquement normalisées avant la recherche.
+- **Le club contient une apostrophe (ex: `Jeanne d'Arc`) :** ✅ Supporté nativement — les apostrophes typographiques (`’`, `‘`, `` ` ``) sont automatiquement normalisées avant la recherche.
 - **Mon club n'a qu'une seule équipe et elle n'a pas de numéro :** ✅ Supporté nativement — une requête `U11M1` trouve désormais une équipe enregistrée sans numéro (numéro 1 implicite). Le champ `note` de l'équipe retournée l'indique explicitement.
 - **Erreurs 404 :** Assurez-vous d'utiliser le endpoint canonique exact `https://ffbb.desimone.fr/mcp`.
 - **Serveur inactif :** Vérifiez le Health Check `https://ffbb.desimone.fr/health`.
@@ -167,4 +188,3 @@ Pour découvrir la documentation technique exhaustive, le guide de contribution 
 <p align="center">
   <i>Construit avec ❤️ pour la communauté du basket. Ce projet non-officiel n'est pas affilié à la Fédération Française de BasketBall.</i>
 </p>
-
