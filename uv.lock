@@ -404,7 +404,7 @@ wheels = [
 
 [[package]]
 name = "ffbb-api-client-v3"
-version = "1.5.6"
+version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "hishel", extra = ["async"] },
@@ -414,9 +414,9 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "readme-renderer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6a/af/ffcb5b3c2f8ef0f0125cb9baf73cec4ed727cb16008a42a1bbd9b390cdcc/ffbb_api_client_v3-1.5.6.tar.gz", hash = "sha256:00d75f6b2896cd52902ef11863ac86d98c62dca279c87127abd9d302393ee3dc", size = 24437554 }
+sdist = { url = "https://files.pythonhosted.org/packages/68/d3/9cef8d97b282218a9f1de7aac00bb7684d18119d7b6db30d9c276add58bd/ffbb_api_client_v3-1.6.0.tar.gz", hash = "sha256:9d4300548ede500ca2ba0d7d5eef7e214ef165e4cbc193dc548a2c0dfc7fae16", size = 24440900 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/15/37/ed79117e025dfc22382ad5a5078c9e5ba60f5fb9f3e15eefdf61ca664be6/ffbb_api_client_v3-1.5.6-py3-none-any.whl", hash = "sha256:f2df3e7434d6956eef5ef1d091bdf5746ed46d147c9caa4057dc18107473c476", size = 158650 },
+    { url = "https://files.pythonhosted.org/packages/d9/ad/a30b00a6f6b8fffcac5cd343051aff79cd947976d9cf04ccfe64fce53195/ffbb_api_client_v3-1.6.0-py3-none-any.whl", hash = "sha256:764ab82ee1d5ab2760b647092626f3f11f7855e755108c6f21b27632adb24db3", size = 159420 },
 ]
 
 [[package]]
