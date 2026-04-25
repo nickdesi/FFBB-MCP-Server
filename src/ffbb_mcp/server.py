@@ -25,7 +25,8 @@ from starlette.responses import (
 )
 
 from . import __version__ as _PACKAGE_VERSION
-from .metrics import generate_prometheus_metrics
+from .dashboard import _build_dashboard_html
+from .metrics import generate_prometheus_metrics, get_snapshot
 from .prompts import ROUTING_PROMPT, register_prompts
 from .resources import register_resources
 from .services import (
@@ -234,12 +235,61 @@ def _logo_response() -> Response:
 
 @mcp.custom_route("/health", methods=["GET"])  # type: ignore[untyped-decorator]
 async def health(request: Request) -> Response:
-    return JSONResponse({"status": "ok", "service": "ffbb-mcp"})
+    """Endpoint de santé enrichi — lisible par machine et humain."""
+    snap = get_snapshot()
+    uptime_s = snap["uptime_seconds"]
+    days = int(uptime_s // 86400)
+    hours = int((uptime_s % 86400) // 3600)
+    minutes = int((uptime_s % 3600) // 60)
+    seconds = int(uptime_s % 60)
+    status = "degraded" if snap["api_errors_total"] > 0 else "ok"
+    return JSONResponse(
+        {
+            "status": status,
+            "service": "ffbb-mcp",
+            "version": _PACKAGE_VERSION,
+            "transport": "streamable-http",
+            "spec": "2025-11-25",
+            "uptime_seconds": round(uptime_s, 1),
+            "uptime_human": f"{days}j {hours:02d}:{minutes:02d}:{seconds:02d}",
+            "api_calls_total": snap["api_calls_total"],
+            "api_errors_total": snap["api_errors_total"],
+            "api_error_rate": round(snap["api_error_rate"], 4),
+            "api_avg_latency_ms": round(snap["api_avg_latency_seconds"] * 1000, 2),
+            "api_inflight_requests": snap["api_inflight_requests"],
+            "cache_hits_total": snap["cache_hits_total"],
+            "cache_misses_total": snap["cache_misses_total"],
+            "cache_hit_ratio_global": round(snap["cache_hit_ratio_global"], 4),
+            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+            "python_version": platform.python_version(),
+            "public_url": _get_public_base_url(),
+        }
+    )
 
 
 @mcp.custom_route("/metrics", methods=["GET"])  # type: ignore[untyped-decorator]
 async def metrics(request: Request) -> Response:
     return PlainTextResponse(generate_prometheus_metrics())
+
+
+@mcp.custom_route("/metrics.json", methods=["GET"])  # type: ignore[untyped-decorator]
+async def metrics_json(request: Request) -> Response:
+    """Snapshot des métriques au format JSON (pour le dashboard front-end)."""
+    snap = get_snapshot()
+    return JSONResponse(
+        {
+            "service": "ffbb-mcp",
+            "version": _PACKAGE_VERSION,
+            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+            **snap,
+        }
+    )
+
+
+@mcp.custom_route("/dashboard", methods=["GET"])  # type: ignore[untyped-decorator]
+async def dashboard(request: Request) -> Response:
+    """Dashboard de supervision HTML — lisible humain, demo-friendly."""
+    return HTMLResponse(content=_build_dashboard_html(), status_code=200)
 
 
 @mcp.custom_route("/logo.webp", methods=["GET"])  # type: ignore[untyped-decorator]
@@ -781,7 +831,7 @@ async def ffbb_get_saisons(
 
 @mcp.tool(
     name="ffbb_resolve_team",
-    title="Résolution d’équipe",
+    title="Résolution d'équipe",
     annotations=_READONLY_ANNOTATIONS,
 )
 @zipai_surgical
@@ -824,7 +874,7 @@ async def ffbb_resolve_team(
 
 @mcp.tool(
     name="ffbb_team_summary",
-    title="Résumé complet d’équipe",
+    title="Résumé complet d'équipe",
     annotations=_READONLY_ANNOTATIONS,
 )
 @zipai_surgical
@@ -945,7 +995,7 @@ async def ffbb_team_summary(
 
 @mcp.tool(
     name="ffbb_last_result",
-    title="Dernier résultat d’équipe",
+    title="Dernier résultat d'équipe",
     annotations=_READONLY_ANNOTATIONS,
 )
 @zipai_surgical
@@ -997,7 +1047,7 @@ async def ffbb_last_result(
 
 @mcp.tool(
     name="ffbb_next_match",
-    title="Prochain match d’équipe",
+    title="Prochain match d'équipe",
     annotations=_READONLY_ANNOTATIONS,
 )
 @zipai_surgical
