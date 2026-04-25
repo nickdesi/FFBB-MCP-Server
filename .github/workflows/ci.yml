@@ -50,4 +50,5 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
       - name: Run pip-audit
-        run: uv tool run pip-audit --desc on
+        # Ignorer CVE-2026-3219 (vulnérabilité pip, upstream non encore disponible).
+        run: uv tool run pip-audit --desc on --ignore-vuln CVE-2026-3219
