@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+from datetime import datetime
 from functools import lru_cache
 from typing import Any, NamedTuple
 
@@ -133,6 +134,11 @@ def format_team_name(name: str | None, number: int | str | None) -> str:
         pass
 
     return name
+
+
+def is_match_day() -> bool:
+    """Retourne True si le jour courant est un samedi ou un dimanche."""
+    return datetime.now().weekday() in [5, 6]
 
 
 _ESSENTIAL_KEYS = frozenset(

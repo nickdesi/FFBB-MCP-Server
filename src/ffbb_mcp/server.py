@@ -57,7 +57,7 @@ from .services import (
     search_terrains_service,
     search_tournois_service,
 )
-from .utils import format_team_name, prune_payload
+from .utils import format_team_name, is_match_day, prune_payload
 
 
 def zipai_surgical(func: Any) -> Any:
@@ -466,11 +466,12 @@ async def ffbb_bilan(
     try:
         if ctx:
             await ctx.report_progress(0, total=3, message="Résolution du club…")
+        effective_refresh = force_refresh or is_match_day()
         result = await ffbb_bilan_service(
             club_name=club_name,
             organisme_id=organisme_id,
             categorie=categorie,
-            force_refresh=force_refresh,
+            force_refresh=effective_refresh,
         )
         if ctx:
             await ctx.report_progress(3, total=3, message="Bilan prêt.")
@@ -528,7 +529,8 @@ async def ffbb_get(
         if type == "competition":
             return await get_competition_service(competition_id=id)
         elif type == "poule":
-            poule_data = await get_poule_service(id, force_refresh=force_refresh)
+            effective_refresh = force_refresh or is_match_day()
+            poule_data = await get_poule_service(id, force_refresh=effective_refresh)
 
             # Formatage des noms d'équipes dans les classements
             classements = poule_data.get("classements", [])
@@ -719,12 +721,13 @@ async def ffbb_club(
         if action == "calendrier":
             if not target_org_id and not club_name:
                 return [{"error": "Fournir organisme_id ou club_name"}]
+            effective_refresh = force_refresh or is_match_day()
             return await get_calendrier_club_service(
                 club_name=club_name,
                 organisme_id=target_org_id,
                 categorie=filtre,
                 numero_equipe=numero_equipe,
-                force_refresh=force_refresh,
+                force_refresh=effective_refresh,
             )
         elif action == "equipes":
             if not target_org_id:
@@ -1031,12 +1034,13 @@ async def ffbb_last_result(
             "message": "Veuillez fournir club_name ou organisme_id pour trouver l'équipe.",
         }
 
+    effective_refresh = force_refresh or is_match_day()
     return await ffbb_last_result_service(
         club_name=club_name,
         organisme_id=organisme_id,
         categorie=categorie,
         numero_equipe=numero_equipe,
-        force_refresh=force_refresh,
+        force_refresh=effective_refresh,
     )
 
 
@@ -1160,11 +1164,12 @@ async def ffbb_bilan_saison(
     try:
         if ctx:
             await ctx.report_progress(0, total=1, message="Calcul du bilan saison…")
+        effective_refresh = force_refresh or is_match_day()
         result = await ffbb_saison_bilan_service(
             organisme_id=organisme_id,
             categorie=categorie,
             numero_equipe=numero_equipe,
-            force_refresh=force_refresh,
+            force_refresh=effective_refresh,
         )
         if ctx:
             await ctx.report_progress(1, total=1, message="Bilan saison prêt.")
