@@ -4,6 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+
 def get_current_version(pyproject_path):
     content = pyproject_path.read_text("utf-8")
     match = re.search(r'^version\s*=\s*"([^"]+)"', content, flags=re.MULTILINE)

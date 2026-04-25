@@ -1,8 +1,8 @@
 """Dashboard HTML pour le serveur FFBB MCP — route /dashboard."""
 import datetime
 
-from .metrics import get_snapshot
 from . import __version__ as _PACKAGE_VERSION
+from .metrics import get_snapshot
 
 
 def _build_dashboard_html() -> str:
@@ -119,12 +119,12 @@ def _build_dashboard_html() -> str:
         "      <img src='/logo.webp' alt='FFBB logo' onerror=\"this.style.display='none'\">\n"
         "      <div>\n"
         "        <div class='title'>FFBB MCP DASHBOARD</div>\n"
-        "        <div class='meta'>v<span>{_PACKAGE_VERSION}</span> &nbsp;&#183;&nbsp; spec <span>2025-11-25</span></div>\n"
+        f"        <div class='meta'>v<span>{_PACKAGE_VERSION}</span> &nbsp;&#183;&nbsp; spec <span>2025-11-25</span></div>\n"
         "      </div>\n"
         "    </div>\n"
         "    <div class='nav-links'>\n"
         "      <a href='/' class='nav-btn'>&#8592; Retour au site</a>\n"
-        "      <span class='badge {status_badge_cls}'><span class='dot'></span>{status_label}</span>\n"
+        f"      <span class='badge {status_badge_cls}'><span class='dot'></span>{status_label}</span>\n"
         "      <span class='refresh-note'><span class='spin'>&#8635;</span></span>\n"
         "    </div>\n"
         "  </header>\n"
