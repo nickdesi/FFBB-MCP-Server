@@ -1,4 +1,5 @@
 """Dashboard HTML pour le serveur FFBB MCP — route /dashboard."""
+
 import datetime
 
 from . import __version__ as _PACKAGE_VERSION
@@ -32,7 +33,11 @@ def _build_dashboard_html() -> str:
     cache_rows = ""
     for name, stat in cache_stats.items():
         ratio_pct = stat["hit_ratio"] * 100
-        bar_color = "#00e676" if ratio_pct >= 80 else ("#ffab40" if ratio_pct >= 50 else "#ff5252")
+        bar_color = (
+            "#00e676"
+            if ratio_pct >= 80
+            else ("#ffab40" if ratio_pct >= 50 else "#ff5252")
+        )
         cache_rows += (
             f"<tr>"
             f"<td class='cache-name'>{name}</td>"
@@ -48,7 +53,9 @@ def _build_dashboard_html() -> str:
         cache_rows = "<tr><td colspan='5' class='empty'>Aucune donnee de cache — aucun appel API effectue.</td></tr>"
 
     hit_pct = hit_ratio * 100
-    global_bar_color = "#00e676" if hit_pct >= 80 else ("#ffab40" if hit_pct >= 50 else "#ff5252")
+    global_bar_color = (
+        "#00e676" if hit_pct >= 80 else ("#ffab40" if hit_pct >= 50 else "#ff5252")
+    )
     inflight_class = "accent" if inflight > 0 else ""
     error_class = "red" if errors > 0 else "green"
 
@@ -133,7 +140,7 @@ def _build_dashboard_html() -> str:
         "    <div class='kpi-grid'>\n"
         f"      <div class='kpi'><div class='label'>Uptime</div><div class='value accent' style='font-size:20px'>{uptime_fmt}</div><div class='sub'>{uptime_s:.0f}s actifs</div></div>\n"
         f"      <div class='kpi'><div class='label'>Appels API</div><div class='value'>{calls}</div><div class='sub'>requetes sortantes</div></div>\n"
-        f"      <div class='kpi'><div class='label'>Erreurs</div><div class='value {error_class}'>{errors}</div><div class='sub'>taux d'echec {error_rate*100:.1f}%</div></div>\n"
+        f"      <div class='kpi'><div class='label'>Erreurs</div><div class='value {error_class}'>{errors}</div><div class='sub'>taux d'echec {error_rate * 100:.1f}%</div></div>\n"
         f"      <div class='kpi'><div class='label'>Latence</div><div class='value'>{avg_lat_ms:.1f}<span style='font-size:14px;color:var(--muted)'>ms</span></div><div class='sub'>moyenne par appel</div></div>\n"
         f"      <div class='kpi'><div class='label'>En cours</div><div class='value {inflight_class}'>{inflight}</div><div class='sub'>requetes inflight</div></div>\n"
         "    </div>\n"

@@ -69,7 +69,10 @@ async def test_ffbb_club_resolution_failure():
 @pytest.mark.asyncio
 async def test_ffbb_club_calendrier_with_numero_equipe():
     # Verify that the numero_equipe parameter is properly passed down
-    with patch("ffbb_mcp.server.get_calendrier_club_service") as mock_cal_service:
+    with (
+        patch("ffbb_mcp.server.get_calendrier_club_service") as mock_cal_service,
+        patch("ffbb_mcp.server.is_match_day", return_value=False),
+    ):
         # Mocking to return an empty list just to test the argument passing
         mock_cal_service.return_value = []
 
