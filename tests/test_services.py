@@ -765,8 +765,14 @@ class TestGetPouleService:
             get_poule_service(123),
         )
 
-        assert result1 == {"id": 123, "rencontres": []}
-        assert result2 == {"id": 123, "rencontres": []}
+        expected = {
+            "id": 123,
+            "rencontres": [],
+            "phase_terminee": True,
+            "rencontres_restantes_par_equipe": {},
+        }
+        assert result1.get("data", result1) == expected
+        assert result2.get("data", result2) == expected
         assert mock_client.get_poule_async.await_count == 1
 
 

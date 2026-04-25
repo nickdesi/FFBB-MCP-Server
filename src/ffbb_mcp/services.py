@@ -41,6 +41,15 @@ logger = logging.getLogger("ffbb-mcp")
 
 T = TypeVar("T")
 
+# ---------------------------------------------------------------------------
+# Expressions régulières pré-compilées (Optimisation des performances)
+# ---------------------------------------------------------------------------
+# Le pré-calcul des regex évite le surcoût de la compilation dynamique lors
+# des cache misses ou des fonctions appelées fréquemment.
+
+_PHASE_EXTRACT_PATTERN = re.compile(r"Phase\s*(\d+)", re.IGNORECASE)
+_NUMERIC_EXTRACT_PATTERN = re.compile(r"(\d+)")
+
 
 def _read_positive_int_env(name: str, default: int) -> int:
     raw = os.environ.get(name)
@@ -74,7 +83,7 @@ def _extract_phase_num(label: str | None) -> int:
     """
     if not label:
         return 1
-    match = re.search(r"Phase\s*(\d+)", label, re.IGNORECASE)
+    match = _PHASE_EXTRACT_PATTERN.search(label)
     if match:
         try:
             return int(match.group(1))
@@ -2376,7 +2385,7 @@ async def resolve_poule_id_service(
     # Si une phase est spécifiée (ex: "phase 3", "3", "p3")
     if phase_query:
         target_phase = phase_query.strip()
-        phase_num_match = re.search(r"(\d+)", target_phase)
+        phase_num_match = _NUMERIC_EXTRACT_PATTERN.search(target_phase)
         target_phase_int: int | None = (
             int(phase_num_match.group(1)) if phase_num_match else None
         )
