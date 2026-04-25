@@ -14,14 +14,14 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python" alt="Python Version" />
-  <img src="https://img.shields.io/badge/version-1.0.0-green?style=for-the-badge" alt="Version" />
+  <img src="https://img.shields.io/badge/version-1.0.1-green?style=for-the-badge" alt="Version" />
   <a href="https://smithery.ai/server/ffbb-mcp-server"><img src="https://img.shields.io/badge/Smithery-Supported-yellow?style=for-the-badge&logo=codeigniter" alt="Smithery Badge" /></a>
   <img src="https://img.shields.io/github/actions/workflow/status/nickdesi/FFBB-MCP-Server/bump-ffbb-client.yml?label=auto-sync&style=for-the-badge" alt="Auto-sync" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
 </p>
 
 <p align="center">
-  <em>Dernière mise à jour : 24 Avril 2026 • Propulsé par <a href="https://pypi.org/project/ffbb-api-client-v3/">ffbb-api-client-v3 v1.6.0</a></em>
+  <em>Dernière mise à jour : 25 Avril 2026 • Propulsé par <a href="https://pypi.org/project/ffbb-api-client-v3/">ffbb-api-client-v3 v1.6.0</a></em>
 </p>
 
 ---

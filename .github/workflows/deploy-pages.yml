@@ -28,13 +28,13 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
       - name: Inject Version and Date into HTML
-        run: python3 tools/update_website_meta.py
+        run: python3 tools/sync_version.py
       - name: Commit and push changes
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add website/index.html website/sitemap.xml website/robots.txt
-          git commit -m "chore: update website metadata [skip ci]" || echo "No changes to commit"
+          git add website/index.html website/sitemap.xml README.md docs/TOOLS_REFERENCE.md CHANGELOG.md uv.lock
+          git commit -m "chore: sync version strings [skip ci]" || echo "No changes to commit"
           git push
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
