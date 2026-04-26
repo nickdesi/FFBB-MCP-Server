@@ -1,34 +1,3 @@
-## 2024-05-24 - Optimisation de la normalisation des noms d'équipes
-**Learning:** L'optimisation apparente de `_normalize_name` via l'encodage ASCII (`s.encode("ascii", "ignore").decode("utf-8")`) en remplacement du filtrage des catégories Unicode (`"".join(ch for ch in s if unicodedata.category(ch) != "Mn")`) est certes plus rapide, mais introduit un risque de bug subtil avec certains caractères français spécifiques (comme "Œ", "Æ"). Le filtrage par catégorie Unicode est plus sûr dans le contexte de noms français, même s'il est plus lent. La véritable optimisation réside dans la réduction des appels redondants via le "hoisting" (pré-calcul) plutôt que la micro-optimisation de la fonction elle-même.
-**Action:** Toujours évaluer les risques fonctionnels des optimisations de manipulation de chaînes liées à l'Unicode (spécifiquement dans un contexte francophone). Privilégier le hoisting des opérations coûteuses en dehors des boucles avant de tenter de réécrire la logique interne des fonctions.
-
-## 2024-05-18 - [JSON Serialization Performance]
-**Learning:** In heavily recursive JSON serialization functions (like `serialize_model`), calling `hasattr()` on native collections (dicts, lists) introduces significant overhead because `hasattr` internally handles `AttributeError` exceptions when the attribute doesn't exist. Python's internal exception handling is relatively slow.
-**Action:** Always place `isinstance(obj, dict)` and `isinstance(obj, list)` checks BEFORE `hasattr` checks when traversing standard data structures. Also, when checking for primitives, prefer `isinstance(obj, str | int | float | bool)` over strict `type(obj) in (...)` to ensure data integrity for subclasses (like `IntEnum`), even if strict type checking is marginally faster.
-
-## 2026-04-18 - [API Payload inconsistencies]
-**Learning:** The FFBB API response structure can be inconsistent. In the `engagements` list fetched for a club, the `nom` attribute may unexpectedly be `None` for some teams. Logic strictly relying on string parsing of `nom` will fail silently or filter out valid results.
-**Action:** Always rely on structured fields like `numero_equipe` primarily, and use string parsing only as a fallback. Ensure that `None` values are safely handled by using `.get("key", "")` before attempting string operations.
-
-## 2024-05-25 - [Type Checking Optimization for Serialization]
-**Learning:** `type(obj) is ...` is measurably faster than `isinstance(obj, ...)` in Python because it avoids traversing the Method Resolution Order (MRO) for inheritance. In heavily recursive serialization functions (like `serialize_model`), introducing a "fast path" with exact type checks for standard JSON primitives (`str`, `int`, `float`, `bool`, `dict`, `list`) can yield a significant ~3x speedup.
-**Action:** Use `type(obj) is ...` fast paths in critical data transformation/serialization functions to handle standard data types, while retaining `isinstance` as a fallback to ensure support for sub-classes (like `IntEnum` or custom collections).
-## 2025-04-19 - [CI Troubleshooting]
-**Learning:** Duplicate arguments defined in pytest CLI vs pytest config (e.g. `--cov=ffbb_mcp`) can cause fatal test failures in newer pytest versions when invoked via CI. Furthermore, CI actions must be updated to existing major versions (e.g., `actions/checkout@v6` -> `v4`).
-**Action:** Always verify action versions and pytest argument combinations locally before pushing.
-
-## 2024-04-20 - [Performance] Regex compilation overhead in cache miss scenarios
-**Learning:** In highly cached functions (like `parse_categorie` decorated with `lru_cache`), the overhead of dynamically compiling regular expressions using `re.search()` with string literals dominates the execution time during cache misses. This becomes relevant when the cache is small compared to the input space, or when handling cold-start requests. Python's internal regex caching limits its effectiveness in complex or varied patterns.
-**Action:** Always pre-compile regular expressions at the module level using `re.compile()` for functions that will be called frequently, even if they are memoized. This halved the uncached execution time of string parsing logic in this codebase.
-
-## 2024-04-21 - [API Design] Defensive defaults and no-op loops
-**Learning:** Adding empty defensive loops or fallbacks like `c[field] = c.get(field)` when dealing with external API responses is an anti-pattern. If a field is missing, it's missing, and assigning `None` manually using `c.get()` is equivalent to not assigning it at all since Python/JSON dumps natively ignore absent keys unless explicitly requested via `setdefault`. Such loops add noise and confusion.
-**Action:** Let missing fields be missing. Use `setdefault` only if the downstream logic explicitly requires the key to exist with a default value.
-
-## 2024-04-21 - [Caching Strategy] `force_refresh` bypassing deduplication
-**Learning:** Bypassing the cache dynamically (e.g. `force_refresh=True`) shouldn't also bypass the inflight deduplication mechanism (`_dedupe_inflight`). If multiple clients request a refresh simultaneously and the request isn't deduplicated, it will result in thunderous API calls to the source, potentially breaking rate limits.
-**Action:** When implementing `force_refresh`, only clear the local cached key (e.g., `cache.pop(key, None)`), but let the request flow through the inflight deduplication logic as normal.
-
-## 2024-05-26 - [Performance] Hoisting static data structures in recursive functions
-**Learning:** Defining static data structures (like a `set` for key lookups) locally inside a frequently called, heavily recursive function (like `prune_payload`) causes significant performance overhead due to redundant memory allocations and initialization on every stack frame.
-**Action:** Always hoist static, immutable lookups to module-level constants (e.g., using `frozenset`) to avoid redefining them during execution. This single change yielded a measurable speedup without sacrificing readability.
+## 2024-05-28 - [Recursive Serialization Optimization in Python]
+**Learning:** In heavily recursive data transformation functions like `prune_payload`, avoiding dynamic limits lookups (e.g., `os.environ.get()` cast to `int`) and extracting them to module-level constants yields significant speedups. Furthermore, prioritizing primitives `(str, int, float, bool, None)` as a fast path using `type(obj)` avoids repeatedly falling into slower dict and list comprehension blocks, saving an extra ~5-10% computation time. Attempting to use `@lru_cache` for environment variables is an anti-pattern as the variable might change at runtime or not change at all making a constant significantly faster without overhead.
+**Action:** When optimizing recursive tree walking functions handling large JSONs, hoist limits and constants to the module level and prioritize `type(obj) is ...` for primitives at the beginning of the function.

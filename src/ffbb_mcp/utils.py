@@ -180,6 +180,9 @@ _ESSENTIAL_KEYS = frozenset(
 )
 
 
+_PRUNE_LIMIT = int(os.environ.get("FFBB_MCP_PRUNE_LIMIT", "50"))
+
+
 def prune_payload(obj: Any, depth: int = 0) -> Any:
     """Réduit agressivement la taille des payloads JSON (ZipAI Surgical Logic).
     - Supprime les valeurs vides (None, [], {}).
@@ -190,7 +193,19 @@ def prune_payload(obj: Any, depth: int = 0) -> Any:
     if depth > 10:
         return "<max depth reached>"
 
-    if isinstance(obj, dict):
+    obj_type = type(obj)
+
+    # Fast path: Primitives are the most common payload items.
+    if (
+        obj_type is str
+        or obj_type is int
+        or obj_type is float
+        or obj_type is bool
+        or obj is None
+    ):
+        return obj
+
+    if obj_type is dict or isinstance(obj, dict):
         # 1. Nettoyage récursif
         cleaned = {
             k: prune_payload(v, depth + 1)
@@ -214,9 +229,9 @@ def prune_payload(obj: Any, depth: int = 0) -> Any:
             return pruned
         return cleaned
 
-    elif isinstance(obj, list):
+    elif obj_type is list or isinstance(obj, list):
         # 1. Limitation de taille (ZipAI Surgical)
-        limit = int(os.environ.get("FFBB_MCP_PRUNE_LIMIT", "50"))
+        limit = _PRUNE_LIMIT
         truncated = obj[:limit]
 
         # 2. Nettoyage récursif
