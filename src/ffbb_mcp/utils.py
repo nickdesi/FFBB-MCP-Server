@@ -210,7 +210,8 @@ def prune_payload(obj: Any, depth: int = 0) -> Any:
         cleaned = {
             k: prune_payload(v, depth + 1)
             for k, v in obj.items()
-            if v is not None and v != [] and v != {}
+            # Optimization: avoid empty collection allocation by using type() instead of != []/{} and early exit using boolean truthiness
+            if v is not None and (v or (type(v) is not list and type(v) is not dict))
         }
 
         # 2. Élagage chirurgical si trop de clés
@@ -239,7 +240,8 @@ def prune_payload(obj: Any, depth: int = 0) -> Any:
         final_list = [
             item
             for item in cleaned_list
-            if item is not None and item != {} and item != []
+            if item is not None
+            and (item or (type(item) is not list and type(item) is not dict))
         ]
 
         if len(obj) > limit:
