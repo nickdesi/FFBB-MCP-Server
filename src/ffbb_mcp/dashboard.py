@@ -2,7 +2,7 @@
 
 import datetime
 
-from . import __version__ as _PACKAGE_VERSION
+from . import __version__ as _PACKAGE_VERSION  # noqa: N812
 from .metrics import get_snapshot
 
 
@@ -17,15 +17,16 @@ def _build_dashboard_html() -> str:
     seconds = int(uptime_s % 60)
     uptime_fmt = f"{days}j {hours:02d}:{minutes:02d}:{seconds:02d}"
 
-    calls = snap["api_calls_total"]
-    errors = snap["api_errors_total"]
+    calls = snap["api_calls_success"] + snap["api_calls_error"]
+    errors = snap["api_calls_error"]
     error_rate = snap["api_error_rate"]
     avg_lat_ms = snap["api_avg_latency_seconds"] * 1000
     inflight = snap["api_inflight_requests"]
-    hits = snap["cache_hits_total"]
-    misses = snap["cache_misses_total"]
-    hit_ratio = snap["cache_hit_ratio_global"]
     cache_stats = snap.get("cache", {})
+    hits = sum(s["hits"] for s in cache_stats.values())
+    misses = sum(s["misses"] for s in cache_stats.values())
+    cache_total = hits + misses
+    hit_ratio = hits / cache_total if cache_total else 0.0
 
     status_badge_cls = "healthy" if errors == 0 else "degraded"
     status_label = "HEALTHY" if errors == 0 else "DEGRADED"

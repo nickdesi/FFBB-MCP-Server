@@ -6,10 +6,18 @@ from typing import Any
 
 START_TIME = time.time()
 
-# Compteurs globaux d'appels FFBB
-_total_calls: int = 0
-_error_calls: int = 0
-_total_latency: float = 0.0
+# Buckets de latence pour le histogram (secondes) — valeurs adaptées aux appels FFBB
+_LATENCY_BUCKETS: tuple[float, ...] = (0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
+
+# Compteurs d'appels par statut
+_calls_success: int = 0
+_calls_error: int = 0
+
+# Histogram de latence : bucket_counts[i] = nb observations <= _LATENCY_BUCKETS[i]
+# Index len(_LATENCY_BUCKETS) = +Inf bucket
+_latency_bucket_counts: list[int] = [0] * (len(_LATENCY_BUCKETS) + 1)
+_latency_sum: float = 0.0
+_latency_count: int = 0
 
 # Compteurs de cache (par nom de cache)
 _cache_hits: dict[str, int] = {}
@@ -27,13 +35,21 @@ _metrics_lock = Lock()
 
 
 def record_call(latency: float, is_error: bool) -> None:
-    """Enregistre un appel API FFBB (latence + erreurs)."""
-    global _total_calls, _error_calls, _total_latency
+    """Enregistre un appel API FFBB (latence + statut)."""
+    global _calls_success, _calls_error, _latency_sum, _latency_count
     with _metrics_lock:
-        _total_calls += 1
-        _total_latency += latency
         if is_error:
-            _error_calls += 1
+            _calls_error += 1
+        else:
+            _calls_success += 1
+        _latency_sum += latency
+        _latency_count += 1
+        for i, bound in enumerate(_LATENCY_BUCKETS):
+            if latency <= bound:
+                _latency_bucket_counts[i] += 1
+                break
+        # +Inf bucket : toujours incrémenté
+        _latency_bucket_counts[len(_LATENCY_BUCKETS)] += 1
 
 
 def inc_inflight() -> None:
@@ -74,24 +90,27 @@ def record_cache_miss(cache_name: str) -> None:
 def get_snapshot() -> dict[str, Any]:
     """Retourne un snapshot instantané des métriques (thread-safe).
 
-    Utile pour les tests, un endpoint /metrics JSON ou le logging périodique.
-    Les métriques dérivées (error_rate, avg_latency, hit_ratio) sont calculées
-    hors du lock pour minimiser la durée de contention.
+    Les métriques dérivées (error_rate, avg_latency, hit_ratio) sont
+    intentionnellement absentes de l'export Prometheus — calculez-les via
+    PromQL (rate(), sum()/sum()). Elles restent disponibles ici pour les
+    besoins internes (dashboard, logging).
     """
     with _metrics_lock:
-        calls = _total_calls
-        errors = _error_calls
-        latency_total = _total_latency
+        success = _calls_success
+        errors = _calls_error
+        lat_sum = _latency_sum
+        lat_count = _latency_count
+        lat_buckets = list(_latency_bucket_counts)
         inflight = _ffbb_inflight
         hits = dict(_cache_hits)
         misses = dict(_cache_misses)
 
+    calls = success + errors
     error_rate = errors / calls if calls > 0 else 0.0
-    avg_latency = latency_total / calls if calls > 0 else 0.0
+    avg_latency = lat_sum / lat_count if lat_count > 0 else 0.0
 
     cache_stats: dict[str, dict[str, Any]] = {}
-    all_cache_names = set(hits) | set(misses)
-    for name in all_cache_names:
+    for name in set(hits) | set(misses):
         h = hits.get(name, 0)
         m = misses.get(name, 0)
         total = h + m
@@ -102,22 +121,17 @@ def get_snapshot() -> dict[str, Any]:
             "hit_ratio": h / total if total > 0 else 0.0,
         }
 
-    total_hits = sum(hits.values())
-    total_misses = sum(misses.values())
-    total_cache = total_hits + total_misses
-
     return {
         "uptime_seconds": time.time() - START_TIME,
-        "api_calls_total": calls,
-        "api_errors_total": errors,
+        "api_calls_success": success,
+        "api_calls_error": errors,
         "api_error_rate": error_rate,
-        "api_latency_seconds_total": latency_total,
         "api_avg_latency_seconds": avg_latency,
+        "api_latency_sum": lat_sum,
+        "api_latency_count": lat_count,
+        "api_latency_buckets": lat_buckets,
         "api_inflight_requests": inflight,
         "cache": cache_stats,
-        "cache_hits_total": total_hits,
-        "cache_misses_total": total_misses,
-        "cache_hit_ratio_global": total_hits / total_cache if total_cache > 0 else 0.0,
     }
 
 
@@ -126,87 +140,71 @@ def get_snapshot() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+def _prom_block(name: str, help_: str, type_: str, *lines: str) -> list[str]:
+    """Retourne un bloc Prometheus complet : HELP, TYPE, puis les lignes de valeurs."""
+    return [f"# HELP {name} {help_}", f"# TYPE {name} {type_}", *lines, ""]
+
+
 def generate_prometheus_metrics() -> str:
     """Génère les métriques au format texte Prometheus (exposition standard).
 
-    Les métriques dérivées (error_rate, avg_latency) sont intentionnellement
-    absentes : un scraper Prometheus les calcule via rate() / irate().
-    Elles restent disponibles via get_snapshot() pour les besoins internes.
+    Conforme aux best practices Prometheus :
+    - Pas de ratios précalculés (calculés côté PromQL)
+    - Pas de totaux globaux redondants (sum() en PromQL)
+    - Latence exposée via histogram (buckets + sum + count)
+    - Labels {status} sur api_calls pour corrélation erreurs/succès
     """
     snap = get_snapshot()
-    uptime = snap["uptime_seconds"]
-    days = int(uptime // 86400)
-    hours = int((uptime % 86400) // 3600)
-    minutes = int((uptime % 3600) // 60)
-    uptime_fmt = f"{days:03d}:{hours:02d}:{minutes:02d}"
 
-    lines: list[str] = [
-        "# HELP ffbb_uptime_seconds Uptime du serveur en secondes",
-        "# TYPE ffbb_uptime_seconds gauge",
-        f"ffbb_uptime_seconds {uptime:.2f}",
-        "",
-        "# HELP ffbb_uptime_formatted Uptime lisible (JJJ:HH:MM)",
-        "# TYPE ffbb_uptime_formatted gauge",
-        f'ffbb_uptime_formatted{{human="{uptime_fmt}"}} 1',
-        "",
-        "# HELP ffbb_api_calls_total Total des appels vers l'API FFBB",
-        "# TYPE ffbb_api_calls_total counter",
-        f"ffbb_api_calls_total {snap['api_calls_total']}",
-        "",
-        "# HELP ffbb_api_errors_total Total des erreurs retournées par l'API FFBB",
-        "# TYPE ffbb_api_errors_total counter",
-        f"ffbb_api_errors_total {snap['api_errors_total']}",
-        "",
-        "# HELP ffbb_api_latency_seconds_total Latence cumulative des appels API (secondes)",
-        "# TYPE ffbb_api_latency_seconds_total counter",
-        f"ffbb_api_latency_seconds_total {snap['api_latency_seconds_total']:.4f}",
-        "",
-        "# HELP ffbb_api_inflight_requests Nombre d'appels FFBB en cours",
-        "# TYPE ffbb_api_inflight_requests gauge",
-        f"ffbb_api_inflight_requests {snap['api_inflight_requests']}",
+    lines: list[str] = _prom_block(
+        "ffbb_uptime_seconds",
+        "Uptime du serveur en secondes",
+        "gauge",
+        f"ffbb_uptime_seconds {snap['uptime_seconds']:.2f}",
+    ) + _prom_block(
+        "ffbb_api_calls_total",
+        "Total des appels vers l'API FFBB",
+        "counter",
+        f'ffbb_api_calls_total{{status="success"}} {snap["api_calls_success"]}',
+        f'ffbb_api_calls_total{{status="error"}} {snap["api_calls_error"]}',
+    ) + [
+        "# HELP ffbb_api_latency_seconds Latence des appels API FFBB",
+        "# TYPE ffbb_api_latency_seconds histogram",
     ]
+
+    # Buckets cumulatifs
+    cumulative = 0
+    for i, bound in enumerate(_LATENCY_BUCKETS):
+        cumulative += snap["api_latency_buckets"][i]
+        lines.append(f'ffbb_api_latency_seconds_bucket{{le="{bound}"}} {cumulative}')
+    lines.append(
+        f'ffbb_api_latency_seconds_bucket{{le="+Inf"}} {snap["api_latency_count"]}'
+    )
+    lines += [
+        f'ffbb_api_latency_seconds_sum {snap["api_latency_sum"]:.4f}',
+        f'ffbb_api_latency_seconds_count {snap["api_latency_count"]}',
+        "",
+    ]
+
+    lines += _prom_block(
+        "ffbb_api_inflight_requests",
+        "Nombre d'appels FFBB en cours",
+        "gauge",
+        f"ffbb_api_inflight_requests {snap['api_inflight_requests']}",
+    )
 
     cache_stats: dict[str, dict] = snap["cache"]
     if cache_stats:
-        lines += [
-            "",
-            "# HELP ffbb_cache_hits_total Hits de cache par cache",
-            "# TYPE ffbb_cache_hits_total counter",
-        ]
-        for name, stat in cache_stats.items():
-            lines.append(f'ffbb_cache_hits_total{{cache="{name}"}} {stat["hits"]}')
-
-        lines += [
-            "",
-            "# HELP ffbb_cache_misses_total Miss de cache par cache",
-            "# TYPE ffbb_cache_misses_total counter",
-        ]
-        for name, stat in cache_stats.items():
-            lines.append(f'ffbb_cache_misses_total{{cache="{name}"}} {stat["misses"]}')
-
-        lines += [
-            "",
-            "# HELP ffbb_cache_hit_ratio Ratio hits/(hits+misses) par cache [0-1]",
-            "# TYPE ffbb_cache_hit_ratio gauge",
-        ]
-        for name, stat in cache_stats.items():
-            lines.append(
-                f'ffbb_cache_hit_ratio{{cache="{name}"}} {stat["hit_ratio"]:.4f}'
-            )
-
-    lines += [
-        "",
-        "# HELP ffbb_cache_hits_global_total Total hits toutes caches confondues",
-        "# TYPE ffbb_cache_hits_global_total counter",
-        f"ffbb_cache_hits_global_total {snap['cache_hits_total']}",
-        "",
-        "# HELP ffbb_cache_misses_global_total Total misses toutes caches confondues",
-        "# TYPE ffbb_cache_misses_global_total counter",
-        f"ffbb_cache_misses_global_total {snap['cache_misses_total']}",
-        "",
-        "# HELP ffbb_cache_hit_ratio_global Ratio hits/total global [0-1]",
-        "# TYPE ffbb_cache_hit_ratio_global gauge",
-        f"ffbb_cache_hit_ratio_global {snap['cache_hit_ratio_global']:.4f}",
-    ]
+        lines += _prom_block(
+            "ffbb_cache_hits_total",
+            "Hits de cache par cache",
+            "counter",
+            *[f'ffbb_cache_hits_total{{cache="{n}"}} {s["hits"]}' for n, s in cache_stats.items()],
+        ) + _prom_block(
+            "ffbb_cache_misses_total",
+            "Misses de cache par cache",
+            "counter",
+            *[f'ffbb_cache_misses_total{{cache="{n}"}} {s["misses"]}' for n, s in cache_stats.items()],
+        )
 
     return "\n".join(lines) + "\n"

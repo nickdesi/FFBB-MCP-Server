@@ -20,8 +20,6 @@ def _read_positive_int_env(key: str, default: int) -> int:
 
 @dataclass
 class _ServiceState:
-    inflight_search_club: dict[str, asyncio.Task[Any]] = field(default_factory=dict)
-    inflight_search_org: dict[str, asyncio.Task[Any]] = field(default_factory=dict)
     inflight_bilan: dict[str, asyncio.Task[Any]] = field(default_factory=dict)
     inflight_calendrier: dict[str, asyncio.Task[Any]] = field(default_factory=dict)
     inflight_lives: dict[str, asyncio.Task[Any]] = field(default_factory=dict)
@@ -45,8 +43,6 @@ state = _ServiceState()
 
 def reset_service_state() -> None:
     global state
-    state.inflight_search_club.clear()
-    state.inflight_search_org.clear()
     state.inflight_bilan.clear()
     state.inflight_calendrier.clear()
     state.inflight_lives.clear()
