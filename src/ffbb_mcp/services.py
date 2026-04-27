@@ -244,7 +244,7 @@ def _cache_get(
     if value is not None:
         _notify_cache_hit(cache_name)
     else:
-        _notify_cache_miss(cache_name)
+        _notify_cache_miss(cache_name)  # uniquement si cache existe mais clé absente
     return value
 
 
@@ -364,7 +364,7 @@ async def _safe_call(
     `coro` peut être soit une coroutine (non-réessayable), soit un "callable"
     zéro-argument qui retourne une nouvelle coroutine (réessayable).
     """
-    logger.info(f"Début exécution: {operation_name}")
+    logger.debug("Début exécution: %s", operation_name)
 
     if not callable(coro):
         raise ValueError(
@@ -379,7 +379,7 @@ async def _safe_call(
             current_coro = make_coro()
             result = await current_coro
             record_call(time.time() - t0, is_error=False)
-            logger.info(f"Succès: {operation_name} (attempt {attempt})")
+            logger.debug("Succès: %s (attempt %d)", operation_name, attempt)
             return result
         except Exception as e:
             record_call(time.time() - t0, is_error=True)

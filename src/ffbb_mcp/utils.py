@@ -216,18 +216,20 @@ def prune_payload(obj: Any, depth: int = 0) -> Any:
 
         # 2. Élagage chirurgical si trop de clés
         if len(cleaned) > 50:
-            sorted_keys = sorted(cleaned.keys())
-            kept_keys = {k for k in sorted_keys if k in _ESSENTIAL_KEYS}
-            other_keys = [k for k in sorted_keys if k not in _ESSENTIAL_KEYS]
-
-            # On garde les clés essentielles + les 25 premières autres
-            for k in other_keys[:25]:
-                kept_keys.add(k)
-
-            pruned = {k: cleaned[k] for k in kept_keys}
-            if len(other_keys) > 25:
-                pruned["_omitted_count"] = len(other_keys) - 25
-            return pruned
+            kept: dict[str, Any] = {}
+            overflow_count = 0
+            non_essential_count = 0
+            for k, v in cleaned.items():
+                if k in _ESSENTIAL_KEYS:
+                    kept[k] = v
+                elif non_essential_count < 25:
+                    kept[k] = v
+                    non_essential_count += 1
+                else:
+                    overflow_count += 1
+            if overflow_count:
+                kept["_omitted_count"] = overflow_count
+            return kept
         return cleaned
 
     elif obj_type is list or isinstance(obj, list):

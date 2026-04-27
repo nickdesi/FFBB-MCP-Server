@@ -1,5 +1,6 @@
 """Module de tracking des métriques du serveur et des appels FFBB."""
 
+import bisect
 import time
 from threading import Lock
 from typing import Any
@@ -44,10 +45,10 @@ def record_call(latency: float, is_error: bool) -> None:
             _calls_success += 1
         _latency_sum += latency
         _latency_count += 1
-        for i, bound in enumerate(_LATENCY_BUCKETS):
-            if latency <= bound:
-                _latency_bucket_counts[i] += 1
-                break
+        # bisect_left : O(log n) — équivalent exact de « premier bucket où latency <= bound »
+        i = bisect.bisect_left(_LATENCY_BUCKETS, latency)
+        if i < len(_LATENCY_BUCKETS):
+            _latency_bucket_counts[i] += 1
         # +Inf bucket : toujours incrémenté
         _latency_bucket_counts[len(_LATENCY_BUCKETS)] += 1
 
@@ -156,21 +157,25 @@ def generate_prometheus_metrics() -> str:
     """
     snap = get_snapshot()
 
-    lines: list[str] = _prom_block(
-        "ffbb_uptime_seconds",
-        "Uptime du serveur en secondes",
-        "gauge",
-        f"ffbb_uptime_seconds {snap['uptime_seconds']:.2f}",
-    ) + _prom_block(
-        "ffbb_api_calls_total",
-        "Total des appels vers l'API FFBB",
-        "counter",
-        f'ffbb_api_calls_total{{status="success"}} {snap["api_calls_success"]}',
-        f'ffbb_api_calls_total{{status="error"}} {snap["api_calls_error"]}',
-    ) + [
-        "# HELP ffbb_api_latency_seconds Latence des appels API FFBB",
-        "# TYPE ffbb_api_latency_seconds histogram",
-    ]
+    lines: list[str] = (
+        _prom_block(
+            "ffbb_uptime_seconds",
+            "Uptime du serveur en secondes",
+            "gauge",
+            f"ffbb_uptime_seconds {snap['uptime_seconds']:.2f}",
+        )
+        + _prom_block(
+            "ffbb_api_calls_total",
+            "Total des appels vers l'API FFBB",
+            "counter",
+            f'ffbb_api_calls_total{{status="success"}} {snap["api_calls_success"]}',
+            f'ffbb_api_calls_total{{status="error"}} {snap["api_calls_error"]}',
+        )
+        + [
+            "# HELP ffbb_api_latency_seconds Latence des appels API FFBB",
+            "# TYPE ffbb_api_latency_seconds histogram",
+        ]
+    )
 
     # Buckets cumulatifs
     cumulative = 0
@@ -181,8 +186,8 @@ def generate_prometheus_metrics() -> str:
         f'ffbb_api_latency_seconds_bucket{{le="+Inf"}} {snap["api_latency_count"]}'
     )
     lines += [
-        f'ffbb_api_latency_seconds_sum {snap["api_latency_sum"]:.4f}',
-        f'ffbb_api_latency_seconds_count {snap["api_latency_count"]}',
+        f"ffbb_api_latency_seconds_sum {snap['api_latency_sum']:.4f}",
+        f"ffbb_api_latency_seconds_count {snap['api_latency_count']}",
         "",
     ]
 
@@ -199,12 +204,18 @@ def generate_prometheus_metrics() -> str:
             "ffbb_cache_hits_total",
             "Hits de cache par cache",
             "counter",
-            *[f'ffbb_cache_hits_total{{cache="{n}"}} {s["hits"]}' for n, s in cache_stats.items()],
+            *[
+                f'ffbb_cache_hits_total{{cache="{n}"}} {s["hits"]}'
+                for n, s in cache_stats.items()
+            ],
         ) + _prom_block(
             "ffbb_cache_misses_total",
             "Misses de cache par cache",
             "counter",
-            *[f'ffbb_cache_misses_total{{cache="{n}"}} {s["misses"]}' for n, s in cache_stats.items()],
+            *[
+                f'ffbb_cache_misses_total{{cache="{n}"}} {s["misses"]}'
+                for n, s in cache_stats.items()
+            ],
         )
 
     return "\n".join(lines) + "\n"

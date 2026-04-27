@@ -24,7 +24,7 @@ from starlette.responses import (
     Response,
 )
 
-from . import __version__ as _PACKAGE_VERSION  # noqa: N812
+from . import __version__ as _PACKAGE_VERSION
 from .dashboard import _build_dashboard_html
 from .metrics import generate_prometheus_metrics, get_snapshot
 from .prompts import ROUTING_PROMPT, register_prompts
@@ -266,7 +266,9 @@ async def health(request: Request) -> Response:
             "api_inflight_requests": snap["api_inflight_requests"],
             "cache_hits_total": cache_hits,
             "cache_misses_total": cache_misses,
-            "cache_hit_ratio_global": round(cache_hits / cache_total, 4) if cache_total else 0.0,
+            "cache_hit_ratio_global": round(cache_hits / cache_total, 4)
+            if cache_total
+            else 0.0,
             "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
             "python_version": platform.python_version(),
             "public_url": _get_public_base_url(),

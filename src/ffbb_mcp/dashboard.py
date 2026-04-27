@@ -2,7 +2,7 @@
 
 import datetime
 
-from . import __version__ as _PACKAGE_VERSION  # noqa: N812
+from . import __version__ as _PACKAGE_VERSION
 from .metrics import get_snapshot
 
 
