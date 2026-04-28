@@ -6,7 +6,6 @@ import os
 import random
 import re
 import time
-import traceback
 import unicodedata
 from collections.abc import Callable, Coroutine  # noqa: TC003
 from datetime import datetime, timedelta
