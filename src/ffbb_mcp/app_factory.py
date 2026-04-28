@@ -1,5 +1,6 @@
 import contextlib
 import logging
+import os
 from collections.abc import AsyncGenerator
 from typing import Any
 
@@ -29,7 +30,9 @@ def create_app(mcp: FastMCP, allowed_origins: list[str]) -> Starlette:
     )
     app.router.redirect_slashes = False
 
-    app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
+    _proxy_hosts_raw = os.environ.get("TRUSTED_PROXY_HOSTS", "*")
+    _trusted_hosts = [h.strip() for h in _proxy_hosts_raw.split(",") if h.strip()]
+    app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=_trusted_hosts or ["*"])
 
     app.add_middleware(
         CORSMiddleware,

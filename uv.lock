@@ -424,7 +424,6 @@ name = "ffbb-mcp"
 version = "1.0.1"
 source = { editable = "." }
 dependencies = [
-    { name = "anysqlite" },
     { name = "cachetools" },
     { name = "ffbb-api-client-v3" },
     { name = "mcp", extra = ["cli"] },
@@ -447,7 +446,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anysqlite", specifier = ">=0.0.5" },
     { name = "cachetools", specifier = ">=5.3.0" },
     { name = "ffbb-api-client-v3", specifier = ">=1.5.3,<2.0.0" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.8.0" },

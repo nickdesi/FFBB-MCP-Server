@@ -19,7 +19,7 @@ from httpx import HTTPStatusError
 from mcp.shared.exceptions import ErrorData, McpError
 from mcp.types import INTERNAL_ERROR
 
-from ffbb_mcp._state import state
+from ffbb_mcp._state import _read_positive_int_env, state
 from ffbb_mcp.aliases import enrich_acronym_cache, normalize_query
 from ffbb_mcp.cache_strategy import get_poule_ttl, get_static_ttl
 from ffbb_mcp.client import get_client_async
@@ -51,16 +51,6 @@ _PHASE_EXTRACT_PATTERN = re.compile(r"Phase\s*(\d+)", re.IGNORECASE)
 _NUMERIC_EXTRACT_PATTERN = re.compile(r"(\d+)")
 
 
-def _read_positive_int_env(name: str, default: int) -> int:
-    raw = os.environ.get(name)
-    if raw is None:
-        return default
-    try:
-        value = int(raw)
-        return value if value > 0 else default
-    except (TypeError, ValueError):
-        return default
-
 
 # Limiter globalement le nombre d'appels concurrents vers l'API FFBB.
 # Valeur par défaut prudente, surchargable via l'env MAX_CONCURRENT_FFBB.
@@ -71,6 +61,9 @@ _ffbb_semaphore = asyncio.Semaphore(_MAX_CONCURRENT_FFBB)
 # être surchargés depuis metrics.py via une fonction d'initialisation.
 _cache_hit_hook: Callable[..., None] | None = record_cache_hit
 _cache_miss_hook: Callable[..., None] | None = record_cache_miss
+
+# Sentinel unique pour distinguer une clé absente d'une valeur falsy (None, 0, [], {}).
+_CACHE_MISS_SENTINEL: object = object()
 
 
 _PARIS_TZ = ZoneInfo("Europe/Paris")
@@ -237,15 +230,18 @@ def _cache_get(
 
     Ce helper évite de dupliquer la logique de notification et permet de
     garder une sémantique uniforme sur tous les caches du module.
+
+    Utilise un sentinel pour distinguer une valeur falsy stockée (None, 0, [], {})
+    d'une clé réellement absente — évite les miss fantômes sur ces valeurs.
     """
     if cache is None:
         return None
-    value = cache.get(key)
-    if value is not None:
+    value = cache.get(key, _CACHE_MISS_SENTINEL)
+    if value is not _CACHE_MISS_SENTINEL:
         _notify_cache_hit(cache_name)
-    else:
-        _notify_cache_miss(cache_name)  # uniquement si cache existe mais clé absente
-    return value
+        return value
+    _notify_cache_miss(cache_name)
+    return None
 
 
 def _cache_set(
@@ -306,8 +302,7 @@ def handle_api_error(e: Exception) -> McpError:
         return e
 
     error_msg = str(e)
-    logger.error(f"FFBB API Error: {error_msg}")
-    logger.error(traceback.format_exc())
+    logger.error("FFBB API Error: %s", error_msg, exc_info=True)
 
     if isinstance(e, HTTPStatusError):
         status = e.response.status_code
@@ -615,16 +610,17 @@ async def get_poule_service(
         make_coro=_fetch,
         cache_name="poule",
     )
-    # PATCH 2: tri par date/heure
+    # Tri par date/heure — on remplace la liste plutôt que de muter in-place
+    # pour ne pas corrompre la référence stockée dans le cache sous concurrence.
     if isinstance(result, dict) and "data" in result:
         rencontres = result["data"].get("rencontres", [])
         if rencontres:
-            # On trie sur (date, heure) ; on gère les None
-            rencontres.sort(
+            result["data"]["rencontres"] = sorted(
+                rencontres,
                 key=lambda r: (
                     r.get("date_reelle") or "9999",
                     r.get("heure_reelle") or "9999",
-                )
+                ),
             )
 
     return (
@@ -663,14 +659,12 @@ async def ffbb_get_classement_service(
         f"classement:{poule_id_int}:{target_organisme_id or ''}:{target_num or ''}"
     )
 
-    if not force_refresh:
-        cached = _cache_get(state.cache_classement, cache_key, "classement")
-        if cached is not None:
-            return (
-                cached["data"]
-                if isinstance(cached, dict) and "data" in cached
-                else cached
-            )
+    if force_refresh and state.cache_classement is not None:
+        state.cache_classement.pop(cache_key, None)
+
+    cached = _cache_get(state.cache_classement, cache_key, "classement")
+    if cached is not None:
+        return cached["data"] if isinstance(cached, dict) and "data" in cached else cached
 
     client = await get_client_async()
     poule = await _with_ffbb_semaphore(
@@ -1418,7 +1412,7 @@ async def ffbb_bilan_service(
     Args:
         force_refresh: Si True, bypass le cache pour obtenir des données fraîches.
     """
-    cache_key = f"bilan:{organisme_id or ''}:{_normalize_name(club_name or '')}:{categorie or ''}"
+    cache_key = f"bilan:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}"
 
     async def _fetch() -> dict[str, Any]:
         # 1. Résoudre l'organisme_id (CENTRALISÉ)
@@ -1622,7 +1616,7 @@ async def get_calendrier_club_service(
     - Agrégation des rencontres
     - Troncature éventuelle si trop de matchs (FFBB_MAX_CALENDAR_MATCHES)
     """
-    cache_key = f"calendrier:{organisme_id or ''}:{(club_name or '').lower().strip()}:{categorie or ''}:{numero_equipe or ''}"
+    cache_key = f"calendrier:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}:{numero_equipe or ''}"
 
     async def _fetch() -> list[dict]:
         # 1. Résoudre les organismes cibles (CENTRALISÉ)
@@ -1979,40 +1973,6 @@ async def ffbb_resolve_team_service(
             )
         )
 
-    # Si aucune catégorie, on résout juste l'organisme
-    if not categorie:
-        resolved_clubs, _ = await _resolve_club_and_org(
-            club_name=club_name, organisme_id=organisme_id
-        )
-        if not resolved_clubs:
-            return {
-                "status": "not_found",
-                "team": None,
-                "candidates": [],
-                "ambiguity": f"Club '{club_name or organisme_id}' introuvable",
-                "club_resolu": None,
-            }
-        if len(resolved_clubs) > 1 and not organisme_id:
-            return {
-                "status": "ambiguous",
-                "team": None,
-                "candidates": resolved_clubs,
-                "ambiguity": f"Plusieurs clubs correspondent à '{club_name}'.",
-                "club_resolu": None,
-            }
-
-        club_resolu = resolved_clubs[0]
-        # Return all teams of this club
-        equipes = await ffbb_equipes_club_service(
-            organisme_id=str(club_resolu["organisme_id"])
-        )
-        return {
-            "status": "resolved_club_only",
-            "team": None,
-            "candidates": equipes,
-            "ambiguity": None,
-            "club_resolu": club_resolu,
-        }
 
     # 1) Résoudre l'organisme avec métadonnées (CENTRALISÉ)
     resolved_clubs, _ = await _resolve_club_and_org(
