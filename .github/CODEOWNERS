@@ -1,0 +1,20 @@
+# CODEOWNERS — automatically request reviews for critical paths
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default: all files
+* @nickdesi
+
+# CI/CD infrastructure — changes must be reviewed carefully
+/.github/ @nickdesi
+
+# Core package manifest and lockfile
+/pyproject.toml @nickdesi
+/uv.lock @nickdesi
+
+# MCP server entrypoint and security-sensitive middleware
+/src/ffbb_mcp/server.py @nickdesi
+/src/ffbb_mcp/cache_strategy.py @nickdesi
+
+# Dockerfile and Smithery deployment config
+/Dockerfile @nickdesi
+/smithery.yaml @nickdesi

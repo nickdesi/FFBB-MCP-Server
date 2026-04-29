@@ -1,10 +1,9 @@
 version: 2
 updates:
-  - package-ecosystem: "pip"
-    directory: "/"
-    schedule:
-      interval: "weekly"
+  # Keep GitHub Actions pinned SHAs up to date
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    # pip is intentionally omitted — lockfile managed by uv.
+    # Critical dep bumps are handled by bump-ffbb-client.yml.
