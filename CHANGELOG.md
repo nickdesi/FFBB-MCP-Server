@@ -5,7 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.1] - 2026-04-29
+## [Unreleased]
+
+### Added
+- Ajout du dashboard (`/dashboard`), enrichissement de `/metrics.json` et `/health` avec statistiques d'utilisation du cache
+- Rafraîchissement automatique des scores en direct le week-end
+
+### Changed
+- Refonte complète de l'infrastructure CI/CD (Ruff, actions épinglées par SHA, exécution concurrente)
+- Nettoyage des métriques Prometheus et suppression du code mort et des dépendances inutilisées
+- Amélioration de la robustesse des processus de validation et de la couverture
+
+### Performance
+- Optimisation majeure du cache (TTLCache/TLRUCache, résolution de l'inflation des clés)
+- Optimisation des chemins critiques dans `services.py` et de la fonction `prune_payload` dans `utils.py`
+
+## [1.1.0] - 2026-04-29
 
 ### Added
 - Nouveau **Dashboard Live** (accessible via `/dashboard`) avec metrics temps réel et efficacité du cache.
