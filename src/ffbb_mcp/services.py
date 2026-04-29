@@ -50,7 +50,6 @@ _PHASE_EXTRACT_PATTERN = re.compile(r"Phase\s*(\d+)", re.IGNORECASE)
 _NUMERIC_EXTRACT_PATTERN = re.compile(r"(\d+)")
 
 
-
 # Limiter globalement le nombre d'appels concurrents vers l'API FFBB.
 # Valeur par défaut prudente, surchargable via l'env MAX_CONCURRENT_FFBB.
 _MAX_CONCURRENT_FFBB = int(os.getenv("MAX_CONCURRENT_FFBB", "8"))
@@ -663,7 +662,9 @@ async def ffbb_get_classement_service(
 
     cached = _cache_get(state.cache_classement, cache_key, "classement")
     if cached is not None:
-        return cached["data"] if isinstance(cached, dict) and "data" in cached else cached
+        return (
+            cached["data"] if isinstance(cached, dict) and "data" in cached else cached
+        )
 
     client = await get_client_async()
     poule = await _with_ffbb_semaphore(
@@ -1971,7 +1972,6 @@ async def ffbb_resolve_team_service(
                 message="Paramètre 'categorie' requis (ex: 'U11M1', 'U13F2').",
             )
         )
-
 
     # 1) Résoudre l'organisme avec métadonnées (CENTRALISÉ)
     resolved_clubs, _ = await _resolve_club_and_org(
