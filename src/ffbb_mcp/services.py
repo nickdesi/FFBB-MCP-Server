@@ -2020,8 +2020,9 @@ async def get_asset_url_service(
 
 
 async def ffbb_search_service(
-    query: str,
+    *,
     type: str = "all",
+    query: str,
     limit: int = 20,
     filter_by: str | None = None,
     sort: list[str] | None = None,
@@ -2044,7 +2045,16 @@ async def ffbb_search_service(
         "entraineurs": search_entraineurs_service,
         "communes": search_communes_service,
     }
-    return await _search_generic(type, dispatch, query, limit, filter_by, sort)
+
+    # type == "all" → multi_search dédiée
+    if type == "all":
+        return await multi_search_service(nom=query, limit=limit)
+
+    # Si type correspond à un service spécialisé, on le délègue directement
+    if type in dispatch:
+        return await dispatch[type](query, limit, filter_by, sort)
+
+    raise McpError(f"Type de recherche inconnu: {type}")
 
 
 async def ffbb_resolve_team_service(
