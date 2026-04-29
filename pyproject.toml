@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 license = { text = "MIT" }
 dependencies = [
     "mcp[cli]>=1.8.0",
-    "ffbb-api-client-v3>=1.5.3,<2.0.0",
+    "ffbb-api-client-v3>=1.6.1,<2.0.0",
     "uvicorn",
     "starlette<2.0.0",
     "pydantic>=2.12.5,<3.0.0",

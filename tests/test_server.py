@@ -82,6 +82,17 @@ async def test_server_tool_signatures():
     assert "id" in props, "id devrait être un argument direct"
     assert "type" in props, "type devrait être un argument direct"
 
+    # Vérifie que ffbb_search expose les nouveaux types sans nested params
+    search_tool = next(t for t in tools if t.name == "ffbb_search")
+    search_props = search_tool.inputSchema.get("properties", {})
+
+    assert search_props.get("type", {}).get("type") == "string"
+    assert set(search_props.get("type", {}).get("enum", [])) >= {
+        "officiels",
+        "entraineurs",
+        "communes",
+    }
+
 
 def test_public_base_url_strips_mcp_suffix(monkeypatch):
     monkeypatch.setenv("PUBLIC_URL", "https://ffbb.desimone.fr/mcp/")

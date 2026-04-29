@@ -37,25 +37,20 @@ from .services import (
     ffbb_next_match_service,
     ffbb_resolve_team_service,
     ffbb_saison_bilan_service,
+    ffbb_search_service,
     get_cache_ttls,
     get_calendrier_club_service,
     get_competition_service,
+    get_entraineur_service,
     get_lives_service,
+    get_officiel_service,
     get_organisme_service,
     get_poule_service,
+    get_rencontre_service,
     get_saisons_service,
     handle_api_error,
-    multi_search_service,
     resolve_poule_id_service,
-    search_competitions_service,
-    search_engagements_service,
-    search_formations_service,
     search_organismes_service,
-    search_pratiques_service,
-    search_rencontres_service,
-    search_salles_service,
-    search_terrains_service,
-    search_tournois_service,
 )
 from .utils import format_team_name, is_match_day, prune_payload
 
@@ -365,13 +360,16 @@ async def ffbb_version() -> dict[str, Any]:
 
 @mcp.tool(
     name="ffbb_search",
-    title="Recherche FFBB unifiée",
+    title="Recherche FFBB (multi-index)",
     annotations=_READONLY_ANNOTATIONS,
 )
 @zipai_surgical
 async def ffbb_search(
     query: Annotated[
-        str, Field(description="Texte libre (ex: 'Vichy', 'U13F Auvergne').")
+        str,
+        Field(
+            description=("Texte libre (ex: 'Vichy', 'U13F Auvergne')."),
+        ),
     ],
     type: Annotated[
         Literal[
@@ -385,17 +383,25 @@ async def ffbb_search(
             "tournois",
             "engagements",
             "formations",
+            "officiels",
+            "entraineurs",
+            "communes",
         ],
-        Field(description="Type de données. 'all' cherche partout (défaut)."),
+        Field(
+            description=("Type de données. 'all' cherche partout (défaut)."),
+        ),
     ] = "all",
-    limit: Annotated[int, Field(default=20, ge=1, le=100)] = 20,
+    limit: Annotated[
+        int,
+        Field(description="Nombre maximum de résultats à retourner."),
+    ] = 20,
     filter_by: Annotated[
         str | None,
         Field(description="Filtre Meilisearch natif (ex: 'codePostal = \"63000\"')."),
     ] = None,
     sort: Annotated[
         list[str] | None,
-        Field(description="Tri Meilisearch natif (ex: ['libelle:asc'])."),
+        Field(description="Tri Meilisearch (ex: ['libelle:asc'])."),
     ] = None,
 ) -> list[dict[str, Any]]:
     """Recherche FFBB — clubs, compétitions, matchs, salles, tournois, etc.
@@ -406,21 +412,9 @@ async def ffbb_search(
     Résultats contiennent un 'id' à utiliser avec ffbb_get ou ffbb_club.
     """
     try:
-        if type == "all":
-            return await multi_search_service(nom=query, limit=limit)
-        dispatch = {
-            "competitions": search_competitions_service,
-            "organismes": search_organismes_service,
-            "salles": search_salles_service,
-            "rencontres": search_rencontres_service,
-            "pratiques": search_pratiques_service,
-            "terrains": search_terrains_service,
-            "tournois": search_tournois_service,
-            "engagements": search_engagements_service,
-            "formations": search_formations_service,
-        }
-        return await dispatch[type](
-            nom=query, limit=limit, filter_by=filter_by, sort=sort
+        # Délègue la logique détaillée au service dédié pour centraliser le dispatch
+        return await ffbb_search_service(
+            query=query, type=type, limit=limit, filter_by=filter_by, sort=sort
         )
     except Exception as e:
         raise handle_api_error(e) from e
@@ -449,7 +443,9 @@ async def ffbb_bilan(
     categorie: Annotated[
         str | None,
         Field(
-            description="Catégorie + genre + numéro équipe (ex: 'U11M1', 'U13F2', 'U15M', 'Senior')."
+            description=(
+                "Catégorie + genre + numéro d'équipe (ex: 'U11M1', 'U13F2', 'U15M', 'Senior')."
+            ),
         ),
     ] = None,
     force_refresh: Annotated[
@@ -509,6 +505,9 @@ async def ffbb_get(
             "competition",
             "poule",
             "organisme",
+            "rencontre",
+            "officiel",
+            "entraineur",
         ],
         Field(description="Type de ressource a charger."),
     ],
@@ -593,6 +592,12 @@ async def ffbb_get(
             return res
         elif type == "organisme":
             return await get_organisme_service(organisme_id=id)
+        elif type == "rencontre":
+            return await get_rencontre_service(id)
+        elif type == "officiel":
+            return await get_officiel_service(id)
+        elif type == "entraineur":
+            return await get_entraineur_service(id)
         return {"error": f"Type inconnu: {type}"}
     except Exception as e:
         raise handle_api_error(e) from e

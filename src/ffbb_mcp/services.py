@@ -1442,26 +1442,37 @@ async def ffbb_bilan_service(
         equipes: list[dict[str, Any]] = []
         for res in eq_results:
             if isinstance(res, list):
-                for e in res:
-                    if isinstance(e, dict) and "error" not in e:
-                        equipes.append(e)
+                # FILTRE: on ignore les dictionnaires d'erreur (Hinting) pour le traitement interne
+                equipes.extend(
+                    [e for e in res if isinstance(e, dict) and "error" not in e]
+                )
+            elif isinstance(res, Exception):
+                logger.error("Erreur lors de la récupération des équipes: %s", res)
 
         if not equipes:
             return {"error": f"Aucune équipe trouvée pour la catégorie '{categorie}'"}
 
-        # Dédupliquer par engagement_id
-        seen_eng: set[str] = set()
-        deduped: list[dict[str, Any]] = []
-        for e in equipes:
-            key = str(e.get("engagement_id", ""))
-            if key not in seen_eng:
-                seen_eng.add(key)
-                deduped.append(e)
-        equipes = deduped
+        # Dédupliquer les équipes par engagement_id pour éviter les doublons de matchs
+        deduped_equipes: list[dict[str, Any]] = []
+        seen_engagement_ids: set[str] = set()
+        for equipe in equipes:
+            if not isinstance(equipe, dict):
+                continue
+            engagement_id = equipe.get("engagement_id")
+            if engagement_id is None:
+                deduped_equipes.append(equipe)
+                continue
+            engagement_key = str(engagement_id)
+            if engagement_key in seen_engagement_ids:
+                continue
+            seen_engagement_ids.add(engagement_key)
+            deduped_equipes.append(equipe)
 
-        # 3. Récupérer toutes les poules en parallèle
+        equipes = deduped_equipes
+
+        # 3. Récupérer toutes les poules concernées
         unique_poule_ids = list(
-            dict.fromkeys(str(e["poule_id"]) for e in equipes if e.get("poule_id"))
+            dict.fromkeys(str(e.get("poule_id")) for e in equipes if e.get("poule_id"))
         )
         # FIX: print() → logger.debug() (les print polluaient stdout/Coolify en prod)
         logger.debug(f"ffbb_bilan: club_nom={club_nom} cible_orgs={target_org_ids}")
@@ -1772,29 +1783,10 @@ async def get_calendrier_club_service(
         future_indices: list[int] = []
 
         for idx, m in enumerate(all_matches):
-            dt = m.get("_dt")
-            score1 = m.get("score_equipe1")
-            score2 = m.get("score_equipe2")
-            joue_flag = m.get("joue")
-
-            # Priorité 1 : flag FFBB joue (0 = à venir, 1 = joué)
-            if joue_flag == 1 or joue_flag == "1":
-                played = True
-            elif joue_flag == 0 or joue_flag == "0":
-                played = False
-            else:
-                # Fallback si joue absent : scores présents OU date passée
-                has_score = score1 not in (None, "", "None") or score2 not in (
-                    None,
-                    "",
-                    "None",
-                )
-                is_past = dt <= now if dt is not None else has_score
-                played = bool(has_score or is_past)
-
-            m["played"] = played
-
-            if played:
+            m["played"] = False
+            if m["_dt"] is not None:
+                m["played"] = True
+            if m["played"]:
                 played_indices.append(idx)
             else:
                 future_indices.append(idx)
@@ -1941,6 +1933,118 @@ async def search_formations_service(
     return await _search_generic(
         "formations", "search_formations_async", nom, limit, filter_by, sort
     )
+
+
+async def search_officiels_service(
+    nom: str,
+    limit: int = 20,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
+) -> list[dict]:
+    return await _search_generic(
+        "officiels", "search_officiels_async", nom, limit, filter_by, sort
+    )
+
+
+async def search_entraineurs_service(
+    nom: str,
+    limit: int = 20,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
+) -> list[dict]:
+    return await _search_generic(
+        "entraineurs", "search_entraineurs_async", nom, limit, filter_by, sort
+    )
+
+
+async def search_communes_service(
+    nom: str,
+    limit: int = 20,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
+) -> list[dict]:
+    return await _search_generic(
+        "communes", "search_communes_async", nom, limit, filter_by, sort
+    )
+
+
+async def get_rencontre_service(rencontre_id: int | str) -> dict[str, Any]:
+    client = await get_client_async()
+    result = await _with_ffbb_semaphore(
+        _safe_call_with_inflight(
+            f"Get rencontre {rencontre_id}",
+            lambda: client.get_rencontre_async(int(rencontre_id)),
+        )
+    )
+    return serialize_model(result) if result is not None else {}
+
+
+async def get_officiel_service(officiel_id: int | str) -> dict[str, Any]:
+    client = await get_client_async()
+    result = await _with_ffbb_semaphore(
+        _safe_call_with_inflight(
+            f"Get officiel {officiel_id}",
+            lambda: client.get_officiel_async(int(officiel_id)),
+        )
+    )
+    return serialize_model(result) if result is not None else {}
+
+
+async def get_entraineur_service(entraineur_id: int | str) -> dict[str, Any]:
+    client = await get_client_async()
+    result = await _with_ffbb_semaphore(
+        _safe_call_with_inflight(
+            f"Get entraineur {entraineur_id}",
+            lambda: client.get_entraineur_async(int(entraineur_id)),
+        )
+    )
+    return serialize_model(result) if result is not None else {}
+
+
+async def get_asset_url_service(
+    uuid: str,
+    width: int | None = None,
+    height: int | None = None,
+    format: str | None = None,
+    quality: int | None = None,
+) -> str:
+    """Construit une URL d'asset Directus optimisée via le client V3."""
+    client = await get_client_async()
+    return client.get_asset_url(
+        uuid=uuid,
+        width=width,
+        height=height,
+        format=format,
+        quality=quality,
+    )
+
+
+async def ffbb_search_service(
+    query: str,
+    type: str = "all",
+    limit: int = 20,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Service de recherche FFBB.
+
+    Recherche dans les données FFBB en fonction de plusieurs types de données.
+    """
+    dispatch = {
+        "competitions": search_competitions_service,
+        "organismes": search_organismes_service,
+        "salles": search_salles_service,
+        "rencontres": search_rencontres_service,
+        "pratiques": search_pratiques_service,
+        "terrains": search_terrains_service,
+        "tournois": search_tournois_service,
+        "engagements": search_engagements_service,
+        "formations": search_formations_service,
+        "officiels": search_officiels_service,
+        "entraineurs": search_entraineurs_service,
+        "communes": search_communes_service,
+    }
+    return await _search_generic(type, dispatch, query, limit, filter_by, sort)
 
 
 async def ffbb_resolve_team_service(
