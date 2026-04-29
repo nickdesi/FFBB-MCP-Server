@@ -204,7 +204,7 @@ def _build_index_html() -> str:
 
 def _build_robots_txt() -> str:
     base_url = _get_public_base_url()
-    return f"User-agent: *\nAllow: /\nSitemap: {base_url}/sitemap.xml\n"
+    return f"User-agent: *\nAllow: /\nAllow: /docs/\nSitemap: {base_url}/sitemap.xml\n"
 
 
 def _build_sitemap_xml() -> str:
@@ -217,6 +217,12 @@ def _build_sitemap_xml() -> str:
     <lastmod>{lastmod}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>{canonical_url}docs/</loc>
+    <lastmod>{lastmod}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
   </url>
 </urlset>
 """
@@ -294,6 +300,30 @@ async def metrics_json(request: Request) -> Response:
 async def dashboard(request: Request) -> Response:
     """Dashboard de supervision HTML — lisible humain, demo-friendly."""
     return HTMLResponse(content=_build_dashboard_html(), status_code=200)
+
+
+@mcp.custom_route("/docs", methods=["GET"])  # type: ignore[untyped-decorator]
+async def docs(request: Request) -> Response:
+    return RedirectResponse("/docs/")
+
+
+@mcp.custom_route("/docs/", methods=["GET"])  # type: ignore[untyped-decorator]
+async def docs_slash(request: Request) -> Response:
+    local_doc = _WEBSITE_DIR / "docs" / "index.html"
+    if local_doc.exists():
+        return HTMLResponse(content=local_doc.read_text(encoding="utf-8"), status_code=200)
+    return RedirectResponse("https://github.com/nickdesi/FFBB-MCP-Server/tree/main/docs")
+
+
+@mcp.custom_route("/docs/{path:path}", methods=["GET"])  # type: ignore[untyped-decorator]
+async def docs_wildcard(request: Request) -> Response:
+    path = request.path_params.get("path", "")
+    local_doc = _WEBSITE_DIR / "docs" / path
+    if local_doc.exists() and local_doc.is_file():
+        if local_doc.suffix == ".html":
+            return HTMLResponse(content=local_doc.read_text(encoding="utf-8"), status_code=200)
+        return FileResponse(local_doc)
+    return RedirectResponse(f"https://github.com/nickdesi/FFBB-MCP-Server/blob/main/docs/{path}")
 
 
 @mcp.custom_route("/logo.webp", methods=["GET"])  # type: ignore[untyped-decorator]
