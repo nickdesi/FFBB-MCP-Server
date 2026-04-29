@@ -1973,7 +1973,7 @@ async def get_rencontre_service(rencontre_id: int | str) -> dict[str, Any]:
     result = await _with_ffbb_semaphore(
         _safe_call_with_inflight(
             f"Get rencontre {rencontre_id}",
-            lambda: client.get_rencontre_async(int(rencontre_id)),
+            lambda: client.get_rencontre_async(int(rencontre_id)),  # type: ignore[attr-defined]
         )
     )
     return serialize_model(result) if result is not None else {}
@@ -1984,7 +1984,7 @@ async def get_officiel_service(officiel_id: int | str) -> dict[str, Any]:
     result = await _with_ffbb_semaphore(
         _safe_call_with_inflight(
             f"Get officiel {officiel_id}",
-            lambda: client.get_officiel_async(int(officiel_id)),
+            lambda: client.get_officiel_async(int(officiel_id)),  # type: ignore[attr-defined]
         )
     )
     return serialize_model(result) if result is not None else {}
@@ -1995,7 +1995,7 @@ async def get_entraineur_service(entraineur_id: int | str) -> dict[str, Any]:
     result = await _with_ffbb_semaphore(
         _safe_call_with_inflight(
             f"Get entraineur {entraineur_id}",
-            lambda: client.get_entraineur_async(int(entraineur_id)),
+            lambda: client.get_entraineur_async(int(entraineur_id)),  # type: ignore[attr-defined]
         )
     )
     return serialize_model(result) if result is not None else {}
@@ -2010,7 +2010,7 @@ async def get_asset_url_service(
 ) -> str:
     """Construit une URL d'asset Directus optimisée via le client V3."""
     client = await get_client_async()
-    return client.get_asset_url(
+    return client.get_asset_url(  # type: ignore[attr-defined]
         uuid=uuid,
         width=width,
         height=height,
@@ -2054,7 +2054,12 @@ async def ffbb_search_service(
     if type in dispatch:
         return await dispatch[type](query, limit, filter_by, sort)
 
-    raise McpError(f"Type de recherche inconnu: {type}")
+    raise McpError(
+        error=ErrorData(
+            code=INTERNAL_ERROR,
+            message=f"Type de recherche inconnu: {type}",
+        )
+    )
 
 
 async def ffbb_resolve_team_service(
