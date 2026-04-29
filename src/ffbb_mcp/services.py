@@ -1788,11 +1788,13 @@ async def get_calendrier_club_service(
             s1 = m.get("score_equipe1")
             s2 = m.get("score_equipe2")
 
-            # Joué = champ joue officiel FFBB (prioritaire) 
+            # Joué = champ joue officiel FFBB (prioritaire)
             # OU scores présents (les deux) ET date dans le passé.
-            has_scores = (s1 not in (None, "", "None")) and (s2 not in (None, "", "None"))
+            has_scores = (s1 not in (None, "", "None")) and (
+                s2 not in (None, "", "None")
+            )
             is_past = dt is not None and dt < now
-            
+
             m["played"] = (joue_val in (1, "1", True)) or (has_scores and is_past)
             if m["played"]:
                 played_indices.append(idx)
