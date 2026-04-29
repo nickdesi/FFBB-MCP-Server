@@ -49,8 +49,20 @@ jobs:
           # Pull the freshly committed version
           ref: main
 
-      - name: Setup Pages
-        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - name: Setup Node
+        uses: actions/setup-node@e12d46a63a907358ff62d047a75015b6c35306e6 # v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'website-docs/package.json'
+
+      - name: Install documentation dependencies
+        run: npm install
+        working-directory: website-docs
+
+      - name: Build documentation
+        run: npm run docs:build
+        working-directory: website-docs
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
