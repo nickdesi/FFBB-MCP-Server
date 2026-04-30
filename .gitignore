@@ -10,7 +10,9 @@ build/
 .pytest_cache/
 .ruff_cache/
 .coverage
-coverage.xml
+
+website-docs/node_modules/
+website/docs/
 
 reproduce_issue.py
 http_cache.db
