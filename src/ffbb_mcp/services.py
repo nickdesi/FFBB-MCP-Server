@@ -525,9 +525,10 @@ async def get_saisons_service(active_only: bool = False) -> list[dict]:
         return cached
 
     client = await get_client_async()
+    filter_criteria = '{"actif": {"$eq": true}}' if active_only else None
     saisons = await _with_ffbb_semaphore(
         _safe_call_with_inflight(
-            "Saisons", lambda: client.get_saisons_async(active_only=active_only)
+            "Saisons", lambda: client.get_saisons_async(filter_criteria=filter_criteria)
         )
     )
     saisons_list = saisons if isinstance(saisons, list) else []
@@ -1983,7 +1984,7 @@ async def get_rencontre_service(rencontre_id: int | str) -> dict[str, Any]:
     result = await _with_ffbb_semaphore(
         _safe_call_with_inflight(
             f"Get rencontre {rencontre_id}",
-            lambda: client.get_rencontre_async(int(rencontre_id)),  # type: ignore[attr-defined]
+            lambda: client.get_rencontre_async(str(rencontre_id)),
         )
     )
     return serialize_model(result) if result is not None else {}
@@ -1994,7 +1995,7 @@ async def get_officiel_service(officiel_id: int | str) -> dict[str, Any]:
     result = await _with_ffbb_semaphore(
         _safe_call_with_inflight(
             f"Get officiel {officiel_id}",
-            lambda: client.get_officiel_async(int(officiel_id)),  # type: ignore[attr-defined]
+            lambda: client.get_officiel_async(str(officiel_id)),
         )
     )
     return serialize_model(result) if result is not None else {}
@@ -2005,7 +2006,7 @@ async def get_entraineur_service(entraineur_id: int | str) -> dict[str, Any]:
     result = await _with_ffbb_semaphore(
         _safe_call_with_inflight(
             f"Get entraineur {entraineur_id}",
-            lambda: client.get_entraineur_async(int(entraineur_id)),  # type: ignore[attr-defined]
+            lambda: client.get_entraineur_async(str(entraineur_id)),
         )
     )
     return serialize_model(result) if result is not None else {}
