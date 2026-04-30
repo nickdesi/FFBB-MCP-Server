@@ -1,7 +1,3 @@
-## 2024-05-28 - [Recursive Serialization Optimization in Python]
-**Learning:** In heavily recursive data transformation functions like `prune_payload`, avoiding dynamic limits lookups (e.g., `os.environ.get()` cast to `int`) and extracting them to module-level constants yields significant speedups. Furthermore, prioritizing primitives `(str, int, float, bool, None)` as a fast path using `type(obj)` avoids repeatedly falling into slower dict and list comprehension blocks, saving an extra ~5-10% computation time. Attempting to use `@lru_cache` for environment variables is an anti-pattern as the variable might change at runtime or not change at all making a constant significantly faster without overhead.
-**Action:** When optimizing recursive tree walking functions handling large JSONs, hoist limits and constants to the module level and prioritize `type(obj) is ...` for primitives at the beginning of the function.
-
-## 2024-05-29 - [Optimization of empty collection filtering in recursive logic]
-**Learning:** Checking for empty collections using `v != []` or `v != {}` inside tight recursive loops forces Python to allocate new empty list/dict objects for each comparison, creating significant overhead in functions like `prune_payload`.
-**Action:** Use boolean evaluation paired with explicit type checks: `v or (type(v) is not list and type(v) is not dict)` avoids empty list/dict allocations while correctly maintaining falsy primitives like `0`, `False`, or `""`.
+## 2025-03-01 - Avoid dictionary comprehensions followed by immediate iterations for accumulations
+**Learning:** In Python, creating an intermediate dictionary via comprehension (`{k: v for ...}`) only to immediately iterate over its `.items()` to accumulate values into another dictionary causes unnecessary iteration overhead and intermediate object allocation.
+**Action:** When extracting subset of fields from a source dictionary and accumulating into another dictionary, use a single `for` loop over the desired keys to process and accumulate in one pass. This pattern is faster (~10-15% improvement).

@@ -311,8 +311,12 @@ async def docs(request: Request) -> Response:
 async def docs_slash(request: Request) -> Response:
     local_doc = _WEBSITE_DIR / "docs" / "index.html"
     if local_doc.exists():
-        return HTMLResponse(content=local_doc.read_text(encoding="utf-8"), status_code=200)
-    return RedirectResponse("https://github.com/nickdesi/FFBB-MCP-Server/tree/main/docs")
+        return HTMLResponse(
+            content=local_doc.read_text(encoding="utf-8"), status_code=200
+        )
+    return RedirectResponse(
+        "https://github.com/nickdesi/FFBB-MCP-Server/tree/main/docs"
+    )
 
 
 @mcp.custom_route("/docs/{path:path}", methods=["GET"])  # type: ignore[untyped-decorator]
@@ -321,9 +325,13 @@ async def docs_wildcard(request: Request) -> Response:
     local_doc = _WEBSITE_DIR / "docs" / path
     if local_doc.exists() and local_doc.is_file():
         if local_doc.suffix == ".html":
-            return HTMLResponse(content=local_doc.read_text(encoding="utf-8"), status_code=200)
+            return HTMLResponse(
+                content=local_doc.read_text(encoding="utf-8"), status_code=200
+            )
         return FileResponse(local_doc)
-    return RedirectResponse(f"https://github.com/nickdesi/FFBB-MCP-Server/blob/main/docs/{path}")
+    return RedirectResponse(
+        f"https://github.com/nickdesi/FFBB-MCP-Server/blob/main/docs/{path}"
+    )
 
 
 @mcp.custom_route("/logo.webp", methods=["GET"])  # type: ignore[untyped-decorator]
