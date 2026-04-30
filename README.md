@@ -4,46 +4,46 @@
   <img src="./assets/logo.webp" width="180" alt="FFBB MCP Logo" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);" />
 </p>
 
-<h3 align="center">Le pont absolu entre l'Intelligence Artificielle et le Basketball français.</h3>
+<h3 align="center">The definitive bridge between Artificial Intelligence and French Basketball.</h3>
 
 <p align="center">
-  Statistiques, calendriers, classements et scores en direct officiels de la FFBB, conçus spécifiquement pour les LLMs via le protocole MCP.
+  Official FFBB (French Basketball Federation) statistics, schedules, standings, and live scores, specifically optimized for LLMs via the Model Context Protocol (MCP).
   <br /><br />
-  🌐 <b><a href="https://ffbb.desimone.fr">Visiter la Landing Page</a></b>
+  🌐 <b><a href="https://ffbb.desimone.fr">Visit the Landing Page</a></b>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python" alt="Python Version" />
-  <img src="https://img.shields.io/badge/version-1.2.0-green?style=for-the-badge" alt="Version" />
+  <img src="https://img.shields.io/badge/version-1.3.0-green?style=for-the-badge" alt="Version" />
   <a href="https://smithery.ai/server/ffbb-mcp-server"><img src="https://img.shields.io/badge/Smithery-Supported-yellow?style=for-the-badge&logo=codeigniter" alt="Smithery Badge" /></a>
-  <img src="https://img.shields.io/github/actions/workflow/status/nickdesi/FFBB-MCP-Server/bump-ffbb-client.yml?label=auto-sync&style=for-the-badge" alt="Auto-sync" />
-  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
+  <img src="https://img.shields.io/github/actions/workflow/status/nickdesi/FFBB-MCP-Server/ci.yml?label=CI&style=for-the-badge" alt="CI Status" />
+  <img src="https://img.shields.io/badge/License-Apache--2.0-blue?style=for-the-badge" alt="License" />
 </p>
 
 <p align="center">
-  <em>Dernière mise à jour : 30 Avril 2026 • Propulsé par <a href="https://pypi.org/project/ffbb-api-client-v3/">ffbb-api-client-v3 v1.7.1</a></em>
+  <em>Last update: April 30, 2026 • Powered by <a href="https://pypi.org/project/ffbb-api-client-v3/">ffbb-api-client-v3</a></em>
 </p>
 
 ---
 
-## 🌟 Aperçu
+## 🌟 Overview
 
-Le serveur **FFBB MCP** est la **première et unique référence mondiale** permettant d'exposer les données officielles du basketball français (FFBB) au protocole MCP (Model Context Protocol).
+The **FFBB MCP** server is the world's first and only reference implementation for exposing official French basketball data (FFBB) via the Model Context Protocol (MCP).
 
-Il permet aux assistants IA (Claude, Gemini, Cursor) de naviguer intelligemment dans tout l'écosystème du basket français : des ligues nationales aux championnats régionaux et départementaux, avec une compréhension logique métier inégalée (résolution de noms de clubs ambigus, gestion des phases et poules, etc.).
+It enables AI assistants (Claude, Gemini, Cursor) to intelligently navigate the entire French basketball ecosystem: from national leagues to regional and departmental championships, with unmatched business logic understanding (club name disambiguation, phase/group management, etc.).
 
-> **L'instance publique canonique :**
+> **Canonical Public Instance:**
 > 👉 `https://ffbb.desimone.fr/mcp`
-> Tous les clients IA doivent pointer vers cette URL. Transport : **Streamable HTTP** (spec MCP 2025-11-25).
+> All AI clients should point to this URL. Transport: **Streamable HTTP** (MCP spec 2025-11-25).
 
 ---
 
-## 🚀 Connecter votre assistant IA
+## 🚀 Connect Your AI Assistant
 
-L'URL de l'instance publique est prête à l'emploi. Voici comment l'intégrer dans vos outils favoris :
+The public instance URL is ready to use. Here is how to integrate it:
 
 ### Claude Desktop
-Ajoutez cette configuration dans votre `claude_desktop_config.json` :
+Add this to your `claude_desktop_config.json`:
 
 ```json
 {
@@ -55,136 +55,82 @@ Ajoutez cette configuration dans votre `claude_desktop_config.json` :
 }
 ```
 
-### Cursor / VS Code (Extension MCP) / AnythingLLM
-Dans l'interface de gestion MCP de l'éditeur :
+### Cursor / VS Code (MCP Extension)
+In the editor's MCP management interface:
 
-1. Type : `Streamable HTTP` (ou `HTTP` selon le client)
-2. URL : `https://ffbb.desimone.fr/mcp`
-
-### Smithery (Intégration automatisée)
-
-```bash
-npx -y @smithery/cli@latest install @nickdesi/mcpffbb --client claude --mcp-url https://ffbb.desimone.fr/mcp
-```
+1. Type: `Streamable HTTP`
+2. URL: `https://ffbb.desimone.fr/mcp`
 
 ---
 
-## 🛠️ Boîte à Outils (Tools)
+## 🛠️ Toolset
 
-Récemment refondu pour maximiser les performances des LLMs, le serveur propose 11 outils unifiés et sur-puissants :
+Optimized for LLM efficiency, the server provides 11 unified and powerful tools:
 
-### 📊 Outils Prêts à l'Emploi (Recommandés)
+### 📊 Agent-Ready Tools (Recommended)
 
-| Outil | Description | Paramètres Clés |
+| Tool | Description | Key Parameters |
 | ----- | ----------- | --------------- |
-| ⚡ **`ffbb_bilan`** | Obtenir le bilan complet de A à Z (toutes phases) d'une équipe, ses classements & résultats en 1 appel. | `club_name`, `categorie`, `force_refresh` |
-| ⚡ **`ffbb_team_summary`** | Le résumé parfait pour un agent : bilan, phase courante, dernier match joué et prochain match. | `club_name`, `categorie` |
-| 🏀 **`ffbb_last_result`** | Le score et détail du tout dernier match joué par l'équipe. | `categorie`, `club_name`, `force_refresh` |
-| 🗓️ **`ffbb_next_match`** | Les infos du prochain match officiel à venir (adversaire, date, salle). | `categorie`, `club_name`, `force_refresh` |
+| ⚡ **`ffbb_bilan`** | Complete A-to-Z team record (all phases), standings & results in 1 call. | `club_name`, `categorie`, `force_refresh` |
+| ⚡ **`ffbb_team_summary`** | The perfect agent summary: record, current phase, last result, and next match. | `club_name`, `categorie` |
+| 🏀 **`ffbb_last_result`** | Score and details of the very last match played by the team. | `categorie`, `club_name`, `force_refresh` |
+| 🗓️ **`ffbb_next_match`** | Upcoming official match details (opponent, date, venue). | `categorie`, `club_name`, `force_refresh` |
 
-### 🔍 Outils d'Exploration & Data Brute
+### 🔍 Exploration & Raw Data Tools
 
-| Outil | Description | Paramètres Clés |
+| Tool | Description | Key Parameters |
 | ----- | ----------- | --------------- |
-| `ffbb_search` | Le moteur de recherche global (clubs, compétitions, salles, matchs, engagements, formations). | `query`, `type`, `limit` |
-| `ffbb_resolve_team` | Résout et trouve l'ID/les infos exactes d'une équipe via une chaîne (ex: «U11M1»). | `club_name`, `categorie` |
-| `ffbb_get` | Accès direct aux classements complets et matchs par ID technique. | `id`, `type`, `force_refresh` |
-| `ffbb_club` | Explorer le planning complet, l'ensemble des équipes ou tous les classements d'un club. | `action`, `club_name`, `force_refresh` |
-| `ffbb_bilan_saison` | Bilan détaillé toutes phases pour une équipe précise. | `organisme_id`, `force_refresh` |
-| `ffbb_lives` | Récupère tous les matchs actuellement en direct en France. | *Aucun* |
-| `ffbb_saisons` | Liste et détermine la saison FFBB en cours. | `active_only` |
-| `ffbb_version` | Diagnostics runtime : version, transport, TTLs de cache actifs. | *Aucun* |
-
-#### Détail de `ffbb_search`
-
-L'outil `ffbb_search` couvre **9 index Meilisearch** et supporte le filtrage et tri natifs :
-
-| Type | Description |
-| --- | --- |
-| `all` | Recherche globale sur tous les index (défaut) |
-| `competitions` | Compétitions officielles |
-| `organismes` | Clubs, comités, ligues |
-| `rencontres` | Matchs et rencontres |
-| `salles` | Salles et gymnases |
-| `pratiques` | Lieux de pratique |
-| `terrains` | Terrains de basket |
-| `tournois` | Tournois |
-| `engagements` | **Engagements d'équipes** |
-| `formations` | **Formations et stages** |
-
-**Paramètres de filtrage :**
-- `filter_by` *(optionnel)* — Filtre Meilisearch natif (ex: `codePostal = "63000"`)
-- `sort` *(optionnel)* — Tri Meilisearch natif (ex: `["libelle:asc"]`)
+| `ffbb_search` | Global search engine (clubs, competitions, venues, matches, registrations). | `query`, `type`, `limit` |
+| `ffbb_resolve_team` | Resolves exact team info/ID from a string (e.g., "U11M1"). | `club_name`, `categorie` |
+| `ffbb_get` | Direct access to full standings and matches by technical ID. | `id`, `type`, `force_refresh` |
+| `ffbb_club` | Explore a club's full schedule, all teams, or all standings. | `action`, `club_name`, `force_refresh` |
+| `ffbb_lives` | Fetch all matches currently playing live in France. | *None* |
 
 ---
 
-## 🔄 Synchronisation automatique avec FFBBApiClientV3
-
-Ce serveur est **automatiquement synchronisé** avec les releases de [FFBBApiClientV3](https://github.com/nickdesi/FFBBApiClientV3) :
-
-```
-FFBBApiClientV3 : git tag v1.x.x
-        │
-        ▼
-  publish.yml publie sur PyPI
-        │
-        ▼  repository_dispatch
-  bump-ffbb-client.yml
-  └── uv lock --upgrade-package ffbb-api-client-v3
-  └── Ouvre une PR auto "chore: bump v1.x.x→v1.y.y"
-```
-
-Un fallback quotidien à **07:00 UTC** vérifie et ouvre automatiquement une PR si une nouvelle version PyPI est disponible.
-
----
-
-## 🏗️ Architecture Technique
+## 🏗️ Technical Architecture
 
 ```mermaid
 flowchart LR
-    A["Agent IA\nClaude / Cursor"] -->|"Streamable HTTP\nPOST /mcp"| B("FastMCP Server\nffbb.desimone.fr")
-    B -->|"Logique Métier & Cache"| C{"Services\nUnifiés"}
-    C <-->|"ffbb-api-client-v3 v1.7.1"| D[("FFBB API Officielle")]
+    A["AI Agent\nClaude / Cursor"] -->|"Streamable HTTP\nPOST /mcp"| B("FastMCP Server\nffbb.desimone.fr")
+    B -->|"Business Logic & Cache"| C{"Unified\nServices"}
+    C <-->|"ffbb-api-client-v3"| D[("Official FFBB API")]
 ```
 
-- **Transport :** Streamable HTTP (spec MCP 2025-11-25) — endpoint unique `/mcp` acceptant POST (JSON-RPC) et GET.
-- **Réduction de contexte :** Le `Service Layer` consolide de nombreux micro-appels FFBB en réponses JSON concises, économisant massivement les tokens de votre LLM.
-- **Cache Intelligent Multi-niveaux :** Un système de TTL dynamique s'adapte au calendrier (mercredi/weekend live, périodes de saisies tardives, hors-saison) pour garantir une fraîcheur maximale (15s en live) tout en optimisant les performances hors match (jusqu'à 24h).
-- **Anti-Burst & Déduplication :** Protection contre les abus via une déduplication des requêtes en vol couplée à un rate-limiter strict.
-- **Auto-résolution :** L'outil `ffbb_club` auto-résout les `poule_id` pour les classements par phase et met en avant l'équipe concernée.
+- **Transport:** Streamable HTTP (MCP spec 2025-11-25).
+- **Context Reduction:** The Service Layer consolidates multiple FFBB micro-calls into concise JSON responses, saving massive LLM tokens.
+- **Intelligent Multi-layer Cache:** Dynamic TTL system adjusting to the calendar (live weekends vs off-season) to ensure maximum freshness (15s live) while optimizing performance.
+- **Hardened CI/CD:** Workflows are secured using commit SHAs for maximum supply chain security.
 
 ---
 
-## 🎭 Intelligence Embarquée (Prompts)
+## 🎭 Embedded Intelligence (Prompts)
 
-Ce serveur expose des **Prompts** natifs pour donner instantanément de l'expertise métier à votre agent :
+This server exposes native **Prompts** to instantly give business expertise to your agent:
 
-- 🎓 `expert_basket` : Injecte les règles métier complexes de la FFBB à votre agent (catégories, désambiguaïsation, [règles de navigation multi-phases](docs/rules_ffbb.md), utilisation optimale des outils unifiés). **Fortement recommandé.**
-- 📈 `bilan_equipe` : Prompt guidé pour sortir un rapport exhaustif d'une équipe.
-- 🏙️ `analyser_match` / `prochain_match` : Workflows en 1 clic pour décortiquer une rencontre spécifique.
-
----
-
-## 🔧 FAQ : Comment intégrer et dépannner l'API FFBB avec l'IA ?
-
-- **Mon IA ne trouve pas mon équipe locale :** Donnez-lui toujours le nom précis du club (ex: `Vichy` au lieu de `JA Vichy` si c'est ambigu) et utilisez **`ffbb_search`**.
-- **L'agent boucle sur des IDs introuvables :** Rappelez à l'agent d'utiliser `ffbb_bilan` avec le paramètre `club_name` pour qu'il fasse lui-même la résolution interne.
-- **Progrès sur les appels lents :** Les outils `ffbb_bilan`, `ffbb_team_summary` et `ffbb_bilan_saison` émettent maintenant des notifications de progression aux clients qui les supportent (Claude Desktop, Cursor…). Aucun changement d'API nécessaire.
-- **Le club contient une apostrophe (ex: `Jeanne d'Arc`) :** ✅ Supporté nativement — les apostrophes typographiques (`’`, `‘`, `` ` ``) sont automatiquement normalisées avant la recherche.
-- **Mon club n'a qu'une seule équipe et elle n'a pas de numéro :** ✅ Supporté nativement — une requête `U11M1` trouve désormais une équipe enregistrée sans numéro (numéro 1 implicite). Le champ `note` de l'équipe retournée l'indique explicitement.
-- **Erreurs 404 :** Assurez-vous d'utiliser le endpoint canonique exact `https://ffbb.desimone.fr/mcp`.
-- **Serveur inactif :** Vérifiez le Health Check `https://ffbb.desimone.fr/health`.
+- 🎓 `expert_basket`: Injects complex FFBB business rules (categories, multi-phase navigation, tool usage). **Highly recommended.**
+- 📈 `bilan_equipe`: Guided prompt for generating a comprehensive team report.
+- 🏙️ `analyser_match` / `prochain_match`: 1-click workflows to dissect a specific encounter.
 
 ---
 
-## 👨‍💻 Contribution & Sous le capot
+## 🔧 FAQ & Troubleshooting
 
-Pour découvrir la documentation technique exhaustive, le guide de contribution et les détails internes :
-1. [Références des outils complets (🛠️)](docs/TOOLS_REFERENCE.md)
-2. [Architecture détaillée (🏗️)](docs/ARCHITECTURE.md)
-3. [Guide de contribution (👨‍💻)](CONTRIBUTING.md)
+- **AI cannot find my local team:** Always provide the full club name (e.g., `Vichy` instead of `JA Vichy` if ambiguous) and use **`ffbb_search`**.
+- **Agent loops on missing IDs:** Remind the agent to use `ffbb_bilan` with `club_name` to trigger internal resolution.
+- ** club contains an apostrophe (e.g., `Jeanne d'Arc`):** ✅ Native support — typographic apostrophes (`’`, `‘`, `` ` ``) are automatically normalized.
+- **404 Errors:** Ensure you are using the canonical endpoint `https://ffbb.desimone.fr/mcp`.
+
+---
+
+## 👨‍💻 Contribution
+
+To discover exhaustive technical documentation and contribution guides:
+1. [Full Tools Reference (🛠️)](docs/TOOLS_REFERENCE.md)
+2. [Detailed Architecture (🏗️)](docs/ARCHITECTURE.md)
+3. [Contribution Guide (👨‍💻)](CONTRIBUTING.md)
 
 ---
 <p align="center">
-  <i>Construit avec ❤️ pour la communauté du basket. Ce projet non-officiel n'est pas affilié à la Fédération Française de BasketBall.</i>
+  <i>Built with ❤️ for the basketball community. This unofficial project is not affiliated with the Fédération Française de BasketBall.</i>
 </p>
