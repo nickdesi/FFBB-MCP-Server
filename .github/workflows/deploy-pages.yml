@@ -22,6 +22,7 @@ jobs:
         with:
           # Use a PAT so the push triggers the pages deployment
           token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
 
       - name: Inject Version and Date into HTML
         run: python3 tools/sync_version.py
