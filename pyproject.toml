@@ -33,6 +33,10 @@ dev = [
     "types-setuptools",
     "pre-commit>=3.7.0",
 ]
+docs = [
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.5.0",
+]
 
 [project.scripts]
 ffbb-mcp = "ffbb_mcp.server:main"
