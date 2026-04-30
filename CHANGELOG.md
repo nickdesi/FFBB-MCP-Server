@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optimisation majeure du cache (TTLCache/TLRUCache, résolution de l'inflation des clés)
 - Optimisation des chemins critiques dans `services.py` et de la fonction `prune_payload` dans `utils.py`
 
-## [1.1.0] - 2026-04-29
+## [1.2.0] - 2026-04-30
 
 ### Added
 - Nouveau **Dashboard Live** (accessible via `/dashboard`) avec metrics temps réel et efficacité du cache.
