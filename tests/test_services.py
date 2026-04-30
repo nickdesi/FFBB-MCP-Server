@@ -50,12 +50,12 @@ class TestGetSaisonsService:
 
     @pytest.mark.asyncio
     async def test_active_filter(self, patch_get_client, mock_client):
-        def mock_get_saisons(active_only=False):
+        def mock_get_saisons(filter_criteria=None):
             data = [
                 {"id": 1, "nom": "2023-2024", "actif": False},
                 {"id": 2, "nom": "2024-2025", "actif": True},
             ]
-            if active_only:
+            if filter_criteria:
                 return [d for d in data if d.get("actif")]
             return data
 
@@ -64,6 +64,9 @@ class TestGetSaisonsService:
         result_active = await get_saisons_service(active_only=True)
         assert len(result_active) == 1
         assert result_active[0]["nom"] == "2024-2025"
+        mock_client.get_saisons_async.assert_awaited_once_with(
+            filter_criteria='{"actif": {"$eq": true}}'
+        )
 
 
 # ---------------------------------------------------------------------------
