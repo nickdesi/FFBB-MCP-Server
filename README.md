@@ -144,7 +144,7 @@ Un fallback quotidien à **07:00 UTC** vérifie et ouvre automatiquement une PR 
 flowchart LR
     A["Agent IA\nClaude / Cursor"] -->|"Streamable HTTP\nPOST /mcp"| B("FastMCP Server\nffbb.desimone.fr")
     B -->|"Logique Métier & Cache"| C{"Services\nUnifiés"}
-    C <-->|"ffbb-api-client-v3 v1.6.1"| D[("FFBB API Officielle")]
+    C <-->|"ffbb-api-client-v3 v1.7.1"| D[("FFBB API Officielle")]
 ```
 
 - **Transport :** Streamable HTTP (spec MCP 2025-11-25) — endpoint unique `/mcp` acceptant POST (JSON-RPC) et GET.
