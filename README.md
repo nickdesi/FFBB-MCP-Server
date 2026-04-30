@@ -100,6 +100,8 @@ flowchart LR
 - **Transport:** Streamable HTTP (MCP spec 2025-11-25).
 - **Context Reduction:** The Service Layer consolidates multiple FFBB micro-calls into concise JSON responses, saving massive LLM tokens.
 - **Intelligent Multi-layer Cache:** Dynamic TTL system adjusting to the calendar (live weekends vs off-season) to ensure maximum freshness (15s live) while optimizing performance.
+- **Concurrency Deduplication:** Identical in-flight FFBB requests are coalesced and re-check the cache under lock to avoid stampedes under parallel agent load.
+- **Precise Latency Metrics:** API call timings use monotonic high-resolution counters for reliable performance monitoring.
 - **Hardened CI/CD:** Workflows are secured using commit SHAs for maximum supply chain security.
 
 ---

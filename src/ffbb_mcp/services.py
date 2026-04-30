@@ -367,15 +367,15 @@ async def _safe_call(
 
     last_exc: Exception | None = None
     for attempt in range(1, max(1, retries) + 1):
-        t0 = time.time()
+        t0 = time.perf_counter()
         try:
             current_coro = make_coro()
             result = await current_coro
-            record_call(time.time() - t0, is_error=False)
+            record_call(time.perf_counter() - t0, is_error=False)
             logger.debug("Succès: %s (attempt %d)", operation_name, attempt)
             return result
         except Exception as e:
-            record_call(time.time() - t0, is_error=True)
+            record_call(time.perf_counter() - t0, is_error=True)
             last_exc = e
 
             # Décider si l'erreur est réessayable
@@ -478,8 +478,11 @@ async def _dedupe_inflight(
         if cached is not None:
             return cached
 
-    existing: asyncio.Task[Any] | None = None
     async with _get_inflight_lock():
+        if cache is not None:
+            cached = _cache_get(cache, cache_key, cache_name)
+            if cached is not None:
+                return cached
         existing = inflight_map.get(cache_key)
         if existing is None:
             existing = asyncio.create_task(make_coro())
@@ -492,7 +495,8 @@ async def _dedupe_inflight(
         return result
     finally:
         async with _get_inflight_lock():
-            inflight_map.pop(cache_key, None)
+            if inflight_map.get(cache_key) is existing:
+                inflight_map.pop(cache_key, None)
 
 
 # ---------------------------------------------------------------------------
