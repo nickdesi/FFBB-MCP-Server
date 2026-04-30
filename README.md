@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <em>Dernière mise à jour : 30 Avril 2026 • Propulsé par <a href="https://pypi.org/project/ffbb-api-client-v3/">ffbb-api-client-v3 v1.6.1</a></em>
+  <em>Dernière mise à jour : 30 Avril 2026 • Propulsé par <a href="https://pypi.org/project/ffbb-api-client-v3/">ffbb-api-client-v3 v1.7.1</a></em>
 </p>
 
 ---
