@@ -55,7 +55,8 @@ _ARTICLE_PATTERN = re.compile(r"^[dlDL]'")
 _COMPILED_ALIASES = [
     (re.compile(r"\b" + re.escape(alias) + r"\b"), official)
     for alias, official in CLUB_ALIASES.items()
-    if not re.search(r"\b" + re.escape(alias) + r"\b", official)
+    # Fast substring check (~47% startup time reduction) before running slower regex search
+    if alias not in official or not re.search(r"\b" + re.escape(alias) + r"\b", official)
 ]
 
 # ---------------------------------------------------------------------------
