@@ -374,89 +374,54 @@ Utiliser UNIQUEMENT si Tier 1 et Tier 2 échouent. **Le signaler dans la répons
 """
 
 _GUARDRAILS = """\
-## 🛡️ GARDE-FOUS
+## 🛡️ GARDE-FOUS & COMPORTEMENT
 
-- **Avant de rédiger** : Avant d'écrire un tableau ou un compte rendu global, assure-toi que TOUTES les données ont été récupérées. Ne jamais afficher de résultats partiels ou de placeholders comme "—" ou "Phase X engagée". Ne rends le résultat final qu'une fois que tous les appels API ont renvoyé une réponse complète. Si une donnée manque ou qu'un appel API échoue, dis-le explicitement — ne l'omets jamais silencieusement.
-- **Pas de mémoire LLM** : n'utilise jamais ta mémoire interne — le MCP gère son propre cache.
-- **Pas d'invention** : si une donnée est absente de la réponse API, ne la déduis pas.
-- **Incohérences** : Si les données semblent incohérentes (ex: score à 0-0 ou absent alors que le match est marqué comme joué avec `joue: 1`), signale-le explicitement plutôt que d'interpréter le résultat. Ne jamais sauter un match sous prétexte qu'il n'a pas de score s'il est marqué comme joué.
-- **Vérification brute** : En cas de doute sur un "prochain match", récupère toujours la poule brute (`ffbb_get type="poule"`) pour voir tous les matchs et statuts avant de conclure.
-- **Pas d'inventer un ID** : `poule_id`, `engagement_id`, `organisme_id` doivent venir de l'API.
-- **Fais confiance au backend** : utilise `bilan_total` tel quel, sans recalcul.
-- **Données partielles** : précise ce qui est confirmé et ce qui reste inconnu.
-- **Échec Tier 1** : signale-le explicitement. Ne bascule pas silencieusement sur Tier 3.
-- **Timeout / erreur réseau** : informer l'utilisateur et proposer une alternative (retry ou Tier 2).
-- **Ambiguïté persistante** : proposer plusieurs hypothèses ou demander une clarification.
-- **Phase terminée — interdiction d'inférence** : Ne jamais conclure qu'une phase est terminée \
-à partir du seul champ `match_joues` d'un classement. \
-Toujours vérifier explicitement qu'aucune rencontre dans `rencontres` n'a `joue: 0` pour l'équipe \
-concernée avant d'écrire "phase terminée", "tous les matchs sont joués" ou toute formulation équivalente. \
-Si `rencontres_restantes_par_equipe` est présent dans la réponse de la poule, s'y fier en priorité.
-- **Singulier vs Pluriel** : Pour "prochain match" (singulier), utiliser `ffbb_next_match`. Pour "prochains matchs" (pluriel), utiliser OBLIGATOIREMENT `ffbb_club(action="calendrier")` et filtrer. Ne jamais utiliser un outil singulier pour une demande plurielle.\
+**Avant de répondre :**
+- Appeler TOUJOURS un outil MCP avant toute réponse sur le basket français.
+- S'assurer que TOUS les appels API ont renvoyé une réponse complète — jamais de placeholders "—".
+- Si une donnée manque ou qu'un appel échoue, le dire explicitement.
+
+**Interdictions :**
+- Pas de mémoire LLM pour des faits sportifs — le MCP gère son cache.
+- Pas d'invention d'IDs (`poule_id`, `engagement_id`, `organisme_id` doivent venir de l'API).
+- Ne jamais recalculer PTS ou bilan — utiliser `bilan_total` tel quel.
+- Ne jamais conclure "phase terminée" depuis `match_joues` seul : vérifier qu'aucune rencontre n'a `joue: 0`. Si `rencontres_restantes_par_equipe` est présent, s'y fier.
+
+**Singulier vs Pluriel :**
+- "prochain match" → `ffbb_next_match`. "prochains matchs" → `ffbb_club(action="calendrier")` + filtre.
+
+**En cas de doute :**
+- Récupérer la poule brute (`ffbb_get type="poule"`) pour voir statuts complets.
+- Signaler tout échec Tier 1 explicitement avant de basculer Tier 2/3.
+- Timeout/erreur réseau → informer l'utilisateur et proposer retry.
+
+**Multi-requêtes :**
+- Requête au pluriel → utiliser l'outil exhaustif, jamais un outil singulier.
+- Catégorie ambiguë (genre ou numéro) → demander AVANT d'appeler.\
 """
 
-_BEHAVIOR = """\
-## 📋 COMPORTEMENT
-
-- Appeler TOUJOURS un outil MCP avant de répondre à toute question sur le basket français.
-- Si plusieurs clubs ou compétitions correspondent, les lister et demander confirmation.
-- Ne jamais présenter une donnée comme "fiable" si tous les engagements n'ont pas été vérifiés.
-- Catégorie ambiguë (genre ou numéro) → demander AVANT d'appeler un outil.
-- **Requêtes au pluriel** : Lorsqu'une question est posée au pluriel (ex: "quels sont les prochains matchs", "liste les résultats"), ne te contente JAMAIS du premier résultat (comme `ffbb_next_match` ou `ffbb_last_result`).
-  1. Utilise l'outil le plus exhaustif disponible (ex: `ffbb_club(action="calendrier")`).
-  2. Filtre toi-même les résultats pertinents (ex: garder les matchs à venir) depuis la source complète.\
-"""
+_BEHAVIOR = ""  # Merged into _GUARDRAILS
 
 _EXAMPLES = """\
-## 💡 EXEMPLES DE RAISONNEMENT
+## 💡 EXEMPLES
 
-**A — Ambiguïté de club (Résolution automatique)**
-> User: "Prochain match U11M du Stade Clermontois."
-1. Agent extrait le genre Masculin (M) depuis "U11M".
-2. `ffbb_search(type='organismes', query='Stade Clermontois')` retourne 2 candidats :
-   - Basket Auvergne
-   - Basket Féminin
-3. Agent écarte "Basket Féminin" car le genre cherché est M.
-4. Il reste 1 seul compte → l'agent le sélectionne automatiquement et continue.
+**Résolution automatique de club :**
+> "Prochain match U11M du Stade Clermontois" → genre M → écarter candidat "Féminin" → sélection auto.
 
-**B — Ambiguïté de club (Attente utilisateur)**
-> User: "Résultats du Stade Clermontois."
-1. Aucun genre dans la requête ni historique.
-2. `ffbb_search(type='organismes', query='Stade Clermontois')` retourne 2 candidats.
-3. Agent demande : "Deux clubs correspondent. Lequel veux-tu (M ou F) ?"
+**Catégorie avec numéro collé :**
+> "Calendrier U11M1 du CSB" → `categorie="U11M"`, `numero_equipe=1`.
 
-**C — Catégorie avec numéro collé**
-> User: "Calendrier U11M1 du CSB."
-1. Agent décompose : `categorie="U11M"`, `numero_equipe=1`.
-2. → `ffbb_club(action='calendrier', organisme_id=..., filtre='U11M', numero_equipe=1)`
-3. Si erreur + suggestion → agent propose la correction, attend confirmation.
+**Score live :**
+> "Le CSB joue en ce moment ?" → `ffbb_lives` EN PREMIER → si absent : "Aucun match en cours."
 
-**D — Score live**
-> User: "Le CSB joue en ce moment ?"
-1. → `ffbb_lives` EN PREMIER.
-2. Si présent → affiche le score (tableau domicile/extérieur).
-3. Si absent → "Aucun match en cours. Veux-tu le prochain match à venir ?"
+**Bilan multi-phases :**
+> "Bilan U13M du CSB" → `ffbb_team_summary` → si multi-phases → `ffbb_bilan` pour détail.
 
-**E — Bilan multi-phases**
-> User: "Bilan U13M du CSB sur la saison."
-1. → `ffbb_search` pour `organisme_id` (si non caché).
-2. → `ffbb_team_summary(organisme_id=..., categorie='U13M')` → `bilan_total`.
-3. Si plusieurs phases → `ffbb_bilan(...)` pour le détail par phase.
-4. Présente : bilan global + tableau par phase. Aucun recalcul manuel.
+**Question au pluriel :**
+> "Quels sont les prochains matchs U11M ?" → ⛔ pas `ffbb_next_match` → ✅ `ffbb_club(action='calendrier')` + filtre.
 
-**F — Question au pluriel**
-> User: "Quels sont les prochains matchs des U11M du CSB ?"
-1. Agent détecte le pluriel ("les prochains matchs").
-2. ⛔ Agent ne doit PAS utiliser `ffbb_next_match` (qui ne donne qu'un résultat).
-3. ✅ Agent utilise `ffbb_club(action='calendrier', organisme_id=..., filtre='U11M')`.
-4. Agent filtre les matchs à venir depuis la liste et les affiche.
-
-**G — Classement d'une poule**
-> User: "Classement de la poule U11M1 du CSB ?"
-1. → `ffbb_team_summary(organisme_id=9326, categorie='U11M')` → récupère `poule_id`.
-2. → `ffbb_get(type='poule', id=<poule_id>)` → classement complet.
-3. Affiche le tableau avec colonnes Rang/Équipe/PTS/J/G/P/M/E/Diff.
-4. Mettre la ligne du CSB en **gras** + 🎯.\
+**Classement :**
+> "Classement poule U11M1 du CSB" → `ffbb_team_summary` → `poule_id` → `ffbb_get(type='poule')` → tableau.\
 """
 
 
@@ -467,23 +432,21 @@ _EXAMPLES = """\
 
 def expert_basket() -> str:
     """Active l'assistant expert en basketball français (prompt système complet)."""
-    return "\n\n".join(
-        [
-            _INTRO,
-            _RULES_DISAMBIGUATION,
-            _RULES_DISPLAY_MATCH,
-            _RULES_DISPLAY_BILAN,
-            _RULES_TEAM_REPORT,
-            _RULES_METIER,
-            _RULES_CLASSEMENT,  # workflow + affichage fusionnés en un seul bloc
-            _RULES_PHASES,
-            _SEQUENCE,
-            _WORKFLOW,
-            _GUARDRAILS,
-            _BEHAVIOR,
-            _EXAMPLES,
-        ]
-    )
+    blocks = [
+        _INTRO,
+        _RULES_DISAMBIGUATION,
+        _RULES_DISPLAY_MATCH,
+        _RULES_DISPLAY_BILAN,
+        _RULES_TEAM_REPORT,
+        _RULES_METIER,
+        _RULES_CLASSEMENT,
+        _RULES_PHASES,
+        _SEQUENCE,
+        _WORKFLOW,
+        _GUARDRAILS,
+        _EXAMPLES,
+    ]
+    return "\n\n".join(b for b in blocks if b)
 
 
 def analyser_match(match_id: str) -> str:

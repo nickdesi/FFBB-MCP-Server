@@ -38,6 +38,7 @@ from .services import (
     ffbb_resolve_team_service,
     ffbb_saison_bilan_service,
     ffbb_search_service,
+    format_poule_response,
     get_cache_ttls,
     get_calendrier_club_service,
     get_competition_service,
@@ -52,7 +53,7 @@ from .services import (
     resolve_poule_id_service,
     search_organismes_service,
 )
-from .utils import format_team_name, prune_payload
+from .utils import prune_payload
 
 
 def zipai_surgical(func: Any) -> Any:
@@ -577,57 +578,7 @@ async def ffbb_get(
         elif type == "poule":
             effective_refresh = force_refresh
             poule_data = await get_poule_service(id, force_refresh=effective_refresh)
-
-            # Formatage des noms d'équipes dans les classements
-            classements = poule_data.get("classements", [])
-            formatted_classements = []
-            for c in classements or []:
-                eng = c.get("id_engagement", {}) or {}
-                nom = eng.get("nom", "")
-                num = eng.get("numero_equipe")
-                c["equipe"] = format_team_name(nom, num)
-                logo_id = (eng.get("logo") or {}).get("id")
-                c["logo_url"] = (
-                    f"https://api.ffbb.com/assets/{logo_id}?height=220&fit=contain&format=avif"
-                    if logo_id
-                    else None
-                )
-                formatted_classements.append(c)
-
-            # Formatage des noms d'équipes dans les rencontres
-            rencontres = poule_data.get("rencontres", [])
-            formatted_rencontres = []
-            for m in rencontres or []:
-                eng1 = m.get("idEngagementEquipe1", {}) or {}
-                eng2 = m.get("idEngagementEquipe2", {}) or {}
-                num1 = eng1.get("numeroEquipe") if isinstance(eng1, dict) else None
-                num2 = eng2.get("numeroEquipe") if isinstance(eng2, dict) else None
-                m["nomEquipe1"] = format_team_name(m.get("nomEquipe1", ""), num1)
-                m["nomEquipe2"] = format_team_name(m.get("nomEquipe2", ""), num2)
-                formatted_rencontres.append(m)
-
-            res = {
-                "id": poule_data.get("id"),
-                "nom": poule_data.get("libelle"),
-                "classements": formatted_classements,
-                "rencontres": formatted_rencontres,
-            }
-            if formatted_rencontres:
-                max_limit = int(os.environ.get("FFBB_MAX_CALENDAR_MATCHES", "300"))
-                total_matches = len(formatted_rencontres)
-                if total_matches > max_limit:
-                    # Troncature pour protéger les performances du client (limite configurable)
-                    truncated_rencontres = formatted_rencontres[:max_limit]
-                    truncated_rencontres.append(
-                        {
-                            "warning": f"Résultat tronqué. Seulement {max_limit} rencontres sur {total_matches} affichées."
-                        }
-                    )
-                    res["rencontres"] = truncated_rencontres
-                    res["_truncated"] = True
-                    res["_omitted_count"] = total_matches - max_limit
-                    res["_total"] = total_matches
-            return res
+            return format_poule_response(poule_data)
         elif type == "organisme":
             return await get_organisme_service(organisme_id=id)
         elif type == "rencontre":

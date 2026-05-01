@@ -5,6 +5,7 @@ import logging
 import os
 import random
 import re
+import threading
 import time
 import unicodedata
 from collections.abc import Callable, Coroutine  # noqa: TC003
@@ -179,8 +180,11 @@ state.cache_calendrier = TLRUCache(
 )
 state.cache_bilan = TLRUCache(maxsize=64, ttu=_ttu_bilan)
 state.cache_poule = TLRUCache(maxsize=128, ttu=_ttu_poule)
+# NOTE INTENTIONNEL : cache_classement réutilise _ttu_poule car les classements
+# sont extraits des mêmes données de poule et partagent leur cycle de vie.
 state.cache_classement = TLRUCache(maxsize=128, ttu=_ttu_poule)
 _inflight_lock: asyncio.Lock | None = None
+_inflight_lock_guard = threading.Lock()
 state.inflight_detail = {}
 state.inflight_search = {}
 state.inflight_calendrier = {}
@@ -189,10 +193,12 @@ state.inflight_poule = {}
 
 
 def _get_inflight_lock() -> asyncio.Lock:
-    """Retourne le lock inflight, en le créant lazily dans la boucle courante."""
+    """Retourne le lock inflight, en le créant lazily de façon thread-safe."""
     global _inflight_lock
     if _inflight_lock is None:
-        _inflight_lock = asyncio.Lock()
+        with _inflight_lock_guard:
+            if _inflight_lock is None:
+                _inflight_lock = asyncio.Lock()
     return _inflight_lock
 
 
@@ -652,6 +658,61 @@ async def get_poule_service(
     )
 
 
+def format_poule_response(poule_data: dict) -> dict[str, Any]:
+    """Formate les données brutes d'une poule pour la réponse MCP.
+
+    Enrichit classements (equipe, logo_url) et rencontres (nomEquipe1/2 formatés).
+    Applique la troncature configurable via FFBB_MAX_CALENDAR_MATCHES.
+    """
+    classements = poule_data.get("classements", [])
+    formatted_classements = []
+    for c in classements or []:
+        eng = c.get("id_engagement", {}) or {}
+        nom = eng.get("nom", "")
+        num = eng.get("numero_equipe")
+        c["equipe"] = format_team_name(nom, num)
+        logo_id = (eng.get("logo") or {}).get("id")
+        c["logo_url"] = (
+            f"https://api.ffbb.com/assets/{logo_id}?height=220&fit=contain&format=avif"
+            if logo_id
+            else None
+        )
+        formatted_classements.append(c)
+
+    rencontres = poule_data.get("rencontres", [])
+    formatted_rencontres = []
+    for m in rencontres or []:
+        eng1 = m.get("idEngagementEquipe1", {}) or {}
+        eng2 = m.get("idEngagementEquipe2", {}) or {}
+        num1 = eng1.get("numeroEquipe") if isinstance(eng1, dict) else None
+        num2 = eng2.get("numeroEquipe") if isinstance(eng2, dict) else None
+        m["nomEquipe1"] = format_team_name(m.get("nomEquipe1", ""), num1)
+        m["nomEquipe2"] = format_team_name(m.get("nomEquipe2", ""), num2)
+        formatted_rencontres.append(m)
+
+    res: dict[str, Any] = {
+        "id": poule_data.get("id"),
+        "nom": poule_data.get("libelle"),
+        "classements": formatted_classements,
+        "rencontres": formatted_rencontres,
+    }
+    if formatted_rencontres:
+        max_limit = int(os.environ.get("FFBB_MAX_CALENDAR_MATCHES", "300"))
+        total_matches = len(formatted_rencontres)
+        if total_matches > max_limit:
+            truncated_rencontres = formatted_rencontres[:max_limit]
+            truncated_rencontres.append(
+                {
+                    "warning": f"Résultat tronqué. Seulement {max_limit} rencontres sur {total_matches} affichées."
+                }
+            )
+            res["rencontres"] = truncated_rencontres
+            res["_truncated"] = True
+            res["_omitted_count"] = total_matches - max_limit
+            res["_total"] = total_matches
+    return res
+
+
 async def get_organisme_service(organisme_id: int | str) -> dict:
     organisme_id_int = _coerce_numeric_id(organisme_id, "organisme_id")
     cache_key = f"organisme:{organisme_id_int}"
@@ -1035,24 +1096,32 @@ async def ffbb_equipes_club_service(
     return filtered_teams
 
 
-async def ffbb_next_match_service(
-    *,
-    club_name: str | None = None,
-    organisme_id: int | str | None = None,
-    categorie: str,
-    numero_equipe: int | None = None,
-    force_refresh: bool = False,
-) -> dict[str, Any]:
-    """Service interne pour ffbb_next_match.
+# ---------------------------------------------------------------------------
+# Helpers partagés — next_match / last_result
+# ---------------------------------------------------------------------------
 
-    - sélectionne l'engagement correspondant à (organisme_id, categorie, numero_equipe)
-    - charge la poule courante
-    - retourne la prochaine rencontre non jouée.
+
+async def _resolve_team_equipes(
+    *,
+    club_name: str | None,
+    organisme_id: int | str | None,
+    categorie: str,
+    numero_equipe: int | None,
+    not_found_status: str = "not_found",
+) -> tuple[dict | None, list[dict], dict | None]:
+    """Résout le club + filtre les équipes par catégorie/numéro.
+
+    Returns:
+        (error_response | None, equipes_filtered, club_resolu | None)
+        Si error_response n'est pas None, les deux autres sont vides/None.
     """
     if not club_name and not organisme_id:
-        return {"status": "error", "message": "Fournir club_name ou organisme_id"}
+        return (
+            {"status": "error", "message": "Fournir club_name ou organisme_id"},
+            [],
+            None,
+        )
 
-    # Résolution des organismes avec métadonnées (CENTRALISÉ)
     resolved_clubs, org_data = await _resolve_club_and_org(
         club_name=club_name,
         organisme_id=organisme_id,
@@ -1060,25 +1129,31 @@ async def ffbb_next_match_service(
     )
 
     if not resolved_clubs:
-        return {
-            "status": "not_found",
-            "message": f"Club '{club_name or organisme_id}' introuvable.",
-            "club_resolu": None,
-        }
+        return (
+            {
+                "status": not_found_status,
+                "message": f"Club '{club_name or organisme_id}' introuvable.",
+                "club_resolu": None,
+            },
+            [],
+            None,
+        )
 
-    # Si ambiguïté sur le club, on s'arrête là (sauf si un seul club matchait)
     if len(resolved_clubs) > 1 and not organisme_id:
-        return {
-            "status": "ambiguous",
-            "message": f"Plusieurs clubs correspondent à '{club_name}'. Précisez l'organisme_id.",
-            "candidates": resolved_clubs,
-            "club_resolu": None,
-        }
+        return (
+            {
+                "status": "ambiguous",
+                "message": f"Plusieurs clubs correspondent à '{club_name}'. Précisez l'organisme_id.",
+                "candidates": resolved_clubs,
+                "club_resolu": None,
+            },
+            [],
+            None,
+        )
 
     club_resolu = resolved_clubs[0]
     target_org_id = str(club_resolu["organisme_id"])
 
-    # Fetch équipes candidates for this category
     equipes = await ffbb_equipes_club_service(
         organisme_id=target_org_id, filtre=categorie, org_data=org_data
     )
@@ -1096,28 +1171,27 @@ async def ffbb_next_match_service(
             if (equipes and "suggested_teams" in equipes[0])
             else []
         )
-        return {
-            "status": "not_found",
-            "message": msg,
-            "club_resolu": club_resolu,
-            "candidates": suggestions,
-        }
+        return (
+            {
+                "status": not_found_status,
+                "message": msg,
+                "club_resolu": club_resolu,
+                "candidates": suggestions,
+            },
+            [],
+            club_resolu,
+        )
 
-    # Filtrer par numéro d'équipe (LOGIQUE CORRIGÉE)
-    # 1. On cherche le numéro exact si fourni
+    # Filtrer par numéro d'équipe
     if numero_equipe is not None:
         want = str(numero_equipe)
         filtered = [
             e for e in equipes if (e.get("numero_equipe") or "").strip() == want
         ]
-
-        # 2. Si non trouvé, on cherche l'équipe sans numéro ("")
         if not filtered:
             filtered = [
                 e for e in equipes if not (e.get("numero_equipe") or "").strip()
             ]
-
-        # 3. Si toujours rien, on retourne la liste des équipes disponibles
         if not filtered:
             all_available = sorted(
                 list(
@@ -1127,45 +1201,42 @@ async def ffbb_next_match_service(
                     }
                 )
             )
-            return {
-                "status": "not_found",
-                "message": f"Aucune équipe matchant '{categorie}' n°{numero_equipe} (ou unique) trouvée.",
-                "club_resolu": club_resolu,
-                "candidates": all_available,
-            }
+            return (
+                {
+                    "status": not_found_status,
+                    "message": f"Aucune équipe matchant '{categorie}' n°{numero_equipe} (ou unique) trouvée.",
+                    "club_resolu": club_resolu,
+                    "candidates": all_available,
+                },
+                [],
+                club_resolu,
+            )
         equipes = filtered
 
-    poules_actives = [e["poule_id"] for e in equipes if e.get("poule_id")]
-    if not poules_actives:
-        all_available_equipes = sorted(
-            list(
-                {
-                    f"{e.get('team_label', categorie)} (n°{e.get('numero_equipe') or 'unique'})"
-                    for e in equipes
-                }
-            )
-        )
-        return {
-            "status": "not_found",
-            "message": "Aucune poule active trouvée pour cette équipe.",
-            "club_resolu": club_resolu,
-            "candidates": all_available_equipes,
-        }
+    return None, equipes, club_resolu
 
-    organisme_nom = club_resolu["nom"]
-    # On évite de forcer à 1 si itération sur les noms
+
+async def _fetch_poule_matches(
+    equipes: list[dict],
+    *,
+    organisme_nom: str,
+    numero_equipe: int | None,
+    force_refresh: bool = False,
+) -> list[tuple[dict, dict]]:
+    """Charge les rencontres de toutes les poules en parallèle et filtre celles du club.
+
+    Returns:
+        Liste de tuples (rencontre_dict, equipe_info_dict) pour les matchs de l'équipe.
+    """
     numero_equipe_match = int(numero_equipe) if numero_equipe is not None else None
 
-    tz = _PARIS_TZ
-
-    async def _fetch_and_filter_next(eq: dict):
-        poule_id = eq.get("poule_id")
+    async def _fetch_one(eq: dict) -> list[tuple[dict, dict]]:
+        pid = eq.get("poule_id")
         my_eng = eq.get("engagement_id")
-        if not poule_id:
+        if not pid:
             return []
-
-        poule = await get_poule_service(poule_id, force_refresh=force_refresh)
-        upcoming_for_pool = []
+        poule = await get_poule_service(pid, force_refresh=force_refresh)
+        matches: list[tuple[dict, dict]] = []
         for m in poule.get("rencontres", []) or []:
             eng1 = m.get("idEngagementEquipe1")
             eng2 = m.get("idEngagementEquipe2")
@@ -1190,34 +1261,102 @@ async def ffbb_next_match_service(
                     is_organisme_nom_normalized=True,
                 )
 
-            if not is_my_team:
-                continue
-
-            joue = m.get("joue")
-            res1 = m.get("resultatEquipe1", m.get("resultat_equipe1"))
-            res2 = m.get("resultatEquipe2", m.get("resultat_equipe2"))
-
-            if joue not in (0, "0", None):
-                continue
-            if res1 not in (None, "", "None") or res2 not in (None, "", "None"):
-                continue
-
-            dt = _parse_dt(m.get("date_rencontre", m.get("date")))
-            if dt is None:
-                dt = datetime.max.replace(tzinfo=tz)
-
-            upcoming_for_pool.append((dt, m, eq))
-
-        return upcoming_for_pool
+            if is_my_team:
+                matches.append((m, eq))
+        return matches
 
     results = await asyncio.gather(
-        *[_fetch_and_filter_next(e) for e in equipes], return_exceptions=True
+        *[_fetch_one(e) for e in equipes if e.get("poule_id")],
+        return_exceptions=True,
     )
-
-    upcoming = []
+    all_matches: list[tuple[dict, dict]] = []
     for res in results:
         if isinstance(res, list):
-            upcoming.extend(res)
+            all_matches.extend(res)
+    return all_matches
+
+
+def _prioritize_phase(
+    matches_with_eq: list[tuple[dict, dict]],
+) -> list[tuple[dict, dict]]:
+    """Retourne uniquement les matchs de la phase la plus élevée."""
+    if not matches_with_eq:
+        return []
+    phase_to_matches: dict[int, list[tuple[dict, dict]]] = {}
+    for m, eq in matches_with_eq:
+        p_num = _extract_phase_num(eq.get("phase_label"))
+        if p_num not in phase_to_matches:
+            phase_to_matches[p_num] = []
+        phase_to_matches[p_num].append((m, eq))
+    max_phase = max(phase_to_matches.keys())
+    return phase_to_matches[max_phase]
+
+
+async def ffbb_next_match_service(
+    *,
+    club_name: str | None = None,
+    organisme_id: int | str | None = None,
+    categorie: str,
+    numero_equipe: int | None = None,
+    force_refresh: bool = False,
+) -> dict[str, Any]:
+    """Service interne pour ffbb_next_match.
+
+    - sélectionne l'engagement correspondant à (organisme_id, categorie, numero_equipe)
+    - charge la poule courante
+    - retourne la prochaine rencontre non jouée.
+    """
+    error, equipes, club_resolu = await _resolve_team_equipes(
+        club_name=club_name,
+        organisme_id=organisme_id,
+        categorie=categorie,
+        numero_equipe=numero_equipe,
+        not_found_status="not_found",
+    )
+    if error:
+        return error
+
+    poules_actives = [e["poule_id"] for e in equipes if e.get("poule_id")]
+    if not poules_actives:
+        all_available_equipes = sorted(
+            list(
+                {
+                    f"{e.get('team_label', categorie)} (n°{e.get('numero_equipe') or 'unique'})"
+                    for e in equipes
+                }
+            )
+        )
+        return {
+            "status": "not_found",
+            "message": "Aucune poule active trouvée pour cette équipe.",
+            "club_resolu": club_resolu,
+            "candidates": all_available_equipes,
+        }
+
+    organisme_nom = club_resolu["nom"]  # type: ignore[index]
+
+    all_matches = await _fetch_poule_matches(
+        equipes,
+        organisme_nom=organisme_nom,
+        numero_equipe=numero_equipe,
+        force_refresh=force_refresh,
+    )
+
+    # Filtrer les matchs à venir (non joués, sans résultat)
+    tz = _PARIS_TZ
+    upcoming: list[tuple[datetime, dict, dict]] = []
+    for m, eq in all_matches:
+        joue = m.get("joue")
+        res1 = m.get("resultatEquipe1", m.get("resultat_equipe1"))
+        res2 = m.get("resultatEquipe2", m.get("resultat_equipe2"))
+        if joue not in (0, "0", None):
+            continue
+        if res1 not in (None, "", "None") or res2 not in (None, "", "None"):
+            continue
+        dt = _parse_dt(m.get("date_rencontre", m.get("date")))
+        if dt is None:
+            dt = datetime.max.replace(tzinfo=tz)
+        upcoming.append((dt, m, eq))
 
     if not upcoming:
         all_available_equipes = sorted(
@@ -1235,9 +1374,7 @@ async def ffbb_next_match_service(
             "candidates": all_available_equipes,
         }
 
-    # PRIORISATION DES PHASES :
-    # On identifie la phase la plus élevée qui a au moins un match à venir.
-    # upcoming est une liste de tuples (datetime, match_dict, equipe_info_dict)
+    # Prioriser la phase la plus élevée
     phase_to_matches: dict[int, list[tuple[datetime, dict, dict]]] = {}
     for dt, m, eq in upcoming:
         p_num = _extract_phase_num(eq.get("phase_label"))
@@ -1247,8 +1384,6 @@ async def ffbb_next_match_service(
 
     max_active_phase = max(phase_to_matches.keys())
     active_phase_matches = phase_to_matches[max_active_phase]
-
-    # On prend le match le plus proche (date ASC) dans cette phase la plus avancée
     active_phase_matches.sort(key=lambda x: x[0])
     next_dt, next_match, source_team = active_phase_matches[0]
 
@@ -1274,7 +1409,6 @@ async def ffbb_next_match_service(
         adversaire = eq1_name
         domicile = False
     else:
-        # Fallback sur les noms
         club_nom = (source_team.get("nom_equipe") or "").lower()
         if club_nom and club_nom in (eq1_name or "").lower():
             adversaire = eq2_name
@@ -2542,151 +2676,51 @@ async def ffbb_last_result_service(
     numero_equipe: int = 1,
     force_refresh: bool = False,
 ) -> dict:
-    # 1. Résolution des organismes avec métadonnées (CENTRALISÉ)
-    resolved_clubs, org_data = await _resolve_club_and_org(
-        club_name=club_name, organisme_id=organisme_id, categorie=categorie
+    error, equipes, club_resolu = await _resolve_team_equipes(
+        club_name=club_name,
+        organisme_id=organisme_id,
+        categorie=categorie,
+        numero_equipe=numero_equipe,
+        not_found_status="no_result",
     )
+    if error:
+        return error
 
-    if not resolved_clubs:
-        return {
-            "status": "not_found",
-            "message": f"Club '{club_name or organisme_id}' introuvable.",
-            "club_resolu": None,
-        }
-
-    # Si ambiguïté sur le club, on s'arrête là
-    if len(resolved_clubs) > 1 and not organisme_id:
-        return {
-            "status": "ambiguous",
-            "message": f"Plusieurs clubs correspondent à '{club_name}'. Précisez l'organisme_id.",
-            "candidates": resolved_clubs,
-            "club_resolu": None,
-        }
-
-    club_resolu = resolved_clubs[0]
-    target_org_id = str(club_resolu["organisme_id"])
-
-    # Fetch équipes candidates for this category
-    equipes = await ffbb_equipes_club_service(
-        organisme_id=target_org_id, filtre=categorie, org_data=org_data
-    )
-
-    if not equipes or (
-        isinstance(equipes, list) and len(equipes) == 1 and "error" in equipes[0]
-    ):
-        msg = (
-            equipes[0]["error"]
-            if (equipes and "error" in equipes[0])
-            else f"Aucune équipe trouvée pour la catégorie '{categorie}'."
-        )
-        suggestions = (
-            equipes[0].get("suggested_teams")
-            if (equipes and "suggested_teams" in equipes[0])
-            else []
-        )
-        return {
-            "status": "no_result",
-            "message": msg,
-            "club_resolu": club_resolu,
-            "candidates": suggestions,
-        }
-
-    # Filtrer par numéro d'équipe (LOGIQUE CORRIGÉE)
-    if numero_equipe is not None:
-        want = str(numero_equipe)
-        filtered = [
-            e for e in equipes if (e.get("numero_equipe") or "").strip() == want
-        ]
-        if not filtered:
-            filtered = [
-                e for e in equipes if not (e.get("numero_equipe") or "").strip()
-            ]
-        if not filtered:
-            all_available = sorted(
-                list(
-                    {
-                        f"{e.get('team_label', categorie)} (n°{e.get('numero_equipe') or 'unique'})"
-                        for e in equipes
-                    }
-                )
-            )
-            return {
-                "status": "no_result",
-                "message": f"Aucune équipe matchant '{categorie}' n°{numero_equipe} (ou unique) trouvée.",
-                "club_resolu": club_resolu,
-                "candidates": all_available,
-            }
-        equipes = filtered
-
-    organisme_nom = club_resolu["nom"]
+    organisme_nom = club_resolu["nom"]  # type: ignore[index]
     numero_equipe_match = int(numero_equipe) if numero_equipe is not None else None
 
     async def _get_latest_match(refresh: bool) -> dict[str, Any] | None:
-        all_joues_tuples: list[tuple[dict, dict]] = []
-
-        async def _fetch_and_filter(eq: dict) -> list[tuple[dict, dict]]:
-            pid = eq.get("poule_id")
-            if not pid:
-                return []
-            poule = await get_poule_service(pid, force_refresh=refresh)
-            return [
-                (r, eq)
-                for r in poule.get("rencontres", [])
-                if r.get("joue") == 1
-                and r.get("resultatEquipe1") not in (None, "None")
-                and (
-                    _match_team_name(
-                        str(r.get("nomEquipe1", "")),
-                        str(organisme_nom),
-                        numero_equipe_match,
-                    )
-                    or _match_team_name(
-                        str(r.get("nomEquipe2", "")),
-                        str(organisme_nom),
-                        numero_equipe_match,
-                    )
-                )
-            ]
-
-        results = await asyncio.gather(
-            *[_fetch_and_filter(e) for e in equipes if e.get("poule_id")],
-            return_exceptions=True,
+        all_matches = await _fetch_poule_matches(
+            equipes,
+            organisme_nom=organisme_nom,
+            numero_equipe=numero_equipe,
+            force_refresh=refresh,
         )
-
-        for res in results:
-            if isinstance(res, list):
-                all_joues_tuples.extend(res)
-
-        if not all_joues_tuples:
+        # Filtrer les matchs joués avec résultat
+        joues = [
+            (m, eq)
+            for m, eq in all_matches
+            if m.get("joue") == 1 and m.get("resultatEquipe1") not in (None, "None")
+        ]
+        if not joues:
             return None
 
-        # PRIORISATION DES PHASES :
-        # On identifie la phase la plus élevée qui a au moins un résultat enregistré (joue=1).
-        phase_to_matches: dict[int, list[tuple[dict, dict]]] = {}
-        for r, eq in all_joues_tuples:
-            p_num = _extract_phase_num(eq.get("phase_label"))
-            if p_num not in phase_to_matches:
-                phase_to_matches[p_num] = []
-            phase_to_matches[p_num].append((r, eq))
-
-        max_played_phase = max(phase_to_matches.keys())
-        active_phase_matches = phase_to_matches[max_played_phase]
-
-        # Trie par date_rencontre pour prendre le plus récent
-        # Chaque element est un tuple (match_dict, equipe_dict)
-        active_phase_matches.sort(
+        # Prioriser la phase la plus élevée
+        active_phase = _prioritize_phase(joues)
+        # Trier par date desc pour prendre le plus récent
+        active_phase.sort(
             key=lambda x: (
                 _parse_dt(x[0].get("date_rencontre", "") or "")
                 or datetime.min.replace(tzinfo=_PARIS_TZ)
             ),
             reverse=True,
         )
-        return active_phase_matches[0][0]
+        return active_phase[0][0]
 
     # 1. Premier appel
     dernier: dict[str, Any] | None = await _get_latest_match(force_refresh)
 
-    # 2. Check 30 days
+    # 2. Check 30 days — auto-refresh si dernier match trop ancien
     if dernier and not force_refresh:
         date_str = dernier.get("date_rencontre", "")
         if len(date_str) >= 10:
@@ -2720,7 +2754,6 @@ async def ffbb_last_result_service(
     )
 
     def _safe_int(val: Any) -> int | None:
-        """Convertit un score API en int, retourne None si absent/invalide."""
         if val is None or val in ("", "None"):
             return None
         try:

@@ -93,6 +93,6 @@ class TestPrompts:
 
     def test_expert_basket_pluriel(self):
         prompt = expert_basket()
-        assert "Question au pluriel" in prompt
-        assert "quels sont les prochains matchs" in prompt
+        assert "pluriel" in prompt.lower()
+        assert "prochains matchs" in prompt
         assert "calendrier" in prompt
