@@ -69,10 +69,7 @@ async def test_ffbb_club_resolution_failure():
 @pytest.mark.asyncio
 async def test_ffbb_club_calendrier_with_numero_equipe():
     # Verify that the numero_equipe parameter is properly passed down
-    with (
-        patch("ffbb_mcp.server.get_calendrier_club_service") as mock_cal_service,
-        patch("ffbb_mcp.server.is_match_day", return_value=False),
-    ):
+    with patch("ffbb_mcp.server.get_calendrier_club_service") as mock_cal_service:
         # Mocking to return an empty list just to test the argument passing
         mock_cal_service.return_value = []
 
@@ -89,5 +86,30 @@ async def test_ffbb_club_calendrier_with_numero_equipe():
             organisme_id=123,
             categorie="U11M",
             numero_equipe=1,
+            force_refresh=False,
+        )
+
+
+@pytest.mark.asyncio
+async def test_ffbb_club_calendrier_match_day_does_not_force_refresh():
+    with (
+        patch("ffbb_mcp.server.get_calendrier_club_service") as mock_cal_service,
+        patch("ffbb_mcp.server.search_organismes_service", AsyncMock(return_value=[])),
+    ):
+        mock_cal_service.return_value = []
+
+        await ffbb_club(
+            action="calendrier",
+            club_name="Stade Clermontois",
+            organisme_id=123,
+            filtre="U11M",
+            force_refresh=False,
+        )
+
+        mock_cal_service.assert_called_once_with(
+            club_name="Stade Clermontois",
+            organisme_id=123,
+            categorie="U11M",
+            numero_equipe=None,
             force_refresh=False,
         )

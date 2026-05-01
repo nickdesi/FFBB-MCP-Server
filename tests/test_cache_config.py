@@ -1,6 +1,8 @@
 import os
+from datetime import datetime
 from unittest.mock import patch
 
+from ffbb_mcp.cache_strategy import get_static_ttl
 from ffbb_mcp.services import _read_positive_int_env, get_cache_ttls
 
 
@@ -53,3 +55,24 @@ def test_get_cache_ttls_lives_report(mock_get_static):
 
     ttls = get_cache_ttls()
     assert ttls["lives"] == (int(state.cache_lives.ttl) if state.cache_lives else -1)
+
+
+@patch("ffbb_mcp.services.get_static_ttl")
+def test_get_cache_ttls_calendrier_dynamic_report(mock_get_static):
+    mock_get_static.return_value = 1800
+
+    with patch.dict(os.environ, {"FFBB_CACHE_TTL_CALENDRIER": "7200"}):
+        ttls = get_cache_ttls()
+        assert ttls["calendrier"] == 7200
+
+
+def test_get_static_ttl_calendrier_adaptive():
+    with patch("ffbb_mcp.cache_strategy.datetime") as mock_datetime:
+        mock_datetime.now.return_value = datetime(2025, 1, 7, 12, 0)  # mardi
+        assert get_static_ttl("calendrier") == 86_400
+
+        mock_datetime.now.return_value = datetime(2025, 1, 6, 9, 0)  # lundi post-match
+        assert get_static_ttl("calendrier") == 1_800
+
+        mock_datetime.now.return_value = datetime(2025, 1, 4, 10, 0)  # samedi live
+        assert get_static_ttl("calendrier") == 300

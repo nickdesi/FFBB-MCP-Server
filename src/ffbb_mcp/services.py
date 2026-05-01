@@ -114,9 +114,11 @@ def _notify_cache_hit(cache_name: str) -> None:
             logger.debug("cache hit hook failed", exc_info=True)
 
 
-def _notify_cache_miss(cache_name: str) -> None:
+def _notify_cache_miss(cache_name: str, reason: str = "not_found") -> None:
     if _cache_miss_hook is not None:
         try:
+            _cache_miss_hook(cache_name, reason)
+        except TypeError:
             _cache_miss_hook(cache_name)
         except Exception:  # idem
             logger.debug("cache miss hook failed", exc_info=True)
@@ -132,7 +134,12 @@ def _notify_cache_miss(cache_name: str) -> None:
 # Les données qui ne changent qu'après des matchs joués (bilans, calendriers) ont des TTL longs.
 # La protection contre le burst est assurée par le mécanisme de déduplication "inflight" (_dedupe_inflight).
 def _ttu_bilan(k, v, now):
-    return now + _read_positive_int_env("FFBB_CACHE_TTL_BILAN", get_static_ttl("bilan"))
+    ttl = (
+        v.get("_ttl", get_static_ttl("bilan"))
+        if isinstance(v, dict)
+        else get_static_ttl("bilan")
+    )
+    return now + ttl
 
 
 def _ttu_poule(k, v, now):
@@ -143,6 +150,12 @@ def _ttu_poule(k, v, now):
         else get_static_ttl("poule")
     )
     return now + ttl
+
+
+def _ttu_calendrier(k, v, now):
+    return now + _read_positive_int_env(
+        "FFBB_CACHE_TTL_CALENDRIER", get_static_ttl("calendrier")
+    )
 
 
 # TTL des caches froids : le TTL est calculé une seule fois à l'initialisation (au chargement du module).
@@ -160,11 +173,9 @@ state.cache_detail = TTLCache(
     maxsize=128,
     ttl=_read_positive_int_env("FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")),
 )
-state.cache_calendrier = TTLCache(
+state.cache_calendrier = TLRUCache(
     maxsize=64,
-    ttl=_read_positive_int_env(
-        "FFBB_CACHE_TTL_CALENDRIER", get_static_ttl("calendrier")
-    ),
+    ttu=_ttu_calendrier,
 )
 state.cache_bilan = TLRUCache(maxsize=64, ttu=_ttu_bilan)
 state.cache_poule = TLRUCache(maxsize=128, ttu=_ttu_poule)
@@ -197,7 +208,9 @@ def get_cache_ttls() -> dict[str, int]:
         "lives": int(state.cache_lives.ttl) if state.cache_lives else -1,
         "search": int(state.cache_search.ttl) if state.cache_search else -1,
         "detail": int(state.cache_detail.ttl) if state.cache_detail else -1,
-        "calendrier": int(state.cache_calendrier.ttl) if state.cache_calendrier else -1,
+        "calendrier": _read_positive_int_env(
+            "FFBB_CACHE_TTL_CALENDRIER", get_static_ttl("calendrier")
+        ),
         "bilan": _read_positive_int_env(
             "FFBB_CACHE_TTL_BILAN", get_static_ttl("bilan")
         ),
@@ -222,7 +235,11 @@ async def _with_ffbb_semaphore(coro):
 
 
 def _cache_get(
-    cache: TTLCache | TLRUCache | None, key: Any, cache_name: str
+    cache: TTLCache | TLRUCache | None,
+    key: Any,
+    cache_name: str,
+    *,
+    record_miss: bool = True,
 ) -> Any | None:
     """Wrapper centralisé pour lire un cache avec metrics hit/miss.
 
@@ -238,7 +255,9 @@ def _cache_get(
     if value is not _CACHE_MISS_SENTINEL:
         _notify_cache_hit(cache_name)
         return value
-    _notify_cache_miss(cache_name)
+    if record_miss:
+        reason = "expired_or_absent" if len(cache) else "cold_start"
+        _notify_cache_miss(cache_name, reason)
     return None
 
 
@@ -480,7 +499,7 @@ async def _dedupe_inflight(
 
     async with _get_inflight_lock():
         if cache is not None:
-            cached = _cache_get(cache, cache_key, cache_name)
+            cached = _cache_get(cache, cache_key, cache_name, record_miss=False)
             if cached is not None:
                 return cached
         existing = inflight_map.get(cache_key)

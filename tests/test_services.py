@@ -4,10 +4,12 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from cachetools import TTLCache
 from ffbb_api_client_v3.models.multi_search_results import MultiSearchResult
 from ffbb_api_client_v3.models.multi_search_results_class import MultiSearchResults
 from mcp.shared.exceptions import McpError
 
+from ffbb_mcp import services
 from ffbb_mcp._state import reset_service_state
 from ffbb_mcp.services import (
     _extract_club_key_word,
@@ -1282,3 +1284,34 @@ async def test_resolve_club_and_org_mf_filtering():
             )
             assert len(resolved_f) == 1
             assert resolved_f[0]["organisme_id"] == 1
+
+
+@pytest.mark.asyncio
+async def test_dedupe_inflight_counts_one_miss(monkeypatch):
+    misses: list[str] = []
+    hits: list[str] = []
+    monkeypatch.setattr(services, "_cache_miss_hook", misses.append)
+    monkeypatch.setattr(services, "_cache_hit_hook", hits.append)
+
+    calls = 0
+
+    async def fetch():
+        nonlocal calls
+        calls += 1
+        return {"ok": True}
+
+    cache = TTLCache(maxsize=8, ttl=60)
+    inflight: dict[str, asyncio.Task] = {}
+
+    result = await services._dedupe_inflight(
+        cache=cache,
+        cache_key="k",
+        inflight_map=inflight,
+        make_coro=fetch,
+        cache_name="test",
+    )
+
+    assert result == {"ok": True}
+    assert calls == 1
+    assert misses == ["test"]
+    assert hits == []

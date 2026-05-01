@@ -23,6 +23,7 @@ _latency_count: int = 0
 # Compteurs de cache (par nom de cache)
 _cache_hits: dict[str, int] = {}
 _cache_misses: dict[str, int] = {}
+_cache_miss_reasons: dict[tuple[str, str], int] = {}
 
 # Gauge : appels FFBB en vol
 _ffbb_inflight: int = 0
@@ -73,7 +74,7 @@ def record_cache_hit(cache_name: str) -> None:
         _cache_hits[cache_name] = _cache_hits.get(cache_name, 0) + 1
 
 
-def record_cache_miss(cache_name: str) -> None:
+def record_cache_miss(cache_name: str, reason: str = "not_found") -> None:
     """Enregistre un miss de cache.
 
     À appeler uniquement depuis _cache_get (pas depuis _cache_set) pour
@@ -81,6 +82,8 @@ def record_cache_miss(cache_name: str) -> None:
     """
     with _metrics_lock:
         _cache_misses[cache_name] = _cache_misses.get(cache_name, 0) + 1
+        key = (cache_name, reason)
+        _cache_miss_reasons[key] = _cache_miss_reasons.get(key, 0) + 1
 
 
 # ---------------------------------------------------------------------------
@@ -105,6 +108,7 @@ def get_snapshot() -> dict[str, Any]:
         inflight = _ffbb_inflight
         hits = dict(_cache_hits)
         misses = dict(_cache_misses)
+        miss_reasons = dict(_cache_miss_reasons)
 
     calls = success + errors
     error_rate = errors / calls if calls > 0 else 0.0
@@ -133,6 +137,7 @@ def get_snapshot() -> dict[str, Any]:
         "api_latency_buckets": lat_buckets,
         "api_inflight_requests": inflight,
         "cache": cache_stats,
+        "cache_miss_reasons": miss_reasons,
     }
 
 
@@ -215,6 +220,18 @@ def generate_prometheus_metrics() -> str:
             *[
                 f'ffbb_cache_misses_total{{cache="{n}"}} {s["misses"]}'
                 for n, s in cache_stats.items()
+            ],
+        )
+
+    cache_miss_reasons: dict[tuple[str, str], int] = snap["cache_miss_reasons"]
+    if cache_miss_reasons:
+        lines += _prom_block(
+            "ffbb_cache_misses_by_reason_total",
+            "Misses de cache par cache et raison",
+            "counter",
+            *[
+                f'ffbb_cache_misses_by_reason_total{{cache="{cache}",reason="{reason}"}} {count}'
+                for (cache, reason), count in cache_miss_reasons.items()
             ],
         )
 

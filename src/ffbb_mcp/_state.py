@@ -32,7 +32,7 @@ class _ServiceState:
     cache_lives: TTLCache[Any, Any] | None = None
     cache_search: TTLCache[Any, Any] | None = None
     cache_detail: TTLCache[Any, Any] | None = None
-    cache_calendrier: TTLCache[Any, Any] | None = None
+    cache_calendrier: TTLCache[Any, Any] | TLRUCache[Any, Any] | None = None
     cache_bilan: TLRUCache[Any, Any] | None = None
     cache_classement: TLRUCache[Any, Any] | None = None
     cache_poule: TLRUCache[Any, Any] | None = None

@@ -68,6 +68,10 @@ def get_static_ttl(cache_name: str) -> int:
         "search": 86_400,
         "bilan": 1_800 if is_in_match_window() else 86_400,
         "classement": 1_800 if is_in_match_window() else 86_400,
-        "calendrier": 300,
+        "calendrier": 300
+        if is_in_match_window()
+        else 1_800
+        if is_post_match_cooling()
+        else 86_400,
         "poule": 15,
     }.get(cache_name, 3_600)  # fallback 1h
