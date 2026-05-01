@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
+      - name: Check version alignment
+        run: uv run python tools/check_version_alignment.py
+
       - name: Lint with ruff
         run: uv run ruff check .
 

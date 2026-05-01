@@ -26,6 +26,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Check version alignment
+        run: uv run python tools/check_version_alignment.py "${GITHUB_REF#refs/tags/}"
+
       - name: Build package
         run: uv build
 
