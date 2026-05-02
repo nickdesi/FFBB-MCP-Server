@@ -53,7 +53,7 @@ _SPACE_PATTERN = re.compile(r"\s+")
 _ARTICLE_PATTERN = re.compile(r"^[dlDL]'")
 
 _COMPILED_ALIASES = [
-    (re.compile(r"\b" + re.escape(alias) + r"\b"), official)
+    (alias, re.compile(r"\b" + re.escape(alias) + r"\b"), official)
     for alias, official in CLUB_ALIASES.items()
     if not re.search(r"\b" + re.escape(alias) + r"\b", official)
 ]
@@ -250,8 +250,10 @@ def normalize_query(query: str) -> str:
         return CLUB_ALIASES[normalized]
 
     # Replace whole words
-    for alias_pattern, official in _COMPILED_ALIASES:
-        normalized = alias_pattern.sub(official, normalized)
+    # Fast path substring check before regex sub avoids expensive engine invocation
+    for alias, alias_pattern, official in _COMPILED_ALIASES:
+        if alias in normalized:
+            normalized = alias_pattern.sub(official, normalized)
 
     # Remove excessive spaces
     normalized = _SPACE_PATTERN.sub(" ", normalized)
