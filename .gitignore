@@ -10,6 +10,7 @@ build/
 .pytest_cache/
 .ruff_cache/
 .coverage
+.jules/
 
 website-docs/node_modules/
 website/docs/
