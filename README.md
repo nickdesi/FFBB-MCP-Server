@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <em>Dernière mise à jour : 30 avril 2026 • Propulsé par <a href="https://pypi.org/project/ffbb-api-client-v3/">ffbb-api-client-v3</a></em>
+  <em>Dernière mise à jour : 30 avril 2026 • Propulsé par <a href="https://pypi.org/project/ffbb-data-client/">ffbb-data-client</a></em>
 </p>
 
 ---
@@ -94,7 +94,7 @@ Optimisé pour l’efficacité des LLM, le serveur fournit 11 outils unifiés et
 flowchart LR
     A["Agent IA\nClaude / Cursor"] -->|"Streamable HTTP\nPOST /mcp"| B("Serveur FastMCP\nffbb.desimone.fr")
     B -->|"Logique métier & cache"| C{"Services\nunifiés"}
-    C <-->|"ffbb-api-client-v3"| D[("API officielle FFBB")]
+    C <-->|"ffbb-data-client"| D[("API officielle FFBB")]
 ```
 
 - **Transport :** Streamable HTTP (spécification MCP 2025-11-25).

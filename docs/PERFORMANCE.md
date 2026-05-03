@@ -7,7 +7,7 @@ This document summarizes recent performance optimizations and explains how to ru
 - **Global concurrency limiter**: all outbound FFBB calls pass through an `asyncio.Semaphore` controlled by the `MAX_CONCURRENT_FFBB` environment variable (default: 8). This prevents thundering-herd effects and keeps the upstream API under control.
 - **Per-key inflight deduplication**: detail endpoints (`competition`, `poule`, `organisme`) and higher-level workflows (`ffbb_bilan_service`, `get_calendrier_club_service`) use an inflight map to deduplicate concurrent calls on the same key.
 - **Shared in-memory TTL caches**: `cachetools.TTLCache` instances are shared between tools and resources for popular read paths (lives, saisons, search results, details, calendrier, bilan).
-- **Lazy imports**: heavy Meilisearch-related symbols from `ffbb_api_client_v3` are imported lazily inside hot functions (`_search_generic`, `multi_search_service`) to reduce cold-start overhead.
+- **Lazy imports**: heavy Meilisearch-related symbols from `ffbb_data_client` are imported lazily inside hot functions (`_search_generic`, `multi_search_service`) to reduce cold-start overhead.
 - **Regex precompilation**: the filtering logic in `ffbb_equipes_club_service` relies on precompiled regular expressions to avoid re-compiling them on every call.
 
 ## Concurrency and batching

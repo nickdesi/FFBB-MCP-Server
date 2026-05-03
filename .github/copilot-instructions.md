@@ -2,7 +2,7 @@
 
 ## Project
 Python MCP (Model Context Protocol) server exposing French basketball federation (FFBB) data.
-Built with `mcp[cli]`, `uvicorn`, `starlette`, `cachetools`, `ffbb-api-client-v3`.
+Built with `mcp[cli]`, `uvicorn`, `starlette`, `cachetools`, `ffbb-data-client`.
 
 ## Stack
 - **Package manager**: `uv` (lockfile: `uv.lock`). Never use `pip install` directly.

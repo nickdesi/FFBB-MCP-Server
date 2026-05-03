@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 dependencies = [
     "mcp[cli]>=1.27.0",
-    "ffbb-api-client-v3>=1.7.1,<2.0.0",
+    "ffbb-data-client>=2.0.0,<3.0.0",
     "uvicorn",
     "starlette<2.0.0",
     "pydantic>=2.12.5,<3.0.0",
@@ -61,7 +61,7 @@ exclude = [
     ".venv",
     ".mypy_cache",
     ".ruff_cache",
-    "FFBBApiClientV3_Ref",
+    "ffbb-data-client_Ref",
     "external",
     "external/**",
 ]

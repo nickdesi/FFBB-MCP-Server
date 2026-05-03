@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from cachetools import TTLCache
-from ffbb_api_client_v3.models.multi_search_results import MultiSearchResult
-from ffbb_api_client_v3.models.multi_search_results_class import MultiSearchResults
+from ffbb_data_client.models.multi_search_results import MultiSearchResult
+from ffbb_data_client.models.multi_search_results_class import MultiSearchResults
 from mcp.shared.exceptions import McpError
 
 from ffbb_mcp import services
