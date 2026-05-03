@@ -132,13 +132,17 @@ def _save_acronyms_cache() -> None:
         logger.warning("Erreur sauvegarde %s: %s", _CACHE_FILE, e)
 
 
+_SKIP_WORDS: frozenset[str] = frozenset(
+    {"de", "du", "le", "la", "les", "et", "en", "des", "aux"}
+)
+
+
 def _extract_initials(name: str) -> str:
     """Extrait les initiales d'un nom officiel FFBB.
 
     Prend la première lettre de chaque mot commençant par une majuscule.
     Ignore les mots courants courts (de, du, le, la, les, d', l', et).
     """
-    skip_words = {"de", "du", "le", "la", "les", "et", "en", "des", "aux"}
     words = name.split()
     initials = []
     for w in words:
@@ -146,7 +150,7 @@ def _extract_initials(name: str) -> str:
         clean = _ARTICLE_PATTERN.sub("", w)
         if not clean:
             continue
-        if clean.lower() in skip_words:
+        if clean.lower() in _SKIP_WORDS:
             continue
         if clean[0].isupper():
             initials.append(clean[0])
