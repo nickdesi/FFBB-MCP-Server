@@ -6,6 +6,7 @@ from statistics import mean, median
 from unittest.mock import AsyncMock, MagicMock
 
 from ffbb_mcp import services
+from ffbb_mcp._state import reset_service_state
 from ffbb_mcp.services import ffbb_bilan_service, get_calendrier_club_service
 
 
@@ -96,13 +97,7 @@ async def measure(iterations: int = 100):
     services.get_client_async = AsyncMock(return_value=client)
 
     # Clear caches to measure real work
-    try:
-        services._cache_detail.clear()
-
-        services._inflight_detail.clear()
-
-    except Exception:
-        pass
+    reset_service_state()
 
     # Warmup
     await ffbb_bilan_service(organisme_id=9326, categorie="U11M1")
