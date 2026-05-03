@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <em>Dernière mise à jour : 30 avril 2026 • Propulsé par <a href="https://pypi.org/project/ffbb-data-client/">ffbb-data-client</a></em>
+  <em>Dernière mise à jour : 3 mai 2026 • Propulsé par <a href="https://pypi.org/project/ffbb-data-client/">ffbb-data-client</a></em>
 </p>
 
 ---
@@ -35,6 +35,11 @@ Il permet aux assistants IA (Claude, Gemini, Cursor) de naviguer intelligemment 
 > **Instance publique canonique :**
 > 👉 `https://ffbb.desimone.fr/mcp`
 > Tous les clients IA doivent pointer vers cette URL. Transport : **Streamable HTTP** (spécification MCP 2025-11-25).
+>
+> **Endpoints publics complémentaires :**
+> - Dashboard live : `https://ffbb.desimone.fr/dashboard`
+> - Métriques JSON : `https://ffbb.desimone.fr/metrics.json`
+> - Santé du service : `https://ffbb.desimone.fr/health`
 
 ---
 
@@ -65,26 +70,29 @@ Dans l’interface de gestion MCP de votre éditeur :
 
 ## 🛠️ Outils disponibles
 
-Optimisé pour l’efficacité des LLM, le serveur fournit 11 outils unifiés et puissants :
+Optimisé pour l’efficacité des LLM, le serveur fournit 12 outils unifiés et puissants :
 
 ### 📊 Outils prêts pour les agents IA (recommandés)
 
 | Outil | Description | Paramètres clés |
 | ----- | ----------- | --------------- |
-| ⚡ **`ffbb_bilan`** | Bilan complet d’une équipe de A à Z (toutes phases), classements et résultats en 1 seul appel. | `club_name`, `categorie`, `force_refresh` |
-| ⚡ **`ffbb_team_summary`** | Résumé idéal pour agent : bilan, phase courante, dernier résultat et prochain match. | `club_name`, `categorie` |
-| 🏀 **`ffbb_last_result`** | Score et détails du tout dernier match joué par l’équipe. | `categorie`, `club_name`, `force_refresh` |
-| 🗓️ **`ffbb_next_match`** | Détails du prochain match officiel (adversaire, date, salle). | `categorie`, `club_name`, `force_refresh` |
+| ⚡ **`ffbb_bilan`** | Bilan complet d’une équipe de A à Z (toutes phases), classements et résultats en 1 seul appel. | `club_name`, `organisme_id`, `categorie`, `force_refresh` |
+| ⚡ **`ffbb_team_summary`** | Résumé idéal pour agent : bilan, phase courante, dernier résultat et prochain match. | `club_name`, `organisme_id`, `categorie` |
+| 📈 **`ffbb_bilan_saison`** | Bilan détaillé de saison pour une équipe précise, toutes phases confondues. | `organisme_id`, `categorie`, `numero_equipe`, `force_refresh` |
+| 🏀 **`ffbb_last_result`** | Score et détails du tout dernier match joué par l’équipe. | `categorie`, `club_name`, `organisme_id`, `numero_equipe`, `force_refresh` |
+| 🗓️ **`ffbb_next_match`** | Détails du prochain match officiel (adversaire, date, salle si disponible). | `categorie`, `club_name`, `organisme_id`, `numero_equipe`, `force_refresh` |
 
-### 🔍 Exploration et données brutes
+### 🔍 Exploration, données brutes et diagnostics
 
 | Outil | Description | Paramètres clés |
 | ----- | ----------- | --------------- |
-| `ffbb_search` | Moteur de recherche global (clubs, compétitions, salles, matchs, engagements). | `query`, `type`, `limit` |
-| `ffbb_resolve_team` | Résout les informations exactes d’une équipe depuis une chaîne (ex. `U11M1`). | `club_name`, `categorie` |
-| `ffbb_get` | Accès direct aux classements et matchs complets via un identifiant technique. | `id`, `type`, `force_refresh` |
-| `ffbb_club` | Explore le calendrier complet d’un club, toutes ses équipes ou tous ses classements. | `action`, `club_name`, `force_refresh` |
+| `ffbb_search` | Moteur de recherche global (clubs, compétitions, salles, matchs, engagements, officiels, entraîneurs). | `query`, `type`, `limit`, `filter_by`, `sort` |
+| `ffbb_resolve_team` | Résout les informations exactes d’une équipe depuis une chaîne (ex. `U11M1`). | `club_name`, `organisme_id`, `categorie` |
+| `ffbb_get` | Accès direct aux ressources FFBB via un identifiant technique. | `id`, `type`, `force_refresh` |
+| `ffbb_club` | Explore le calendrier complet d’un club, toutes ses équipes ou ses classements. | `action`, `club_name`, `organisme_id`, `filtre`, `numero_equipe`, `phase`, `force_refresh` |
 | `ffbb_lives` | Récupère tous les matchs actuellement en direct en France. | *Aucun* |
+| `ffbb_saisons` | Liste les saisons FFBB disponibles, avec option saison active uniquement. | `active_only` |
+| `ffbb_version` | Retourne la version, le transport, les versions runtime et les TTL de cache. | *Aucun* |
 
 ---
 
@@ -100,6 +108,8 @@ flowchart LR
 - **Transport :** Streamable HTTP (spécification MCP 2025-11-25).
 - **Réduction du contexte :** la couche de services consolide plusieurs micro-appels FFBB en réponses JSON concises, économisant massivement les tokens des LLM.
 - **Cache multi-couche intelligent :** système de TTL dynamique adapté au calendrier (week-ends de matchs, intersaison) pour garantir une fraîcheur maximale (15 s en live) tout en optimisant les performances.
+- **Rafraîchissement live automatique :** les scores en direct sont rafraîchis automatiquement le week-end, avec cache court dédié aux jours de match.
+- **Observabilité intégrée :** dashboard live, métriques JSON et endpoint santé exposent l’état du service, l’usage du cache et les indicateurs de performance.
 - **Déduplication concurrente :** les requêtes FFBB identiques déjà en cours sont mutualisées et le cache est revérifié sous verrou pour éviter les effets de stampede sous charge parallèle.
 - **Métriques de latence précises :** les durées d’appels API utilisent des compteurs monotoniques haute résolution pour un suivi fiable des performances.
 - **CI/CD renforcé :** les workflows sont sécurisés avec des SHA de commits pour renforcer la sécurité de la chaîne d’approvisionnement.
