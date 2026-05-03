@@ -12,10 +12,15 @@ on:
   # Allow manual trigger
   workflow_dispatch:
 
+concurrency:
+  group: bump-ffbb-data-client
+  cancel-in-progress: true
+
 jobs:
   bump:
     name: Bump ffbb-data-client
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
       pull-requests: write
@@ -28,12 +33,13 @@ jobs:
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: true
+          cache-dependency-glob: uv.lock
 
       - name: Resolve current version in uv.lock
         id: current
         run: |
-          VERSION=$(grep -A1 'name = "ffbb-data-client"' uv.lock | grep 'version' | head -1 | sed 's/.*= "\(.*\)"/\1/')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          VERSION=$(uv export --frozen --no-emit-project --no-hashes | sed -n 's/^ffbb-data-client==//p' | head -1)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Run uv lock upgrade
         run: uv lock --upgrade-package ffbb-data-client
@@ -41,8 +47,8 @@ jobs:
       - name: Resolve new version in uv.lock
         id: new
         run: |
-          VERSION=$(grep -A1 'name = "ffbb-data-client"' uv.lock | grep 'version' | head -1 | sed 's/.*= "\(.*\)"/\1/')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          VERSION=$(uv export --frozen --no-emit-project --no-hashes | sed -n 's/^ffbb-data-client==//p' | head -1)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Skip if no change
         if: steps.current.outputs.version == steps.new.outputs.version
@@ -56,7 +62,7 @@ jobs:
           token: ${{ secrets.BUMP_BOT_TOKEN || github.token }}
           commit-message: "chore: bump ffbb-data-client to v${{ steps.new.outputs.version }}"
           branch: chore/bump-ffbb-client-${{ steps.new.outputs.version }}
-          title: "chore: bump ffbb-data-client ${{ steps.current.outputs.version }} → ${{ steps.new.outputs.version }}"
+          title: "chore: bump ffbb-data-client ${{ steps.current.outputs.version }} -> ${{ steps.new.outputs.version }}"
           body: |
             ## Automatic dependency bump
 
