@@ -534,7 +534,7 @@ wheels = [
 ]
 
 [[package]]
-name = "ffbb-api-client-v3"
+name = "ffbb-data-client"
 version = "1.7.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
@@ -545,9 +545,9 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "readme-renderer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4d/f5/28f996f795695469a92ebdef4d85ee5fefc09825182d80e17471374345b7/ffbb_api_client_v3-1.7.1.tar.gz", hash = "sha256:bc37e828cca6caae7e61f062c5c0db52826fe26e5a42d8003ec2f547030d3568", size = 317920 }
+sdist = { url = "https://files.pythonhosted.org/packages/4d/f5/28f996f795695469a92ebdef4d85ee5fefc09825182d80e17471374345b7/ffbb_data_client-1.7.1.tar.gz", hash = "sha256:bc37e828cca6caae7e61f062c5c0db52826fe26e5a42d8003ec2f547030d3568", size = 317920 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/68/93/8eb711ce577483cffa0e8f8a9d7bb68052c65430b233f21e1c5627a2a138/ffbb_api_client_v3-1.7.1-py3-none-any.whl", hash = "sha256:c832f483c2e63211d2dee564c57e55473a085a34a598e32f5033e1d299290bfa", size = 177796 },
+    { url = "https://files.pythonhosted.org/packages/68/93/8eb711ce577483cffa0e8f8a9d7bb68052c65430b233f21e1c5627a2a138/ffbb_data_client-1.7.1-py3-none-any.whl", hash = "sha256:c832f483c2e63211d2dee564c57e55473a085a34a598e32f5033e1d299290bfa", size = 177796 },
 ]
 
 [[package]]
@@ -556,7 +556,7 @@ version = "1.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "cachetools" },
-    { name = "ffbb-api-client-v3" },
+    { name = "ffbb-data-client" },
     { name = "mcp", extra = ["cli"] },
     { name = "pydantic" },
     { name = "starlette" },
@@ -582,7 +582,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "cachetools", specifier = ">=5.3.0" },
-    { name = "ffbb-api-client-v3", specifier = ">=1.7.1,<2.0.0" },
+    { name = "ffbb-data-client", specifier = ">=1.7.1,<2.0.0" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.27.0" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6.0" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.0" },

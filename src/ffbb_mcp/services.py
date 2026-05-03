@@ -842,7 +842,7 @@ async def _search_generic(
     )
 
     async def _fetch() -> list[dict]:
-        # Lazy import to avoid heavy ffbb_api_client_v3 initialization at
+        # Lazy import to avoid heavy ffbb_data_client initialization at
         # module import time.
 
         client = await get_client_async()
@@ -876,9 +876,9 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
     cache_key = f"multi_search:{normalized_query}:{limit}"
 
     async def _fetch() -> list[dict[str, Any]]:
-        # Lazy imports to avoid heavy ffbb_api_client_v3 initialization at
+        # Lazy imports to avoid heavy ffbb_data_client initialization at
         # module import time.
-        from ffbb_api_client_v3.config import (
+        from ffbb_data_client.config import (
             MEILISEARCH_INDEX_COMPETITIONS,
             MEILISEARCH_INDEX_ORGANISMES,
             MEILISEARCH_INDEX_PRATIQUES,
@@ -887,7 +887,7 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
             MEILISEARCH_INDEX_TERRAINS,
             MEILISEARCH_INDEX_TOURNOIS,
         )
-        from ffbb_api_client_v3.models import MultiSearchQuery
+        from ffbb_data_client.models import MultiSearchQuery
 
         client = await get_client_async()
         primary_limit = min(limit, max(2, (limit + 2) // 3))

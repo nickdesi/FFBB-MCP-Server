@@ -4,8 +4,8 @@ import os
 import time
 import traceback
 
-from ffbb_api_client_v3 import FFBBAPIClientV3, TokenManager
-from ffbb_api_client_v3.utils.cache_manager import CacheConfig, CacheManager
+from ffbb_data_client import FFBBDataClient, TokenManager
+from ffbb_data_client.utils.cache_manager import CacheConfig, CacheManager
 
 """
 Client FFBB avec gestion automatique du cycle de vie des tokens.
@@ -33,7 +33,7 @@ _CACHE_TTL_SECONDS: int = (
 class FFBBClientFactory:
     """Factory singleton pour le client FFBB avec token refresh proactif."""
 
-    _instance: FFBBAPIClientV3 | None = None
+    _instance: FFBBDataClient | None = None
     _token_created_at: float = 0.0
     # FIX: Lock initialisé à None et créé lazily au premier appel async
     # pour éviter les DeprecationWarning sur Python < 3.10 (Lock lié
@@ -49,7 +49,7 @@ class FFBBClientFactory:
         return elapsed >= _TOKEN_TTL_SECONDS
 
     @classmethod
-    def _create_client(cls) -> FFBBAPIClientV3:
+    def _create_client(cls) -> FFBBDataClient:
         """Crée une nouvelle instance du client avec des tokens frais. Synchrone."""
         logger.debug("Initialisation du client FFBB...")
         # FIX: logger.debug au lieu de logger.info — ce log se déclenche
@@ -67,7 +67,7 @@ class FFBBClientFactory:
         )
         cache_manager = CacheManager(config=cache_config)
 
-        client = FFBBAPIClientV3.create(
+        client = FFBBDataClient.create(
             api_bearer_token=tokens.api_token,
             meilisearch_bearer_token=tokens.meilisearch_token,
             cached_session=cache_manager.session,
@@ -77,7 +77,7 @@ class FFBBClientFactory:
         return client
 
     @classmethod
-    async def get_client_async(cls) -> FFBBAPIClientV3:
+    async def get_client_async(cls) -> FFBBDataClient:
         """Retourne le client FFBB en asynchrone, en le créant ou rafraîchissant si nécessaire."""
         # Première vérification rapide sans lock
         if not cls._is_token_expired():
@@ -112,6 +112,6 @@ class FFBBClientFactory:
         cls._init_lock = None
 
 
-async def get_client_async() -> FFBBAPIClientV3:
+async def get_client_async() -> FFBBDataClient:
     """Helper shortcut for FFBBClientFactory.get_client_async()."""
     return await FFBBClientFactory.get_client_async()

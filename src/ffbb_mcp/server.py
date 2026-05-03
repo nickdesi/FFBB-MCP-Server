@@ -156,7 +156,7 @@ mcp: FastMCP = FastMCP(
         "2. ffbb_club(action='calendrier', filtre='<categorie>') → calendrier complet du club, "
         "puis filtrer les rencontres non jouées."
     ),
-    dependencies=["mcp", "ffbb-api-client-v3"],
+    dependencies=["mcp", "ffbb-data-client"],
     # Streamable HTTP transport (MCP spec 2025-11-25)
     # stateless_http=True → pas de session persistante (scalabilité horizontale)
     # json_response=True  → répond en application/json (plus simple que SSE pour POST)

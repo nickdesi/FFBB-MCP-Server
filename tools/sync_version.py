@@ -18,10 +18,10 @@ def get_client_version(root_dir):
     if not lock_path.exists():
         return None
     content = lock_path.read_text("utf-8")
-    # Search for ffbb-api-client-v3 version in lockfile
-    # Pattern: [[package]]\nname = "ffbb-api-client-v3"\nversion = "X.Y.Z"
+    # Search for ffbb-data-client version in lockfile
+    # Pattern: [[package]]\nname = "ffbb-data-client"\nversion = "X.Y.Z"
     match = re.search(
-        r'\[\[package\]\]\s+name\s*=\s*"ffbb-api-client-v3"\s+version\s*=\s*"([^"]+)"',
+        r'\[\[package\]\]\s+name\s*=\s*"ffbb-data-client"\s+version\s*=\s*"([^"]+)"',
         content,
         flags=re.DOTALL,
     )
@@ -68,7 +68,7 @@ def update_readme(root_dir, version, client_version):
     # 3. Update client version if found
     if client_version:
         content = re.sub(
-            r"(Propulsé par <a href=\"https://pypi.org/project/ffbb-api-client-v3/\">ffbb-api-client-v3 v)[^\s<]+(</a>)",
+            r"(Propulsé par <a href=\"https://pypi.org/project/ffbb-data-client/\">ffbb-data-client v)[^\s<]+(</a>)",
             f"\\g<1>{client_version}\\g<2>",
             content,
         )

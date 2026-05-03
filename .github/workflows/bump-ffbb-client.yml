@@ -1,7 +1,7 @@
-name: Auto-bump ffbb-api-client-v3
+name: Auto-bump ffbb-data-client
 
 on:
-  # Triggered by a repository_dispatch from FFBBApiClientV3's publish workflow
+  # Triggered by a repository_dispatch from ffbb-data-client's publish workflow
   repository_dispatch:
     types: [ffbb-client-released]
 
@@ -14,7 +14,7 @@ on:
 
 jobs:
   bump:
-    name: Bump ffbb-api-client-v3
+    name: Bump ffbb-data-client
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -32,37 +32,37 @@ jobs:
       - name: Resolve current version in uv.lock
         id: current
         run: |
-          VERSION=$(grep -A1 'name = "ffbb-api-client-v3"' uv.lock | grep 'version' | head -1 | sed 's/.*= "\(.*\)"/\1/')
+          VERSION=$(grep -A1 'name = "ffbb-data-client"' uv.lock | grep 'version' | head -1 | sed 's/.*= "\(.*\)"/\1/')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Run uv lock upgrade
-        run: uv lock --upgrade-package ffbb-api-client-v3
+        run: uv lock --upgrade-package ffbb-data-client
 
       - name: Resolve new version in uv.lock
         id: new
         run: |
-          VERSION=$(grep -A1 'name = "ffbb-api-client-v3"' uv.lock | grep 'version' | head -1 | sed 's/.*= "\(.*\)"/\1/')
+          VERSION=$(grep -A1 'name = "ffbb-data-client"' uv.lock | grep 'version' | head -1 | sed 's/.*= "\(.*\)"/\1/')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Skip if no change
         if: steps.current.outputs.version == steps.new.outputs.version
         run: |
-          echo "ffbb-api-client-v3 already at ${{ steps.new.outputs.version }}, nothing to do."
+          echo "ffbb-data-client already at ${{ steps.new.outputs.version }}, nothing to do."
 
       - name: Create Pull Request
         if: steps.current.outputs.version != steps.new.outputs.version
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ secrets.BUMP_BOT_TOKEN || github.token }}
-          commit-message: "chore: bump ffbb-api-client-v3 to v${{ steps.new.outputs.version }}"
+          commit-message: "chore: bump ffbb-data-client to v${{ steps.new.outputs.version }}"
           branch: chore/bump-ffbb-client-${{ steps.new.outputs.version }}
-          title: "chore: bump ffbb-api-client-v3 ${{ steps.current.outputs.version }} → ${{ steps.new.outputs.version }}"
+          title: "chore: bump ffbb-data-client ${{ steps.current.outputs.version }} → ${{ steps.new.outputs.version }}"
           body: |
             ## Automatic dependency bump
 
             | Package | From | To |
             |---|---|---|
-            | `ffbb-api-client-v3` | `${{ steps.current.outputs.version }}` | `${{ steps.new.outputs.version }}` |
+            | `ffbb-data-client` | `${{ steps.current.outputs.version }}` | `${{ steps.new.outputs.version }}` |
 
             Triggered by: `${{ github.event_name }}`
 
