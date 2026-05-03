@@ -3,6 +3,7 @@ import time
 from unittest.mock import AsyncMock, MagicMock
 
 from ffbb_mcp import services
+from ffbb_mcp._state import reset_service_state
 from ffbb_mcp.services import ffbb_bilan_service, get_calendrier_club_service
 
 # Build reusable mocks similar to tests
@@ -92,13 +93,7 @@ async def workload(iterations: int = 20):
     services.get_client_async = AsyncMock(return_value=client)
     # Ensure caches and inflight maps are cleared so each call exercises
     # the full code path instead of returning cached results.
-    try:
-        services._cache_detail.clear()
-
-        services._inflight_detail.clear()
-
-    except Exception:
-        pass
+    reset_service_state()
 
     # Warmup
     await ffbb_bilan_service(organisme_id=9326, categorie="U11M1")
