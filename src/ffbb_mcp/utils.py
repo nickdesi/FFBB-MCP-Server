@@ -83,18 +83,19 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
         return ParsedCategorie(categorie=None, sexe=None, numero_equipe=None)
 
     # 1) Catégorie type Uxx
-    cat_match = _CAT_PATTERN.search(s)
+    cat_match = _CAT_PATTERN.search(s) if "U" in s else None
     categorie: str | None = None
     if cat_match:
         categorie = f"U{cat_match.group(1)}"
-    elif "SENIOR" in s or "SENIORS" in s:
+    elif "SENIOR" in s:
         categorie = "SENIOR"
 
     # 2) Sexe (M/F) — on évite de matcher le M de "U11M" si déjà capturé
+    # Fast path: verify substrings before invoking slow regex engine
     sexe: str | None = None
-    if _M_PATTERN.search(s):
+    if "M" in s and _M_PATTERN.search(s):
         sexe = "M"
-    if _F_PATTERN.search(s):
+    if "F" in s and _F_PATTERN.search(s):
         sexe = "F"
 
     # 3) Numéro d'équipe (chiffre final non lié à Uxx)
@@ -102,16 +103,23 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
     # Exemples : U11M1 → 1, U11M → None, U13F2 → 2, U11 → None
     numero_equipe: int | None = None
     # Retirer le pattern Uxx du début, puis chercher un chiffre isolé restant
-    remainder = s
-    if cat_match:
-        remainder = s[cat_match.end() :]
+    remainder = s[cat_match.end() :] if cat_match else s
+
     # Chercher un chiffre libre (pas partie de Uxx) dans le reste
-    num_match = _NUM_PATTERN.search(remainder)
-    if num_match:
-        try:
-            numero_equipe = int(num_match.group(1))
-        except ValueError:
-            numero_equipe = None
+    # Fast path: only invoke regex if there's at least one digit
+    has_digit = False
+    for char in remainder:
+        if char.isdigit():
+            has_digit = True
+            break
+
+    if has_digit:
+        num_match = _NUM_PATTERN.search(remainder)
+        if num_match:
+            try:
+                numero_equipe = int(num_match.group(1))
+            except ValueError:
+                numero_equipe = None
 
     return ParsedCategorie(categorie=categorie, sexe=sexe, numero_equipe=numero_equipe)
 
