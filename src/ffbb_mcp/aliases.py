@@ -77,6 +77,7 @@ _CACHE_DIR = Path(__file__).resolve().parent
 _CACHE_FILE = _CACHE_DIR / "acronyms_cache.json"
 _cache_lock = Lock()
 _acronyms_cache: dict[str, str] | None = None
+_acronyms_cache_upper: dict[str, str] | None = None
 
 
 def _load_acronyms_cache() -> dict[str, str]:
@@ -85,6 +86,7 @@ def _load_acronyms_cache() -> dict[str, str]:
     Si le fichier n'existe pas, l'initialise avec les valeurs par défaut.
     """
     global _acronyms_cache
+    global _acronyms_cache_upper
     if _acronyms_cache is not None:
         return _acronyms_cache
 
@@ -97,6 +99,7 @@ def _load_acronyms_cache() -> dict[str, str]:
             try:
                 data = json.loads(_CACHE_FILE.read_text(encoding="utf-8"))
                 if isinstance(data, dict):
+                    _acronyms_cache_upper = {k.upper(): v for k, v in data.items()}
                     _acronyms_cache = data
                     logger.info(
                         "Cache d'acronymes chargé: %d entrées depuis %s",
@@ -110,6 +113,7 @@ def _load_acronyms_cache() -> dict[str, str]:
                 )
 
         # Initialisation avec les valeurs par défaut
+        _acronyms_cache_upper = {k.upper(): v for k, v in _DEFAULT_ACRONYMS.items()}
         _acronyms_cache = dict(_DEFAULT_ACRONYMS)
         _save_acronyms_cache()
         logger.info(
@@ -181,13 +185,13 @@ def resolve_acronym(query: str) -> str:
     if not stripped.isalpha() or not stripped.isupper():
         return query
 
-    cache = _load_acronyms_cache()
+    _load_acronyms_cache()
 
     # Recherche case-insensitive dans le cache
-    for key, value in cache.items():
-        if key.upper() == stripped.upper():
-            logger.info("Acronyme résolu: %s → %s", stripped, value)
-            return value
+    assert _acronyms_cache_upper is not None
+    if value := _acronyms_cache_upper.get(stripped.upper()):
+        logger.info("Acronyme résolu: %s → %s", stripped, value)
+        return value
 
     return query
 
@@ -209,12 +213,15 @@ def enrich_acronym_cache(official_name: str) -> None:
     cache = _load_acronyms_cache()
 
     # Vérifier si l'acronyme existe déjà (case-insensitive)
-    existing_keys_upper = {k.upper() for k in cache}
-    if initials.upper() in existing_keys_upper:
+    # _load_acronyms_cache guarantees _acronyms_cache_upper is initialized
+    initials_upper = initials.upper()
+    assert _acronyms_cache_upper is not None
+    if initials_upper in _acronyms_cache_upper:
         return
 
     with _cache_lock:
         cache[initials] = official_name
+        _acronyms_cache_upper[initials_upper] = official_name
         _save_acronyms_cache()
         logger.info("Acronyme auto-enrichi: %s → %s", initials, official_name)
 
