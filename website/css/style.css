@@ -197,6 +197,35 @@ h1, h2, h3 {
     border-color: rgba(255, 255, 255, 0.2);
 }
 
+.btn-docs {
+    position: relative;
+    background: var(--accent-gradient);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 0 0 1px rgba(255, 87, 34, 0.35), 0 14px 34px rgba(255, 87, 34, 0.32);
+}
+
+.btn-docs:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3), 0 18px 42px rgba(255, 87, 34, 0.45);
+}
+
+.btn-docs::after {
+    content: "Recommandé";
+    position: absolute;
+    top: -12px;
+    right: -10px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: #fff;
+    color: var(--accent-red);
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.24);
+}
+
 /* Features Grid */
 .features {
     padding: var(--section-spacing) 0;
