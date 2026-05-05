@@ -99,8 +99,8 @@ def _load_acronyms_cache() -> dict[str, str]:
             try:
                 data = json.loads(_CACHE_FILE.read_text(encoding="utf-8"))
                 if isinstance(data, dict):
-                    _acronyms_cache_upper = {k.upper(): v for k, v in data.items()}
                     _acronyms_cache = data
+                    _acronyms_cache_upper = {k.upper(): v for k, v in data.items()}
                     logger.info(
                         "Cache d'acronymes chargé: %d entrées depuis %s",
                         len(data),
@@ -113,8 +113,8 @@ def _load_acronyms_cache() -> dict[str, str]:
                 )
 
         # Initialisation avec les valeurs par défaut
-        _acronyms_cache_upper = {k.upper(): v for k, v in _DEFAULT_ACRONYMS.items()}
         _acronyms_cache = dict(_DEFAULT_ACRONYMS)
+        _acronyms_cache_upper = {k.upper(): v for k, v in _DEFAULT_ACRONYMS.items()}
         _save_acronyms_cache()
         logger.info(
             "Cache d'acronymes initialisé avec %d entrées par défaut",
