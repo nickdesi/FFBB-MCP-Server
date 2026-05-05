@@ -21,7 +21,10 @@ In addition, all FFBB calls go through a `_safe_call` wrapper that applies retry
 
 ## Observability and Prometheus metrics
 
-The `/metrics` endpoint exposes Prometheus-style metrics that reflect both usage and performance.
+The `/metrics` endpoint exposes Prometheus-style metrics that reflect both usage and performance. Two companion routes are also available:
+
+- `/metrics.json` — JSON snapshot for lightweight dashboards or automation.
+- `/dashboard` — built-in HTML dashboard for manual monitoring.
 
 ### Global FFBB call metrics
 
@@ -55,16 +58,16 @@ These metrics allow you to verify that hot paths are effectively cached and to t
 
 ## Local benchmarking (fast, mock-based)
 
-1. Activate the project's virtualenv:
+Run the lightweight benchmark that measures `ffbb_bilan_service` and `get_calendrier_club_service` using internal mocks:
 
 ```bash
-source .venv/bin/activate
+uv run python tools/measure_services.py
 ```
 
-2. Run the lightweight benchmark that measures `ffbb_bilan_service` and `get_calendrier_club_service` using internal mocks:
+Windows fallback if `uv` is not available but the local virtualenv exists:
 
-```bash
-python tools/measure_services.py
+```powershell
+.\.venv\Scripts\python.exe tools\measure_services.py
 ```
 
 This script runs 100 iterations by default and prints mean/median/p95 timings. It exercises the code paths without relying on the external FFBB API.
@@ -75,7 +78,15 @@ To approximate real-world conditions, you can simulate network latency without a
 
 ```bash
 # simulate 150ms latency per API call
-SIMULATE_LATENCY_MS=150 python tools/measure_services.py
+SIMULATE_LATENCY_MS=150 uv run python tools/measure_services.py
+```
+
+PowerShell equivalent:
+
+```powershell
+$env:SIMULATE_LATENCY_MS = "150"
+uv run python tools/measure_services.py
+Remove-Item Env:SIMULATE_LATENCY_MS
 ```
 
 ## CI benchmark job (GitHub Actions)
@@ -90,7 +101,17 @@ The benchmark script supports two environment variables to enforce P95 threshold
 Example (CI job that fails if P95 > 0.5s):
 
 ```bash
-THRESHOLD_P95_BILAN=0.5 THRESHOLD_P95_CAL=0.5 python tools/measure_services.py
+THRESHOLD_P95_BILAN=0.5 THRESHOLD_P95_CAL=0.5 uv run python tools/measure_services.py
+```
+
+PowerShell equivalent:
+
+```powershell
+$env:THRESHOLD_P95_BILAN = "0.5"
+$env:THRESHOLD_P95_CAL = "0.5"
+uv run python tools/measure_services.py
+Remove-Item Env:THRESHOLD_P95_BILAN
+Remove-Item Env:THRESHOLD_P95_CAL
 ```
 
 To enable CI failure on thresholds, set the environment variables in the workflow.

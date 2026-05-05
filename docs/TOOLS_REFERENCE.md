@@ -1,13 +1,13 @@
 # 📚 Référence Complète des Outils FFBB MCP
 
-> Version courante : **1.3.0**
+> Version courante : **1.2.0**
 
 Ce document fournit une documentation technique exhaustive pour les outils exposés par le serveur FFBB MCP. Il est destiné aux développeurs et aux agents IA pour comprendre les capacités et les schémas de données du serveur.
 
 ## ✨ Nouveautés v1.0.0
 
 | # | Amélioration | Impact |
-|---|-------------|--------|
+| --- | --- | --- |
 | 1 | **`ToolAnnotations` typée** — `_READONLY_ANNOTATIONS` passe d'un `dict` brut à un objet `ToolAnnotations` Pydantic. Sémantique stricte, auto-complétée, validée par le SDK. | Tous les outils |
 | 2 | **`title=` sur tous les 12 outils** — Chaque `@mcp.tool()` expose désormais un titre lisible (ex: `"Bilan complet toutes phases"`). Affiché dans les UI de clients MCP (Claude Desktop, Cursor, Smithery…). | Tous les outils |
 | 3 | **Progression (`Context`)** — `ffbb_bilan`, `ffbb_team_summary` et `ffbb_bilan_saison` émettent des `report_progress()` aux clients supportant les progress tokens. No-op si le client ne les supporte pas. | `ffbb_bilan`, `ffbb_team_summary`, `ffbb_bilan_saison` |
@@ -19,7 +19,7 @@ Ce document fournit une documentation technique exhaustive pour les outils expos
 ## ✨ Nouveautés v0.4.1
 
 | # | Correctif | Impact |
-|---|-----------|--------|
+| --- | --- | --- |
 | 1 | **Apostrophes typographiques** — `'`, `'`, `` ` `` et `‛` sont normalisées en apostrophe ASCII avant toute recherche. Les requêtes `Jeanne d'Arc Vichy` fonctionnent maintenant même avec une apostrophe copiée depuis Word ou iOS. | `ffbb_bilan`, `ffbb_resolve_team`, `ffbb_next_match`, `ffbb_last_result`, `ffbb_search` |
 | 2 | **Équipe sans numéro explicite** — quand un club n'a qu'une seule équipe enregistrée sans `numero_equipe`, une requête `U11M1` la retrouve désormais (numéro 1 implicite). Le champ `note` de l'objet équipe retourné le signale. | `ffbb_equipes_club`, `ffbb_bilan`, `ffbb_resolve_team`, `ffbb_next_match`, `ffbb_last_result` |
 
@@ -36,7 +36,7 @@ Le serveur a été refondu pour proposer des outils polyvalents qui réduisent l
 - **Arguments** :
   - `query` (string, requis) : Le texte à rechercher (nom de club, ville, nom de compétition, etc.).
   - `type` (enum, défaut: `"all"`) : Filtre le type de résultat.
-    - `all` : Cherche partout (9 index Meilisearch).
+    - `all` : Cherche partout sur les index FFBB disponibles.
     - `competitions` : Championnats et coupes.
     - `organismes` : Clubs, comités, ligues.
     - `rencontres` : Matchs spécifiques.
@@ -44,8 +44,11 @@ Le serveur a été refondu pour proposer des outils polyvalents qui réduisent l
     - `pratiques` : Types de jeu (5x5, 3x3).
     - `terrains` : Terrains extérieurs.
     - `tournois` : Événements ponctuels.
-    - `engagements` : Engagements d'équipes dans les compétitions *(nouveau v0.4.0)*.
-    - `formations` : Formations, stages et certifications *(nouveau v0.4.0)*.
+    - `engagements` : Engagements d'équipes dans les compétitions.
+    - `formations` : Formations, stages et certifications.
+    - `officiels` : Officiels/arbitres.
+    - `entraineurs` : Entraîneurs.
+    - `communes` : Communes.
   - `limit` (integer, défaut: `20`) : Nombre maximum de résultats (1-100).
   - `filter_by` (string, optionnel) : Filtre Meilisearch natif appliqué aux résultats (ex: `codePostal = "63000"`). Permet de restreindre les résultats sur n'importe quel attribut filtrable de l'index ciblé. *(nouveau v0.4.0)*
   - `sort` (list[string], optionnel) : Tri Meilisearch natif (ex: `["libelle:asc"]`). Permet de trier les résultats par un ou plusieurs attributs triables. *(nouveau v0.4.0)*
@@ -80,10 +83,14 @@ Le serveur a été refondu pour proposer des outils polyvalents qui réduisent l
   - `id` (integer|string, requis) : L'ID technique de l'entité.
   - `type` (enum, requis) : Le type d'entité demandée.
     - `competition` : Détails, saisons disponibles et liste des poules.
-    - `poule` : **Le plus complet pour un championnat.** Contient le classement ET toutes les rencontres de la saison pour cette poule.
+    - `poule` : Détail d'une poule, avec classement et rencontres. Peut être tronqué si la poule est volumineuse.
     - `organisme` : Détails admin du club, adresse, et liste des engagements (équipes).
+    - `rencontre` : Détail d'une rencontre.
+    - `officiel` : Détail d'un officiel.
+    - `entraineur` : Détail d'un entraîneur.
+  - `force_refresh` (boolean, défaut: `false`) : Pour `type="poule"`, contourne le cache afin de récupérer les scores/données les plus fraîches.
 
-- **Note importante** : `ffbb_get(type='poule')` est la méthode la plus rapide pour obtenir à la fois les scores passés et le calendrier futur d'un groupe.
+- **Note importante** : `ffbb_get(type='poule')` est adapté aux demandes portant sur une poule complète (classement, historique, calendrier global). Pour une équipe précise, privilégie `ffbb_club(action='calendrier')`, `ffbb_last_result` ou `ffbb_next_match` afin d'éviter les réponses volumineuses ou tronquées.
 
 ---
 
@@ -98,8 +105,11 @@ Le serveur a été refondu pour proposer des outils polyvalents qui réduisent l
     - `classement` : Récupère le classement d'une poule spécifique.
   - `organisme_id` (integer, optionnel) : ID du club (préféré pour la précision).
   - `club_name` (string, optionnel) : Nom du club (utilisé si l'ID est inconnu).
-  - `filtre` (string, optionnel) : Filtre textuel pour la catégorie (ex: "U13", "Senior F", "NM1").
-  - `poule_id` (integer, requis si action=`classement`) : L'identifiant de la poule.
+  - `filtre` (string, optionnel) : Filtre textuel pour la catégorie (ex: "U13", "U11M", "Senior F", "NM1").
+  - `poule_id` (integer, requis si action=`classement` et si l'auto-résolution échoue) : L'identifiant de la poule.
+  - `numero_equipe` (integer, optionnel) : Numéro d'équipe (`1`, `2`, etc.) pour cibler une équipe précise, notamment avec `action="calendrier"`.
+  - `phase` (string, optionnel) : Nom ou numéro de phase (ex: `"Phase 3"`, `"2"`) pour auto-résoudre la bonne poule avec `action="classement"`.
+  - `force_refresh` (boolean, défaut: `false`) : Contourne le cache pour les calendriers ou classements, utile les jours de match.
 
 - **Sortie pour `action="equipes"`** : tableau d'objets avec, pour chaque équipe engagée :
   - `team_id` : identifiant stable de l'engagement (alias d'`engagement_id`).
@@ -248,7 +258,6 @@ la logique de désambiguïsation (U11M1, U13F-2, etc.).
 - `last_match` : dernier match joué (ou `null` s'il n'y en a pas).
 - `next_match` : prochain match à venir (ou `null` s'il n'y en a pas).
 - `summary` : bilan global (toutes phases) tel que calculé par `ffbb_bilan`.
-- `raw` : réponse brute complète de `ffbb_bilan_service` (pour débogage ou cas avancés).
 
 **Exemple d'appel** :
 
@@ -294,7 +303,7 @@ la logique de désambiguïsation (U11M1, U13F-2, etc.).
 
   ```jsonc
   {
-    "package_version": "1.3.0",       // version du package ffbb-mcp
+    "package_version": "1.2.0",       // version du package ffbb-mcp
     "mcp_sdk_version": "1.27.0",      // version du SDK MCP Python installé
     "python_version": "3.12.9",       // version de l'interpréteur Python
     "transport": "streamable-http",   // "streamable-http" ou "stdio"
@@ -335,28 +344,29 @@ Le serveur ne se contente pas de données brutes, il guide l'IA via des prompts 
      - `ffbb_club(action='equipes', organisme_id=ID)` → lister les équipes, catégories et `poule_id`.
      - `ffbb_get(type='poule', id=POULE_ID)` → vision complète de la poule (**classement + tous les matchs**).
 
-3. **Anti‑pattern à éviter (calendrier)**
-   - Si tu connais déjà un `poule_id`,
-     - **utilise toujours** `ffbb_get(type='poule', id=POULE_ID)` pour récupérer classement + rencontres.
-     - N’utilise `ffbb_club(action='calendrier')` **qu’en dernier recours**, lorsque tu n’as réellement aucun `poule_id` exploitable.
+3. **Calendrier, poule et derniers/prochains matchs**
+   - Pour une demande sur la **poule complète** (classement, historique et calendrier global), utilise `ffbb_get(type='poule', id=POULE_ID)`.
+   - Pour une liste de matchs **filtrée sur un club ou une équipe précise**, utilise `ffbb_club(action='calendrier', ...)` avec `organisme_id`, `filtre`, `numero_equipe` ou `phase` si nécessaire.
+   - Pour une question directe au singulier, préfère `ffbb_last_result` ou `ffbb_next_match`.
 
 4. **Données live et cache**
    - Les données FFBB sont **toujours live** côté API officielle.
-   - Ne suppose jamais l’existence d’un cache côté LLM ou côté utilisateur :
+   - Ne suppose jamais l'existence d'un cache côté LLM ou côté utilisateur :
      - pour connaître un résultat, un classement ou un calendrier à jour, tu dois **appeler les outils**.
-   - Le serveur MCP gère déjà un cache interne optimisé ; le LLM n’a pas à se préoccuper de la couche cache.
+   - Le serveur MCP gère déjà un cache interne optimisé ; le LLM n'a pas à se préoccuper de la couche cache.
 
 5. **Désambiguïsation des catégories**
    - Si l’utilisateur donne une catégorie ambiguë (ex. `"U13"` sans préciser Masculin/Féminin ni le numéro d’équipe), demande toujours des précisions :
      - Genre : `M` ou `F` (ex. `U13M`, `U13F`).
      - Numéro d’équipe lorsqu’il y en a plusieurs (`U13M-1`, `U13M-2`, etc.).
-   - Ne sélectionne pas arbitrairement une équipe en cas d’ambiguïté : priorise la demande d’informations supplémentaires.   - *(v0.4.1)* Si le club n'a qu'une seule équipe et qu'elle n'a pas de numéro en base, une requête `U11M1` la retrouve automatiquement. Le champ `note` de la réponse le confirme — pas besoin de retenter sans numéro.
+   - Ne sélectionne pas arbitrairement une équipe en cas d’ambiguïté : priorise la demande d’informations supplémentaires.
+   - Si le club n'a qu'une seule équipe et qu'elle n'a pas de numéro en base, une requête `U11M1` peut la retrouver automatiquement comme équipe 1 implicite.
 
 6. **Noms de clubs avec apostrophe**
-   - *(v0.4.1)* Les apostrophes typographiques (copiées depuis iOS, Word, etc.) sont
-     transparentes : `Jeanne d’Arc` et `Jeanne d'Arc` produisent le même résultat.
+   - Les apostrophes typographiques (copiées depuis iOS, Word, etc.) sont transparentes : `Jeanne d’Arc` et `Jeanne d'Arc` produisent le même résultat.
    - Aucune action côté agent requise.
-6. **Répétition d’appels**
+
+7. **Répétition d’appels**
    - Répéter un même appel d’outil avec les mêmes paramètres est acceptable :
      - les résultats de recherche, bilans et détails sont mis en cache côté serveur MCP pour optimiser les performances.
    - Inutile d’essayer d’optimiser les appels côté LLM en réutilisant "de mémoire" des résultats potentiellement obsolètes.
@@ -399,7 +409,6 @@ uv run python tools/measure_services.py
 
 Si l'un des P95 dépasse le seuil, le script affiche un message d'erreur explicite
 et sort avec `exit 1`, ce qui permet de faire échouer le job CI.
-
 
 ## 🔐 Sécurité, validation & garde-fous
 
@@ -445,6 +454,7 @@ Deux nouveaux outils sont disponibles pour interroger facilement les résultats 
 **Description** : Dernier résultat joué d'une équipe d'un club.
 
 Permet d'obtenir en un seul appel :
+
 - la date et la journée du dernier match joué,
 - les équipes domicile / extérieur,
 - les scores,

@@ -1,5 +1,6 @@
-# Règles FFBB – Résolution d'équipe, navigation multi-phases et cas limites
-## Validé contre MCP FFBB v0.2.0
+# 🏀 Règles métier FFBB MCP
+
+> Validé contre MCP FFBB v1.2.0
 
 ---
 
@@ -44,9 +45,7 @@ Si l'utilisateur demande un score "maintenant" ou "en ce moment" :
   laisser `ffbb_next_match` / `ffbb_resolve_team` résoudre automatiquement.
 - Si `status: "ambiguous"` → présenter les candidats à l'utilisateur
   et attendre confirmation avant de continuer.
-- `ffbb_resolve_team` sert UNIQUEMENT à résoudre un organisme_id.
-  Il ne reconnaît PAS les labels "U11M1", "U13M2" → retourne `not_found`.
-  Ne JAMAIS l'utiliser pour distinguer équipe 1 vs équipe 2.
+- `ffbb_resolve_team` aide à distinguer les équipes 1/2, les catégories proches et les phases disponibles lorsque la requête utilisateur est ambiguë.
 - Mémoriser l'`organisme_id` résolu pour tous les appels suivants.
 
 ---
@@ -252,4 +251,3 @@ Lors de la résolution d'un club par son nom (ex: "Stade Clermontois"), le syst�
 3. **Exception** : Si l'utilisateur fournit le nom complet (ex: "Stade Clermontois Basket Féminin"), ce choix est respecté sans application de la logique M/F.
 4. **Persistance** : Une fois l'organisme résolu, son `organisme_id` est réutilisé pour tous les appels suivants tant que le genre reste cohérent.
 5. **Transparence en cas d'échec** : Si aucun engagement n'est trouvé après application de cette branche, le système doit lister tous les organismes considérés (en précisant ceux marqués "Féminin") pour validation manuelle.
-```

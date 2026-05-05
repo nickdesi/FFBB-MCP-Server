@@ -119,10 +119,14 @@ Ce document fournit des exemples de bout en bout pour aider les agents IA à sui
 
 ---
 
-## 5. Notes générales pour les agents IA
+## 5. Notes générales pour les agents
 
-- Toujours privilégier les **outils unifiés** (`ffbb_bilan`, `ffbb_search`, `ffbb_get`, `ffbb_club`, `ffbb_lives`, `ffbb_saisons`) plutôt qu'une combinaison ad hoc d'appels bas niveau.
-- Garder en tête que les données FFBB sont **live** :
-  - appeler les outils dès que des informations fraîches (score, classement, calendrier) sont nécessaires ;
-  - ne pas s'appuyer sur des suppositions ou sur des informations mémorisées dans la conversation.
-- Répéter un appel avec les mêmes paramètres est acceptable : le serveur MCP applique un cache interne pour limiter la charge sur l'API officielle FFBB.
+- Utiliser `ffbb_search(type="organismes")` pour lever une ambiguïté de club, puis réutiliser l'`organisme_id`.
+- Utiliser `ffbb_club(action="equipes")` pour lister les engagements, phases et `poule_id` disponibles d'un club.
+- Utiliser `ffbb_resolve_team` quand la catégorie ou le numéro d'équipe est ambigu (`U11M`, `U13F2`, etc.).
+- Utiliser `ffbb_team_summary` pour obtenir en un appel un résumé équipe + dernier/prochain match + bilan.
+- Utiliser `ffbb_bilan` ou `ffbb_bilan_saison` pour un bilan complet de saison.
+- Utiliser `ffbb_get(type="poule")` pour une demande sur la poule complète : classement, historique et calendrier global.
+- Utiliser `ffbb_club(action="calendrier")` pour une liste de matchs filtrée club/équipe/catégorie avec `is_last_match` et `is_next_match`.
+- Utiliser `ffbb_last_result` et `ffbb_next_match` pour les questions directes au singulier : “dernier résultat” ou “prochain match”.
+- Demander une précision à l'utilisateur si plusieurs clubs, équipes, phases ou poules correspondent.
