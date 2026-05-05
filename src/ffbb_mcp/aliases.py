@@ -188,7 +188,8 @@ def resolve_acronym(query: str) -> str:
     _load_acronyms_cache()
 
     # Recherche case-insensitive dans le cache
-    if value := _acronyms_cache_upper.get(stripped.upper()):  # type: ignore
+    assert _acronyms_cache_upper is not None
+    if value := _acronyms_cache_upper.get(stripped.upper()):
         logger.info("Acronyme résolu: %s → %s", stripped, value)
         return value
 
@@ -214,12 +215,13 @@ def enrich_acronym_cache(official_name: str) -> None:
     # Vérifier si l'acronyme existe déjà (case-insensitive)
     # _load_acronyms_cache guarantees _acronyms_cache_upper is initialized
     initials_upper = initials.upper()
-    if initials_upper in _acronyms_cache_upper:  # type: ignore
+    assert _acronyms_cache_upper is not None
+    if initials_upper in _acronyms_cache_upper:
         return
 
     with _cache_lock:
         cache[initials] = official_name
-        _acronyms_cache_upper[initials_upper] = official_name  # type: ignore
+        _acronyms_cache_upper[initials_upper] = official_name
         _save_acronyms_cache()
         logger.info("Acronyme auto-enrichi: %s → %s", initials, official_name)
 
