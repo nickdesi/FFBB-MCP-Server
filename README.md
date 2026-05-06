@@ -10,6 +10,7 @@
   Statistiques officielles FFBB, calendriers, classements et scores en direct, optimisés pour les LLM via le Model Context Protocol (MCP).
   <br /><br />
   🌐 <b><a href="https://ffbb.desimone.fr">Visiter la page d’accueil</a></b>
+  · 🧩 <b><a href="https://github.com/nickdesi/FFBB-MCP-Server/releases/latest">Installer l’extension VS Code</a></b>
 </p>
 
 <p align="center">
@@ -47,6 +48,19 @@ Il permet aux assistants IA (Claude, Gemini, Cursor) de naviguer intelligemment 
 
 L’URL de l’instance publique est prête à l’emploi. Voici comment l’intégrer :
 
+### ⭐ Installation la plus simple : extension VS Code
+
+Pour VS Code et GitHub Copilot en mode agent, le plus rapide est d’installer l’extension **FFBB Basketball MCP** depuis la dernière release GitHub :
+
+1. Téléchargez le fichier `.vsix` depuis les [releases](https://github.com/nickdesi/FFBB-MCP-Server/releases/latest).
+2. Dans VS Code : `Extensions` → `...` → `Install from VSIX...`.
+3. Ouvrez Copilot Chat en **Agent mode** : les outils FFBB sont disponibles automatiquement.
+
+L’extension configure directement le serveur public `https://ffbb.desimone.fr/mcp`. Aucun fichier JSON à modifier.
+
+> Alternative sans extension : cliquez sur ce lien depuis VS Code pour ajouter le serveur MCP distant :
+> [Installer FFBB MCP](vscode:mcp/install?%7B%22name%22%3A%22ffbb-mcp%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fffbb.desimone.fr%2Fmcp%22%7D)
+
 ### Claude Desktop
 Ajoutez ceci dans votre fichier `claude_desktop_config.json` :
 
@@ -60,11 +74,13 @@ Ajoutez ceci dans votre fichier `claude_desktop_config.json` :
 }
 ```
 
-### Cursor / VS Code (extension MCP)
+### Cursor / VS Code (configuration manuelle)
 Dans l’interface de gestion MCP de votre éditeur :
 
 1. Type : `Streamable HTTP`
 2. URL : `https://ffbb.desimone.fr/mcp`
+
+Pour VS Code, préférez l’extension quand c’est possible : elle évite toute configuration manuelle.
 
 ---
 

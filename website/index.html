@@ -7,8 +7,8 @@
     <meta name="google-site-verification" content="TuCtfpsMfaMi13jU8fbz5LFA1vxzqeLZMHc74ulWRig" />
     <title>FFBB MCP Server - Basketball Data for AI Agents</title>
     <meta name="description"
-        content="Accédez aux données officielles du basketball français (FFBB) directement dans vos agents IA. Bilan, résultats, classements et calendrier live.">
-    <meta name="keywords" content="FFBB, Basketball, MCP Server, Claude, Cursor, AI, Basket France, API Basketball">
+        content="Accédez aux données officielles du basketball français (FFBB) directement dans vos agents IA. Extension VS Code facile à installer, bilan, résultats, classements et calendrier live.">
+    <meta name="keywords" content="FFBB, Basketball, MCP Server, extension VS Code, GitHub Copilot, Claude, Cursor, AI, Basket France, API Basketball">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://ffbb.desimone.fr/" />
     <meta name="theme-color" content="#0a0a0a">
@@ -43,7 +43,7 @@
                 "image": "https://ffbb.desimone.fr/logo.webp",
                 "softwareVersion": "1.2.0",
                 "datePublished": "2025-01-01T00:00:00Z",
-                "dateModified": "2026-04-30T11:32:20Z",
+                "dateModified": "2026-05-06T00:00:00Z",
                 "author": {
                     "@type": "Person",
                     "name": "Nicolas De Simone",
@@ -62,26 +62,26 @@
                 "mainEntity": [
                     {
                         "@type": "Question",
-                        "name": "Comment interroger l'API FFBB avec Claude ou cursor ?",
+                        "name": "Comment interroger l'API FFBB avec l'IA ?",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "Il suffit de configurer FFBB MCP Server dans votre client IA avec le type HTTP Streamable et l'URL https://ffbb.desimone.fr/mcp. Votre agent saura ensuite automatiquement quels outils utiliser pour chercher un club, récupérer un calendrier ou un classement."
+                            "text": "Le plus simple avec VS Code est d'installer l'extension FFBB Basketball MCP depuis la dernière release GitHub. Elle configure automatiquement le serveur public https://ffbb.desimone.fr/mcp pour GitHub Copilot en mode agent. Sinon, configurez votre client IA avec le type HTTP Streamable et cette même URL."
                         }
                     },
                     {
                         "@type": "Question",
-                        "name": "Mon club de basket est introuvable, pourquoi ?",
+                        "name": "Mon club de basket est introuvable, que faire ?",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "Utilisez le nom précis (ex: Vichy) et l'outil ffbb_search. Le serveur MCP supporte la tolérance aux erreurs et résout automatiquement les IDs."
+                            "text": "Si l'agent échoue avec un nom générique, utilisez un mot-clé précis (ex: \"Vichy\"). L'outil ffbb_search est tolérant aux fautes de frappe et aux cas complexes, incluant les noms avec des apostrophes (ex: \"Jeanne d'Arc\") ou les équipes uniques sans numéro apparent impliqué (ex: \"U11M\" devient automatiquement \"U11M1\")."
                         }
                     },
                     {
                         "@type": "Question",
-                        "name": "Les scores et données FFBB sont-ils en temps réel ?",
+                        "name": "Les données et scores sont-ils en temps réel ?",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "Oui, le cache est dynamique et se rafraîchit en temps réel (15 secondes) pendant les fenêtres de matchs (LIVE) et jusqu'à 24h hors saison pour économiser la bande passante."
+                            "text": "Totalement. Une stratégie de cache dynamique est implémentée pour garantir une fraîcheur maximale (<strong>15 secondes de TTL</strong>) lors des périodes de matchs Live, garantissant des scores de basket en temps réel, tout en préservant l'API officielle hors saison."
                         }
                     }
                 ]
@@ -105,6 +105,7 @@
             <img src="logo.webp" alt="Logo FFBB MCP Server" class="hero-logo" width="120" height="120">
             <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 1.5rem;">
                 <div class="badge">V1.2.0 Stable</div>
+                <div class="badge">Extension VS Code facile</div>
                 <div class="badge">Disponible sur Smithery</div>
             </div>
             <h1 class="hero-title">Le basketball français dans votre <span class="accent-text">IA générative</span></h1>
@@ -121,11 +122,14 @@
                     </svg>
                     GitHub
                 </a>
-                <a href="/docs/" class="btn btn-docs" aria-label="Ouvrir la documentation FFBB MCP">
-                    <span aria-hidden="true">📚</span>
-                    Lire la documentation
+                <a href="https://github.com/nickdesi/FFBB-MCP-Server/releases/latest" class="btn btn-docs" aria-label="Installer l’extension VS Code FFBB Basketball MCP">
+                    <span aria-hidden="true">🧩</span>
+                    Installer l’extension VS Code
                 </a>
-                <a href="/dashboard" class="btn btn-secondary">Dashboard Live</a>
+                <a href="/docs/" class="btn btn-secondary" aria-label="Ouvrir la documentation FFBB MCP">
+                    <span aria-hidden="true">📚</span>
+                    Documentation
+                </a>
             </div>
         </header>
 
@@ -205,7 +209,9 @@
 
             <!-- Tabs -->
             <div class="tab-container" role="tablist" aria-label="Méthodes d'installation">
-                <button class="tab-btn tab-active" role="tab" aria-selected="true" aria-controls="tab-claude"
+                <button class="tab-btn tab-active" role="tab" aria-selected="true" aria-controls="tab-vscode"
+                    id="btn-vscode" onclick="switchTab(event, 'tab-vscode')" data-tab="tab-vscode">Extension VS Code</button>
+                <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-claude"
                     id="btn-claude" onclick="switchTab(event, 'tab-claude')" data-tab="tab-claude">Claude
                     Desktop</button>
                 <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-smithery" id="btn-smithery"
@@ -214,8 +220,23 @@
                     onclick="switchTab(event, 'tab-cursor')" data-tab="tab-cursor">Cursor / VS Code</button>
             </div>
 
+            <!-- Tab: Extension VS Code -->
+            <div class="tab-panel" id="tab-vscode" role="tabpanel" aria-labelledby="btn-vscode">
+                <div class="install-card">
+                    <div>
+                        <div class="install-kicker">Recommandé pour GitHub Copilot</div>
+                        <h3>Installez FFBB Basketball MCP en quelques clics</h3>
+                        <p>Téléchargez le fichier <code>.vsix</code> depuis la dernière release, puis installez-le dans VS Code via <strong>Extensions → … → Install from VSIX…</strong>. Le serveur public FFBB est configuré automatiquement pour le mode agent.</p>
+                    </div>
+                    <div class="install-actions">
+                        <a class="btn btn-docs" href="https://github.com/nickdesi/FFBB-MCP-Server/releases/latest">Télécharger l’extension</a>
+                        <a class="btn btn-secondary" href="vscode:mcp/install?%7B%22name%22%3A%22ffbb-mcp%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fffbb.desimone.fr%2Fmcp%22%7D">Installer sans extension</a>
+                    </div>
+                </div>
+            </div>
+
             <!-- Tab: Claude Desktop -->
-            <div class="tab-panel" id="tab-claude" role="tabpanel" aria-labelledby="btn-claude">
+            <div class="tab-panel tab-panel-hidden" id="tab-claude" role="tabpanel" aria-labelledby="btn-claude">
                 <div class="code-terminal">
                     <div class="terminal-header" aria-hidden="true">
                         <div class="dot dot-red"></div>
@@ -282,7 +303,7 @@ npx -y @smithery/cli@latest install @nickdesi/mcpffbb \
         <section id="faq" class="features" style="margin-top: 4rem;">
             <div class="section-label">
                 <div class="badge">Questions fréquentes</div>
-                <h2 class="section-title">FAQ : API FFBB & Intégration IA</h2>
+                <h2 class="section-title">FAQ : API FFBB, extension VS Code & Intégration IA</h2>
                 <p class="section-subtitle">Les réponses aux questions les plus courantes sur le serveur et la data.</p>
             </div>
             <div class="features-grid"
@@ -290,10 +311,7 @@ npx -y @smithery/cli@latest install @nickdesi/mcpffbb \
                 <article class="feature-card" style="text-align: left; padding: 1.5rem;">
                     <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Comment interroger l'API FFBB avec l'IA ?
                     </h3>
-                    <p>Il suffit de configurer <strong>FFBB MCP Server</strong> dans votre client (Claude, Cursor, etc.)
-                        avec l'URL <code>https://ffbb.desimone.fr/mcp</code>. L'agent utilisera automatiquement
-                        l'intelligence métier intégrée pour comprendre les catégories, rechercher les clubs et récupérer
-                        les plannings et classements sans effort supplémentaire.</p>
+                    <p>Avec VS Code, installez simplement l’extension <strong>FFBB Basketball MCP</strong> depuis la dernière release GitHub : elle configure automatiquement <code>https://ffbb.desimone.fr/mcp</code> pour GitHub Copilot en mode agent. Pour Claude, Cursor ou un autre client MCP, utilisez la configuration HTTP Streamable avec la même URL.</p>
                 </article>
                 <article class="feature-card" style="text-align: left; padding: 1.5rem;">
                     <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Mon club de basket est introuvable, que faire
@@ -317,7 +335,7 @@ npx -y @smithery/cli@latest install @nickdesi/mcpffbb \
         <footer class="site-footer">
             <p>&copy; 2026 Nicolas De Simone — Développeur écosystème de données FFBB</p>
             <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;">
-                Dernière mise à jour du contenu : 30 Avril 2026 <span aria-hidden="true">•</span>
+                Dernière mise à jour du contenu : 6 Mai 2026 <span aria-hidden="true">•</span>
                 Propulsé par la logique métier de <a href="https://pypi.org/project/ffbb-data-client/" target="_blank"
                     rel="noopener" style="color: inherit; text-decoration: underline;">ffbb-data-client sur PyPI</a>
             </p>

@@ -391,6 +391,41 @@ h1, h2, h3 {
     width: fit-content;
     margin: 0 auto 24px;
 }
+
+.install-card {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 32px;
+    align-items: center;
+    background: linear-gradient(135deg, rgba(255, 87, 34, 0.14), rgba(255, 255, 255, 0.04));
+    border: 1px solid rgba(255, 87, 34, 0.28);
+    border-radius: 18px;
+    padding: 32px;
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.36);
+}
+.install-card h3 {
+    font-size: 1.8rem;
+    margin-bottom: 12px;
+}
+.install-card p {
+    color: var(--text-secondary);
+    max-width: 680px;
+}
+.install-kicker {
+    color: var(--accent-orange);
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+.install-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 230px;
+}
+
 .tab-btn {
     padding: 10px 20px;
     border-radius: 8px;
@@ -467,6 +502,8 @@ h1, h2, h3 {
     .stats-bar { flex-direction: row; }
     .tab-container { width: 100%; }
     .tab-btn { flex: 1; text-align: center; }
+    .install-card { grid-template-columns: 1fr; }
+    .install-actions { min-width: 0; }
 }
 
 /* Reduced motion: disable all animations */
