@@ -14,6 +14,8 @@ build/
 
 website-docs/node_modules/
 website/docs/
+vscode-extension/node_modules/
+vscode-extension/*.vsix
 
 reproduce_issue.py
 http_cache.db
