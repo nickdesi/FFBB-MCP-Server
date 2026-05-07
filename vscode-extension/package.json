@@ -2,7 +2,7 @@
   "name": "ffbb-basketball-mcp",
   "displayName": "FFBB Basketball MCP",
   "description": "MCP server for French Basketball Federation (FFBB) — scores, standings, calendars and live data for AI agents.",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "publisher": "nickdesi",
   "icon": "assets/icon.png",
   "license": "MIT",
@@ -43,7 +43,7 @@
     "mcpServerDefinitionProviders": [
       {
         "id": "ffbb-mcp",
-        "label": "FFBB Basketball MCP Server"
+        "label": "FFBB"
       }
     ]
   },

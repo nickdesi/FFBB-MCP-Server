@@ -617,7 +617,6 @@ _PROMPTS = [
     bilan_equipe,
     scores_live,
     calendrier_equipe,
-    zipai_protocol,
 ]
 
 # __all__ généré dynamiquement depuis _PROMPTS → jamais de désynchronisation
