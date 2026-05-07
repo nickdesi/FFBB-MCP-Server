@@ -267,6 +267,24 @@ class TestFormatPouleResponse:
         assert len(result["rencontres"]) == 3
         assert "warning" in result["rencontres"][-1]
 
+    def test_truncation_invalid_env_falls_back(self, monkeypatch):
+        monkeypatch.setenv("FFBB_MAX_CALENDAR_MATCHES", "abc")
+        poule_data = {
+            "id": 1,
+            "libelle": "Poule",
+            "classements": [],
+            "rencontres": [
+                {
+                    "idEngagementEquipe1": {},
+                    "idEngagementEquipe2": {},
+                    "nomEquipe1": "A",
+                    "nomEquipe2": "B",
+                }
+            ],
+        }
+        result = format_poule_response(poule_data)
+        assert result["rencontres"][0]["nomEquipe1"] == "A"
+
     def test_no_logo(self):
         poule_data = {
             "id": 1,

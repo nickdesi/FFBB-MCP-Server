@@ -697,7 +697,7 @@ def format_poule_response(poule_data: dict) -> dict[str, Any]:
         "rencontres": formatted_rencontres,
     }
     if formatted_rencontres:
-        max_limit = int(os.environ.get("FFBB_MAX_CALENDAR_MATCHES", "300"))
+        max_limit = _read_positive_int_env("FFBB_MAX_CALENDAR_MATCHES", 300)
         total_matches = len(formatted_rencontres)
         if total_matches > max_limit:
             truncated_rencontres = formatted_rencontres[:max_limit]
