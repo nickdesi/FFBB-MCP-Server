@@ -33,6 +33,13 @@
   "main": "./out/extension.js",
   "activationEvents": [],
   "contributes": {
+    "commands": [
+      {
+        "command": "ffbbMcp.installServer",
+        "title": "FFBB MCP: Install Server",
+        "category": "FFBB Basketball"
+      }
+    ],
     "mcpServerDefinitionProviders": [
       {
         "id": "ffbb-mcp",
@@ -44,6 +51,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "check": "npm run compile && npm run package:ls",
     "package": "vsce package --no-dependencies",
     "package:ls": "vsce ls --tree --no-dependencies"
   },

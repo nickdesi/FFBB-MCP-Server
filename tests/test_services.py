@@ -242,6 +242,9 @@ class TestBilanService:
         mock_client.search_organismes_async = AsyncMock(return_value=MagicMock(hits=[]))
         result = await ffbb_bilan_service(club_name="Inconnu", categorie="U11M1")
         assert "error" in result
+        assert "suggestion" in result
+        assert result["next_call"] == "ffbb_search(type='organismes', query='Inconnu')"
+        assert result["_meta"]["cache"] == "bilan"
 
     @pytest.mark.asyncio
     async def test_error_when_no_equipes(self, patch_get_client, mock_client):
@@ -249,6 +252,9 @@ class TestBilanService:
         mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
         result = await ffbb_bilan_service(organisme_id=9326, categorie="U17F1")
         assert "error" in result
+        assert "suggestion" in result
+        assert result["next_call"] == "ffbb_club(action='equipes', organisme_id=9326)"
+        assert result["_meta"]["cache"] == "bilan"
 
     @pytest.mark.asyncio
     async def test_aggregates_two_phases(self, patch_get_client, mock_client):

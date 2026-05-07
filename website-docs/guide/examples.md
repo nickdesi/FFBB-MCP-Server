@@ -119,7 +119,43 @@ Ce document fournit des exemples de bout en bout pour aider les agents IA à sui
 
 ---
 
-## 5. Notes générales pour les agents
+## 5. Recettes utilisateur
+
+### Parent — “Quand et où joue l’équipe ?”
+
+- Question typique : “C’est quand le prochain match des U13M1 ?”
+- Outil recommandé : `ffbb_next_match`.
+- Si la catégorie est incomplète (`U13M` sans numéro), appeler d’abord `ffbb_resolve_team`.
+- Réponse attendue : date, heure, salle, domicile/extérieur, adversaire.
+
+### Coach — “Quels matchs restent à jouer ?”
+
+- Question typique : “Combien de matchs restent aux U15F ?”
+- Outil obligatoire : `ffbb_club(action="calendrier")`.
+- Filtrer côté agent : `played == false`, puis trier par date croissante.
+- Ne pas utiliser `ffbb_next_match`, qui ne retourne qu’une seule échéance.
+
+### Journaliste — “Bilan et dynamique d’une équipe”
+
+- Question typique : “Quel est le bilan des U18M1 cette saison ?”
+- Outil recommandé : `ffbb_team_summary` pour une synthèse rapide, ou `ffbb_bilan` pour le détail toutes phases.
+- Réponse attendue : bilan total, phase courante, dernier résultat, prochain match.
+
+### Club / administrateur — “Programme d’une catégorie”
+
+- Question typique : “Donne le programme U11 du club ce week-end.”
+- Workflow : résoudre le club une fois avec `ffbb_search(type="organismes")`, mémoriser l’`organisme_id` dans la conversation, puis appeler `ffbb_club(action="calendrier", filtre="U11")`.
+- Réponse attendue : liste compacte par équipe, horaire et lieu.
+
+### Développeur agent — “Éviter les mauvaises hypothèses”
+
+- Si une catégorie est ambiguë (`U13`, `U13M`) : appeler `ffbb_resolve_team`.
+- Si la demande est au pluriel : appeler `ffbb_club(action="calendrier")`.
+- Si l’utilisateur donne un nom plutôt qu’un ID : résoudre avec `ffbb_search`, puis réutiliser l’`organisme_id`.
+
+---
+
+## 6. Notes générales pour les agents
 
 - Utiliser `ffbb_search(type="organismes")` pour lever une ambiguïté de club, puis réutiliser l'`organisme_id`.
 - Utiliser `ffbb_club(action="equipes")` pour lister les engagements, phases et `poule_id` disponibles d'un club.

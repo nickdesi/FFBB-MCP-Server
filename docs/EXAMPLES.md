@@ -33,7 +33,7 @@ Ce document fournit des exemples de bout en bout pour aider les agents IA à sui
 
 ---
 
-## 2. Calendrier complet d'une équipe via poule (`ffbb_search` → `ffbb_club` → `ffbb_get`)
+## 2. Calendrier complet d'une équipe via `ffbb_club(action="calendrier")`
 
 **Question utilisateur**  
 > "Montre moi le calendrier complet des U11F de Limoges."
@@ -41,33 +41,25 @@ Ce document fournit des exemples de bout en bout pour aider les agents IA à sui
 **Workflow attendu**
 
 1. Désambiguïsation éventuelle :
-   - Si le club n'est pas unique (plusieurs clubs "Limoges"), l'agent peut demander de préciser ou choisir le plus probable en expliquant.
-   - Vérifier le genre `F` et le niveau (U11F-1, U11F-2, etc.). Si le numéro d'équipe manque, demander.
+   - Si le club n'est pas unique (plusieurs clubs "Limoges"), résoudre via `ffbb_search(type='organismes')`.
+   - Vérifier le genre `F` et le niveau (U11F-1, U11F-2, etc.). Si le numéro d'équipe manque et que plusieurs équipes existent, utiliser `ffbb_resolve_team` ou demander.
 
 2. Trouver le club (organisme) :
 
    - `ffbb_search(type='organismes', query="Limoges")` → récupère un ou plusieurs `organisme_id`.
 
-3. Lister les équipes du club :
+3. Récupérer le calendrier exhaustif filtré :
 
-   - `ffbb_club(action='equipes', organisme_id=ORGANISME_ID)` → liste des équipes (catégories, genres, numéros d'équipe, poule_id, etc.).
+   - `ffbb_club(action='calendrier', organisme_id=ORGANISME_ID, filtre="U11F", numero_equipe=1)`
 
-4. Identifier la bonne équipe :
-   - Filtrer les équipes U11F.
-   - Si plusieurs équipes U11F existent (`U11F-1`, `U11F-2`), utiliser les règles du prompt (prioriser l'équipe 1 ou demander à l'utilisateur de choisir).
-   - Récupérer le `poule_id` correspondant.
-
-5. Récupérer le calendrier complet via la poule :
-
-   - `ffbb_get(type='poule', id=POULE_ID)`
-   - Cet appel fournit **à la fois le classement et toutes les rencontres** de la poule.
-
-6. Construire la réponse :
+4. Construire la réponse :
    - Lister les matchs (date, heure, domicile/extérieur, adversaire, score si joué).
-   - Optionnel : rappeler la position actuelle de l'équipe dans le classement de la poule.
+   - Pour des **matchs restants**, garder uniquement `played == false`, puis trier par date croissante.
+   - Si la réponse contient une métadonnée `_meta.generated_at`, l'utiliser pour qualifier la fraîcheur des données si utile.
 
-7. **Anti‑pattern à éviter** :
-   - Ne pas appeler `ffbb_club(action='calendrier')` tant que le `poule_id` est connu : utiliser `ffbb_get(type='poule')` qui est plus complet et plus précis.
+5. **Anti-pattern à éviter** :
+   - Ne pas appeler `ffbb_next_match` pour une demande au pluriel ou un calendrier complet.
+   - Ne pas s'appuyer uniquement sur `ffbb_get(type='poule')` pour des matchs restants : la poule peut être tronquée.
 
 ---
 
@@ -104,22 +96,47 @@ Ce document fournit des exemples de bout en bout pour aider les agents IA à sui
 1. Trouver le club (organisme) :
    - `ffbb_search(type='organismes', query="Stade Clermontois")` → récupérer l'`organisme_id`.
 
-2. Récupérer un calendrier court pour la catégorie ciblée :
-   - `ffbb_club(action="calendrier", organisme_id=<ID>, filtre="U11M")`
-   - La réponse contient une liste de matchs avec, pour chacun : `played`, `is_last_match`, `is_next_match`, `score_equipe1`, `score_equipe2`, etc.
+2. Résoudre l'équipe si nécessaire :
+   - `ffbb_resolve_team(organisme_id=<ID>, categorie="U11M")` si plusieurs équipes U11M peuvent exister.
 
-3. Identifier le dernier match joué :
-   - filtrer le tableau sur `is_last_match == true` ;
-   - retourner ce match et son score pour répondre à la question.
+3. Appeler l'outil singulier :
+   - `ffbb_last_result(organisme_id=<ID>, categorie="U11M", numero_equipe=1)`
 
-4. Explication importante :
-   - ne pas utiliser `ffbb_get(type='poule')` dans ce cas, car la poule contient souvent ~100 matchs et la réponse est tronquée côté MCP ;
-   - le dernier match du club pourrait se trouver dans la partie tronquée ;
-   - réserver `ffbb_get(type='poule')` aux cas où l'utilisateur demande explicitement le **classement complet** ou l'**historique entier** de la poule.
+4. Répondre avec le tableau domicile/extérieur et le score.
+
+5. Explication importante :
+   - `ffbb_last_result` est le bon outil pour un **dernier match** au singulier ;
+   - utiliser `ffbb_club(action="calendrier")` seulement si l'utilisateur demande plusieurs résultats ou le calendrier.
 
 ---
 
-## 5. Notes générales pour les agents
+## 5. Matchs restants d'une équipe
+
+**Question utilisateur**
+> "Combien de matchs restent-ils aux U13M1 du Stade Clermontois ?"
+
+**Workflow attendu**
+
+1. Résoudre le club :
+   - `ffbb_search(type='organismes', query="Stade Clermontois")` → `organisme_id`.
+
+2. Identifier l'équipe si nécessaire :
+   - `ffbb_team_summary(organisme_id=<ID>, categorie="U13M1")` pour récupérer le contexte équipe et la phase courante.
+
+3. Récupérer le calendrier complet du club filtré :
+   - `ffbb_club(action="calendrier", organisme_id=<ID>, filtre="U13M", numero_equipe=1)`
+
+4. Filtrer côté agent :
+   - garder uniquement `played == false` ;
+   - trier par date croissante ;
+   - compter les matchs restants ;
+   - déterminer domicile/déplacement avec `equipe1` = domicile et `equipe2` = extérieur.
+
+5. Répondre avec le nombre total et les prochaines échéances, sans afficher le calendrier brut complet.
+
+---
+
+## 6. Notes générales pour les agents
 
 - Utiliser `ffbb_search(type="organismes")` pour lever une ambiguïté de club, puis réutiliser l'`organisme_id`.
 - Utiliser `ffbb_club(action="equipes")` pour lister les engagements, phases et `poule_id` disponibles d'un club.
@@ -128,5 +145,5 @@ Ce document fournit des exemples de bout en bout pour aider les agents IA à sui
 - Utiliser `ffbb_bilan` ou `ffbb_bilan_saison` pour un bilan complet de saison.
 - Utiliser `ffbb_get(type="poule")` pour une demande sur la poule complète : classement, historique et calendrier global.
 - Utiliser `ffbb_club(action="calendrier")` pour une liste de matchs filtrée club/équipe/catégorie avec `is_last_match` et `is_next_match`.
-- Utiliser `ffbb_last_result` et `ffbb_next_match` pour les questions directes au singulier : “dernier résultat” ou “prochain match”.
-- Demander une précision à l'utilisateur si plusieurs clubs, équipes, phases ou poules correspondent.
+- Pour les matchs restants ou prochaines journées, filtrer `played == false` et trier par date croissante.
+- Si `_meta.generated_at`, `_meta.timezone` ou `_meta.cache` est présent, s'en servir pour qualifier la fraîcheur sans polluer la réponse.

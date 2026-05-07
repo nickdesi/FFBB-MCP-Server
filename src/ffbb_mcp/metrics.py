@@ -2,6 +2,7 @@
 
 import bisect
 import time
+from collections.abc import Mapping
 from threading import Lock
 from typing import Any
 
@@ -236,3 +237,35 @@ def generate_prometheus_metrics() -> str:
         )
 
     return "\n".join(lines) + "\n"
+
+
+def summarize_health(snapshot: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Construit un résumé compact de santé à partir d'un snapshot métriques."""
+    snap = dict(snapshot) if snapshot is not None else get_snapshot()
+    cache = snap.get("cache", {})
+    cache_hits = sum(stat["hits"] for stat in cache.values())
+    cache_misses = sum(stat["misses"] for stat in cache.values())
+    cache_total = cache_hits + cache_misses
+    api_calls_total = snap["api_calls_success"] + snap["api_calls_error"]
+    api_errors_total = snap["api_calls_error"]
+    inflight = snap["api_inflight_requests"]
+
+    if api_errors_total:
+        status = "degraded"
+    elif inflight:
+        status = "busy"
+    else:
+        status = "ok"
+
+    return {
+        "status": status,
+        "api_calls_total": api_calls_total,
+        "api_calls_success": snap["api_calls_success"],
+        "api_errors_total": api_errors_total,
+        "api_error_rate": snap["api_error_rate"],
+        "api_avg_latency_seconds": snap["api_avg_latency_seconds"],
+        "api_inflight_requests": inflight,
+        "cache_hits_total": cache_hits,
+        "cache_misses_total": cache_misses,
+        "cache_hit_ratio_global": cache_hits / cache_total if cache_total else 0.0,
+    }

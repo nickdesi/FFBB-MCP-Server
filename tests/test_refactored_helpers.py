@@ -297,6 +297,19 @@ class TestFormatPouleResponse:
         result = format_poule_response(poule_data)
         assert result["classements"][0]["logo_url"] is None
 
+    def test_format_poule_response_adds_freshness_meta(self):
+        result = format_poule_response(
+            {"id": "p1", "libelle": "Poule A", "_ttl_seconds": 120}
+        )
+
+        meta = result["_meta"]
+        assert meta["source"] == "ffbb_api_live"
+        assert meta["timezone"] == "Europe/Paris"
+        assert meta["cache"] == "poule"
+        assert meta["ttl_seconds"] == 120
+        assert meta["force_refresh_supported"] is True
+        assert "generated_at" in meta
+
 
 # ---------------------------------------------------------------------------
 # _get_inflight_lock thread safety

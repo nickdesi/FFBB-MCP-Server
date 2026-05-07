@@ -214,7 +214,10 @@ _RULES_METIER = """\
 - **Bilan** : Utiliser `bilan_total` retourné par `ffbb_team_summary` ou `ffbb_bilan`. \
 Ne jamais recalculer V/D à la main si ce champ est présent.
 - **Saison courante** : Toutes les données correspondent à la saison active. \
-Ne mentionner une saison passée qu'après vérification explicite.\
+Ne mentionner une saison passée qu'après vérification explicite.
+- **Fraîcheur** : Si `_meta.generated_at`, `_meta.timezone` ou `_meta.cache` est présent, \
+les utiliser pour qualifier la fraîcheur des données sans les afficher systématiquement. \
+Si l'utilisateur demande "données fraîches", "live" ou "aujourd'hui", privilégier `force_refresh=true` quand l'outil le permet.\
 """
 
 # FIX: fusion des deux anciens blocs classement en un seul cohérent.
@@ -491,14 +494,19 @@ def prochain_match(club_name: str, categorie: str = "", numero_equipe: int = 1) 
     equipe = f" — équipe {categorie.strip()}" if categorie.strip() else ""
     num = f", numero_equipe={numero_equipe}" if numero_equipe != 1 else ""
     cat_arg = f", categorie='{categorie.strip()}'{num}" if categorie.strip() else ""
+    resolve_step = (
+        f"`ffbb_resolve_team(organisme_id=..., categorie='{categorie.strip()}')` si plusieurs équipes peuvent correspondre."
+        if categorie.strip() and numero_equipe == 1
+        else "Conserver `numero_equipe` explicite si l'utilisateur l'a donné."
+    )
     return "\n\n".join(
         [
             f"Trouve le prochain match de '{club_name.strip()}'{equipe}.",
             _strategy(
                 "`ffbb_search(type='organismes', query=<club_name>)` si `organisme_id` non caché.",
-                f"`ffbb_team_summary(organisme_id=...{cat_arg})` → champ `next_match` (Tier 1).",
-                f"`ffbb_next_match(organisme_id=...{cat_arg})` si `ffbb_team_summary` indisponible.",
-                "`ffbb_club(action='calendrier', organisme_id=...)` → filtrer à venir (Tier 3 uniquement).",
+                resolve_step,
+                f"`ffbb_next_match(organisme_id=...{cat_arg})` → prochain match unique (SINGULIER).",
+                "Pour plusieurs matchs/prochaines journées : utiliser `ffbb_club(action='calendrier')` et filtrer `played == false`.",
             ),
             "Retourne : date, heure, adversaire, lieu, statut domicile/extérieur.",
         ]
@@ -572,7 +580,9 @@ def calendrier_equipe(club_name: str, categorie: str, numero_equipe: int = 1) ->
             f"Calendrier complet '{cat}' (n°{numero_equipe}) — club '{cn}'.",
             _strategy(
                 "`ffbb_search(type='organismes', query=<club_name>)` si `organisme_id` non caché.",
+                f"`ffbb_resolve_team(organisme_id=..., categorie='{cat}{numero_equipe}')` si la catégorie ou l'équipe est ambiguë.",
                 f"`ffbb_club(action='calendrier', organisme_id=..., filtre='{cat}', numero_equipe={numero_equipe})`.",
+                "Pour les matchs restants : garder `played == false`, puis trier par date croissante.",
             ),
             "Tableau chronologique : **Date | Heure | Domicile | Score | Extérieur | Statut**.\n"
             "Séparer visuellement les matchs joués (✅) des matchs à venir (🕐).",

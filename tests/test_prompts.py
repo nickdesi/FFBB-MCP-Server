@@ -3,6 +3,7 @@
 from ffbb_mcp.prompts import (
     analyser_match,
     bilan_equipe,
+    calendrier_equipe,
     classement_poule,
     expert_basket,
     prochain_match,
@@ -38,6 +39,9 @@ class TestPrompts:
         result = prochain_match("Vichy", categorie="U11M")
         assert "U11M" in result
         assert "Vichy" in result
+        assert "ffbb_next_match" in result
+        assert "SINGULIER" in result
+        assert "ffbb_club(action='calendrier')" in result
 
     def test_classement_poule(self):
         result = classement_poule("Nationale 1")
@@ -96,3 +100,16 @@ class TestPrompts:
         assert "pluriel" in prompt.lower()
         assert "prochains matchs" in prompt
         assert "calendrier" in prompt
+
+    def test_expert_basket_mentions_freshness_meta(self):
+        prompt = expert_basket()
+        assert "_meta.generated_at" in prompt
+        assert "_meta.timezone" in prompt
+        assert "force_refresh=true" in prompt
+
+    def test_calendrier_equipe_filters_remaining_matches(self):
+        prompt = calendrier_equipe("Vichy", "U13M", numero_equipe=2)
+        assert "ffbb_resolve_team" in prompt
+        assert "played == false" in prompt
+        assert "date croissante" in prompt
+        assert "numero_equipe=2" in prompt

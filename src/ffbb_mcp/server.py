@@ -27,7 +27,7 @@ from starlette.responses import (
 
 from . import __version__ as _PACKAGE_VERSION
 from .dashboard import _build_dashboard_html
-from .metrics import generate_prometheus_metrics, get_snapshot
+from .metrics import generate_prometheus_metrics, get_snapshot, summarize_health
 from .prompts import ROUTING_PROMPT, register_prompts
 from .resources import register_resources
 from .services import (
@@ -265,38 +265,30 @@ def _logo_response() -> Response:
 async def health(request: Request) -> Response:
     """Endpoint de santé enrichi — lisible par machine et humain."""
     snap = get_snapshot()
+    summary = summarize_health(snap)
     uptime_s = snap["uptime_seconds"]
     days = int(uptime_s // 86400)
     hours = int((uptime_s % 86400) // 3600)
     minutes = int((uptime_s % 3600) // 60)
     seconds = int(uptime_s % 60)
-    api_calls_total = snap["api_calls_success"] + snap["api_calls_error"]
-    errors = snap["api_calls_error"]
-    cache = snap.get("cache", {})
-    cache_hits = sum(s["hits"] for s in cache.values())
-    cache_misses = sum(s["misses"] for s in cache.values())
-    cache_total = cache_hits + cache_misses
-    status = "degraded" if errors > 0 else "ok"
     return JSONResponse(
         {
-            "status": status,
+            "status": summary["status"],
             "service": "ffbb-mcp",
             "version": _PACKAGE_VERSION,
             "transport": "streamable-http",
             "spec": "2025-11-25",
             "uptime_seconds": round(uptime_s, 1),
             "uptime_human": f"{days}j {hours:02d}:{minutes:02d}:{seconds:02d}",
-            "api_calls_total": api_calls_total,
-            "api_calls_success": snap["api_calls_success"],
-            "api_errors_total": errors,
-            "api_error_rate": round(snap["api_error_rate"], 4),
-            "api_avg_latency_ms": round(snap["api_avg_latency_seconds"] * 1000, 2),
-            "api_inflight_requests": snap["api_inflight_requests"],
-            "cache_hits_total": cache_hits,
-            "cache_misses_total": cache_misses,
-            "cache_hit_ratio_global": round(cache_hits / cache_total, 4)
-            if cache_total
-            else 0.0,
+            "api_calls_total": summary["api_calls_total"],
+            "api_calls_success": summary["api_calls_success"],
+            "api_errors_total": summary["api_errors_total"],
+            "api_error_rate": round(summary["api_error_rate"], 4),
+            "api_avg_latency_ms": round(summary["api_avg_latency_seconds"] * 1000, 2),
+            "api_inflight_requests": summary["api_inflight_requests"],
+            "cache_hits_total": summary["cache_hits_total"],
+            "cache_misses_total": summary["cache_misses_total"],
+            "cache_hit_ratio_global": round(summary["cache_hit_ratio_global"], 4),
             "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
             "python_version": platform.python_version(),
             "public_url": _get_public_base_url(),
@@ -573,7 +565,13 @@ async def ffbb_bilan(
 @zipai_surgical
 async def ffbb_get(
     id: Annotated[
-        int, Field(description="Identifiant numerique de la ressource FFBB.")
+        int,
+        Field(
+            description=(
+                "Identifiant numérique FFBB exact. Ne pas passer un nom de club: "
+                "utiliser d'abord ffbb_search pour résoudre l'id."
+            )
+        ),
     ],
     type: Annotated[
         Literal[
@@ -644,7 +642,12 @@ async def ffbb_club(
             "equipes",
             "classement",
         ],
-        Field(description="Action a effectuer pour le club."),
+        Field(
+            description=(
+                "Action club. Utiliser 'calendrier' pour les demandes au pluriel "
+                "(matchs restants, calendrier, prochaines journées)."
+            )
+        ),
     ],
     club_name: Annotated[
         str | None,
@@ -669,7 +672,7 @@ async def ffbb_club(
         Field(
             description=(
                 "Filtre facultatif de categorie/genre (ex: 'U11', 'U11M', 'U11F'). "
-                "Utilise pour restreindre les equipes et poules."
+                "Pour une équipe précise, compléter avec numero_equipe."
             )
         ),
     ] = None,
@@ -891,7 +894,7 @@ async def ffbb_resolve_team(
         Field(
             description=(
                 "Catégorie + genre + numéro d'équipe (ex: 'U11M1', 'U13F2', 'U15M'). "
-                "Optionnel (toutes équipes si vide)."
+                "Si le numéro manque, cet outil retourne la bonne équipe ou des candidats."
             ),
         ),
     ] = None,
@@ -945,10 +948,9 @@ async def ffbb_team_summary(
       - dernier match joué
       - prochain match à venir
 
-    Recommandé pour répondre à des questions du type :
-      - "Quel est le bilan de X cette saison ?"
-      - "Quel est le prochain match de X ?"
-      - "Quel a été le dernier résultat de X ?".
+    Recommandé pour une vue rapide d'une équipe précise. Si la catégorie est ambiguë
+    ou sans numéro d'équipe, l'outil tente une résolution via `ffbb_resolve_team`.
+    Pour une liste de matchs restants, utiliser plutôt `ffbb_club(action="calendrier")`.
     """
     try:
         if ctx:
@@ -1044,7 +1046,9 @@ async def ffbb_team_summary(
 async def ffbb_last_result(
     categorie: Annotated[
         str,
-        Field(description="Catégorie de l'équipe (ex: 'U11', 'U11M', 'U11F')"),
+        Field(
+            description="Catégorie de l'équipe précise (ex: 'U11M1', 'U11M', 'U11F')"
+        ),
     ],
     club_name: Annotated[
         str | None, Field(description="Nom du club (ex: 'Stade Clermontois')")
@@ -1054,7 +1058,9 @@ async def ffbb_last_result(
     ] = None,
     numero_equipe: Annotated[
         int,
-        Field(description="Numéro d'equipe dans la categorie (1 par defaut)"),
+        Field(
+            description="Numéro d'équipe dans la catégorie. Résoudre avec ffbb_resolve_team si ambigu."
+        ),
     ] = 1,
     force_refresh: Annotated[
         bool,
@@ -1063,6 +1069,7 @@ async def ffbb_last_result(
 ) -> dict[str, Any]:
     """Dernier résultat d'une équipe précise.
 
+    SINGULIER UNIQUEMENT: retourne le dernier match joué d'une seule équipe.
     Recommendation LLM : Si la categorie est imprécise ou sans numéro (ex: 'U11M'),
     appeler d'abord `ffbb_resolve_team` pour obtenir le `numero_equipe` reel.
     """
@@ -1096,7 +1103,10 @@ async def ffbb_last_result(
 @zipai_surgical
 async def ffbb_next_match(
     categorie: Annotated[
-        str, Field(description="Catégorie de l'équipe (ex: 'U11', 'U11M', 'U11F')")
+        str,
+        Field(
+            description="Catégorie de l'équipe précise (ex: 'U11M1', 'U11M', 'U11F')"
+        ),
     ],
     club_name: Annotated[
         str | None, Field(description="Nom du club (ex: 'Stade Clermontois')")
@@ -1105,7 +1115,10 @@ async def ffbb_next_match(
         int | None, Field(description="Identifiant FFBB du club (organisme_id)")
     ] = None,
     numero_equipe: Annotated[
-        int, Field(description="Numéro d'equipe dans la categorie (1 par defaut)")
+        int,
+        Field(
+            description="Numéro d'équipe dans la catégorie. Résoudre avec ffbb_resolve_team si ambigu."
+        ),
     ] = 1,
     force_refresh: Annotated[
         bool,

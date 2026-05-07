@@ -68,6 +68,27 @@ _CACHE_MISS_SENTINEL: object = object()
 _PARIS_TZ = ZoneInfo("Europe/Paris")
 
 
+def _freshness_meta(
+    *,
+    source: str = "ffbb_api_live",
+    cache: str | None = None,
+    ttl_seconds: int | None = None,
+    force_refresh_supported: bool = False,
+) -> dict[str, Any]:
+    meta: dict[str, Any] = {
+        "source": source,
+        "generated_at": datetime.now(_PARIS_TZ).isoformat(),
+        "timezone": "Europe/Paris",
+    }
+    if cache:
+        meta["cache"] = cache
+    if ttl_seconds is not None:
+        meta["ttl_seconds"] = ttl_seconds
+    if force_refresh_supported:
+        meta["force_refresh_supported"] = True
+    return meta
+
+
 @lru_cache(maxsize=128)
 def _extract_phase_num(label: str | None) -> int:
     """Extrait le numéro de phase d'un libellé (ex: 'Phase 3' -> 3).
@@ -284,7 +305,8 @@ def _coerce_numeric_id(value: int | str, label: str) -> int:
             error=ErrorData(
                 code=INTERNAL_ERROR,
                 message=(
-                    f"{label} invalide: '{value}'. Un identifiant numérique est requis."
+                    f"{label} invalide: '{value}'. Un identifiant numérique est requis. "
+                    "Utilisez l'id retourné par ffbb_search ou ffbb_club(action='equipes')."
                 ),
             )
         ) from e
@@ -333,21 +355,30 @@ def handle_api_error(e: Exception) -> McpError:
             return McpError(
                 error=ErrorData(
                     code=INTERNAL_ERROR,
-                    message="Ressource FFBB introuvable (404). Vérifiez l'identifiant.",
+                    message=(
+                        "Ressource FFBB introuvable (404). Action conseillée: vérifiez l'identifiant "
+                        "numérique ou relancez ffbb_search(type='organismes') pour résoudre le club."
+                    ),
                 )
             )
         if status in (401, 403):
             return McpError(
                 error=ErrorData(
                     code=INTERNAL_ERROR,
-                    message="Accès FFBB refusé (401/403). Les tokens sont peut-être expirés.",
+                    message=(
+                        "Accès FFBB refusé (401/403). Action conseillée: vérifiez la configuration "
+                        "d'accès FFBB et réessayez ensuite."
+                    ),
                 )
             )
         if status == 429:
             return McpError(
                 error=ErrorData(
                     code=INTERNAL_ERROR,
-                    message="Rate-limit FFBB atteint (429). Réessayez dans quelques secondes.",
+                    message=(
+                        "Rate-limit FFBB atteint (429). Action conseillée: réduisez les appels parallèles "
+                        "et réessayez dans quelques secondes."
+                    ),
                 )
             )
 
@@ -357,14 +388,20 @@ def handle_api_error(e: Exception) -> McpError:
         return McpError(
             error=ErrorData(
                 code=INTERNAL_ERROR,
-                message="Timeout API FFBB. L'API officielle est temporairement lente. Réessayez dans quelques secondes.",
+                message=(
+                    "Timeout API FFBB. Action conseillée: réessayez dans quelques secondes; "
+                    "si la fraîcheur live n'est pas nécessaire, évitez force_refresh=True."
+                ),
             )
         )
 
     return McpError(
         error=ErrorData(
             code=INTERNAL_ERROR,
-            message=f"Erreur API FFBB ({error_type}): {error_msg}",
+            message=(
+                f"Erreur API FFBB ({error_type}): {error_msg}. Action conseillée: "
+                "vérifiez les paramètres, puis réessayez ou relancez une recherche FFBB."
+            ),
         )
     )
 
@@ -695,6 +732,11 @@ def format_poule_response(poule_data: dict) -> dict[str, Any]:
         "nom": poule_data.get("libelle"),
         "classements": formatted_classements,
         "rencontres": formatted_rencontres,
+        "_meta": _freshness_meta(
+            cache="poule",
+            ttl_seconds=poule_data.get("_ttl_seconds"),
+            force_refresh_supported=True,
+        ),
     }
     if formatted_rencontres:
         max_limit = _read_positive_int_env("FFBB_MAX_CALENDAR_MATCHES", 300)
@@ -1551,9 +1593,10 @@ async def ffbb_saison_bilan_service(
     return {
         "status": "ok",
         "club": club_nom,
-        "categorie": categorie,
+        "categorie": categorie or "",
         "bilan_total": totaux,
         "phases": phases,
+        "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
     }
 
 
@@ -1581,7 +1624,12 @@ async def ffbb_bilan_service(
         club_nom = resolved_clubs[0]["nom"] if resolved_clubs else (club_name or "")
 
         if not target_org_ids:
-            return {"error": f"Club '{club_name}' introuvable"}
+            return {
+                "error": f"Club '{club_name}' introuvable",
+                "suggestion": "Vérifiez l'orthographe ou résolvez d'abord le club avec ffbb_search.",
+                "next_call": f"ffbb_search(type='organismes', query='{club_name or ''}')",
+                "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
+            }
 
         # 2. Récupérer les équipes filtrées en parallèle
         eq_tasks = []
@@ -1608,7 +1656,16 @@ async def ffbb_bilan_service(
                 logger.error("Erreur lors de la récupération des équipes: %s", res)
 
         if not equipes:
-            return {"error": f"Aucune équipe trouvée pour la catégorie '{categorie}'"}
+            return {
+                "error": f"Aucune équipe trouvée pour la catégorie '{categorie}'",
+                "suggestion": "Listez les équipes disponibles puis choisissez la catégorie et le numéro exacts.",
+                "next_call": (
+                    f"ffbb_club(action='equipes', organisme_id={target_org_ids[0]})"
+                    if target_org_ids
+                    else "ffbb_club(action='equipes', club_name='<club>')"
+                ),
+                "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
+            }
 
         # Dédupliquer les équipes par engagement_id pour éviter les doublons de matchs
         deduped_equipes: list[dict[str, Any]] = []
@@ -1752,6 +1809,7 @@ async def ffbb_bilan_service(
             "phase_courante": phase_courante,
             "equipes_bilan": equipes_bilan,
             "phases": phases,
+            "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
         }
 
     # Force refresh : bypass le cache et appel direct
@@ -2747,6 +2805,7 @@ async def ffbb_last_result_service(
             "message": "Aucun match joué trouvé.",
             "club_resolu": club_resolu,
             "candidates": all_available_equipes,
+            "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
         }
 
     est_domicile = _match_team_name(
@@ -2788,4 +2847,5 @@ async def ffbb_last_result_service(
         "exterieur": format_team_name(dernier.get("nomEquipe2", ""), num2),
         "score_exterieur": dernier.get("resultatEquipe2"),
         "victoire": victoire,
+        "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
     }

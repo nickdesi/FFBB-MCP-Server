@@ -4,6 +4,10 @@ VS Code extension that connects **GitHub Copilot agent mode** (and any MCP-compa
 
 ## Features
 
+- Registers the hosted FFBB MCP server in VS Code.
+- Adds a command palette action: **FFBB MCP: Install Server**.
+- Shows a one-time onboarding prompt to install the MCP server quickly.
+
 Once installed, the following tools are available in agent mode:
 
 | Tool | Description |
@@ -38,8 +42,9 @@ Or paste this in your `.vscode/mcp.json`:
 ## Usage
 
 1. Install this extension
-2. Open GitHub Copilot Chat → switch to **Agent mode**
-3. The FFBB tools are automatically available
+2. Run **FFBB MCP: Install Server** from the command palette, or accept the one-time install prompt
+3. Open GitHub Copilot Chat → switch to **Agent mode**
+4. The FFBB tools are available
 
 **Example prompts:**
 - *"Quel est le prochain match du Stade Clermontois ?"*
