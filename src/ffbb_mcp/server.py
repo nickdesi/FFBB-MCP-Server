@@ -3,6 +3,7 @@ import datetime
 import logging
 import os
 import platform
+import re
 import urllib.parse
 from functools import wraps
 from importlib.metadata import PackageNotFoundError as _PkgNotFound
@@ -89,6 +90,31 @@ _REMOTE_LOGO_URL = (
 _LOGO_PATH = _WEBSITE_DIR / "logo.webp"
 
 logger = logging.getLogger("ffbb-mcp")
+
+# ---------------------------------------------------------------------------
+# Security helpers
+# ---------------------------------------------------------------------------
+
+# Meilisearch filter_by: allow only printable non-control chars, block newlines/nulls.
+_FILTER_BY_MAX_LEN = 500
+_FILTER_BY_BLOCKED = re.compile(r"[\x00-\x08\x0a-\x1f\x7f]")
+
+
+def _validate_filter_by(filter_by: str | None) -> str | None:
+    """Validates a Meilisearch filter expression from user input.
+
+    Raises ValueError on obviously malicious input (newlines, null bytes).
+    """
+    if filter_by is None:
+        return None
+    if len(filter_by) > _FILTER_BY_MAX_LEN:
+        raise ValueError(
+            f"filter_by dépasse la longueur maximale ({_FILTER_BY_MAX_LEN} caractères)"
+        )
+    if _FILTER_BY_BLOCKED.search(filter_by):
+        raise ValueError("filter_by contient des caractères de contrôle invalides")
+    return filter_by
+
 
 _READONLY_ANNOTATIONS = ToolAnnotations(
     readOnlyHint=True,
@@ -323,7 +349,14 @@ async def docs_slash(request: Request) -> Response:
 @mcp.custom_route("/docs/{path:path}", methods=["GET"])  # type: ignore[untyped-decorator]
 async def docs_wildcard(request: Request) -> Response:
     path = request.path_params.get("path", "")
-    local_doc = _WEBSITE_DIR / "docs" / path
+    docs_root = (_WEBSITE_DIR / "docs").resolve()
+    try:
+        local_doc = (docs_root / path).resolve()
+        # Prevent path traversal: resolved path must stay within docs/
+        if docs_root not in local_doc.parents and local_doc != docs_root:
+            return Response("Forbidden", status_code=403)
+    except Exception:
+        return Response("Not Found", status_code=404)
     if local_doc.exists() and local_doc.is_file():
         if local_doc.suffix == ".html":
             return HTMLResponse(
@@ -451,10 +484,13 @@ async def ffbb_search(
     Résultats contiennent un 'id' à utiliser avec ffbb_get ou ffbb_club.
     """
     try:
+        safe_filter = _validate_filter_by(filter_by)
         # Délègue la logique détaillée au service dédié pour centraliser le dispatch
         return await ffbb_search_service(
-            query=query, type=type, limit=limit, filter_by=filter_by, sort=sort
+            query=query, type=type, limit=limit, filter_by=safe_filter, sort=sort
         )
+    except ValueError as e:
+        raise handle_api_error(e) from e
     except Exception as e:
         raise handle_api_error(e) from e
 
@@ -1200,6 +1236,14 @@ def main() -> None:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
     mode = os.environ.get("MCP_MODE", "stdio").lower()
+
+    if "*" in _allowed_hosts or "*" in _allowed_origins:
+        logger.warning(
+            "⚠️  SÉCURITÉ : ALLOWED_HOSTS ou ALLOWED_ORIGINS est configuré sur '*' "
+            "(wildcard). Toutes les origines sont acceptées. "
+            "Définissez des valeurs explicites en production via les variables d'env "
+            "ALLOWED_HOSTS et ALLOWED_ORIGINS."
+        )
 
     if mode in ("sse", "http", "streamable-http"):
         host = os.environ.get("HOST", "0.0.0.0")
