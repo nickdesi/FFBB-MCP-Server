@@ -86,8 +86,6 @@ CLUB_ALIASES = {
 # de l'exécution (notamment dans la boucle de `normalize_query`),
 # ce qui offre un gain de performance notable (~x3 sur la normalisation).
 
-_APOSTROPHE_PATTERN = re.compile("[\u2018\u2019\u201b\u0060]")
-_SPACE_PATTERN = re.compile(r"\s+")
 _ARTICLE_PATTERN = re.compile(r"^[dlDL]'")
 
 _COMPILED_ALIASES = [
@@ -309,8 +307,17 @@ def _normalize_apostrophes(text: str) -> str:
 
     Variantes couvertes : \u2019 (U+2019), \u2018 (U+2018), \u201b (U+201B), \u0060 (backtick).
     """
-    # Utilisation d'escapes Unicode explicites pour éviter toute ambiguïté d'encodage.
-    return _APOSTROPHE_PATTERN.sub("\u0027", text)
+    # Fast-path literal checks pour éviter les remplacements inutiles.
+    # Les strings natives sont beaucoup plus rapides que les regex pour cette tâche.
+    if "\u2019" in text:
+        text = text.replace("\u2019", "\u0027")
+    if "\u2018" in text:
+        text = text.replace("\u2018", "\u0027")
+    if "\u201b" in text:
+        text = text.replace("\u201b", "\u0027")
+    if "\u0060" in text:
+        text = text.replace("\u0060", "\u0027")
+    return text
 
 
 def normalize_query(query: str) -> str:
@@ -345,5 +352,5 @@ def normalize_query(query: str) -> str:
             normalized = alias_pattern.sub(official, normalized)
 
     # Remove excessive spaces
-    normalized = _SPACE_PATTERN.sub(" ", normalized)
+    normalized = " ".join(normalized.split())
     return normalized
