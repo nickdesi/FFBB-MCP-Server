@@ -46,7 +46,7 @@ COPY website/ ./website/
 RUN chown -R appuser:appuser /app
 USER appuser
 
-HEALTHCHECK --interval=30s --timeout=3s \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
   CMD python -c "import urllib.request, sys; sys.exit(0) if urllib.request.urlopen('http://localhost:9123/health').getcode() == 200 else sys.exit(1)"
 
 EXPOSE 9123
