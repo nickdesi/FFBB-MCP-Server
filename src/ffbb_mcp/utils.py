@@ -106,20 +106,15 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
     remainder = s[cat_match.end() :] if cat_match else s
 
     # Chercher un chiffre libre (pas partie de Uxx) dans le reste
-    # Fast path: only invoke regex if there's at least one digit
-    has_digit = False
-    for char in remainder:
-        if char.isdigit():
-            has_digit = True
-            break
-
-    if has_digit:
-        num_match = _NUM_PATTERN.search(remainder)
-        if num_match:
-            try:
-                numero_equipe = int(num_match.group(1))
-            except ValueError:
-                numero_equipe = None
+    # Bolt Optimization: Removed manual `for char in remainder: if char.isdigit():`
+    # check. Iterating characters in Python is slower than directly invoking
+    # the C-optimized `re` engine, which handles short circuits faster.
+    num_match = _NUM_PATTERN.search(remainder)
+    if num_match:
+        try:
+            numero_equipe = int(num_match.group(1))
+        except ValueError:
+            numero_equipe = None
 
     return ParsedCategorie(categorie=categorie, sexe=sexe, numero_equipe=numero_equipe)
 
