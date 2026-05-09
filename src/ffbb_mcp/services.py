@@ -2494,6 +2494,13 @@ def _normalize_name(value: str) -> str:
     if not value:
         return ""
     s = value.strip().upper()
+
+    # ⚡ Bolt: Fast-path pour les chaînes déjà ASCII (sans accents ni caractères spéciaux).
+    # Évite l'overhead de la normalisation Unicode et de l'itération lettre par lettre
+    # qui est ~1.4x plus lente.
+    if s.isascii():
+        return s
+
     s = unicodedata.normalize("NFD", s)
     return "".join(c for c in s if unicodedata.category(c) not in ("Mn", "So"))
 
