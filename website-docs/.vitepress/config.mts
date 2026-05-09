@@ -10,7 +10,7 @@ export default defineConfig({
     nav: [
       { text: 'Accueil', link: '/' },
       { text: 'Guide', link: '/guide/installation' },
-      { text: 'Référence', link: '/reference/tools' }
+      { text: 'Documentation technique', link: '/reference/tools' }
     ],
     sidebar: [
       {
@@ -22,7 +22,7 @@ export default defineConfig({
         ]
       },
       {
-        text: 'Référence Technique',
+        text: 'Documentation technique',
         items: [
           { text: 'Outils disponibles', link: '/reference/tools' },
           { text: 'Architecture', link: '/reference/architecture' },

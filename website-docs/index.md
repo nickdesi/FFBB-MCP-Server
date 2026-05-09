@@ -3,29 +3,29 @@ layout: home
 
 hero:
   name: "FFBB MCP Server"
-  text: "Documentation Technique"
-  tagline: Explorez la puissance du Basketball français dans votre IDE.
+  text: "Documentation technique"
+  tagline: "Référence détaillée séparée du README : installation, outils, architecture et déploiement."
   image:
     src: /logo.webp
     alt: FFBB Logo
   actions:
     - theme: brand
-      text: Commencer
+      text: Installer
       link: /guide/installation
     - theme: alt
       text: Référence des outils
       link: /reference/tools
 
 features:
-  - title: "Performance"
-    details: "Cache intelligent multicouche pour des réponses instantanées sans saturer l'API FFBB."
-    icon: ⚡️
-  - title: "Sémantique"
-    details: "Interprétation intelligente des acronymes et des catégories (U11M, Senior F, etc.)."
-    icon: 🧠
-  - title: "Prêt pour Claude"
-    details: "Optimisé pour Claude Desktop et les agents autonomes avec des prompts contextuels."
-    icon: 🤖
+  - title: "Installation"
+    details: "Configuration rapide pour VS Code, Claude Desktop, Cursor et autres clients MCP."
+    icon: 🚀
+  - title: "Référence"
+    details: "Schémas, paramètres et workflows des outils FFBB MCP, hors README."
+    icon: 🛠️
+  - title: "Exploitation"
+    details: "Architecture, performance, cache, métriques et déploiement Coolify."
+    icon: ⚙️
 ---
 
 <style>
