@@ -6,8 +6,10 @@ import pytest
 
 from ffbb_mcp._state import reset_service_state
 from ffbb_mcp.services import (
+    _dedup_equipes_by_engagement,
     _fetch_poule_matches,
     _prioritize_phase,
+    _resolve_club_and_org,
     _resolve_team_equipes,
     format_poule_response,
 )
@@ -17,6 +19,75 @@ from ffbb_mcp.services import (
 def clear_caches():
     reset_service_state()
     yield
+
+
+# ---------------------------------------------------------------------------
+# _dedup_equipes_by_engagement
+# ---------------------------------------------------------------------------
+
+
+def test_dedup_equipes_by_engagement_preserves_missing_ids():
+    equipes = [
+        {"engagement_id": 1, "nom": "A"},
+        {"engagement_id": "1", "nom": "A duplicate"},
+        {"engagement_id": None, "nom": "Sans engagement"},
+        {"nom": "Sans clé"},
+        {"engagement_id": 2, "nom": "B"},
+    ]
+
+    result = _dedup_equipes_by_engagement(equipes)
+
+    assert result == [
+        {"engagement_id": 1, "nom": "A"},
+        {"engagement_id": None, "nom": "Sans engagement"},
+        {"nom": "Sans clé"},
+        {"engagement_id": 2, "nom": "B"},
+    ]
+
+
+# ---------------------------------------------------------------------------
+# _resolve_club_and_org error logging
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_resolve_club_and_org_logs_organisme_load_error(caplog):
+    with patch(
+        "ffbb_mcp.services.get_organisme_service",
+        new_callable=AsyncMock,
+        side_effect=RuntimeError("boom"),
+    ):
+        caplog.set_level("DEBUG", logger="ffbb-mcp")
+        resolved, org_data = await _resolve_club_and_org(None, 123)
+
+    assert resolved == []
+    assert org_data is None
+    assert "Impossible de charger l'organisme_id 123" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_resolve_club_and_org_logs_first_org_detail_error(caplog):
+    with (
+        patch(
+            "ffbb_mcp.services.search_organismes_service",
+            new_callable=AsyncMock,
+            return_value=[{"id": 456, "nom": "Club"}],
+        ),
+        patch(
+            "ffbb_mcp.services.get_organisme_service",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("boom"),
+        ),
+    ):
+        caplog.set_level("DEBUG", logger="ffbb-mcp")
+        resolved, org_data = await _resolve_club_and_org("Club", None)
+
+    assert resolved == [{"nom": "Club", "organisme_id": 456, "code": ""}]
+    assert org_data is None
+    assert (
+        "Impossible de charger les détails du premier organisme pour Club"
+        in caplog.text
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -244,7 +315,7 @@ class TestFormatPouleResponse:
         assert result["rencontres"][0]["nomEquipe1"] == "CLUB A"
 
     def test_truncation(self, monkeypatch):
-        monkeypatch.setenv("FFBB_MAX_CALENDAR_MATCHES", "2")
+        monkeypatch.setattr("ffbb_mcp.services._MAX_CALENDAR_MATCHES", 2)
         poule_data = {
             "id": 1,
             "libelle": "Poule",
@@ -268,7 +339,7 @@ class TestFormatPouleResponse:
         assert "warning" in result["rencontres"][-1]
 
     def test_truncation_invalid_env_falls_back(self, monkeypatch):
-        monkeypatch.setenv("FFBB_MAX_CALENDAR_MATCHES", "abc")
+        monkeypatch.setattr("ffbb_mcp.services._MAX_CALENDAR_MATCHES", 300)
         poule_data = {
             "id": 1,
             "libelle": "Poule",

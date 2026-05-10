@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import random
 import re
 import threading
@@ -11,7 +10,7 @@ import unicodedata
 from collections.abc import Callable, Coroutine  # noqa: TC003
 from datetime import datetime, timedelta
 from functools import lru_cache
-from typing import Any, TypeVar
+from typing import Any, Protocol, TypeVar, cast
 from zoneinfo import ZoneInfo
 
 from cachetools import TLRUCache, TTLCache
@@ -53,7 +52,8 @@ _NUMERIC_EXTRACT_PATTERN = re.compile(r"(\d+)")
 
 # Limiter globalement le nombre d'appels concurrents vers l'API FFBB.
 # Valeur par défaut prudente, surchargable via l'env MAX_CONCURRENT_FFBB.
-_MAX_CONCURRENT_FFBB = int(os.getenv("MAX_CONCURRENT_FFBB", "8"))
+_MAX_CONCURRENT_FFBB = _read_positive_int_env("MAX_CONCURRENT_FFBB", 8)
+_MAX_CALENDAR_MATCHES = _read_positive_int_env("FFBB_MAX_CALENDAR_MATCHES", 300)
 _ffbb_semaphore = asyncio.Semaphore(_MAX_CONCURRENT_FFBB)
 
 # Hooks simples pour les metrics de cache. Ils sont no-op par défaut et peuvent
@@ -288,11 +288,45 @@ def _cache_get(
     return None
 
 
+class _CacheSupportsSetItem(Protocol):
+    def __setitem__(self, key: Any, value: Any) -> None: ...
+
+
+class SupportsAssetUrl(Protocol):
+    def get_asset_url(
+        self,
+        *,
+        uuid: str,
+        width: int | None = None,
+        height: int | None = None,
+        format: str | None = None,
+        quality: int | None = None,
+    ) -> str: ...
+
+
+async def get_asset_url_service(
+    uuid: str,
+    width: int | None = None,
+    height: int | None = None,
+    format: str | None = None,
+    quality: int | None = None,
+) -> str:
+    """Construit une URL d'asset Directus optimisée via le client V3."""
+    client = cast("SupportsAssetUrl", await get_client_async())
+    return client.get_asset_url(
+        uuid=uuid,
+        width=width,
+        height=height,
+        format=format,
+        quality=quality,
+    )
+
+
 def _cache_set(
     cache: TTLCache | TLRUCache | None, key: Any, value: Any, cache_name: str
 ) -> None:
-    if hasattr(cache, "__setitem__"):
-        cache[key] = value  # type: ignore[index]
+    if cache is not None:
+        cast("_CacheSupportsSetItem", cache)[key] = value
     # Le miss correspondant a déjà été enregistré dans _cache_get.
 
 
@@ -334,6 +368,25 @@ def _extract_and_accumulate_bilan(
     for f, v in stats.items():
         totaux[f] += v
     return stats
+
+
+def _dedup_equipes_by_engagement(equipes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Déduplique les équipes par engagement_id pour éviter les doublons de matchs."""
+    deduped_equipes: list[dict[str, Any]] = []
+    seen_engagement_ids: set[str] = set()
+    for equipe in equipes:
+        if not isinstance(equipe, dict):
+            continue
+        engagement_id = equipe.get("engagement_id")
+        if engagement_id is None:
+            deduped_equipes.append(equipe)
+            continue
+        engagement_key = str(engagement_id)
+        if engagement_key in seen_engagement_ids:
+            continue
+        seen_engagement_ids.add(engagement_key)
+        deduped_equipes.append(equipe)
+    return deduped_equipes
 
 
 # ---------------------------------------------------------------------------
@@ -739,7 +792,7 @@ def format_poule_response(poule_data: dict) -> dict[str, Any]:
         ),
     }
     if formatted_rencontres:
-        max_limit = _read_positive_int_env("FFBB_MAX_CALENDAR_MATCHES", 300)
+        max_limit = _MAX_CALENDAR_MATCHES
         total_matches = len(formatted_rencontres)
         if total_matches > max_limit:
             truncated_rencontres = formatted_rencontres[:max_limit]
@@ -1020,9 +1073,12 @@ async def ffbb_equipes_club_service(
     sans devoir inspecter les poules une par une.
     """
     # Réutilise org_data si fourni, sinon récupère via get_organisme_service
-    data = (
-        org_data if org_data is not None else await get_organisme_service(organisme_id)  # type: ignore
-    )
+    if org_data is not None:
+        data: dict[str, Any] | None = org_data
+    elif organisme_id is not None:
+        data = await get_organisme_service(organisme_id)
+    else:
+        return []
     if not data:
         return []
 
@@ -1375,7 +1431,7 @@ async def ffbb_next_match_service(
             "candidates": all_available_equipes,
         }
 
-    organisme_nom = club_resolu["nom"]  # type: ignore[index]
+    organisme_nom = str(club_resolu.get("nom", "")) if club_resolu is not None else ""
 
     all_matches = await _fetch_poule_matches(
         equipes,
@@ -1559,10 +1615,10 @@ async def ffbb_saison_bilan_service(
         *[_fetch_poule(pid) for pid in poule_ids], return_exceptions=True
     )
     poules_map: dict[str, dict[str, Any]] = {
-        pid: pd  # type: ignore
+        pid: pd
         for pid, pd in zip(poule_ids, poules_raw, strict=False)
-        if not isinstance(pd, Exception) and pd
-    }  # type: ignore
+        if isinstance(pd, dict)
+    }
 
     # Agrégation par phase
     phases: list[dict[str, Any]] = []
@@ -1667,23 +1723,7 @@ async def ffbb_bilan_service(
                 "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
             }
 
-        # Dédupliquer les équipes par engagement_id pour éviter les doublons de matchs
-        deduped_equipes: list[dict[str, Any]] = []
-        seen_engagement_ids: set[str] = set()
-        for equipe in equipes:
-            if not isinstance(equipe, dict):
-                continue
-            engagement_id = equipe.get("engagement_id")
-            if engagement_id is None:
-                deduped_equipes.append(equipe)
-                continue
-            engagement_key = str(engagement_id)
-            if engagement_key in seen_engagement_ids:
-                continue
-            seen_engagement_ids.add(engagement_key)
-            deduped_equipes.append(equipe)
-
-        equipes = deduped_equipes
+        equipes = _dedup_equipes_by_engagement(equipes)
 
         # 3. Récupérer toutes les poules concernées
         unique_poule_ids = list(
@@ -1707,10 +1747,10 @@ async def ffbb_bilan_service(
         )
         logger.debug("ffbb_bilan: poules_raw=%s", poules_raw)
         poules_map: dict[str, dict[str, Any]] = {
-            pid: pd  # type: ignore
+            pid: pd
             for pid, pd in zip(unique_poule_ids, poules_raw, strict=False)
-            if not isinstance(pd, Exception) and pd
-        }  # type: ignore
+            if isinstance(pd, dict)
+        }
         logger.debug("ffbb_bilan: poules_map_keys=%s", list(poules_map.keys()))
 
         # Map poule_id → engagement_ids du club + nom compétition + numero_equipe
@@ -1889,22 +1929,7 @@ async def get_calendrier_club_service(
             return []
 
         # Dédupliquer les équipes par engagement_id pour éviter les doublons de matchs
-        deduped_equipes: list[dict[str, Any]] = []
-        seen_engagement_ids: set[str] = set()
-        for equipe in equipes:
-            if not isinstance(equipe, dict):
-                continue
-            engagement_id = equipe.get("engagement_id")
-            if engagement_id is None:
-                deduped_equipes.append(equipe)
-                continue
-            engagement_key = str(engagement_id)
-            if engagement_key in seen_engagement_ids:
-                continue
-            seen_engagement_ids.add(engagement_key)
-            deduped_equipes.append(equipe)
-
-        equipes = deduped_equipes
+        equipes = _dedup_equipes_by_engagement(equipes)
 
         # 3. Parcourir toutes les poules de ces équipes pour récupérer toutes les rencontres et scores
         seen_match_ids: set[Any] = set()
@@ -1999,19 +2024,9 @@ async def get_calendrier_club_service(
         future_indices: list[int] = []
 
         for idx, m in enumerate(all_matches):
-            dt = m.get("_dt")
-            joue_val = m.get("joue")
-            s1 = m.get("score_equipe1")
-            s2 = m.get("score_equipe2")
-
-            # Joué = champ joue officiel FFBB (prioritaire)
-            # OU scores présents (les deux) ET date dans le passé.
-            has_scores = (s1 not in (None, "", "None")) and (
-                s2 not in (None, "", "None")
+            m["played"] = (
+                m.get("joue") == 1 or m.get("joue") == "1" or m.get("joue") is True
             )
-            is_past = dt is not None and dt < now
-
-            m["played"] = (joue_val in (1, "1", True)) or (has_scores and is_past)
             if m["played"]:
                 played_indices.append(idx)
             else:
@@ -2025,15 +2040,10 @@ async def get_calendrier_club_service(
             m["is_next_match"] = next_future_idx is not None and idx == next_future_idx
             m.pop("_dt", None)
 
-        try:
-            max_matches = int(os.getenv("FFBB_MAX_CALENDAR_MATCHES", "300"))
-        except ValueError:
-            max_matches = 300
-
         effective = all_matches
 
-        if len(effective) > max_matches:
-            truncated = effective[:max_matches]
+        if len(effective) > _MAX_CALENDAR_MATCHES:
+            truncated = effective[:_MAX_CALENDAR_MATCHES]
             warning = {
                 "warning": (
                     "Résultat tronqué côté MCP: trop de matchs pour ce club/catégorie. "
@@ -2041,7 +2051,7 @@ async def get_calendrier_club_service(
                     "Affinez votre requête (catégorie précise, équipe 1/2, phase, etc.)."
                 ),
                 "total_initial": len(all_matches),
-                "limite_appliquee": max_matches,
+                "limite_appliquee": _MAX_CALENDAR_MATCHES,
             }
             truncated.append(warning)
             return truncated
@@ -2225,24 +2235,6 @@ async def get_entraineur_service(entraineur_id: int | str) -> dict[str, Any]:
         )
     )
     return serialize_model(result) if result is not None else {}
-
-
-async def get_asset_url_service(
-    uuid: str,
-    width: int | None = None,
-    height: int | None = None,
-    format: str | None = None,
-    quality: int | None = None,
-) -> str:
-    """Construit une URL d'asset Directus optimisée via le client V3."""
-    client = await get_client_async()
-    return client.get_asset_url(  # type: ignore[attr-defined]
-        uuid=uuid,
-        width=width,
-        height=height,
-        format=format,
-        quality=quality,
-    )
 
 
 async def ffbb_search_service(
@@ -2532,7 +2524,11 @@ async def _resolve_club_and_org(
                     }
                 )
         except Exception:
-            pass
+            logger.debug(
+                "Impossible de charger l'organisme_id %s",
+                organisme_id,
+                exc_info=True,
+            )
     elif club_name:
         # Recherche secondaire parallèle pour les ententes (ENT. CLUB_A / CLUB_B).
         # Une entente est un organisme distinct dont le nom commence par "ENT." et
@@ -2589,7 +2585,11 @@ async def _resolve_club_and_org(
                 if first_org_id:
                     org_data = await get_organisme_service(first_org_id)
             except Exception:
-                pass
+                logger.debug(
+                    "Impossible de charger les détails du premier organisme pour %s",
+                    club_name,
+                    exc_info=True,
+                )
 
         for org in orgs:
             if isinstance(org, dict) and org.get("id"):
@@ -2751,8 +2751,7 @@ async def ffbb_last_result_service(
     if error:
         return error
 
-    organisme_nom = club_resolu["nom"]  # type: ignore[index]
-    numero_equipe_match = int(numero_equipe) if numero_equipe is not None else None
+    organisme_nom = str(club_resolu.get("nom", "")) if club_resolu is not None else ""
 
     async def _get_latest_match(refresh: bool) -> dict[str, Any] | None:
         all_matches = await _fetch_poule_matches(
@@ -2815,8 +2814,9 @@ async def ffbb_last_result_service(
             "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
         }
 
+    _numero_equipe_match = int(numero_equipe) if numero_equipe is not None else None
     est_domicile = _match_team_name(
-        str(dernier.get("nomEquipe1", "")), str(organisme_nom), numero_equipe_match
+        str(dernier.get("nomEquipe1", "")), str(organisme_nom), _numero_equipe_match
     )
 
     def _safe_int(val: Any) -> int | None:

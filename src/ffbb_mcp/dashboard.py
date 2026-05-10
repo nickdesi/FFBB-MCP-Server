@@ -8,7 +8,7 @@ from .metrics import get_snapshot
 
 def _build_dashboard_html() -> str:
     snap = get_snapshot()
-    now_utc = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    now_utc = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
     uptime_s = snap["uptime_seconds"]
     days = int(uptime_s // 86400)

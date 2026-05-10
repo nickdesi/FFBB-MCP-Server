@@ -1,3 +1,4 @@
+import importlib
 import os
 from datetime import datetime
 from unittest.mock import patch
@@ -76,3 +77,16 @@ def test_get_static_ttl_calendrier_adaptive():
 
         mock_datetime.now.return_value = datetime(2025, 1, 4, 10, 0)  # samedi live
         assert get_static_ttl("calendrier") == 300
+
+
+def test_services_import_ignores_invalid_max_concurrent_ffbb(monkeypatch):
+    import ffbb_mcp.services as services
+
+    monkeypatch.setenv("MAX_CONCURRENT_FFBB", "invalid")
+
+    reloaded = importlib.reload(services)
+
+    assert reloaded._MAX_CONCURRENT_FFBB == 8
+
+    monkeypatch.delenv("MAX_CONCURRENT_FFBB", raising=False)
+    importlib.reload(services)

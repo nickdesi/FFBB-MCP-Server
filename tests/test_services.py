@@ -626,7 +626,7 @@ class TestCalendrierClubService:
         self, patch_get_client, mock_client, monkeypatch
     ):
         # Force une petite limite pour le test
-        monkeypatch.setenv("FFBB_MAX_CALENDAR_MATCHES", "3")
+        monkeypatch.setattr("ffbb_mcp.services._MAX_CALENDAR_MATCHES", 3)
 
         # 0. Mock get_organisme (requis par _resolve_club_and_org)
         org_mock = MagicMock()
