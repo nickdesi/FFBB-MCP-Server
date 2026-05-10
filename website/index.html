@@ -5,9 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="TuCtfpsMfaMi13jU8fbz5LFA1vxzqeLZMHc74ulWRig" />
-    <title>FFBB MCP Server - Basketball Data for AI Agents</title>
+    <title>FFBB MCP Server - Données FFBB live pour agents IA</title>
     <meta name="description"
-        content="Accédez aux données officielles du basketball français (FFBB) directement dans vos agents IA. Extension VS Code facile à installer, bilan, résultats, classements et calendrier live.">
+        content="Connectez GitHub Copilot, Claude, Cursor et autres clients MCP aux données officielles FFBB : calendriers, classements, bilans, derniers résultats, prochains matchs et scores live via Streamable HTTP.">
     <meta name="keywords" content="FFBB, Basketball, MCP Server, extension VS Code, GitHub Copilot, Claude, Cursor, AI, Basket France, API Basketball">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://ffbb.desimone.fr/" />
@@ -19,9 +19,9 @@
     <link rel="stylesheet" href="css/style.css">
 
     <!-- Open Graph / Social Media -->
-    <meta property="og:title" content="FFBB MCP Server">
+    <meta property="og:title" content="FFBB MCP Server — Données FFBB live pour agents IA">
     <meta property="og:description"
-        content="Accédez aux données FFBB en temps réel via vos agents IA (Claude, Cursor, ...)">
+        content="Serveur MCP public pour consulter calendriers, classements, bilans, résultats et scores live FFBB depuis GitHub Copilot, Claude ou Cursor.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://ffbb.desimone.fr/">
     <meta property="og:image" content="https://ffbb.desimone.fr/logo.webp">
@@ -65,7 +65,7 @@
                         "name": "Comment interroger l'API FFBB avec l'IA ?",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "Le plus simple avec VS Code est d'installer l'extension FFBB Basketball MCP depuis la dernière release GitHub. Elle configure automatiquement le serveur public https://ffbb.desimone.fr/mcp pour GitHub Copilot en mode agent. Sinon, configurez votre client IA avec le type HTTP Streamable et cette même URL."
+                            "text": "Le plus simple avec VS Code est d'installer l'extension FFBB Basketball MCP depuis la dernière release GitHub. Elle enregistre le serveur public https://ffbb.desimone.fr/mcp pour GitHub Copilot en mode agent. Sinon, configurez votre client MCP avec le transport Streamable HTTP et cette même URL."
                         }
                     },
                     {
@@ -73,7 +73,15 @@
                         "name": "Mon club de basket est introuvable, que faire ?",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "Si l'agent échoue avec un nom générique, utilisez un mot-clé précis (ex: \"Vichy\"). L'outil ffbb_search est tolérant aux fautes de frappe et aux cas complexes, incluant les noms avec des apostrophes (ex: \"Jeanne d'Arc\") ou les équipes uniques sans numéro apparent impliqué (ex: \"U11M\" devient automatiquement \"U11M1\")."
+                            "text": "Essayez un libellé plus précis via <code>ffbb_search</code> : ville, nom officiel ou fragments distinctifs du club. Une fois l’ID FFBB trouvé, réutilisez-le pour les requêtes suivantes afin d’éviter les ambiguïtés."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "Faut-il connaître l'ID FFBB ou le numéro d'équipe ?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "L’ID FFBB est plus fiable que le nom du club. Pour une catégorie ambiguë comme <code>U13M</code>, utilisez <code>ffbb_resolve_team</code> ou précisez le numéro d’équipe."
                         }
                     },
                     {
@@ -81,7 +89,7 @@
                         "name": "Les données et scores sont-ils en temps réel ?",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "Totalement. Une stratégie de cache dynamique est implémentée pour garantir une fraîcheur maximale (<strong>15 secondes de TTL</strong>) lors des périodes de matchs Live, garantissant des scores de basket en temps réel, tout en préservant l'API officielle hors saison."
+                            "text": "Les scores live utilisent un cache très court pendant les matchs. Les calendriers, classements et ressources FFBB utilisent une stratégie de cache adaptée au type de donnée afin de rester exploitables sans surcharger les services officiels."
                         }
                     }
                 ]
@@ -103,15 +111,15 @@
         <!-- Hero Section -->
         <header class="hero">
             <img src="logo.webp" alt="Logo FFBB MCP Server" class="hero-logo" width="120" height="120">
-            <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 1.5rem;">
+            <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 1.5rem; flex-wrap: wrap;">
                 <div class="badge">V1.2.1 Stable</div>
-                <div class="badge">Extension VS Code facile</div>
-                <div class="badge">Disponible sur Smithery</div>
+                <div class="badge">12 outils MCP en lecture seule</div>
+                <div class="badge">Streamable HTTP</div>
             </div>
-            <h1 class="hero-title">Le basketball français dans votre <span class="accent-text">IA générative</span></h1>
+            <h1 class="hero-title">Les données FFBB live dans votre <span class="accent-text">agent IA</span></h1>
             <p class="hero-subtitle">
-                Connectez vos agents Claude, Cursor ou ChatGPT aux données live de la FFBB via le serveur MCP le plus
-                performant.
+                Interrogez calendriers, classements, bilans, derniers résultats, prochains matchs et scores live depuis
+                GitHub Copilot, Claude, Cursor ou tout client MCP compatible.
             </p>
             <div class="cta-group">
                 <a href="https://github.com/nickdesi/FFBB-MCP-Server" class="btn btn-primary">
@@ -120,7 +128,7 @@
                         <path
                             d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
                     </svg>
-                    GitHub
+                    Code source
                 </a>
                 <a href="https://github.com/nickdesi/FFBB-MCP-Server/releases/latest" class="btn btn-docs" aria-label="Installer l’extension VS Code FFBB Basketball MCP">
                     <span aria-hidden="true">🧩</span>
@@ -137,22 +145,22 @@
         <div class="stats-bar" aria-label="Statistiques clés">
             <div class="stat-item">
                 <span class="stat-number">12</span>
-                <span class="stat-label">outils MCP</span>
+                <span class="stat-label">outils lecture seule</span>
             </div>
             <div class="stat-divider" aria-hidden="true"></div>
             <div class="stat-item">
-                <span class="stat-number">100&nbsp;%</span>
-                <span class="stat-label">données live</span>
+                <span class="stat-number">Live</span>
+                <span class="stat-label">scores en direct</span>
             </div>
             <div class="stat-divider" aria-hidden="true"></div>
             <div class="stat-item">
-                <span class="stat-number">15&nbsp;000+</span>
-                <span class="stat-label">clubs référencés</span>
+                <span class="stat-number">/mcp</span>
+                <span class="stat-label">endpoint public</span>
             </div>
             <div class="stat-divider" aria-hidden="true"></div>
             <div class="stat-item">
                 <span class="stat-number">HTTP</span>
-                <span class="stat-label">Streamable transport</span>
+                <span class="stat-label">Streamable MCP</span>
             </div>
         </div>
 
@@ -160,41 +168,38 @@
         <section class="features">
             <div class="section-label">
                 <div class="badge">Fonctionnalités</div>
-                <h2 class="section-title">Une API unifiée pour l'IA</h2>
+                <h2 class="section-title">Ce que vos agents peuvent demander</h2>
             </div>
             <div class="features-grid">
                 <article class="feature-card">
                     <div class="feature-icon">📊</div>
-                    <h3>Bilan complet</h3>
-                    <p>Obtenez le bilan complet d'une équipe toutes phases confondues par son nom ou son ID en un seul
-                        appel.</p>
+                    <h3>Résumé d’équipe</h3>
+                    <p>Un seul appel pour récupérer bilan global, phase courante, classement, dernier résultat et prochain match.</p>
                 </article>
                 <article class="feature-card">
-                    <div class="feature-icon">🔍</div>
-                    <h3>Recherche intelligente</h3>
-                    <p>Recherchez n'importe quel club, salle, compétition ou terrain avec une tolérance aux erreurs de
-                        frappe.</p>
+                    <div class="feature-icon">📅</div>
+                    <h3>Calendriers complets</h3>
+                    <p>Listez les matchs passés et à venir d’un club, avec filtre par catégorie et numéro d’équipe.</p>
                 </article>
                 <article class="feature-card">
-                    <div class="feature-icon">⏱️</div>
-                    <h3>Scores Live</h3>
-                    <p>Accédez aux scores en direct des matchs en cours pour ne rien rater de l'action FFBB.</p>
+                    <div class="feature-icon">🔎</div>
+                    <h3>Recherche FFBB étendue</h3>
+                    <p>Trouvez clubs, compétitions, rencontres, salles, terrains, engagements, officiels ou entraîneurs.</p>
                 </article>
                 <article class="feature-card">
-                    <div class="feature-icon">🗓️</div>
-                    <h3>Prochain Match</h3>
-                    <p>Planifiez l'avenir en récupérant instantanément le prochain rendez-vous d'une équipe précise.</p>
+                    <div class="feature-icon">🏀</div>
+                    <h3>Résultats & prochains matchs</h3>
+                    <p>Obtenez le dernier match joué ou le prochain rendez-vous d’une équipe précisément résolue.</p>
                 </article>
                 <article class="feature-card">
                     <div class="feature-icon">📈</div>
-                    <h3>Classements & Poules</h3>
-                    <p>Visualisez les classements complets et les détails des poules pour une analyse approfondie.</p>
+                    <h3>Classements & poules</h3>
+                    <p>Accédez aux classements officiels, aux poules et aux ressources FFBB par identifiant technique.</p>
                 </article>
                 <article class="feature-card">
                     <div class="feature-icon">⚡</div>
-                    <h3>Optimisé FastMCP</h3>
-                    <p>Conçu avec FastMCP pour une intégration native et ultra-rapide avec l'écosystème Model Context
-                        Protocol.</p>
+                    <h3>Serveur MCP public</h3>
+                    <p>Endpoint Streamable HTTP prêt pour VS Code, Claude, Cursor, Smithery et les agents MCP compatibles.</p>
                 </article>
             </div>
         </section>
@@ -226,7 +231,7 @@
                     <div>
                         <div class="install-kicker">Recommandé pour GitHub Copilot</div>
                         <h3>Installez FFBB Basketball MCP en quelques clics</h3>
-                        <p>Téléchargez le fichier <code>.vsix</code> depuis la dernière release, puis installez-le dans VS Code via <strong>Extensions → … → Install from VSIX…</strong>. Le serveur public FFBB est configuré automatiquement pour le mode agent.</p>
+                        <p>Téléchargez le fichier <code>.vsix</code> depuis la dernière release, puis installez-le dans VS Code via <strong>Extensions → … → Install from VSIX…</strong>. L’extension enregistre le serveur public FFBB pour GitHub Copilot en mode agent.</p>
                     </div>
                     <div class="install-actions">
                         <a class="btn btn-docs" href="https://github.com/nickdesi/FFBB-MCP-Server/releases/latest">Télécharger l’extension</a>
@@ -311,22 +316,21 @@ npx -y @smithery/cli@latest install @nickdesi/mcpffbb \
                 <article class="feature-card" style="text-align: left; padding: 1.5rem;">
                     <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Comment interroger l'API FFBB avec l'IA ?
                     </h3>
-                    <p>Avec VS Code, installez simplement l’extension <strong>FFBB Basketball MCP</strong> depuis la dernière release GitHub : elle configure automatiquement <code>https://ffbb.desimone.fr/mcp</code> pour GitHub Copilot en mode agent. Pour Claude, Cursor ou un autre client MCP, utilisez la configuration HTTP Streamable avec la même URL.</p>
+                    <p>Avec VS Code, installez l’extension <strong>FFBB Basketball MCP</strong> depuis la dernière release GitHub : elle enregistre <code>https://ffbb.desimone.fr/mcp</code> pour GitHub Copilot en mode agent. Pour Claude, Cursor ou un autre client MCP, utilisez le transport Streamable HTTP avec la même URL.</p>
                 </article>
                 <article class="feature-card" style="text-align: left; padding: 1.5rem;">
                     <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Mon club de basket est introuvable, que faire
                         ?</h3>
-                    <p>Si l'agent échoue avec un nom générique, utilisez un mot-clé précis (ex: "Vichy"). L'outil
-                        <code>ffbb_search</code> est tolérant aux fautes de frappe et aux cas complexes, incluant les
-                        noms avec des apostrophes (ex: "Jeanne d'Arc") ou les équipes uniques sans numéro apparent
-                        impliqué (ex: "U11M" devient automatiquement "U11M1").</p>
+                    <p>Essayez un libellé plus précis via <code>ffbb_search</code> : ville, nom officiel ou fragments distinctifs du club. Une fois l’ID FFBB trouvé, réutilisez-le pour les requêtes suivantes afin d’éviter les ambiguïtés.</p>
+                </article>
+                <article class="feature-card" style="text-align: left; padding: 1.5rem;">
+                    <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Faut-il connaître l'ID FFBB ou le numéro d'équipe ?</h3>
+                    <p>L’ID FFBB est plus fiable que le nom du club. Pour une catégorie ambiguë comme <code>U13M</code>, utilisez <code>ffbb_resolve_team</code> ou précisez le numéro d’équipe.</p>
                 </article>
                 <article class="feature-card" style="text-align: left; padding: 1.5rem;">
                     <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Les données et scores sont-ils en temps réel
                         ?</h3>
-                    <p>Totalement. Une stratégie de cache dynamique est implémentée pour garantir une fraîcheur maximale
-                        (<strong>15 secondes de TTL</strong>) lors des périodes de matchs Live, garantissant des scores
-                        de basket en temps réel, tout en préservant l'API officielle hors saison.</p>
+                    <p>Les scores live utilisent un cache très court pendant les matchs. Les calendriers, classements et ressources FFBB utilisent une stratégie de cache adaptée au type de donnée afin de rester exploitables sans surcharger les services officiels.</p>
                 </article>
             </div>
         </section>
