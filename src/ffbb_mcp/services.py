@@ -2639,6 +2639,9 @@ async def _resolve_club_and_org(
     return resolved, org_data
 
 
+_DIGIT_PATTERN = re.compile(r"\d")
+
+
 @lru_cache(maxsize=256)
 def _match_team_name(
     nom_equipe_rencontre: str,
@@ -2672,7 +2675,9 @@ def _match_team_name(
     if search_num == 1:
         # Equipe unique : suffixe optionnel.
         # On accepte soit le suffixe "- 1", soit l'absence de chiffre dans le nom.
-        has_digit = any(ch.isdigit() for ch in nom_norm)
+        # Optimization: use precompiled regex instead of 'any(ch.isdigit() for ch in nom_norm)'
+        # to avoid Python iteration overhead and significantly speed up the check.
+        has_digit = bool(_DIGIT_PATTERN.search(nom_norm))
         return nom_norm.endswith(suffix_norm) or not has_digit
 
     return nom_norm.endswith(suffix_norm)

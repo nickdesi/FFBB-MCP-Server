@@ -105,21 +105,14 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
     # Retirer le pattern Uxx du début, puis chercher un chiffre isolé restant
     remainder = s[cat_match.end() :] if cat_match else s
 
-    # Chercher un chiffre libre (pas partie de Uxx) dans le reste
-    # Fast path: only invoke regex if there's at least one digit
-    has_digit = False
-    for char in remainder:
-        if char.isdigit():
-            has_digit = True
-            break
-
-    if has_digit:
-        num_match = _NUM_PATTERN.search(remainder)
-        if num_match:
-            try:
-                numero_equipe = int(num_match.group(1))
-            except ValueError:
-                numero_equipe = None
+    # Optimization: Directly invoke the C-optimized regex engine
+    # rather than using a manual Python loop over characters which has high overhead.
+    num_match = _NUM_PATTERN.search(remainder)
+    if num_match:
+        try:
+            numero_equipe = int(num_match.group(1))
+        except ValueError:
+            numero_equipe = None
 
     return ParsedCategorie(categorie=categorie, sexe=sexe, numero_equipe=numero_equipe)
 
