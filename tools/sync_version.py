@@ -78,20 +78,24 @@ def update_readme(root_dir, version, client_version):
 
 
 def update_docs(root_dir, version):
-    docs_path = root_dir / "docs" / "TOOLS_REFERENCE.md"
-    if not docs_path.exists():
-        return
-    content = docs_path.read_text("utf-8")
-    # Update version header
-    content = re.sub(
-        r"(> Version courante : \*\*)[^*]+(\*\*)", f"\\g<1>{version}\\g<2>", content
-    )
-    # Update example package_version (lines like "package_version": "1.1.0")
-    content = re.sub(
-        r'("package_version":\s*")[^"]+(")', f"\\g<1>{version}\\g<2>", content
-    )
-    docs_path.write_text(content, "utf-8")
-    print(f"✅ Updated docs/TOOLS_REFERENCE.md (v{version})")
+    doc_paths = [
+        root_dir / "docs" / "TOOLS_REFERENCE.md",
+        root_dir / "website-docs" / "reference" / "tools.md",
+    ]
+    for docs_path in doc_paths:
+        if not docs_path.exists():
+            continue
+        content = docs_path.read_text("utf-8")
+        # Update version header
+        content = re.sub(
+            r"(> Version courante : \*\*)[^*]+(\*\*)", f"\\g<1>{version}\\g<2>", content
+        )
+        # Update example package_version (lines like "package_version": "1.1.0")
+        content = re.sub(
+            r'("package_version":\s*")[^"]+(")', f"\\g<1>{version}\\g<2>", content
+        )
+        docs_path.write_text(content, "utf-8")
+        print(f"✅ Updated {docs_path.relative_to(root_dir)} (v{version})")
 
 
 def update_website(root_dir, version):
