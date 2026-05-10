@@ -2,6 +2,19 @@
 
 These principles directly address issues with LLMs making wrong assumptions, overcomplicating code, and touching orthogonal code.
 
+## 0. Push / Tag / Release Gate
+When the user asks to push, tag, release, or publish:
+- Treat it as a release-readiness workflow, not a plain `git push`.
+- Before pushing, run every local check mirrored by CI for the touched scope. For this repo that includes at minimum:
+  - `rtk uv run python tools/check_version_alignment.py`
+  - `rtk uv run ruff format --check .`
+  - `rtk uv run ruff check .`
+  - `rtk uv run mypy src`
+  - `rtk uv run pytest`
+- If version files changed, run `rtk uv run tools/sync_version.py`, inspect the diff, and ensure both generated docs and website docs are synchronized.
+- Check for test/runtime side effects before commit, especially `src/ffbb_mcp/acronyms_cache.json`; revert unrelated cache mutations.
+- After pushing, inspect the relevant GitHub Actions run(s) and fix failures before declaring success.
+
 ## 1. Think Before Coding
 Don't assume. Don't hide confusion. Surface tradeoffs.
 
