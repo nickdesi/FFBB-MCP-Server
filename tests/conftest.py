@@ -15,6 +15,8 @@ def mock_client():
     client.get_competition_async = AsyncMock(return_value=None)
     client.get_poule_async = AsyncMock(return_value=None)
     client.get_organisme_async = AsyncMock(return_value=None)
+    client.get_rencontre_async = AsyncMock(return_value=None)
+    client.get_salle_async = AsyncMock(return_value=None)
     client.search_competitions_async = AsyncMock(return_value=None)
     client.search_organismes_async = AsyncMock(return_value=None)
     client.search_rencontres_async = AsyncMock(return_value=None)
