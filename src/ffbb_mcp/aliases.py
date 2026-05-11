@@ -86,8 +86,6 @@ CLUB_ALIASES = {
 # de l'exécution (notamment dans la boucle de `normalize_query`),
 # ce qui offre un gain de performance notable (~x3 sur la normalisation).
 
-_ARTICLE_PATTERN = re.compile(r"^[dlDL]'")
-
 _COMPILED_ALIASES = [
     (alias, re.compile(r"\b" + re.escape(alias) + r"\b"), official)
     for alias, official in CLUB_ALIASES.items()
@@ -226,8 +224,10 @@ def _extract_initials(name: str) -> str:
     words = name.split()
     initials = []
     for w in words:
-        # Supprimer les articles collés (d', l')
-        clean = _ARTICLE_PATTERN.sub("", w)
+        # ⚡ Bolt: Remplacement de l'expression régulière par une vérification
+        # de préfixe native via les méthodes de chaînes. Évite l'overhead de re.sub().
+        # Supprimer les articles collés (d', l', D', L')
+        clean = w[2:] if w.startswith(("d'", "l'", "D'", "L'")) else w
         if not clean:
             continue
         if clean.lower() in _SKIP_WORDS:
