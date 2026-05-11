@@ -146,6 +146,77 @@ def _notify_cache_miss(cache_name: str, reason: str = "not_found") -> None:
             logger.debug("cache miss hook failed", exc_info=True)
 
 
+def _extract_salle_id(data: dict[str, Any]) -> str | None:
+    raw_salle = data.get("salle") or data.get("idSalle") or data.get("id_salle")
+    if isinstance(raw_salle, dict):
+        raw_salle = raw_salle.get("id") or raw_salle.get("salle_id")
+    if raw_salle in (None, ""):
+        return None
+    return str(raw_salle)
+
+
+def _format_salle_address(salle: dict[str, Any]) -> str | None:
+    parts = [
+        salle.get("adresse") or salle.get("adresse1"),
+        salle.get("code_postal") or salle.get("codePostal"),
+        salle.get("ville") or salle.get("commune"),
+    ]
+    address = " ".join(str(part).strip() for part in parts if part)
+    return address or None
+
+
+async def _enrich_with_salle_details(
+    data: dict[str, Any], client: Any
+) -> dict[str, Any]:
+    salle_id = _extract_salle_id(data)
+    if not salle_id or data.get("salle_details"):
+        return data
+
+    salle = await _with_ffbb_semaphore(
+        _safe_call_with_inflight(
+            f"Get salle {salle_id}",
+            lambda: client.get_salle_async(salle_id),
+        )
+    )
+    salle_data = serialize_model(salle) if salle is not None else {}
+    if isinstance(salle_data, dict) and salle_data:
+        data["salle_details"] = salle_data
+        adresse = _format_salle_address(salle_data)
+        if adresse:
+            data["adresse_salle"] = adresse
+    return data
+
+
+async def _enrich_matches_with_salle_details(matches: list[dict[str, Any]]) -> None:
+    salle_ids = list(
+        dict.fromkeys(salle_id for m in matches if (salle_id := _extract_salle_id(m)))
+    )
+    if not salle_ids:
+        return
+
+    client = await get_client_async()
+    salle_cache: dict[str, dict[str, Any]] = {}
+    for salle_id in salle_ids:
+        salle = await _with_ffbb_semaphore(
+            _safe_call_with_inflight(
+                f"Get salle {salle_id}",
+                lambda salle_id=salle_id: client.get_salle_async(salle_id),
+            )
+        )
+        salle_data = serialize_model(salle) if salle is not None else {}
+        if isinstance(salle_data, dict) and salle_data:
+            salle_cache[salle_id] = salle_data
+
+    for match in matches:
+        salle_id = _extract_salle_id(match)
+        if not salle_id or salle_id not in salle_cache:
+            continue
+        match["salle_details"] = salle_cache[salle_id]
+        adresse = _format_salle_address(salle_cache[salle_id])
+        if adresse:
+            match["adresse_salle"] = adresse
+
+
 # ---------------------------------------------------------------------------
 # Cache service-level (en mémoire, complémentaire au cache SQLite HTTP)
 # ---------------------------------------------------------------------------
@@ -1991,20 +2062,26 @@ async def get_calendrier_club_service(
                 date_match = match.get("date_rencontre", match.get("date", ""))
                 journee = match.get("numeroJournee", match.get("numero_journee", ""))
                 joue = match.get("joue")
-
-                all_matches.append(
-                    {
-                        "id": match_id,
-                        "date": date_match,
-                        "joue": joue,
-                        "equipe1": eq1,
-                        "equipe2": eq2,
-                        "score_equipe1": score1,
-                        "score_equipe2": score2,
-                        "competition_nom": equipe.get("competition", ""),
-                        "num_journee": journee,
-                    }
+                salle = (
+                    match.get("salle") or match.get("idSalle") or match.get("id_salle")
                 )
+
+                calendar_match = {
+                    "id": match_id,
+                    "date": date_match,
+                    "joue": joue,
+                    "equipe1": eq1,
+                    "equipe2": eq2,
+                    "score_equipe1": score1,
+                    "score_equipe2": score2,
+                    "competition_nom": equipe.get("competition", ""),
+                    "num_journee": journee,
+                }
+                if salle:
+                    calendar_match["salle"] = salle
+                all_matches.append(calendar_match)
+
+        await _enrich_matches_with_salle_details(all_matches)
 
         # --- Tri robuste par date + flags temporels ---
         tz = _PARIS_TZ
@@ -2212,7 +2289,10 @@ async def get_rencontre_service(rencontre_id: int | str) -> dict[str, Any]:
             lambda: client.get_rencontre_async(str(rencontre_id)),
         )
     )
-    return serialize_model(result) if result is not None else {}
+    data = serialize_model(result) if result is not None else {}
+    return (
+        await _enrich_with_salle_details(data, client) if isinstance(data, dict) else {}
+    )
 
 
 async def get_officiel_service(officiel_id: int | str) -> dict[str, Any]:

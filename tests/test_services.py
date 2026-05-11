@@ -21,6 +21,7 @@ from ffbb_mcp.services import (
     get_competition_service,
     get_organisme_service,
     get_poule_service,
+    get_rencontre_service,
     get_saisons_service,
     multi_search_service,
     search_organismes_service,
@@ -121,6 +122,47 @@ class TestGetOrganismeService:
         mock_client.get_organisme_async = AsyncMock(return_value=None)
         result = await get_organisme_service(organisme_id=99999)
         assert result == {}
+
+
+class TestGetRencontreService:
+    @pytest.mark.asyncio
+    async def test_enriches_salle_details(self, patch_get_client, mock_client):
+        rencontre_mock = MagicMock()
+        rencontre_mock.model_dump = MagicMock(
+            return_value={"id": "m1", "salle": {"id": "s1"}}
+        )
+        salle_mock = MagicMock()
+        salle_mock.model_dump = MagicMock(
+            return_value={
+                "id": "s1",
+                "nom": "Gymnase Test",
+                "adresse": "1 rue du Basket",
+                "codePostal": "63000",
+                "ville": "Clermont-Ferrand",
+            }
+        )
+        mock_client.get_rencontre_async = AsyncMock(return_value=rencontre_mock)
+        mock_client.get_salle_async = AsyncMock(return_value=salle_mock)
+
+        result = await get_rencontre_service("m1")
+
+        mock_client.get_rencontre_async.assert_awaited_once_with("m1")
+        mock_client.get_salle_async.assert_awaited_once_with("s1")
+        assert result["salle_details"]["nom"] == "Gymnase Test"
+        assert result["adresse_salle"] == "1 rue du Basket 63000 Clermont-Ferrand"
+
+    @pytest.mark.asyncio
+    async def test_does_not_call_salle_when_missing(
+        self, patch_get_client, mock_client
+    ):
+        rencontre_mock = MagicMock()
+        rencontre_mock.model_dump = MagicMock(return_value={"id": "m1"})
+        mock_client.get_rencontre_async = AsyncMock(return_value=rencontre_mock)
+
+        result = await get_rencontre_service("m1")
+
+        assert result == {"id": "m1"}
+        mock_client.get_salle_async.assert_not_awaited()
 
 
 # ---------------------------------------------------------------------------
@@ -486,16 +528,24 @@ class TestCalendrierClubService:
                         "resultatEquipe2": 40,
                         "idEngagementEquipe1": {"id": 1001},
                         "idEngagementEquipe2": {"id": 1002},
+                        "salle": {"id": "s1"},
                     }
                 ]
             }
         )
         mock_client.get_poule_async = AsyncMock(return_value=poule_mock)
+        salle_mock = MagicMock()
+        salle_mock.model_dump = MagicMock(
+            return_value={"id": "s1", "adresse1": "2 avenue du Sport", "ville": "Riom"}
+        )
+        mock_client.get_salle_async = AsyncMock(return_value=salle_mock)
 
         result = await get_calendrier_club_service(organisme_id=123)
         assert len(result) == 1
         assert result[0]["equipe1"] == "CLERMONT"
         assert result[0]["score_equipe1"] == 50
+        assert result[0]["salle_details"]["id"] == "s1"
+        assert result[0]["adresse_salle"] == "2 avenue du Sport Riom"
 
     @pytest.mark.asyncio
     async def test_deduplicates_poule_fetches(self, patch_get_client, mock_client):
