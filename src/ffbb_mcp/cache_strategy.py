@@ -73,5 +73,5 @@ def get_static_ttl(cache_name: str) -> int:
         else 1_800
         if is_post_match_cooling()
         else 86_400,
-        "poule": 15,
+        "poule": 5,  # 5s fallback; TTL dynamique via get_poule_ttl() ajuste selon matches en cours
     }.get(cache_name, 3_600)  # fallback 1h

@@ -1527,6 +1527,34 @@ async def ffbb_next_match_service(
             dt = datetime.max.replace(tzinfo=tz)
         upcoming.append((dt, m, eq))
 
+    # AUTO-REFRESH FALLBACK: Si aucun match trouvé en cache et force_refresh=False,
+    # tenter un rafraîchissement pour éviter un faux "no_upcoming_match" sur cache périmé.
+    if not upcoming and not force_refresh:
+        logger.info(
+            f"ffbb_next_match: aucun match trouvé en cache pour {categorie}, "
+            "tentative de rafraîchissement..."
+        )
+        all_matches = await _fetch_poule_matches(
+            equipes,
+            organisme_nom=organisme_nom,
+            numero_equipe=numero_equipe,
+            force_refresh=True,
+        )
+        # Re-filter après refresh
+        upcoming = []
+        for m, eq in all_matches:
+            joue = m.get("joue")
+            res1 = m.get("resultatEquipe1", m.get("resultat_equipe1"))
+            res2 = m.get("resultatEquipe2", m.get("resultat_equipe2"))
+            if joue not in (0, "0", None):
+                continue
+            if res1 not in (None, "", "None") or res2 not in (None, "", "None"):
+                continue
+            dt = _parse_dt(m.get("date_rencontre", m.get("date")))
+            if dt is None:
+                dt = datetime.max.replace(tzinfo=tz)
+            upcoming.append((dt, m, eq))
+
     if not upcoming:
         all_available_equipes = sorted(
             list(
@@ -2934,5 +2962,5 @@ async def ffbb_last_result_service(
         "exterieur": format_team_name(dernier.get("nomEquipe2", ""), num2),
         "score_exterieur": dernier.get("resultatEquipe2"),
         "victoire": victoire,
-        "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
+        "_meta": _freshness_meta(cache="poule", force_refresh_supported=True),
     }
