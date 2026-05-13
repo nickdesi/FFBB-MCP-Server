@@ -48,6 +48,7 @@ T = TypeVar("T")
 
 _PHASE_EXTRACT_PATTERN = re.compile(r"Phase\s*(\d+)", re.IGNORECASE)
 _NUMERIC_EXTRACT_PATTERN = re.compile(r"(\d+)")
+_DIGIT_PATTERN = re.compile(r"\d")
 
 
 # Limiter globalement le nombre d'appels concurrents vers l'API FFBB.
@@ -2774,13 +2775,14 @@ def _match_team_name(
 
     # On traite None comme 1 pour la recherche de suffixe (équipe unique ou principale)
     search_num = numero_equipe if numero_equipe is not None else 1
-    suffix = f"- {search_num}"
-    suffix_norm = _normalize_name(suffix)
+    # Optimization: f"- {search_num}" is always ASCII and already normalized upper case,
+    # so we don't need to call _normalize_name(suffix)
+    suffix_norm = f"- {search_num}"
 
     if search_num == 1:
         # Equipe unique : suffixe optionnel.
         # On accepte soit le suffixe "- 1", soit l'absence de chiffre dans le nom.
-        has_digit = any(ch.isdigit() for ch in nom_norm)
+        has_digit = bool(_DIGIT_PATTERN.search(nom_norm))
         return nom_norm.endswith(suffix_norm) or not has_digit
 
     return nom_norm.endswith(suffix_norm)

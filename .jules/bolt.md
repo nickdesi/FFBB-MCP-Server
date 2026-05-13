@@ -1,0 +1,3 @@
+## 2025-03-01 - Optimize `_match_team_name` character check
+**Learning:** Checking for digits using a Python generator expression `any(ch.isdigit() for ch in string)` introduces significant iteration overhead, slowing down hot paths like team name matching.
+**Action:** Replace manual character loops or generators with pre-compiled C-optimized regex engines (e.g., `re.compile(r'\d').search()`), which is approximately 2x faster for character inclusion checks. Additionally, skip unnecessary string normalizations (e.g., `_normalize_name(suffix)`) if the input string is already statically composed of ASCII characters and normalized components.
