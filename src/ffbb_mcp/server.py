@@ -26,6 +26,7 @@ from starlette.responses import (
 )
 
 from . import __version__ as _PACKAGE_VERSION
+from .benchmark import get_benchmark_trends, run_benchmark
 from .dashboard import _build_dashboard_html
 from .metrics import (
     generate_prometheus_metrics,
@@ -369,6 +370,25 @@ async def metrics_json(request: Request) -> Response:
 async def dashboard(request: Request) -> Response:
     """Dashboard de supervision HTML — lisible humain, demo-friendly."""
     return HTMLResponse(content=_build_dashboard_html(), status_code=200)
+
+
+@mcp.custom_route("/benchmark", methods=["GET", "POST"])  # type: ignore[untyped-decorator]
+async def benchmark(request: Request) -> Response:
+    """Lance un benchmark de performance ou consulte les tendances.
+
+    GET  → retourne les tendances historiques
+    POST → exécute un nouveau benchmark
+    """
+    if request.method == "GET":
+        trends = get_benchmark_trends()
+        return JSONResponse(trends)
+
+    # POST — méthode synchrone, on lance le benchmark
+    from .services import logger as svc_logger
+
+    svc_logger.info("Benchmark déclenché via /benchmark")
+    result = await run_benchmark()
+    return JSONResponse(result, status_code=201)
 
 
 @mcp.custom_route("/docs", methods=["GET"])  # type: ignore[untyped-decorator]

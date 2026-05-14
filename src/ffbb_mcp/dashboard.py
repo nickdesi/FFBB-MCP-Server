@@ -3,6 +3,7 @@
 import datetime
 
 from . import __version__ as _PACKAGE_VERSION
+from .benchmark import get_benchmark_trends
 from .metrics import get_snapshot
 
 _CORE_TOOLS = {
@@ -13,6 +14,90 @@ _CORE_TOOLS = {
     "ffbb_club",
     "ffbb_get",
 }
+
+
+def _build_benchmark_html() -> str:
+    trends = get_benchmark_trends()
+    latest = trends["latest"]
+
+    if not latest:
+        return (
+            "<div class='section-title'>&#9889; Benchmark Performance</div>"
+            "<div class='kpi'><p class='label'>Aucun benchmark lancé. "
+            "Utilisez <code>/benchmark</code> ou lancez depuis GitHub Actions.</p></div>"
+        )
+
+    direction_icon = {
+        "improving": "&#9650;",
+        "degrading": "&#9660;",
+        "stable": "&#9654;",
+        "unknown": "&#9679;",
+    }
+    direction_label = {
+        "improving": "Amélioration",
+        "degrading": "Dégradation",
+        "stable": "Stable",
+        "unknown": "Inconnue",
+    }
+    dir_icon = direction_icon.get(trends["direction"], "&#9679;")
+    dir_label = direction_label.get(trends["direction"], "")
+
+    runs = trends["runs"]
+    max_in_chart = min(trends["total_runs"], 20)
+    chart_bars = ""
+    if runs and trends["average_ms"]:
+        max_val = max(r["total_ms"] for r in runs[-max_in_chart:]) or 1
+        for r in runs[-max_in_chart:]:
+            pct = (r["total_ms"] / max_val) * 100
+            color = "#00e676" if r["success"] else "#ff5252"
+            bar = (
+                f"<div class='bench-bar-wrap' title='{r.get('timestamp', '')[:19]} "
+                f"— {'OK' if r['success'] else 'ECHEC'}: {r['total_ms']}ms'>"
+                f"<div class='bench-bar' style='height:{pct:.0f}%;background:{color}'></div>"
+                f"</div>"
+            )
+            chart_bars += bar
+
+    latest_ms = latest["total_ms"]
+    avg_ms = trends["average_ms"]
+    success_rate = trends["success_rate"]
+    trend_dir = f"{dir_icon} {dir_label}"
+
+    step_rows = ""
+    for s in latest.get("steps", []):
+        step_rows += (
+            f"<tr>"
+            f"<td class='cache-name'>{s['name']}</td>"
+            f"<td class='num'>{s['duration_ms']}ms</td>"
+            f"</tr>"
+        )
+
+    html = (
+        "<div class='section-title'>&#9889; Benchmark Performance</div>"
+        "<div class='kpi-grid'>"
+        f"<div class='kpi'><div class='label'>Dernier run</div>"
+        f"<div class='value'>{latest_ms}<span style='font-size:14px;color:var(--muted)'>ms</span></div>"
+        f"<div class='sub'>{latest.get('scenario', '')}</div></div>"
+        f"<div class='kpi'><div class='label'>Moyenne</div>"
+        f"<div class='value accent'>{avg_ms or '—'}<span style='font-size:14px;color:var(--muted)'>ms</span></div>"
+        f"<div class='sub'>sur {trends['total_runs']} runs</div></div>"
+        f"<div class='kpi'><div class='label'>Succès</div>"
+        f"<div class='value green'>{success_rate}%</div>"
+        f"<div class='sub'></div></div>"
+        f"<div class='kpi'><div class='label'>Tendance</div>"
+        f"<div class='value' style='font-size:20px'>{trend_dir}</div>"
+        f"<div class='sub'>3 derniers runs</div></div>"
+        "</div>"
+        "<div class='section-title' style='margin-top:16px'>&#128200; Latence (derniers runs)</div>"
+        f"<div class='bench-chart'>{chart_bars}</div>"
+        "<div class='table-container' style='margin-top:16px'>"
+        "<table>"
+        "<thead><tr><th>Étape</th><th style='text-align:right'>Durée</th></tr></thead>"
+        f"<tbody>{step_rows}</tbody>"
+        "</table>"
+        "</div>"
+    )
+    return html
 
 
 def _build_dashboard_html() -> str:
@@ -137,6 +222,9 @@ def _build_dashboard_html() -> str:
         "    .cache-name{color:var(--accent);font-weight:600} .num{text-align:right;font-variant-numeric:tabular-nums}\n"
         "    .bar-track{display:inline-block;width:100px;height:6px;background:var(--border);border-radius:10px;vertical-align:middle;overflow:hidden}\n"
         "    .bar-fill{height:100%;border-radius:10px;transition:width .4s ease} .bar-label{font-size:11px;margin-left:8px;font-variant-numeric:tabular-nums}\n"
+        "    .bench-chart{display:flex;align-items:flex-end;gap:3px;height:80px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow-x:auto}\n"
+        "    .bench-bar-wrap{flex:1 0 18px;height:100%;display:flex;align-items:flex-end;justify-content:center}\n"
+        "    .bench-bar{width:12px;border-radius:4px 4px 0 0;min-height:2px;transition:height .3s ease}\n"
         "    .empty{color:var(--muted);font-style:italic;text-align:center;padding:30px}\n"
         "    .endpoints{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}\n"
         "    .ep-link{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);text-decoration:none;font-size:11px;transition:all .2s}\n"
@@ -204,6 +292,7 @@ def _build_dashboard_html() -> str:
         f"        <tbody>{tool_rows}</tbody>\n"
         "      </table>\n"
         "    </div>\n"
+        f"    {_build_benchmark_html()}\n"
         "    <div class='section-title'>&#128279; Points d'acces</div>\n"
         "    <div class='endpoints'>\n"
         "      <a class='ep-link' href='/'><span class='ep-method'>GET</span> Accueil site</a>\n"

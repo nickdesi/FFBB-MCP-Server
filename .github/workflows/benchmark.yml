@@ -1,0 +1,29 @@
+name: Benchmark
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    name: Run performance benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger benchmark
+        run: |
+          result=$(curl -s -o /tmp/benchmark.json -w "%{http_code}" \
+            -X POST "https://ffbb.desimone.fr/benchmark" \
+            -H "Content-Type: application/json")
+          if [ "$result" != "201" ]; then
+            echo "::error::Benchmark failed with HTTP $result"
+            cat /tmp/benchmark.json
+            exit 1
+          fi
+          total_ms=$(python3 -c "import json; d=json.load(open('/tmp/benchmark.json')); print(d.get('total_ms','?'))")
+          success=$(python3 -c "import json; d=json.load(open('/tmp/benchmark.json')); print(d.get('success',False))")
+          echo "✅ Benchmark: $total_ms ms — success=$success"
