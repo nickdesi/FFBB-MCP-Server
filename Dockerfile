@@ -1,8 +1,10 @@
-FROM ghcr.io/astral-sh/uv:python3.14-slim AS builder
+FROM python:3.14-slim AS builder
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV UV_COMPILE_BYTECODE=1
+
+COPY --from=ghcr.io/astral-sh/uv:0.11 /uv /uvx /bin/
 
 WORKDIR /build
 
