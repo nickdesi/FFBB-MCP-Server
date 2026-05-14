@@ -13,6 +13,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
+from ffbb_mcp._state import state
 from ffbb_mcp.services import (
     ffbb_bilan_service,
     ffbb_equipes_club_service,
@@ -28,6 +29,19 @@ _BENCHMARK_FILE = _BENCHMARK_DIR / "benchmark_results.json"
 
 _MAX_RUNS = 50
 _lock = Lock()
+
+
+def _evict_runtime_caches_for_benchmark() -> None:
+    """Vide les caches service-level pour mesurer un run réellement "cold"."""
+    for cache in (
+        state.cache_search,
+        state.cache_organisme,
+        state.cache_bilan,
+        state.cache_poule,
+        state.cache_classement,
+    ):
+        if cache is not None:
+            cache.clear()
 
 
 def _persist(runs: list[dict[str, Any]]) -> None:
@@ -81,6 +95,8 @@ async def run_benchmark() -> dict[str, Any]:
             raise
 
     try:
+        _evict_runtime_caches_for_benchmark()
+
         orgs = await _step(
             "search_club", search_organismes_service(nom="Stade Clermontois")
         )
@@ -97,7 +113,12 @@ async def run_benchmark() -> dict[str, Any]:
             raise ValueError("Aucune équipe U11M trouvée")
 
         bilan = await _step(
-            "get_bilan", ffbb_bilan_service(organisme_id=org_id, categorie="U11M")
+            "get_bilan",
+            ffbb_bilan_service(
+                organisme_id=org_id,
+                categorie="U11M",
+                force_refresh=True,
+            ),
         )
         if not bilan:
             raise ValueError("Bilan vide")
