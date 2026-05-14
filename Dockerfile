@@ -29,6 +29,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 WORKDIR /app
+ENV HOME=/app
 
 COPY --from=builder /opt/venv /opt/venv
 COPY assets/ ./assets/
