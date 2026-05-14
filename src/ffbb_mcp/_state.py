@@ -22,8 +22,6 @@ def _read_positive_int_env(key: str, default: int) -> int:
 class _ServiceState:
     inflight_bilan: dict[str, asyncio.Task[Any]] = field(default_factory=dict)
     inflight_calendrier: dict[str, asyncio.Task[Any]] = field(default_factory=dict)
-    inflight_lives: dict[str, asyncio.Task[Any]] = field(default_factory=dict)
-    inflight_saisons: dict[str, asyncio.Task[Any]] = field(default_factory=dict)
     inflight_poule: dict[str, asyncio.Task[Any]] = field(default_factory=dict)
     inflight_detail: dict[str, asyncio.Task[Any]] = field(default_factory=dict)
     inflight_search: dict[str, asyncio.Task[Any]] = field(default_factory=dict)
@@ -31,7 +29,9 @@ class _ServiceState:
     # Caches in-memory globaux
     cache_lives: TTLCache[Any, Any] | None = None
     cache_search: TTLCache[Any, Any] | None = None
-    cache_detail: TTLCache[Any, Any] | None = None
+    cache_competition: TTLCache[Any, Any] | None = None
+    cache_organisme: TTLCache[Any, Any] | None = None
+    cache_saisons: TTLCache[Any, Any] | None = None
     cache_calendrier: TTLCache[Any, Any] | TLRUCache[Any, Any] | None = None
     cache_bilan: TLRUCache[Any, Any] | None = None
     cache_classement: TLRUCache[Any, Any] | None = None
@@ -45,8 +45,6 @@ def reset_service_state() -> None:
     global state
     state.inflight_bilan.clear()
     state.inflight_calendrier.clear()
-    state.inflight_lives.clear()
-    state.inflight_saisons.clear()
     state.inflight_poule.clear()
     state.inflight_detail.clear()
     state.inflight_search.clear()
@@ -54,8 +52,12 @@ def reset_service_state() -> None:
         state.cache_lives.clear()
     if state.cache_search is not None:
         state.cache_search.clear()
-    if state.cache_detail is not None:
-        state.cache_detail.clear()
+    if state.cache_competition is not None:
+        state.cache_competition.clear()
+    if state.cache_organisme is not None:
+        state.cache_organisme.clear()
+    if state.cache_saisons is not None:
+        state.cache_saisons.clear()
     if state.cache_calendrier is not None:
         state.cache_calendrier.clear()
     if state.cache_bilan is not None:

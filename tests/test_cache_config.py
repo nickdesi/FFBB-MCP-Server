@@ -31,7 +31,17 @@ def test_read_positive_int_env():
 
 def test_get_cache_ttls_structure():
     ttls = get_cache_ttls()
-    expected_keys = {"lives", "search", "detail", "calendrier", "bilan", "poule"}
+    expected_keys = {
+        "lives",
+        "search",
+        "detail",
+        "competition",
+        "organisme",
+        "saisons",
+        "calendrier",
+        "bilan",
+        "poule",
+    }
     assert set(ttls.keys()) == expected_keys
     for val in ttls.values():
         assert isinstance(val, int)

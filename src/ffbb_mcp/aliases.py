@@ -10,6 +10,7 @@ Ce module fournit :
 
 import json
 import logging
+import os
 import re
 from pathlib import Path
 from threading import Lock
@@ -147,7 +148,16 @@ _DEFAULT_ACRONYMS = {
     "SAHB": "SAINT-AMAND HAINAUT BASKET",
 }
 
-_CACHE_DIR = Path(__file__).resolve().parent
+
+def _resolve_cache_dir() -> Path:
+    """Retourne un dossier cache utilisateur robuste et écrivable."""
+    xdg = os.environ.get("XDG_CACHE_HOME")
+    if xdg:
+        return Path(xdg).expanduser() / "ffbb-mcp"
+    return Path.home() / ".cache" / "ffbb-mcp"
+
+
+_CACHE_DIR = _resolve_cache_dir()
 _CACHE_FILE = _CACHE_DIR / "acronyms_cache.json"
 _cache_lock = Lock()
 _acronyms_cache: dict[str, str] | None = None
@@ -202,6 +212,7 @@ def _save_acronyms_cache() -> None:
     if _acronyms_cache is None:
         return
     try:
+        _CACHE_DIR.mkdir(parents=True, exist_ok=True)
         _CACHE_FILE.write_text(
             json.dumps(_acronyms_cache, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",

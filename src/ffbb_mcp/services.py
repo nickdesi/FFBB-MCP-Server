@@ -10,7 +10,7 @@ import unicodedata
 from collections.abc import Callable, Coroutine  # noqa: TC003
 from datetime import datetime, timedelta
 from functools import lru_cache
-from typing import Any, Protocol, TypeVar, cast
+from typing import Any, Protocol, cast
 from zoneinfo import ZoneInfo
 
 from cachetools import TLRUCache, TTLCache
@@ -37,8 +37,6 @@ from ffbb_mcp.utils import (
 )
 
 logger = logging.getLogger("ffbb-mcp")
-
-T = TypeVar("T")
 
 # ---------------------------------------------------------------------------
 # Expressions régulières pré-compilées (Optimisation des performances)
@@ -262,7 +260,15 @@ state.cache_search = TTLCache(
     maxsize=256,
     ttl=_read_positive_int_env("FFBB_CACHE_TTL_SEARCH", get_static_ttl("search")),
 )
-state.cache_detail = TTLCache(
+state.cache_competition = TTLCache(
+    maxsize=128,
+    ttl=_read_positive_int_env("FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")),
+)
+state.cache_organisme = TTLCache(
+    maxsize=128,
+    ttl=_read_positive_int_env("FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")),
+)
+state.cache_saisons = TTLCache(
     maxsize=128,
     ttl=_read_positive_int_env("FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")),
 )
@@ -305,7 +311,12 @@ def get_cache_ttls() -> dict[str, int]:
         # Return -1 if uninitialized to distinguish from an actual 0 TTL
         "lives": int(state.cache_lives.ttl) if state.cache_lives else -1,
         "search": int(state.cache_search.ttl) if state.cache_search else -1,
-        "detail": int(state.cache_detail.ttl) if state.cache_detail else -1,
+        "detail": int(state.cache_competition.ttl) if state.cache_competition else -1,
+        "competition": int(state.cache_competition.ttl)
+        if state.cache_competition
+        else -1,
+        "organisme": int(state.cache_organisme.ttl) if state.cache_organisme else -1,
+        "saisons": int(state.cache_saisons.ttl) if state.cache_saisons else -1,
         "calendrier": _read_positive_int_env(
             "FFBB_CACHE_TTL_CALENDRIER", get_static_ttl("calendrier")
         ),
@@ -638,11 +649,14 @@ async def _safe_call_with_inflight(
 
 
 async def _dedupe_inflight_detail(
-    cache_key: str, make_coro, cache_name: str = "detail"
+    cache_key: str,
+    make_coro,
+    cache_name: str = "detail",
+    cache: TTLCache | TLRUCache | None = None,
 ) -> Any:
     """Déduplique les appels concurrents sur la même clé de détail."""
     return await _dedupe_inflight(
-        cache=state.cache_detail,
+        cache=cache,
         cache_key=cache_key,
         inflight_map=state.inflight_detail,
         make_coro=make_coro,
@@ -710,7 +724,7 @@ async def get_lives_service() -> list[dict]:
 
 async def get_saisons_service(active_only: bool = False) -> list[dict]:
     cache_key = f"saisons:{active_only}"
-    cached = _cache_get(state.cache_detail, cache_key, "saisons")
+    cached = _cache_get(state.cache_saisons, cache_key, "saisons")
     if cached is not None:
         return cached
 
@@ -723,7 +737,7 @@ async def get_saisons_service(active_only: bool = False) -> list[dict]:
     )
     saisons_list = saisons if isinstance(saisons, list) else []
     result = [serialize_model(s) for s in saisons_list]
-    _cache_set(state.cache_detail, cache_key, result, "saisons")
+    _cache_set(state.cache_saisons, cache_key, result, "saisons")
     return result
 
 
@@ -741,7 +755,12 @@ async def get_competition_service(competition_id: int | str) -> dict:
         )
         return serialize_model(comp) or {}
 
-    return await _dedupe_inflight_detail(cache_key, _fetch, cache_name="competition")
+    return await _dedupe_inflight_detail(
+        cache_key,
+        _fetch,
+        cache_name="competition",
+        cache=state.cache_competition,
+    )
 
 
 async def get_poule_service(
@@ -893,7 +912,12 @@ async def get_organisme_service(organisme_id: int | str) -> dict:
         )
         return serialize_model(org) or {}
 
-    return await _dedupe_inflight_detail(cache_key, _fetch, cache_name="organisme")
+    return await _dedupe_inflight_detail(
+        cache_key,
+        _fetch,
+        cache_name="organisme",
+        cache=state.cache_organisme,
+    )
 
 
 async def ffbb_get_classement_service(
@@ -1211,7 +1235,6 @@ async def ffbb_equipes_club_service(
     if parsed_filter is None:
         return all_teams
 
-    assert parsed_filter is not None
     filtered_teams: list[dict[str, Any]] = []
     for t in all_teams:
         # Filtre catégorie (strict)

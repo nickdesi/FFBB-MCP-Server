@@ -1140,14 +1140,17 @@ async def ffbb_last_result(
             "message": "Veuillez fournir club_name ou organisme_id pour trouver l'équipe.",
         }
 
-    effective_refresh = force_refresh
-    return await ffbb_last_result_service(
-        club_name=club_name,
-        organisme_id=organisme_id,
-        categorie=categorie,
-        numero_equipe=numero_equipe,
-        force_refresh=effective_refresh,
-    )
+    try:
+        effective_refresh = force_refresh
+        return await ffbb_last_result_service(
+            club_name=club_name,
+            organisme_id=organisme_id,
+            categorie=categorie,
+            numero_equipe=numero_equipe,
+            force_refresh=effective_refresh,
+        )
+    except Exception as e:
+        raise handle_api_error(e) from e
 
 
 # ---------------------------------------------------------------------------
@@ -1207,13 +1210,16 @@ async def ffbb_next_match(
             "message": "Veuillez fournir club_name ou organisme_id pour trouver l'équipe.",
         }
 
-    return await ffbb_next_match_service(
-        club_name=club_name,
-        organisme_id=organisme_id,
-        categorie=categorie,
-        numero_equipe=numero_equipe,
-        force_refresh=force_refresh,
-    )
+    try:
+        return await ffbb_next_match_service(
+            club_name=club_name,
+            organisme_id=organisme_id,
+            categorie=categorie,
+            numero_equipe=numero_equipe,
+            force_refresh=force_refresh,
+        )
+    except Exception as e:
+        raise handle_api_error(e) from e
 
 
 # ---------------------------------------------------------------------------
