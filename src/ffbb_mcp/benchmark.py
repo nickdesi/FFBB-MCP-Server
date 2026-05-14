@@ -22,7 +22,7 @@ from ffbb_mcp.services import (
 logger = logging.getLogger("ffbb-mcp")
 
 _BENCHMARK_DIR = (
-    Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "ffbb-mcp"
+    Path(os.environ.get("XDG_CACHE_HOME", Path("/app") / ".cache")) / "ffbb-mcp"
 )
 _BENCHMARK_FILE = _BENCHMARK_DIR / "benchmark_results.json"
 
