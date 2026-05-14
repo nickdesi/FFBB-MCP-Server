@@ -1,0 +1,37 @@
+name: Deploy to Coolify
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Trigger Coolify deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger deploy webhook
+        env:
+          COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_DEPLOY_HOOK }}
+        if: env.COOLIFY_WEBHOOK != ''
+        run: |
+          echo "Déclenchement du déploiement Coolify..."
+          result=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "$COOLIFY_WEBHOOK")
+          if [ "$result" = "200" ] || [ "$result" = "202" ]; then
+            echo "✅ Déploiement déclenché (HTTP $result)"
+          else
+            echo "::warning::Échec déclenchement Coolify (HTTP $result)"
+          fi
+
+      - name: No webhook configured
+        if: ${{ secrets.COOLIFY_DEPLOY_HOOK == '' }}
+        run: |
+          echo "ℹ️  Aucun webhook Coolify configuré."
+          echo "Pour l'activer :"
+          echo "1. Coolify → ton projet → Webhooks → copier l'URL"
+          echo "2. GitHub → Settings → Secrets → COOLIFY_DEPLOY_HOOK"
