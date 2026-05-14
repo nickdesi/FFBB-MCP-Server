@@ -5,6 +5,15 @@ import datetime
 from . import __version__ as _PACKAGE_VERSION
 from .metrics import get_snapshot
 
+_CORE_TOOLS = {
+    "ffbb_search",
+    "ffbb_resolve_team",
+    "ffbb_next_match",
+    "ffbb_last_result",
+    "ffbb_club",
+    "ffbb_get",
+}
+
 
 def _build_dashboard_html() -> str:
     snap = get_snapshot()
@@ -23,10 +32,31 @@ def _build_dashboard_html() -> str:
     avg_lat_ms = snap["api_avg_latency_seconds"] * 1000
     inflight = snap["api_inflight_requests"]
     cache_stats = snap.get("cache", {})
+    tool_calls = snap.get("tool_calls", {})
     hits = sum(s["hits"] for s in cache_stats.values())
     misses = sum(s["misses"] for s in cache_stats.values())
     cache_total = hits + misses
     hit_ratio = hits / cache_total if cache_total else 0.0
+    core_calls = sum(count for name, count in tool_calls.items() if name in _CORE_TOOLS)
+    legacy_calls = sum(
+        count for name, count in tool_calls.items() if name not in _CORE_TOOLS
+    )
+
+    tool_rows = ""
+    for name, count in sorted(tool_calls.items(), key=lambda item: (-item[1], item[0])):
+        bucket = "CORE" if name in _CORE_TOOLS else "LEGACY"
+        tool_rows += (
+            f"<tr>"
+            f"<td class='cache-name'>{name}</td>"
+            f"<td class='num'>{count}</td>"
+            f"<td>{bucket}</td>"
+            f"</tr>"
+        )
+
+    if not tool_rows:
+        tool_rows = (
+            "<tr><td colspan='3' class='empty'>Aucun appel outil MCP observe.</td></tr>"
+        )
 
     status_badge_cls = "healthy" if errors == 0 else "degraded"
     status_label = "HEALTHY" if errors == 0 else "DEGRADED"
@@ -160,6 +190,18 @@ def _build_dashboard_html() -> str:
         "      <table>\n"
         "        <thead><tr><th>Type de ressource</th><th style='text-align:right'>Hits</th><th style='text-align:right'>Misses</th><th style='text-align:right'>Total</th><th>Ratio</th></tr></thead>\n"
         f"        <tbody>{cache_rows}</tbody>\n"
+        "      </table>\n"
+        "    </div>\n"
+        "    <div class='section-title'>&#129516; Usage des Outils MCP</div>\n"
+        "    <div class='kpi-grid'>\n"
+        f"      <div class='kpi'><div class='label'>Calls Core</div><div class='value green'>{core_calls}</div></div>\n"
+        f"      <div class='kpi'><div class='label'>Calls Legacy</div><div class='value'>{legacy_calls}</div></div>\n"
+        f"      <div class='kpi'><div class='label'>Tools distincts</div><div class='value'>{len(tool_calls)}</div></div>\n"
+        "    </div>\n"
+        "    <div class='table-container' style='margin-top:16px'>\n"
+        "      <table>\n"
+        "        <thead><tr><th>Outil</th><th style='text-align:right'>Appels</th><th>Classe</th></tr></thead>\n"
+        f"        <tbody>{tool_rows}</tbody>\n"
         "      </table>\n"
         "    </div>\n"
         "    <div class='section-title'>&#128279; Points d'acces</div>\n"

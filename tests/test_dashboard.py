@@ -14,6 +14,7 @@ def test_dashboard_html_renders_empty_cache(monkeypatch):
             "api_avg_latency_seconds": 0.0,
             "api_inflight_requests": 0,
             "cache": {},
+            "tool_calls": {},
         },
     )
 
@@ -23,6 +24,7 @@ def test_dashboard_html_renders_empty_cache(monkeypatch):
     assert "1m" not in html
     assert "0j 00:01:05" in html
     assert "Aucune donnee de cache" in html
+    assert "Aucun appel outil MCP observe" in html
     assert "FFBB MCP DASHBOARD" in html
 
 
@@ -40,6 +42,11 @@ def test_dashboard_html_renders_degraded_cache_rows(monkeypatch):
                 "hot": {"hits": 8, "misses": 2, "total": 10, "hit_ratio": 0.8},
                 "cold": {"hits": 1, "misses": 3, "total": 4, "hit_ratio": 0.25},
             },
+            "tool_calls": {
+                "ffbb_search": 7,
+                "ffbb_get": 5,
+                "ffbb_team_summary": 3,
+            },
         },
     )
 
@@ -54,3 +61,10 @@ def test_dashboard_html_renders_degraded_cache_rows(monkeypatch):
     assert "80.0%" in html
     assert "25.0%" in html
     assert "En cours" in html
+    assert "Usage des Outils MCP" in html
+    assert "Calls Core" in html
+    assert "Calls Legacy" in html
+    assert "class='cache-name'>ffbb_search" in html
+    assert "class='cache-name'>ffbb_team_summary" in html
+    assert ">CORE<" in html
+    assert ">LEGACY<" in html

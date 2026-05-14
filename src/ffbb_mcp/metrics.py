@@ -26,6 +26,9 @@ _cache_hits: dict[str, int] = {}
 _cache_misses: dict[str, int] = {}
 _cache_miss_reasons: dict[tuple[str, str], int] = {}
 
+# Compteurs d'usage des outils MCP (par nom d'outil)
+_tool_calls: dict[str, int] = {}
+
 # Gauge : appels FFBB en vol
 _ffbb_inflight: int = 0
 
@@ -87,6 +90,31 @@ def record_cache_miss(cache_name: str, reason: str = "not_found") -> None:
         _cache_miss_reasons[key] = _cache_miss_reasons.get(key, 0) + 1
 
 
+def record_tool_call(tool_name: str) -> None:
+    """Enregistre un appel d'outil MCP par nom d'outil exposé."""
+    with _metrics_lock:
+        _tool_calls[tool_name] = _tool_calls.get(tool_name, 0) + 1
+
+
+def reset_metrics() -> None:
+    """Réinitialise les métriques en mémoire (usage tests)."""
+    global START_TIME, _calls_success, _calls_error, _latency_sum, _latency_count
+    global _ffbb_inflight
+    with _metrics_lock:
+        START_TIME = time.time()
+        _calls_success = 0
+        _calls_error = 0
+        _latency_sum = 0.0
+        _latency_count = 0
+        _ffbb_inflight = 0
+        for i in range(len(_latency_bucket_counts)):
+            _latency_bucket_counts[i] = 0
+        _cache_hits.clear()
+        _cache_misses.clear()
+        _cache_miss_reasons.clear()
+        _tool_calls.clear()
+
+
 # ---------------------------------------------------------------------------
 # Snapshot
 # ---------------------------------------------------------------------------
@@ -110,6 +138,7 @@ def get_snapshot() -> dict[str, Any]:
         hits = dict(_cache_hits)
         misses = dict(_cache_misses)
         miss_reasons = dict(_cache_miss_reasons)
+        tool_calls = dict(_tool_calls)
 
     calls = success + errors
     error_rate = errors / calls if calls > 0 else 0.0
@@ -139,6 +168,7 @@ def get_snapshot() -> dict[str, Any]:
         "api_inflight_requests": inflight,
         "cache": cache_stats,
         "cache_miss_reasons": miss_reasons,
+        "tool_calls": tool_calls,
     }
 
 
@@ -233,6 +263,18 @@ def generate_prometheus_metrics() -> str:
             *[
                 f'ffbb_cache_misses_by_reason_total{{cache="{cache}",reason="{reason}"}} {count}'
                 for (cache, reason), count in cache_miss_reasons.items()
+            ],
+        )
+
+    tool_calls: dict[str, int] = snap.get("tool_calls", {})
+    if tool_calls:
+        lines += _prom_block(
+            "ffbb_mcp_tool_calls_total",
+            "Total des appels d'outils MCP par nom d'outil",
+            "counter",
+            *[
+                f'ffbb_mcp_tool_calls_total{{tool="{name}"}} {count}'
+                for name, count in sorted(tool_calls.items())
             ],
         )
 

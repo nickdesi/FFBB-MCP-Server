@@ -4,6 +4,8 @@
 
 Ce document fournit une documentation technique exhaustive pour les outils exposés par le serveur FFBB MCP. Il est destiné aux développeurs et aux agents IA pour comprendre les capacités et les schémas de données du serveur.
 
+Plan de deprecation sans rupture API: voir `docs/TOOL_DEPRECATION_PLAN.md`.
+
 ## ✨ Nouveautés v1.0.0
 
 | # | Amélioration | Impact |

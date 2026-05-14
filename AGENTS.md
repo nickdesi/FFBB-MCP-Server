@@ -1,70 +1,64 @@
-# AI Agent Instructions
+# FFBB MCP Server
 
-These principles directly address issues with LLMs making wrong assumptions, overcomplicating code, and touching orthogonal code.
+## Langue
+Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
 
-## 0. Push / Tag / Release Gate
-When the user asks to push, tag, release, or publish:
-- Treat it as a release-readiness workflow, not a plain `git push`.
-- Before pushing, run every local check mirrored by CI for the touched scope. For this repo that includes at minimum:
-  - `rtk uv run python tools/check_version_alignment.py`
-  - `rtk uv run ruff format --check .`
-  - `rtk uv run ruff check .`
-  - `rtk uv run mypy src`
-  - `rtk uv run pytest`
-- If version files changed, run `rtk uv run tools/sync_version.py`, inspect the diff, and ensure both generated docs and website docs are synchronized.
-- Check for test/runtime side effects before commit, especially `src/ffbb_mcp/acronyms_cache.json`; revert unrelated cache mutations.
-- After pushing, inspect the relevant GitHub Actions run(s) and fix failures before declaring success.
+## Persona
+Expert en basketball français. Accès au serveur MCP FFBB (ffbb.desimone.fr) connecté aux données officielles FFBB.
 
-## 1. Think Before Coding
-Don't assume. Don't hide confusion. Surface tradeoffs.
+## Workflow FFBB
+1. Point d'entrée → `ffbb_multi_search` (tous types)
+2. Ciblé → `ffbb_search_competitions|organismes|rencontres|salles|pratiques|terrains|tournois`
+3. Détails → `ffbb_get_competition|poule|organisme|classement|saisons`
+4. Calendrier club → `ffbb_calendrier_club` (nom ou organisme_id)
+5. Scores live → `ffbb_get_lives`
 
-LLMs often pick an interpretation silently and run with it. This principle forces explicit reasoning:
-- State assumptions explicitly — If uncertain, ask rather than guess
-- Present multiple interpretations — Don't pick silently when ambiguity exists
-- Push back when warranted — If a simpler approach exists, say so
-- Stop when confused — Name what's unclear and ask for clarification
+## Règles de comportement
+- Appelle TOUJOURS un outil MCP avant de répondre
+- Si plusieurs résultats, liste et demande confirmation
+- Réponds toujours en français
+- Si API ne répond pas, dis-le clairement
+- Scores live : précise "données en temps réel, mises à jour toutes les 30s"
+- Équipes d'un club : `ffbb_equipes_club` → poule_id → `ffbb_get_classement`
 
-## 2. Simplicity First
-Minimum code that solves the problem. Nothing speculative.
+## Règles strictes (outils FFBB)
+- INTERDIT: `ffbb_get_poule` ou `ffbb_get_classement` pour chercher un score ou match
+- INTERDIT: Déduire un score depuis le classement
+- INTERDIT: Déclarer qu'un score "n'est pas disponible" sans avoir vérifié
+- OBLIGATOIRE: Présenter un résultat de match AVEC le classement complet (paniers_marqués, paniers_encaissés)
+- `ffbb_get(type='poule')` ne retourne QUE les rencontres → classement = `ffbb_get_classement`
 
-Combat the tendency toward overengineering:
-- No features beyond what was asked
-- No abstractions for single-use code
-- No "flexibility" or "configurability" that wasn't requested
-- No error handling for impossible scenarios
-- If 200 lines could be 50, rewrite it
+## Développement MCP (FastMCP)
+- Cycle de vie : `mcp.run()` ou `mcp.run_streamable_http_async()` — pas de montage manuel via `app.mount()`
+- Chemin personnalisé : configurer `mcp.settings.streamable_http_path` avant `mcp.run()`
 
-The test: Would a senior engineer say this is overcomplicated? If yes, simplify.
+## Conventions de code
+- Services : `ffbb_<nom>_service` (dans services.py)
+- Tools MCP : `ffbb_<nom>` (dans server.py, `@mcp.tool()`)
+- Pas de suffixe `_compact_` ou `_impl_` exposé
+- Modifier une fonction à la fois, seulement si test/usage échoue
+- Nouvelle fonction → test manuel validé avant exposition MCP
 
-## 3. Surgical Changes
-Touch only what you must. Clean up only your own mess.
+## Commandes
+- Tests : `.venv/bin/python -m pytest -q` (pas `pytest` seul)
+- Pre-merge :
+  1. pytest -q → 0 failed
+  2. Test manuel du service : status='ok'
+  3. `grep "compact\|fantôme" src/ffbb_mcp/*.py` → 0 résultat
 
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting
-- Don't refactor things that aren't broken
-- Match existing style, even if you'd do it differently
-- If you notice unrelated dead code, mention it — don't delete it
+## Push / Tag / Release Gate
+Avant push/tag/release :
+- `rtk uv run python tools/check_version_alignment.py`
+- `rtk uv run ruff format --check .`
+- `rtk uv run ruff check .`
+- `rtk uv run mypy src`
+- `rtk uv run pytest`
+- Si version files modifiés : `rtk uv run tools/sync_version.py` + vérifier diff docs/website
+- Vérifier cache (`acronyms_cache.json`) — revert mutations non liées
+- Après push : inspecter les GitHub Actions
 
-When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused
-- Don't remove pre-existing dead code unless asked
-
-The test: Every changed line should trace directly to the user's request.
-
-## 4. Goal-Driven Execution
-Define success criteria. Loop until verified.
-
-Transform imperative tasks into verifiable goals:
-
-| Instead of... | Transform to... |
-| --- | --- |
-| "Add validation" | "Write tests for invalid inputs, then make them pass" |
-| "Fix the bug" | "Write a test that reproduces it, then make it pass" |
-| "Refactor X" | "Ensure tests pass before and after" |
-
-For multi-step tasks, state a brief plan:
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-
-Strong success criteria let the LLM loop independently. Weak criteria ("make it work") require constant clarification.
+## graphify
+- Présent dans graphify-out/ avec god nodes
+- Lire `graphify-out/GRAPH_REPORT.md` avant les fichiers source
+- Préférer `graphify query|path|explain` pour les questions cross-module
+- Après modif code : `graphify update .`

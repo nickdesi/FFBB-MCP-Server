@@ -1,4 +1,10 @@
-from ffbb_mcp.metrics import summarize_health
+from ffbb_mcp.metrics import (
+    generate_prometheus_metrics,
+    get_snapshot,
+    record_tool_call,
+    reset_metrics,
+    summarize_health,
+)
 
 
 def test_summarize_health_ok_with_empty_metrics():
@@ -64,3 +70,19 @@ def test_summarize_health_degraded_when_errors():
     assert summary["status"] == "degraded"
     assert summary["api_calls_total"] == 4
     assert summary["api_errors_total"] == 1
+
+
+def test_tool_calls_present_in_snapshot_and_prometheus():
+    reset_metrics()
+
+    record_tool_call("ffbb_version")
+    record_tool_call("ffbb_version")
+    record_tool_call("ffbb_search")
+
+    snapshot = get_snapshot()
+    assert snapshot["tool_calls"] == {"ffbb_version": 2, "ffbb_search": 1}
+
+    prom = generate_prometheus_metrics()
+    assert "ffbb_mcp_tool_calls_total" in prom
+    assert 'ffbb_mcp_tool_calls_total{tool="ffbb_version"} 2' in prom
+    assert 'ffbb_mcp_tool_calls_total{tool="ffbb_search"} 1' in prom

@@ -1,5 +1,6 @@
 """Tests d'intégration pour le serveur MCP FFBB refactoré."""
 
+import logging
 import numbers
 
 import pytest
@@ -10,6 +11,8 @@ from ffbb_mcp.server import (
     _build_robots_txt,
     _build_sitemap_xml,
     _get_public_base_url,
+    _resolve_log_level,
+    _resolve_uvicorn_log_level,
     ffbb_version,
     mcp,
 )
@@ -127,3 +130,22 @@ def test_sitemap_xml_uses_canonical_root(monkeypatch):
 
     assert "<loc>https://ffbb.desimone.fr/</loc>" in sitemap
     assert "<changefreq>weekly</changefreq>" in sitemap
+
+
+def test_resolve_log_level_defaults_to_info():
+    assert _resolve_log_level(None) == logging.INFO
+    assert _resolve_log_level("unknown") == logging.INFO
+
+
+def test_resolve_log_level_supports_common_values():
+    assert _resolve_log_level("debug") == logging.DEBUG
+    assert _resolve_log_level("warn") == logging.WARNING
+    assert _resolve_log_level("error") == logging.ERROR
+
+
+def test_resolve_uvicorn_log_level_mapping():
+    assert _resolve_uvicorn_log_level(logging.DEBUG) == "debug"
+    assert _resolve_uvicorn_log_level(logging.INFO) == "info"
+    assert _resolve_uvicorn_log_level(logging.WARNING) == "warning"
+    assert _resolve_uvicorn_log_level(logging.ERROR) == "error"
+    assert _resolve_uvicorn_log_level(logging.CRITICAL) == "critical"

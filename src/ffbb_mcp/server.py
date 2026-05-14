@@ -27,7 +27,12 @@ from starlette.responses import (
 
 from . import __version__ as _PACKAGE_VERSION
 from .dashboard import _build_dashboard_html
-from .metrics import generate_prometheus_metrics, get_snapshot, summarize_health
+from .metrics import (
+    generate_prometheus_metrics,
+    get_snapshot,
+    record_tool_call,
+    summarize_health,
+)
 from .prompts import ROUTING_PROMPT, register_prompts
 from .resources import register_resources
 from .services import (
@@ -68,6 +73,20 @@ def zipai_surgical(func: Any) -> Any:
     return wrapper
 
 
+def track_tool_usage(tool_name: str):
+    """Décorateur léger pour compter les appels par outil MCP."""
+
+    def decorator(func: Any) -> Any:
+        @wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            record_tool_call(tool_name)
+            return await func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
 def _find_website_dir() -> Path:
     """Détecte le dossier website/ en local ou en production."""
     # 1. Mode repo (src/ffbb_mcp/server.py -> ../../website)
@@ -90,6 +109,37 @@ _REMOTE_LOGO_URL = (
 _LOGO_PATH = _WEBSITE_DIR / "logo.webp"
 
 logger = logging.getLogger("ffbb-mcp")
+
+
+def _resolve_log_level(raw: str | None) -> int:
+    """Résout un niveau de log à partir d'une valeur d'environnement."""
+    if not raw:
+        return logging.INFO
+    value = raw.strip().upper()
+    mapping = {
+        "CRITICAL": logging.CRITICAL,
+        "ERROR": logging.ERROR,
+        "WARNING": logging.WARNING,
+        "WARN": logging.WARNING,
+        "INFO": logging.INFO,
+        "DEBUG": logging.DEBUG,
+        "NOTSET": logging.NOTSET,
+    }
+    return mapping.get(value, logging.INFO)
+
+
+def _resolve_uvicorn_log_level(level: int) -> str:
+    """Mappe le niveau Python vers un niveau uvicorn compatible."""
+    if level <= logging.DEBUG:
+        return "debug"
+    if level <= logging.INFO:
+        return "info"
+    if level <= logging.WARNING:
+        return "warning"
+    if level <= logging.ERROR:
+        return "error"
+    return "critical"
+
 
 # ---------------------------------------------------------------------------
 # Security helpers
@@ -398,6 +448,7 @@ async def index(request: Request) -> Response:
     title="Version et diagnostics serveur",
     annotations=_READONLY_ANNOTATIONS,
 )
+@track_tool_usage("ffbb_version")
 @zipai_surgical
 async def ffbb_version() -> dict[str, Any]:
     """Informations de version et configuration runtime du serveur FFBB MCP.
@@ -427,6 +478,7 @@ async def ffbb_version() -> dict[str, Any]:
     title="Recherche FFBB (multi-index)",
     annotations=_READONLY_ANNOTATIONS,
 )
+@track_tool_usage("ffbb_search")
 @zipai_surgical
 async def ffbb_search(
     query: Annotated[
@@ -497,6 +549,7 @@ async def ffbb_search(
     title="Bilan complet toutes phases",
     annotations=_READONLY_ANNOTATIONS,
 )
+@track_tool_usage("ffbb_bilan")
 @zipai_surgical
 async def ffbb_bilan(
     club_name: Annotated[
@@ -562,6 +615,7 @@ async def ffbb_bilan(
     title="Ressource FFBB par identifiant",
     annotations=_READONLY_ANNOTATIONS,
 )
+@track_tool_usage("ffbb_get")
 @zipai_surgical
 async def ffbb_get(
     id: Annotated[
@@ -634,6 +688,7 @@ async def ffbb_get(
 @mcp.tool(
     name="ffbb_club", title="Outils agrégés club", annotations=_READONLY_ANNOTATIONS
 )
+@track_tool_usage("ffbb_club")
 @zipai_surgical
 async def ffbb_club(
     action: Annotated[
@@ -837,6 +892,7 @@ async def ffbb_club(
 @mcp.tool(
     name="ffbb_lives", title="Scores en direct", annotations=_READONLY_ANNOTATIONS
 )
+@track_tool_usage("ffbb_lives")
 @zipai_surgical
 async def ffbb_get_lives() -> list[dict[str, Any]]:
     """Matchs en cours (scores live, cache 30s). Retourne [] si aucun match."""
@@ -856,6 +912,7 @@ async def ffbb_get_lives() -> list[dict[str, Any]]:
     title="Liste des saisons FFBB",
     annotations=_READONLY_ANNOTATIONS,
 )
+@track_tool_usage("ffbb_saisons")
 @zipai_surgical
 async def ffbb_get_saisons(
     active_only: Annotated[
@@ -879,6 +936,7 @@ async def ffbb_get_saisons(
     title="Résolution d'équipe",
     annotations=_READONLY_ANNOTATIONS,
 )
+@track_tool_usage("ffbb_resolve_team")
 @zipai_surgical
 async def ffbb_resolve_team(
     club_name: Annotated[
@@ -922,6 +980,7 @@ async def ffbb_resolve_team(
     title="Résumé complet d'équipe",
     annotations=_READONLY_ANNOTATIONS,
 )
+@track_tool_usage("ffbb_team_summary")
 @zipai_surgical
 async def ffbb_team_summary(
     club_name: Annotated[
@@ -1042,6 +1101,7 @@ async def ffbb_team_summary(
     title="Dernier résultat d'équipe",
     annotations=_READONLY_ANNOTATIONS,
 )
+@track_tool_usage("ffbb_last_result")
 @zipai_surgical
 async def ffbb_last_result(
     categorie: Annotated[
@@ -1100,6 +1160,7 @@ async def ffbb_last_result(
     title="Prochain match d'équipe",
     annotations=_READONLY_ANNOTATIONS,
 )
+@track_tool_usage("ffbb_next_match")
 @zipai_surgical
 async def ffbb_next_match(
     categorie: Annotated[
@@ -1165,6 +1226,7 @@ async def ffbb_next_match(
     title="Bilan détaillé de saison",
     annotations=_READONLY_ANNOTATIONS,
 )
+@track_tool_usage("ffbb_bilan_saison")
 @zipai_surgical
 async def ffbb_bilan_saison(
     organisme_id: Annotated[
@@ -1244,8 +1306,9 @@ register_resources(mcp)
 
 
 def main() -> None:
+    app_log_level = _resolve_log_level(os.environ.get("FFBB_LOG_LEVEL", "INFO"))
     logging.basicConfig(
-        level=logging.INFO,
+        level=app_log_level,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
     mode = os.environ.get("MCP_MODE", "stdio").lower()
@@ -1272,7 +1335,12 @@ def main() -> None:
 
         import uvicorn
 
-        uvicorn.run(app, host=host, port=port, log_level="info")
+        uvicorn.run(
+            app,
+            host=host,
+            port=port,
+            log_level=_resolve_uvicorn_log_level(app_log_level),
+        )
     else:
         logger.info("Démarrage MCP FFBB en mode stdio...")
         mcp.run(transport="stdio")
