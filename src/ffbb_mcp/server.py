@@ -383,12 +383,14 @@ async def benchmark(request: Request) -> Response:
         trends = get_benchmark_trends()
         return JSONResponse(trends)
 
-    # POST — méthode synchrone, on lance le benchmark
-    from .services import logger as svc_logger
-
-    svc_logger.info("Benchmark déclenché via /benchmark")
-    result = await run_benchmark()
-    return JSONResponse(result, status_code=201)
+    try:
+        result = await run_benchmark()
+        return JSONResponse(result, status_code=201)
+    except Exception as e:
+        logger.exception("Benchmark failed")
+        return JSONResponse(
+            {"error": str(e), "error_type": type(e).__name__}, status_code=500
+        )
 
 
 @mcp.custom_route("/docs", methods=["GET"])  # type: ignore[untyped-decorator]
