@@ -1,4 +1,4 @@
-FROM python:3.14-slim AS builder
+FROM ghcr.io/astral-sh/uv:python3.14-slim AS builder
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -11,8 +11,7 @@ COPY src/ ./src/
 COPY assets/ ./assets/
 COPY website/ ./website/
 
-RUN pip install --no-cache-dir uv && \
-    uv venv /opt/venv && \
+RUN uv venv /opt/venv && \
     . /opt/venv/bin/activate && \
     uv pip install --no-cache-dir .
 
