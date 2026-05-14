@@ -17,7 +17,7 @@ jobs:
       - name: Trigger benchmark
         run: |
           result=$(curl -s -o /tmp/benchmark.json -w "%{http_code}" \
-            -X POST "https://ffbb.desimone.fr/benchmark" \
+            -X POST "https://ffbb.desimone.fr/benchmark/run" \
             -H "Content-Type: application/json")
           if [ "$result" != "201" ]; then
             echo "::error::Benchmark failed with HTTP $result"

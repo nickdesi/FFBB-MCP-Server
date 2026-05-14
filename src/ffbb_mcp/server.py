@@ -372,17 +372,16 @@ async def dashboard(request: Request) -> Response:
     return HTMLResponse(content=_build_dashboard_html(), status_code=200)
 
 
-@mcp.custom_route("/benchmark", methods=["GET", "POST"])  # type: ignore[untyped-decorator]
-async def benchmark(request: Request) -> Response:
-    """Lance un benchmark de performance ou consulte les tendances.
+@mcp.custom_route("/benchmark", methods=["GET"])  # type: ignore[untyped-decorator]
+async def benchmark_get(request: Request) -> Response:
+    """Retourne les tendances historiques du benchmark."""
+    trends = get_benchmark_trends()
+    return JSONResponse(trends)
 
-    GET  → retourne les tendances historiques
-    POST → exécute un nouveau benchmark
-    """
-    if request.method == "GET":
-        trends = get_benchmark_trends()
-        return JSONResponse(trends)
 
+@mcp.custom_route("/benchmark/run", methods=["POST"])  # type: ignore[untyped-decorator]
+async def benchmark_post(request: Request) -> Response:
+    """Exécute un benchmark de performance."""
     try:
         result = await run_benchmark()
         return JSONResponse(result, status_code=201)
