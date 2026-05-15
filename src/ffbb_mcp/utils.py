@@ -102,21 +102,14 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
     # Retirer le pattern Uxx du début, puis chercher un chiffre isolé restant
     remainder = s[cat_match.end() :] if cat_match else s
 
-    # Chercher un chiffre libre (pas partie de Uxx) dans le reste
-    # Fast path: only invoke regex if there's at least one digit
-    has_digit = False
-    for char in remainder:
-        if char.isdigit():
-            has_digit = True
-            break
-
-    if has_digit:
-        num_match = _NUM_PATTERN.search(remainder)
-        if num_match:
-            try:
-                numero_equipe = int(num_match.group(1))
-            except ValueError:
-                numero_equipe = None
+    # ⚡ Bolt: Remplacement de l'itération python sur la chaine par un seul regex
+    # qui est implémenté en C et est plus performant.
+    num_match = _NUM_PATTERN.search(remainder)
+    if num_match:
+        try:
+            numero_equipe = int(num_match.group(1))
+        except ValueError:
+            numero_equipe = None
 
     return ParsedCategorie(categorie=categorie, sexe=sexe, numero_equipe=numero_equipe)
 
@@ -206,13 +199,15 @@ def prune_payload(obj: Any, depth: int = 0) -> Any:
         return obj
 
     if obj_type is dict or isinstance(obj, dict):
-        # 1. Nettoyage récursif
-        cleaned = {
-            k: prune_payload(v, depth + 1)
-            for k, v in obj.items()
-            # Optimization: avoid empty collection allocation by using type() instead of != []/{} and early exit using boolean truthiness
-            if v is not None and (v or (type(v) is not list and type(v) is not dict))
-        }
+        # Fusion du nettoyage récursif et de l'élagage en une seule passe
+        cleaned: dict[str, Any] = {}
+        for k, v in obj.items():
+            if v is None or (not v and (type(v) is list or type(v) is dict)):
+                continue
+            cleaned_v = prune_payload(v, depth + 1)
+            # Post-pruning check
+            if cleaned_v is not None and (cleaned_v or (type(cleaned_v) is not list and type(cleaned_v) is not dict)):
+                cleaned[k] = cleaned_v
 
         # 2. Élagage chirurgical si trop de clés
         if len(cleaned) > 50:
@@ -235,16 +230,18 @@ def prune_payload(obj: Any, depth: int = 0) -> Any:
     elif obj_type is list or isinstance(obj, list):
         # 1. Limitation de taille (ZipAI Surgical)
         limit = _PRUNE_LIMIT
-        truncated = obj[:limit]
 
-        # 2. Nettoyage récursif
-        cleaned_list = [prune_payload(item, depth + 1) for item in truncated]
-        final_list = [
-            item
-            for item in cleaned_list
-            if item is not None
-            and (item or (type(item) is not list and type(item) is not dict))
-        ]
+        # 2. Fusion de la troncature et du nettoyage en une seule passe
+        final_list = []
+        for i, item in enumerate(obj):
+            if i >= limit:
+                break
+            if item is None or (not item and (type(item) is list or type(item) is dict)):
+                continue
+            cleaned_item = prune_payload(item, depth + 1)
+            # Post-pruning check
+            if cleaned_item is not None and (cleaned_item or (type(cleaned_item) is not list and type(cleaned_item) is not dict)):
+                final_list.append(cleaned_item)
 
         if len(obj) > limit:
             # On ajoute un champ _omitted_count à la fin de la liste pour prévenir l'agent
