@@ -206,7 +206,10 @@ def prune_payload(obj: Any, depth: int = 0) -> Any:
                 continue
             cleaned_v = prune_payload(v, depth + 1)
             # Post-pruning check
-            if cleaned_v is not None and (cleaned_v or (type(cleaned_v) is not list and type(cleaned_v) is not dict)):
+            if cleaned_v is not None and (
+                cleaned_v
+                or (type(cleaned_v) is not list and type(cleaned_v) is not dict)
+            ):
                 cleaned[k] = cleaned_v
 
         # 2. Élagage chirurgical si trop de clés
@@ -236,11 +239,16 @@ def prune_payload(obj: Any, depth: int = 0) -> Any:
         for i, item in enumerate(obj):
             if i >= limit:
                 break
-            if item is None or (not item and (type(item) is list or type(item) is dict)):
+            if item is None or (
+                not item and (type(item) is list or type(item) is dict)
+            ):
                 continue
             cleaned_item = prune_payload(item, depth + 1)
             # Post-pruning check
-            if cleaned_item is not None and (cleaned_item or (type(cleaned_item) is not list and type(cleaned_item) is not dict)):
+            if cleaned_item is not None and (
+                cleaned_item
+                or (type(cleaned_item) is not list and type(cleaned_item) is not dict)
+            ):
                 final_list.append(cleaned_item)
 
         if len(obj) > limit:
