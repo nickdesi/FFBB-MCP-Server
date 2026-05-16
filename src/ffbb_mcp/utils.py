@@ -23,15 +23,6 @@ def serialize_model(obj: Any) -> Any:
     if isinstance(obj, str | int | float | bool):
         return obj
 
-    # Placer la vérification des types de collection natifs (dict/list) avant les
-    # vérifications hasattr(). hasattr déclenche des exceptions internes silencieuses
-    # coûteuses lorsque l'attribut est manquant, ce qui ralentit la récursion sur de
-    # grands payloads JSON standards.
-    if isinstance(obj, dict):
-        return {k: serialize_model(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [serialize_model(item) for item in obj]
-
     # Let Pydantic do the heavy lifting natively in C/Rust (V2)
     if hasattr(obj, "model_dump"):  # Pydantic v2
         return obj.model_dump(mode="json")
@@ -212,14 +203,14 @@ def prune_payload(obj: Any, depth: int = 0) -> Any:
                 cleaned[k] = cleaned_v
 
         # 2. Élagage chirurgical si trop de clés
-        if len(cleaned) > 50:
+        if len(cleaned) > _PRUNE_LIMIT:
             kept: dict[str, Any] = {}
             overflow_count = 0
             non_essential_count = 0
             for k, v in cleaned.items():
                 if k in _ESSENTIAL_KEYS:
                     kept[k] = v
-                elif non_essential_count < 25:
+                elif non_essential_count < (_PRUNE_LIMIT - len(_ESSENTIAL_KEYS)):
                     kept[k] = v
                     non_essential_count += 1
                 else:

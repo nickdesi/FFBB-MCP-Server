@@ -6,11 +6,13 @@ import numbers
 import pytest
 from mcp.server.fastmcp import FastMCP
 
-from ffbb_mcp.server import (
+from ffbb_mcp.routes import (
     _build_index_html,
     _build_robots_txt,
     _build_sitemap_xml,
     _get_public_base_url,
+)
+from ffbb_mcp.server import (
     _resolve_log_level,
     _resolve_uvicorn_log_level,
     ffbb_version,

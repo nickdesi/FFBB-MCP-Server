@@ -75,10 +75,10 @@ def create_app(mcp: FastMCP, allowed_origins: list[str]) -> Starlette:
                     x in err_str
                     for x in ["broken pipe", "connection closed", "client disconnected"]
                 ):
-                    logger.debug(f"Client disconnected: {e}")
+                    logger.debug("Client disconnected: %s", e)
                 else:
                     logger.error(
-                        f"Middleware error on {request.url.path}: {e}", exc_info=True
+                        "Middleware error on %s: %s", request.url.path, e, exc_info=True
                     )
 
                 response = JSONResponse(
