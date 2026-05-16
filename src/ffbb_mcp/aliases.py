@@ -235,10 +235,14 @@ def _extract_initials(name: str) -> str:
     words = name.split()
     initials = []
     for w in words:
-        # ⚡ Bolt: Remplacement de l'expression régulière par une vérification
-        # de préfixe native via les méthodes de chaînes. Évite l'overhead de re.sub().
+        # ⚡ Bolt: Accès direct par index plutôt que de créer un tuple et
+        # d'appeler startswith, évitant des allocations inutiles.
         # Supprimer les articles collés (d', l', D', L')
-        clean = w[2:] if w.startswith(("d'", "l'", "D'", "L'")) else w
+        if len(w) >= 2 and w[1] == "'" and w[0] in ("d", "l", "D", "L"):
+            clean = w[2:]
+        else:
+            clean = w
+
         if not clean:
             continue
         if clean.lower() in _SKIP_WORDS:
@@ -313,22 +317,19 @@ def enrich_acronym_cache(official_name: str) -> None:
         logger.info("Acronyme auto-enrichi: %s → %s", initials, official_name)
 
 
+_APOSTROPHES_MAP = str.maketrans("\u2019\u2018\u201b\u0060", "''''")
+
+
 def _normalize_apostrophes(text: str) -> str:
     """Normalise toutes les variantes typographiques d'apostrophe en apostrophe ASCII.
 
     Variantes couvertes : \u2019 (U+2019), \u2018 (U+2018), \u201b (U+201B), \u0060 (backtick).
     """
-    # Fast-path literal checks pour éviter les remplacements inutiles.
-    # Les strings natives sont beaucoup plus rapides que les regex pour cette tâche.
-    if "\u2019" in text:
-        text = text.replace("\u2019", "\u0027")
-    if "\u2018" in text:
-        text = text.replace("\u2018", "\u0027")
-    if "\u201b" in text:
-        text = text.replace("\u201b", "\u0027")
-    if "\u0060" in text:
-        text = text.replace("\u0060", "\u0027")
-    return text
+    # Fast-path : la plupart des textes sont déjà ASCII et ne contiennent pas de backtick.
+    if text.isascii() and "`" not in text:
+        return text
+
+    return text.translate(_APOSTROPHES_MAP)
 
 
 def normalize_query(query: str) -> str:
