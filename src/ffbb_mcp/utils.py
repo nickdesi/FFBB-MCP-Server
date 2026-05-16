@@ -102,8 +102,7 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
     # Retirer le pattern Uxx du début, puis chercher un chiffre isolé restant
     remainder = s[cat_match.end() :] if cat_match else s
 
-    # ⚡ Bolt: Remplacement de l'itération python sur la chaine par un seul regex
-    # qui est implémenté en C et est plus performant.
+    #  Bolt: Regex direct (moteur C) — plus rapide que l'itération manuelle Python.
     num_match = _NUM_PATTERN.search(remainder)
     if num_match:
         try:

@@ -2803,7 +2803,9 @@ def _match_team_name(
     if search_num == 1:
         # Equipe unique : suffixe optionnel.
         # On accepte soit le suffixe "- 1", soit l'absence de chiffre dans le nom.
-        has_digit = any(ch.isdigit() for ch in nom_norm)
+        # ⚡ Bolt: Remplacement de any(ch.isdigit()) par la regex compilée en C
+        # pour éviter l'overhead de la boucle et du générateur Python.
+        has_digit = bool(_NUMERIC_EXTRACT_PATTERN.search(nom_norm))
         return nom_norm.endswith(suffix_norm) or not has_digit
 
     return nom_norm.endswith(suffix_norm)
