@@ -1,4 +1,4 @@
-FROM python:3.13-slim AS builder
+FROM python:3.14-slim AS builder
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -17,7 +17,7 @@ RUN uv venv /opt/venv && \
     . /opt/venv/bin/activate && \
     uv pip install --no-cache-dir .
 
-FROM python:3.13-slim
+FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
