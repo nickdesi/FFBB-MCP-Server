@@ -23,3 +23,7 @@ http_cache.db
 ffbb-data-client_Ref/
 external/antigravity-awesome-skills/
 tools/skill_router/
+
+# Runtime data & graphify artifacts
+data/
+graphify-out/
