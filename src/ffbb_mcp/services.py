@@ -46,6 +46,10 @@ logger = logging.getLogger("ffbb-mcp")
 
 _PHASE_EXTRACT_PATTERN = re.compile(r"Phase\s*(\d+)", re.IGNORECASE)
 _NUMERIC_EXTRACT_PATTERN = re.compile(r"(\d+)")
+_ELIMINATION_KEYWORDS = re.compile(
+    r"(finale|1/2|demi[- ]fin|quart|play[- ]?off|coupe|barrage|promotion)",
+    re.IGNORECASE,
+)
 
 
 # Limiter globalement le nombre d'appels concurrents vers l'API FFBB.
@@ -101,6 +105,17 @@ def _extract_phase_num(label: str | None) -> int:
         except ValueError:
             pass
     return 1
+
+
+def _detect_phase_type(competition: str | None) -> str:
+    """Detecte le type de phase a partir du nom de competition.
+
+    Retourne ``"elimination"`` si le champ contient un terme eliminiatoire
+    (finale, 1/2, quart, play-off, coupe, barrage, promotion), sinon ``"poule"``.
+    """
+    if not competition:
+        return "poule"
+    return "elimination" if _ELIMINATION_KEYWORDS.search(competition) else "poule"
 
 
 def _parse_dt(raw: str | None) -> datetime | None:
@@ -810,6 +825,8 @@ async def get_poule_service(
                     )
         data["rencontres_restantes_par_equipe"] = restantes_par_equipe
         data["phase_terminee"] = len(restantes_par_equipe) == 0
+        comp_name = data.get("nom") or data.get("libelle") or ""
+        data["phase_type"] = _detect_phase_type(comp_name)
 
         # Calculate dynamic TTL
         ttl = await get_poule_ttl(poule_id_int, get_lives_service)
@@ -1768,6 +1785,8 @@ async def ffbb_saison_bilan_service(
                     "competition": poule_data.get("nom", ""),
                     "poule_id": pid,
                     "position": entry.get("position"),
+                    "phase_type": poule_data.get("phase_type", "poule"),
+                    "phase_terminee": poule_data.get("phase_terminee", False),
                     **stats,
                 }
             )
@@ -1938,6 +1957,8 @@ async def ffbb_bilan_service(
                         "poule_id": pid,
                         "numero_equipe": num_equipe,
                         "position": entry.get("position"),
+                        "phase_type": poule_data.get("phase_type", "poule"),
+                        "phase_terminee": poule_data.get("phase_terminee", False),
                         **stats,
                     }
                 )

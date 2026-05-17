@@ -830,6 +830,7 @@ class TestGetPouleService:
             "id": 123,
             "rencontres": [],
             "phase_terminee": True,
+            "phase_type": "poule",
             "rencontres_restantes_par_equipe": {},
         }
         assert result1.get("data", result1) == expected
