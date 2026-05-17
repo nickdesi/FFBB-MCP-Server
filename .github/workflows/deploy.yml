@@ -27,7 +27,9 @@ jobs:
           fi
 
       - name: No webhook configured
-        if: ${{ secrets.COOLIFY_DEPLOY_HOOK == '' }}
+        if: env.COOLIFY_WEBHOOK == ''
+        env:
+          COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_DEPLOY_HOOK }}
         run: |
           echo "ℹ️  Aucun webhook Coolify configuré."
           echo "Pour l'activer :"
