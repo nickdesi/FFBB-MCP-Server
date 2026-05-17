@@ -108,8 +108,14 @@ def _parse_dt(raw: str | None) -> datetime | None:
     if not raw:
         return None
     tz = _PARIS_TZ
+
+    # ⚡ Bolt: Fast-path pour Python <= 3.10 : fromisoformat ne supporte pas
+    # toujours l'espace comme séparateur. On le remplace par 'T' si nécessaire
+    # pour profiter de la vitesse de fromisoformat (C-native) au lieu de strptime.
+    raw_iso = raw.replace(" ", "T") if " " in raw and len(raw) == 19 else raw
+
     try:
-        dt = datetime.fromisoformat(raw)
+        dt = datetime.fromisoformat(raw_iso)
     except Exception:
         for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
             try:
