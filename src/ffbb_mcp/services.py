@@ -2206,17 +2206,6 @@ async def get_calendrier_club_service(
     )
 
 
-async def search_competitions_service(
-    nom: str,
-    limit: int = 20,
-    filter_by: str | None = None,
-    sort: list[str] | None = None,
-) -> list[dict]:
-    return await _search_generic(
-        "competitions", "search_competitions_async", nom, limit, filter_by, sort
-    )
-
-
 async def search_organismes_service(
     nom: str,
     limit: int = 20,
@@ -2228,114 +2217,20 @@ async def search_organismes_service(
     )
 
 
-async def search_salles_service(
-    nom: str,
-    limit: int = 20,
-    filter_by: str | None = None,
-    sort: list[str] | None = None,
-) -> list[dict]:
-    return await _search_generic(
-        "salles", "search_salles_async", nom, limit, filter_by, sort
-    )
-
-
-async def search_rencontres_service(
-    nom: str,
-    limit: int = 20,
-    filter_by: str | None = None,
-    sort: list[str] | None = None,
-) -> list[dict]:
-    return await _search_generic(
-        "rencontres", "search_rencontres_async", nom, limit, filter_by, sort
-    )
-
-
-async def search_pratiques_service(
-    nom: str,
-    limit: int = 20,
-    filter_by: str | None = None,
-    sort: list[str] | None = None,
-) -> list[dict]:
-    return await _search_generic(
-        "pratiques", "search_pratiques_async", nom, limit, filter_by, sort
-    )
-
-
-async def search_terrains_service(
-    nom: str,
-    limit: int = 20,
-    filter_by: str | None = None,
-    sort: list[str] | None = None,
-) -> list[dict]:
-    return await _search_generic(
-        "terrains", "search_terrains_async", nom, limit, filter_by, sort
-    )
-
-
-async def search_tournois_service(
-    nom: str,
-    limit: int = 20,
-    filter_by: str | None = None,
-    sort: list[str] | None = None,
-) -> list[dict]:
-    return await _search_generic(
-        "tournois", "search_tournois_async", nom, limit, filter_by, sort
-    )
-
-
-async def search_engagements_service(
-    nom: str,
-    limit: int = 20,
-    filter_by: str | None = None,
-    sort: list[str] | None = None,
-) -> list[dict]:
-    return await _search_generic(
-        "engagements", "search_engagements_async", nom, limit, filter_by, sort
-    )
-
-
-async def search_formations_service(
-    nom: str,
-    limit: int = 20,
-    filter_by: str | None = None,
-    sort: list[str] | None = None,
-) -> list[dict]:
-    return await _search_generic(
-        "formations", "search_formations_async", nom, limit, filter_by, sort
-    )
-
-
-async def search_officiels_service(
-    nom: str,
-    limit: int = 20,
-    filter_by: str | None = None,
-    sort: list[str] | None = None,
-) -> list[dict]:
-    return await _search_generic(
-        "officiels", "search_officiels_async", nom, limit, filter_by, sort
-    )
-
-
-async def search_entraineurs_service(
-    nom: str,
-    limit: int = 20,
-    filter_by: str | None = None,
-    sort: list[str] | None = None,
-) -> list[dict]:
-    return await _search_generic(
-        "entraineurs", "search_entraineurs_async", nom, limit, filter_by, sort
-    )
-
-
-async def search_communes_service(
-    nom: str,
-    limit: int = 20,
-    filter_by: str | None = None,
-    sort: list[str] | None = None,
-) -> list[dict]:
-    return await _search_generic(
-        "communes", "search_communes_async", nom, limit, filter_by, sort
-    )
+# Mapping de configuration pour les types de recherche non exposés individuellement.
+_SEARCH_TYPE_METHOD: dict[str, str] = {
+    "competitions": "search_competitions_async",
+    "salles": "search_salles_async",
+    "rencontres": "search_rencontres_async",
+    "pratiques": "search_pratiques_async",
+    "terrains": "search_terrains_async",
+    "tournois": "search_tournois_async",
+    "engagements": "search_engagements_async",
+    "formations": "search_formations_async",
+    "officiels": "search_officiels_async",
+    "entraineurs": "search_entraineurs_async",
+    "communes": "search_communes_async",
+}
 
 
 async def get_rencontre_service(rencontre_id: int | str) -> dict[str, Any]:
@@ -2386,28 +2281,17 @@ async def ffbb_search_service(
 
     Recherche dans les données FFBB en fonction de plusieurs types de données.
     """
-    dispatch = {
-        "competitions": search_competitions_service,
-        "organismes": search_organismes_service,
-        "salles": search_salles_service,
-        "rencontres": search_rencontres_service,
-        "pratiques": search_pratiques_service,
-        "terrains": search_terrains_service,
-        "tournois": search_tournois_service,
-        "engagements": search_engagements_service,
-        "formations": search_formations_service,
-        "officiels": search_officiels_service,
-        "entraineurs": search_entraineurs_service,
-        "communes": search_communes_service,
-    }
-
     # type == "all" → multi_search dédiée
     if type == "all":
         return await multi_search_service(nom=query, limit=limit)
 
-    # Si type correspond à un service spécialisé, on le délègue directement
-    if type in dispatch:
-        return await dispatch[type](query, limit, filter_by, sort)
+    # organismes → fonction dédiée (importée ailleurs)
+    if type == "organismes":
+        return await search_organismes_service(query, limit, filter_by, sort)
+
+    # Autres types → appel direct via le mapping de configuration
+    if method_name := _SEARCH_TYPE_METHOD.get(type):
+        return await _search_generic(type, method_name, query, limit, filter_by, sort)
 
     raise McpError(
         error=ErrorData(
