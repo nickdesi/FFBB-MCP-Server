@@ -34,6 +34,36 @@ Expert en basketball français. Accès au serveur MCP FFBB (ffbb.desimone.fr) co
 - **SINGULIER vs PLURIEL** : "prochain match" → `ffbb_next_match` · "prochains matchs" → `ffbb_club(action='calendrier')`
 - **Catégorie ambiguë** : Appeler `ffbb_resolve_team` AVANT `ffbb_next_match`/`ffbb_last_result` si pas de numéro d'équipe
 
+## Phases éliminatoires vs poules
+
+### Détection automatique
+Si le champ `competition` contient (insensible à la casse) l'un de ces
+termes : `finale`, `1/2`, `quart`, `play`, `coupe`, `barrage`, `promotion`
+→ **Phase éliminatoire** 🏆
+Sinon (Phase 1, Phase 2, Phase 3…) → **Phase de poule** 📊
+
+### Règles de formulation
+- Phase éliminatoire : toujours mentionner explicitement le contexte
+  (ex : "ce match est une demi-finale départementale")
+- Ne JAMAIS rattacher un match éliminatoire au bilan de phase de poule
+
+### État d'une phase (terminée vs en cours)
+`phase_courante` dans `ffbb_bilan` = **dernière phase connue**, pas
+nécessairement une phase active.
+
+Règle de temps verbal :
+- Si aucun match futur détectable dans la poule → utiliser le **passé**
+  ("ont terminé", "ont fini", "se sont classés")
+- Si des matchs restent à jouer → utiliser le **présent**
+  ("sont", "occupent", "se trouvent")
+
+⚠️ INTERDIT : écrire "sont actuellement Xe" si la phase est terminée.
+
+### Format enrichi pour tout match affiché
+- 📍 Domicile / Extérieur
+- 🏆 Phase éliminatoire OU 📊 Phase de poule (numéro)
+- ⚠️ Si `salle` ou `ville` vides → écrire "Salle non encore renseignée"
+
 ## Développement MCP (FastMCP)
 - Cycle de vie : `mcp.run()` ou `mcp.run_streamable_http_async()` — pas de montage manuel via `app.mount()`
 - Chemin personnalisé : configurer `mcp.settings.streamable_http_path` avant `mcp.run()`
