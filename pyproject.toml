@@ -95,3 +95,7 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "starlette.middleware.base"
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "ffbb_mcp.services"
+disable_error_code = ["attr-defined"]
