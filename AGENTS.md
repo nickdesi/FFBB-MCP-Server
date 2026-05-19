@@ -1,22 +1,33 @@
 # FFBB MCP Server
 
+> ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
+> Dernière mise à jour : jolly-pixel | server.py: 1123 lignes | services.py: 2902 lignes
+
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
 
 ## Persona
 Expert en basketball français. Accès au serveur MCP FFBB (ffbb.desimone.fr) connecté aux données officielles FFBB.
 
-## Workflow FFBB (Outils MCP v1.2.1+)
-1. **Recherche** → `ffbb_search` (type='all' par défaut, ou 'organismes', 'competitions', etc.)
-2. **Résolution club** → `ffbb_resolve_team` (si catégorie ambiguë sans numéro d'équipe)
-3. **Bilan/Résumé** → `ffbb_team_summary` (bilan + dernier/prochain match en 1 appel)
-4. **Bilan détaillé** → `ffbb_bilan` (toutes phases, toutes équipes)
-5. **Club unifié** → `ffbb_club` (action='calendrier'|'equipes'|'classement')
-6. **Ressource par ID** → `ffbb_get` (type='competition'|'poule'|'organisme'|'rencontre')
-7. **Matchs singuliers** → `ffbb_next_match` / `ffbb_last_result` (UNE seule équipe)
-8. **Scores live** → `ffbb_lives` (cache 15s, actualisation 30s)
-9. **Bilan saison** → `ffbb_bilan_saison` (organisme_id + categorie + numero_equipe)
-10. **Saisons** → `ffbb_saisons` (active_only=True pour saison en cours)
+## Workflow FFBB (Outils MCP)
+1. **ffbb_search** → Recherche FFBB — clubs, compétitions, matchs, salles, tournois, etc
+2. **ffbb_resolve_team** → Identifie une equipe unique (Pivot central)
+3. **ffbb_team_summary** → Résumé complet et agent-friendly pour une équipe
+4. **ffbb_bilan** → Bilan complet d'une équipe toutes phases confondues en UN seul appel
+5. **ffbb_club** → Outils agreges autour d'un club (calendrier, equipes, classement)
+6. **ffbb_get** → Recupere une ressource FFBB par identifiant
+7. **ffbb_next_match** → Prochain match à jouer pour une équipe précise
+8. **ffbb_last_result** → Dernier résultat d'une équipe précise
+9. **ffbb_lives** → Matchs en cours (scores live, cache 30s). Retourne [] si aucun match
+10. **ffbb_bilan_saison** → Bilan détaillé de la saison pour une équipe précise (toutes phases)
+11. **ffbb_saisons** → Liste des saisons FFBB. active_only=True pour la saison en cours uniquement
+12. **ffbb_version** → Informations de version et configuration runtime du serveur FFBB MCP
+
+## Ressources MCP
+- `ffbb://saisons` → Liste des saisons FFBB au format JSON
+- `ffbb://competition/{competition_id}` → Détails d'une compétition au format JSON
+- `ffbb://poule/{poule_id}` → Détails d'une poule au format JSON
+- `ffbb://organisme/{organisme_id}` → Détails d'un organisme/club au format JSON
 
 ## Règles de comportement
 - Appelle TOUJOURS un outil MCP avant de répondre
@@ -73,21 +84,22 @@ Règle de temps verbal :
 ## Architecture
 ```
 src/ffbb_mcp/
-├── server.py          # Tools MCP + main() (≈1100 lignes)
-├── routes.py          # Routes HTTP (health, metrics, dashboard, docs, etc.)
-├── services.py        # Logique métier (≈2990 lignes)
-├── cache_strategy.py  # TTL dynamique selon fenêtres de match
-├── client.py          # FFBBDataClient factory + token refresh
-├── metrics.py         # Prometheus metrics + health snapshot
-├── utils.py           # serialize_model, parse_categorie, prune_payload
-├── aliases.py         # Alias clubs + cache acronymes persistant
-├── prompts.py         # Prompts MCP réutilisables
-├── resources.py       # Resources MCP (ffbb://saisons, etc.)
-├── dashboard.py       # Dashboard HTML
-├── benchmark.py       # Benchmark performance
-├── app_factory.py     # Starlette app + middlewares
-├── _state.py          # State global (caches, inflight)
-└── __init__.py        # Version du package
+├── __init__.py            # Version du package
+├── __main__.py            # Point d'entrée CLI
+├── _state.py              # State global (caches, inflight)
+├── aliases.py             # Alias clubs + cache acronymes persistant
+├── app_factory.py         # Starlette app + middlewares
+├── benchmark.py           # Benchmark performance
+├── cache_strategy.py      # TTL dynamique selon fenêtres de match
+├── client.py              # FFBBDataClient factory + token refresh
+├── dashboard.py           # Dashboard HTML
+├── metrics.py             # Prometheus metrics + health snapshot
+├── prompts.py             # Prompts MCP réutilisables
+├── resources.py           # Resources MCP (ffbb://saisons, etc.)
+├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
+├── server.py              # Tools MCP + main() (≈1123 lignes)
+├── services.py            # Logique métier (≈2902 lignes)
+└── utils.py               # serialize_model, parse_categorie, prune_payload
 ```
 
 ## Conventions de code
@@ -96,7 +108,7 @@ src/ffbb_mcp/
 - Pas de suffixe `_compact_` ou `_impl_` exposé
 - Modifier une fonction à la fois, seulement si test/usage échoue
 - Nouvelle fonction → test manuel validé avant exposition MCP
-- **God files** : `services.py` (2990 lignes) — refactoring différé (cycles d'import)
+- **God files** : `services.py` (2902 lignes) — refactoring différé (cycles d'import)
 
 ## Commandes
 - Tests : `.venv/bin/python -m pytest -q` (pas `pytest` seul)
@@ -119,22 +131,17 @@ Avant push/tag/release :
 ## Variables d'environnement
 | Variable | Défaut | Usage |
 |----------|--------|-------|
-| `MCP_MODE` | `stdio` | Mode de transport (`stdio` / `streamable-http`) |
-| `PORT` | `9123` | Port d'écoute HTTP |
-| `HOST` | `0.0.0.0` | Interface d'écoute |
-| `PUBLIC_URL` | `https://ffbb.desimone.fr` | URL publique pour liens/sitemap |
+| `TRUSTED_PROXY_HOSTS` | `127.0.0.1` | Proxies de confiance |
+| `FFBB_ENABLE_BENCHMARK` | `` | Activer endpoint `/benchmark/run` (sécurité) |
 | `ALLOWED_HOSTS` | `*` | Hosts autorisés (DNS rebinding protection) |
 | `ALLOWED_ORIGINS` | `*` | Origins CORS |
+| `PUBLIC_URL` | `https://ffbb.desimone.fr` | URL publique pour liens/sitemap |
+| `MCP_MODE` | `stdio` | Mode de transport (`stdio` / `streamable-http`) |
 | `FFBB_LOG_LEVEL` | `INFO` | Niveau de log |
+| `HOST` | `0.0.0.0` | Interface d'écoute |
+| `PORT` | `9123` | Port d'écoute HTTP |
 | `MAX_CONCURRENT_FFBB` | `8` | Concurrence max appels API FFBB |
-| `FFBB_ENABLE_BENCHMARK` | `false` | Activer endpoint `/benchmark/run` (sécurité) |
-| `FFBB_MCP_PRUNE_LIMIT` | `50` | Limite troncature payload |
 | `FFBB_MAX_CALENDAR_MATCHES` | `300` | Max rencontres retournées |
-| `FFBB_CACHE_TTL_*` | voir `cache_strategy.py` | TTL par type de cache |
-| `TRUSTED_PROXY_HOSTS` | `127.0.0.1` | Proxies de confiance |
-
-## graphify
-- Présent dans graphify-out/ avec god nodes
-- Lire `graphify-out/GRAPH_REPORT.md` avant les fichiers source
-- Préférer `graphify query|path|explain` pour les questions cross-module
-- Après modif code : `graphify update .`
+| `FFBB_POULE_FETCH_CONCURRENCY` | `8` | Concurrence max fetch poules |
+| `FFBB_MCP_PRUNE_LIMIT` | `50` | Limite troncature payload |
+| `FFBB_CACHE_TTL_*` | — | TTL par type de cache (voir cache_strategy.py) |
