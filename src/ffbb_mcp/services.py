@@ -126,7 +126,6 @@ def _parse_dt(raw: str | None) -> datetime | None:
 
     try:
         # Fast path for Python 3.11+: fromisoformat natively supports spaces.
-        # This replaces the costly fallback loop and string replace.
         dt = datetime.fromisoformat(raw)
         if dt.tzinfo is None:
             return dt.replace(tzinfo=tz)
