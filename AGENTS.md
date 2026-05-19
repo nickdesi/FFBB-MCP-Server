@@ -145,3 +145,10 @@ Avant push/tag/release :
 | `FFBB_POULE_FETCH_CONCURRENCY` | `8` | Concurrence max fetch poules |
 | `FFBB_MCP_PRUNE_LIMIT` | `50` | Limite troncature payload |
 | `FFBB_CACHE_TTL_*` | — | TTL par type de cache (voir cache_strategy.py) |
+
+## Notes workflow / outils
+
+### PR Comments pour Jules (Google)
+- **NE PAS utiliser** `gh pr review --comment` — Jules ne le détecte pas
+- **Utiliser** `gh pr comment <number> --body "..."` ou commenter via l'UI GitHub
+- Jules écoute les `issue_comment` events, pas les `pull_request_review` events
