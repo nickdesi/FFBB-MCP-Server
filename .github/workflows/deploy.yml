@@ -6,10 +6,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: deploy-${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
   deploy:
     name: Trigger Coolify deployment
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Trigger deploy webhook

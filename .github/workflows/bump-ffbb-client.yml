@@ -5,9 +5,9 @@ on:
   repository_dispatch:
     types: [ffbb-client-released]
 
-  # Fallback: check daily at 07:00 UTC if a new PyPI version is available
+  # Fallback: check weekly on Wednesday at 07:00 UTC if a new PyPI version is available
   schedule:
-    - cron: '0 7 * * *'
+    - cron: '0 7 * * 3'
 
   # Allow manual trigger
   workflow_dispatch:
@@ -19,7 +19,7 @@ concurrency:
 jobs:
   bump:
     name: Bump ffbb-data-client
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write
