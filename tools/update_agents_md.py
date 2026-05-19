@@ -38,16 +38,16 @@ def extract_tools() -> list[dict]:
 
 def _get_mcp_tool_name(deco: ast.expr) -> str | None:
     """Extrait le paramètre name= du décorateur @mcp.tool(name='...')."""
-    if isinstance(deco, ast.Call):
-        if isinstance(deco.func, ast.Attribute):
-            if (
-                isinstance(deco.func.value, ast.Name)
-                and deco.func.value.id == "mcp"
-                and deco.func.attr == "tool"
-            ):
-                for kw in deco.keywords:
-                    if kw.arg == "name" and isinstance(kw.value, ast.Constant):
-                        return str(kw.value.value)
+    if (
+        isinstance(deco, ast.Call)
+        and isinstance(deco.func, ast.Attribute)
+        and isinstance(deco.func.value, ast.Name)
+        and deco.func.value.id == "mcp"
+        and deco.func.attr == "tool"
+    ):
+        for kw in deco.keywords:
+            if kw.arg == "name" and isinstance(kw.value, ast.Constant):
+                return str(kw.value.value)
     return None
 
 
@@ -74,15 +74,16 @@ def extract_resources() -> list[dict]:
 
 
 def _resource_uri(deco: ast.expr) -> str | None:
-    if isinstance(deco, ast.Call):
-        if isinstance(deco.func, ast.Attribute):
-            if (
-                isinstance(deco.func.value, ast.Name)
-                and deco.func.value.id == "mcp"
-                and deco.func.attr == "resource"
-            ):
-                if deco.args and isinstance(deco.args[0], ast.Constant):
-                    return str(deco.args[0].value)
+    if (
+        isinstance(deco, ast.Call)
+        and isinstance(deco.func, ast.Attribute)
+        and isinstance(deco.func.value, ast.Name)
+        and deco.func.value.id == "mcp"
+        and deco.func.attr == "resource"
+        and deco.args
+        and isinstance(deco.args[0], ast.Constant)
+    ):
+        return str(deco.args[0].value)
     return None
 
 
@@ -111,13 +112,18 @@ def extract_env_vars() -> list[dict]:
     for py_file in sorted(src_dir.glob("*.py")):
         text = py_file.read_text()
         # os.environ.get("VAR", "default")
-        for m in re.finditer(r'''os\.environ\.get\(["']([^"']+)["']\s*(?:,\s*["']([^"']*)["'])?\)''', text):
+        for m in re.finditer(
+            r"""os\.environ\.get\(["']([^"']+)["']\s*(?:,\s*["']([^"']*)["'])?\)""",
+            text,
+        ):
             var_name = m.group(1)
             default = m.group(2) or ""
             if var_name not in env_vars:
                 env_vars[var_name] = default
         # _read_positive_int_env("VAR", default_int)
-        for m in re.finditer(r'''_read_positive_int_env\(["']([^"']+)["']\s*,\s*(\d+)\)''', text):
+        for m in re.finditer(
+            r"""_read_positive_int_env\(["']([^"']+)["']\s*,\s*(\d+)\)""", text
+        ):
             var_name = m.group(1)
             default = m.group(2)
             if var_name not in env_vars:
