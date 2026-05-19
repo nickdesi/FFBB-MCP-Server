@@ -11,7 +11,7 @@ permissions:
 jobs:
   run:
     name: Run performance benchmark
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Trigger benchmark
@@ -19,7 +19,7 @@ jobs:
           result=$(curl -s -o /tmp/benchmark.json -w "%{http_code}" \
             -X POST "https://ffbb.desimone.fr/benchmark/run" \
             -H "Content-Type: application/json")
-          if [ "$result" != "201" ]; then
+          if [ "$result" != "200" ] && [ "$result" != "201" ]; then
             echo "::error::Benchmark failed with HTTP $result"
             cat /tmp/benchmark.json
             exit 1

@@ -1,0 +1,68 @@
+name: Update AGENTS.md
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/ffbb_mcp/server.py'
+      - 'src/ffbb_mcp/resources.py'
+      - 'src/ffbb_mcp/services.py'
+      - 'src/ffbb_mcp/utils.py'
+      - 'src/ffbb_mcp/routes.py'
+      - 'src/ffbb_mcp/cache_strategy.py'
+      - 'src/ffbb_mcp/aliases.py'
+      - 'src/ffbb_mcp/app_factory.py'
+      - 'src/ffbb_mcp/benchmark.py'
+      - 'src/ffbb_mcp/_state.py'
+      - 'tools/update_agents_md.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agents-md-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  update:
+    name: Update AGENTS.md
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Generate AGENTS.md
+        run: uv run python tools/update_agents_md.py
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if git diff --quiet AGENTS.md; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add AGENTS.md
+          git commit -m "chore: update AGENTS.md [skip ci]"
+          git push
