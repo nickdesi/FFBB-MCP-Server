@@ -124,27 +124,38 @@ def _parse_dt(raw: str | None) -> datetime | None:
         return None
     tz = _PARIS_TZ
 
-    # ⚡ Bolt: Fast-path pour Python <= 3.10 : fromisoformat ne supporte pas
-    # toujours l'espace comme séparateur. On le remplace par 'T' si nécessaire
-    # pour profiter de la vitesse de fromisoformat (C-native) au lieu de strptime.
-    raw_iso = raw.replace(" ", "T") if " " in raw and len(raw) == 19 else raw
-
     try:
-        dt = datetime.fromisoformat(raw_iso)
-    except Exception:
-        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
-            try:
-                dt = datetime.strptime(raw, fmt)
-                break
-            except Exception:
-                dt = None
-        else:
-            return None
-    if dt is None:
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=tz)
-    return dt.astimezone(tz)
+        # Fast path for Python 3.11+: fromisoformat natively supports spaces.
+        # This replaces the costly fallback loop and string replace.
+        dt = datetime.fromisoformat(raw)
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=tz)
+        return dt.astimezone(tz)
+    except ValueError:
+        pass
+
+    # Fallback pour Python <= 3.10 : fromisoformat ne supporte pas
+    # toujours l'espace comme séparateur. On le remplace par 'T' via
+    # concatenation (plus rapide que str.replace) si la date fait 19 chars.
+    if type(raw) is str and len(raw) == 19 and raw[10] == " ":
+        try:
+            dt = datetime.fromisoformat(raw[:10] + "T" + raw[11:])
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=tz)
+            return dt.astimezone(tz)
+        except ValueError:
+            pass
+
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            dt = datetime.strptime(raw, fmt)
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=tz)
+            return dt.astimezone(tz)
+        except ValueError:
+            pass
+
+    return None
 
 
 def _notify_cache_hit(cache_name: str) -> None:
