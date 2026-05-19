@@ -347,6 +347,13 @@ Avant push/tag/release :
 | Variable | Défaut | Usage |
 |----------|--------|-------|
 {NL.join(env_table_rows)}
+
+## Notes workflow / outils
+
+### PR Comments pour Jules (Google)
+- **NE PAS utiliser** `gh pr review --comment` — Jules ne le détecte pas
+- **Utiliser** `gh pr comment <number> --body "..."` ou commenter via l'UI GitHub
+- Jules écoute les `issue_comment` events, pas les `pull_request_review` events
 """
     return content
 

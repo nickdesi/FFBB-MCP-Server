@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB-MCP-Server | server.py: 1123 lignes | services.py: 2912 lignes
+> Dernière mise à jour : jolly-pixel | server.py: 1123 lignes | services.py: 2902 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -98,7 +98,7 @@ src/ffbb_mcp/
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
 ├── server.py              # Tools MCP + main() (≈1123 lignes)
-├── services.py            # Logique métier (≈2912 lignes)
+├── services.py            # Logique métier (≈2902 lignes)
 └── utils.py               # serialize_model, parse_categorie, prune_payload
 ```
 
@@ -108,7 +108,7 @@ src/ffbb_mcp/
 - Pas de suffixe `_compact_` ou `_impl_` exposé
 - Modifier une fonction à la fois, seulement si test/usage échoue
 - Nouvelle fonction → test manuel validé avant exposition MCP
-- **God files** : `services.py` (2912 lignes) — refactoring différé (cycles d'import)
+- **God files** : `services.py` (2902 lignes) — refactoring différé (cycles d'import)
 
 ## Commandes
 - Tests : `.venv/bin/python -m pytest -q` (pas `pytest` seul)
@@ -145,3 +145,10 @@ Avant push/tag/release :
 | `FFBB_POULE_FETCH_CONCURRENCY` | `8` | Concurrence max fetch poules |
 | `FFBB_MCP_PRUNE_LIMIT` | `50` | Limite troncature payload |
 | `FFBB_CACHE_TTL_*` | — | TTL par type de cache (voir cache_strategy.py) |
+
+## Notes workflow / outils
+
+### PR Comments pour Jules (Google)
+- **NE PAS utiliser** `gh pr review --comment` — Jules ne le détecte pas
+- **Utiliser** `gh pr comment <number> --body "..."` ou commenter via l'UI GitHub
+- Jules écoute les `issue_comment` events, pas les `pull_request_review` events
