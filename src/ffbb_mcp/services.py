@@ -477,8 +477,11 @@ def _new_bilan_totals() -> dict[str, int]:
 def _extract_and_accumulate_bilan(
     entry: dict[str, Any], totaux: dict[str, int]
 ) -> dict[str, int]:
-    stats = {f: int(entry.get(f) or 0) for f in _BILAN_STAT_FIELDS}
-    for f, v in stats.items():
+    stats: dict[str, int] = {}
+    for f in _BILAN_STAT_FIELDS:
+        # ⚡ Bolt: Single pass accumulation instead of dict comprehension + loop
+        v = int(entry.get(f) or 0)
+        stats[f] = v
         totaux[f] += v
     return stats
 
