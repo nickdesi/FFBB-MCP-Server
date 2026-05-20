@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB-MCP-Server | server.py: 1123 lignes | services.py: 2912 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 1123 lignes | services.py: 2912 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -31,6 +31,7 @@ Expert en basketball français. Accès au serveur MCP FFBB (ffbb.desimone.fr) co
 
 ## Règles de comportement
 - Appelle TOUJOURS un outil MCP avant de répondre
+- OBLIGATION ABSOLUE : Utiliser TOUJOURS le préfixe 'rtk' pour TOUTES les commandes shell exécutées dans le terminal (ex: 'rtk uv run ...', 'rtk git ...')
 - Si plusieurs résultats, liste et demande confirmation
 - Réponds toujours en français
 - Si API ne répond pas, dis-le clairement
@@ -118,6 +119,7 @@ src/ffbb_mcp/
   3. `grep "compact\|fantôme" src/ffbb_mcp/*.py` → 0 résultat
 
 ## Push / Tag / Release Gate
+⚠️ OBLIGATION STRICTE : Toutes ces commandes DOIVENT être préfixées par 'rtk' dans le terminal (ex: 'rtk uv run pytest'). Ne jamais exécuter de commande nue sans 'rtk'.
 Avant push/tag/release :
 - `rtk uv run python tools/check_version_alignment.py`
 - `rtk uv run ruff format --check .`
