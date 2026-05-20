@@ -27,3 +27,4 @@ tools/skill_router/
 # Runtime data & graphify artifacts
 data/
 graphify-out/
+coverage.xml

@@ -1,3 +1,4 @@
 {
-  "$schema": "https://opencode.ai/config.json"
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": "## PR Creation — GitHub Best Practices\nToujours fournir une description complète lors de la création d'une PR avec `gh pr create` :\n- **--title** : format conventional commits (`fix(ci): ...`, `feat(...): ...`, `chore(...): ...`)\n- **--body** : structuré avec les sections suivantes :\n  - **Summary** : 1-2 phrases sur le but de la PR\n  - **Root Cause** ou **Context** : pourquoi ce changement est nécessaire\n  - **Changes** : tableau listant les fichiers modifiés et la nature du changement\n  - **Test Results** : résultats des tests (passed/failed/skipped, coverage)\n  - **Related** : lien vers l'issue ou le CI run concerné si applicable\n- Ne JAMAIS créer de PR sans body descriptif.\n\n## Pre-Push Gate — OBLIGATOIRE\nAvant TOUT `git push` ou `git commit && git push`, lancer TOUJOURS la suite complète :\n1. `uv run python tools/check_version_alignment.py`\n2. `uv run ruff check .`\n3. `uv run ruff format --check .`\n4. `uv run mypy src`\n5. `uv run pytest tests --cov=src --cov-report=xml`\nNe pusher que si les 5 passent sans erreur."
 }
