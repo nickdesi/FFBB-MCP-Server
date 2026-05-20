@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 import datetime
 import logging
 import os
 import platform
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from mcp.server.fastmcp import FastMCP
-from starlette.requests import Request
+if TYPE_CHECKING:
+    from mcp.server.fastmcp import FastMCP
+    from starlette.requests import Request
+
 from starlette.responses import (
     FileResponse,
     HTMLResponse,

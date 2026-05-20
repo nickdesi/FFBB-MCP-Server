@@ -1,10 +1,14 @@
 """Module de tracking des métriques du serveur et des appels FFBB."""
 
+from __future__ import annotations
+
 import bisect
 import time
-from collections.abc import Mapping
 from threading import Lock
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 START_TIME = time.time()
 

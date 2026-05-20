@@ -8,7 +8,7 @@ import json
 import logging
 import os
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -125,7 +125,7 @@ async def run_benchmark() -> dict[str, Any]:
 
         total_ms = round(sum(s["duration_ms"] for s in steps), 1)
         run = {
-            "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "timestamp": datetime.now(UTC).isoformat(timespec="seconds"),
             "scenario": scenario,
             "steps": steps,
             "total_ms": total_ms,
@@ -146,7 +146,7 @@ async def run_benchmark() -> dict[str, Any]:
     except Exception as e:
         total_ms = round(sum(s["duration_ms"] for s in steps), 1)
         run = {
-            "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "timestamp": datetime.now(UTC).isoformat(timespec="seconds"),
             "scenario": scenario,
             "steps": steps,
             "total_ms": total_ms,

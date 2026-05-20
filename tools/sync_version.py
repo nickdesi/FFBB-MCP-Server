@@ -42,7 +42,7 @@ def update_readme(root_dir, version, client_version):
     )
 
     # 2. Update update date
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
     months_fr = [
         "",
         "Janvier",
@@ -103,7 +103,7 @@ def update_website(root_dir, version):
     if not index_path.exists():
         return
 
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
     iso_date = now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     months_fr = [

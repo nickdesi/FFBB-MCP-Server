@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 import contextlib
 import logging
 import os
 import re
 import uuid
-from collections.abc import AsyncGenerator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from mcp.server.fastmcp import FastMCP
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
+    from mcp.server.fastmcp import FastMCP
+
 from starlette.applications import Starlette
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
@@ -22,7 +27,7 @@ _REQUEST_ID_RE = re.compile(r"^[a-zA-Z0-9\-]{1,64}$")
 
 def create_app(mcp: FastMCP, allowed_origins: list[str]) -> Starlette:
     @contextlib.asynccontextmanager
-    async def lifespan(app: Starlette) -> AsyncGenerator[None, None]:
+    async def lifespan(app: Starlette) -> AsyncGenerator[None]:
         async with mcp.session_manager.run():
             yield
 

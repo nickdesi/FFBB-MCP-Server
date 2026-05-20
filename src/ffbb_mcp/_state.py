@@ -1,9 +1,13 @@
-import asyncio
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from cachetools import TLRUCache, TTLCache
+if TYPE_CHECKING:
+    import asyncio
+
+    from cachetools import TLRUCache, TTLCache
 
 
 def _read_positive_int_env(key: str, default: int) -> int:

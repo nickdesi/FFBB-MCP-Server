@@ -12,6 +12,7 @@ license = { text = "Apache-2.0" }
 dependencies = [
     "mcp[cli]>=1.27.0",
     "ffbb-data-client>=2.1.0,<3.0.0",
+    "httpx>=0.28.0",
     "uvicorn>=0.30.0,<1.0.0",
     "starlette<2.0.0",
     "pydantic>=2.12.5,<3.0.0",
@@ -27,7 +28,7 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
-    "ruff>=0.3.0",
+    "ruff>=0.15.12",
     "mypy>=1.15.0",
     "types-cachetools>=7.0.0.20260503",
     "types-setuptools",
@@ -54,7 +55,7 @@ addopts = "--cov=ffbb_mcp --cov-fail-under=65"
 
 [tool.ruff]
 line-length = 88
-target-version = "py310"
+target-version = "py314"
 exclude = [
     ".agent",
     ".git",

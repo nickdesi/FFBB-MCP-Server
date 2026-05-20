@@ -325,6 +325,7 @@ source = { editable = "." }
 dependencies = [
     { name = "cachetools" },
     { name = "ffbb-data-client" },
+    { name = "httpx" },
     { name = "mcp", extra = ["cli"] },
     { name = "pydantic" },
     { name = "starlette" },
@@ -351,6 +352,7 @@ docs = [
 requires-dist = [
     { name = "cachetools", specifier = ">=5.3.0" },
     { name = "ffbb-data-client", specifier = ">=2.1.0,<3.0.0" },
+    { name = "httpx", specifier = ">=0.28.0" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.27.0" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6.0" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.0" },
@@ -360,7 +362,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.3.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.12" },
     { name = "starlette", specifier = "<2.0.0" },
     { name = "types-cachetools", marker = "extra == 'dev'", specifier = ">=7.0.0.20260503" },
     { name = "types-setuptools", marker = "extra == 'dev'" },
