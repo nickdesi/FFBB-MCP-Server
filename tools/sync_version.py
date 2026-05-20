@@ -28,18 +28,29 @@ def get_client_version(root_dir):
     return match.group(1) if match else None
 
 
-def update_readme(root_dir, version, client_version):
+def update_readme(root_dir, version, client_version, pyproject_path):
     readme_path = root_dir / "README.md"
     if not readme_path.exists():
         return
     content = readme_path.read_text("utf-8")
 
-    # 1. Update badge
+    # 1. Update version badge
     content = re.sub(
         r'(<img src="https://img.shields.io/badge/version-)[^ ]+(-green\?style=for-the-badge" alt="Version" />)',
         f"\\g<1>{version}\\g<2>",
         content,
     )
+
+    # 1b. Sync Python version badge with pyproject.toml requires-python
+    pyproject_content = pyproject_path.read_text("utf-8")
+    py_match = re.search(r'requires-python\s*=\s*">=([^"]+)"', pyproject_content)
+    if py_match:
+        py_version = py_match.group(1)
+        content = re.sub(
+            r'(img src="https://img\.shields\.io/badge/Python-)[^%]+(%2B-blue\?style=for-the-badge&logo=python")',
+            f"\\g<1>{py_version}%2B\\g<2>",
+            content,
+        )
 
     # 2. Update update date
     now = datetime.datetime.now(datetime.UTC)
@@ -190,7 +201,7 @@ def main():
         sync_lockfile()  # Run lock first to have latest client version in lockfile
         client_version = get_client_version(root_dir)
 
-        update_readme(root_dir, version, client_version)
+        update_readme(root_dir, version, client_version, pyproject_path)
         update_docs(root_dir, version)
         update_website(root_dir, version)
         update_changelog(root_dir, version)
