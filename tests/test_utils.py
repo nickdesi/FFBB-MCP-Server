@@ -1,5 +1,5 @@
 from ffbb_mcp.aliases import _normalize_apostrophes, normalize_query
-from ffbb_mcp.utils import prune_payload, serialize_model
+from ffbb_mcp.utils import parse_categorie, prune_payload, serialize_model
 
 
 def test_serialize_simple_types():
@@ -134,3 +134,56 @@ class TestPrunePayload:
         assert prune_payload(123) == 123
         assert prune_payload("hello") == "hello"
         assert prune_payload(None) is None
+
+
+class TestParseCategorie:
+    """Vérifie le parsing robuste des catégories FFBB, y compris U7 et U9."""
+
+    def test_parse_standard_u_double_digit(self):
+        res = parse_categorie("U11M1")
+        assert res.categorie == "U11"
+        assert res.sexe == "M"
+        assert res.numero_equipe == 1
+
+        res2 = parse_categorie("u13 f 2")
+        assert res2.categorie == "U13"
+        assert res2.sexe == "F"
+        assert res2.numero_equipe == 2
+
+    def test_parse_u_single_digit(self):
+        # Bug corrigé : support de U9 et U7
+        res = parse_categorie("U9")
+        assert res.categorie == "U9"
+        assert res.sexe is None
+        assert res.numero_equipe is None
+
+        res2 = parse_categorie("u9m1")
+        assert res2.categorie == "U9"
+        assert res2.sexe == "M"
+        assert res2.numero_equipe == 1
+
+        res3 = parse_categorie("U7F")
+        assert res3.categorie == "U7"
+        assert res3.sexe == "F"
+        assert res3.numero_equipe is None
+
+        res4 = parse_categorie("u7 f 2")
+        assert res4.categorie == "U7"
+        assert res4.sexe == "F"
+        assert res4.numero_equipe == 2
+
+    def test_parse_seniors(self):
+        res = parse_categorie("Senior F")
+        assert res.categorie == "SENIOR"
+        assert res.sexe == "F"
+        assert res.numero_equipe is None
+
+        res2 = parse_categorie("SENIORS MASCULINS 2")
+        assert res2.categorie == "SENIOR"
+        assert res2.sexe == "M"
+        assert res2.numero_equipe == 2
+
+    def test_parse_edge_cases(self):
+        assert parse_categorie("") == (None, None, None)
+        assert parse_categorie(None) == (None, None, None)
+        assert parse_categorie("   ") == (None, None, None)

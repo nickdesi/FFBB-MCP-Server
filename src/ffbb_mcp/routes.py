@@ -138,7 +138,10 @@ def register_routes(mcp: FastMCP) -> None:
                 "cache_hits_total": summary["cache_hits_total"],
                 "cache_misses_total": summary["cache_misses_total"],
                 "cache_hit_ratio_global": round(summary["cache_hit_ratio_global"], 4),
-                "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+                "timestamp": datetime.datetime.now(datetime.UTC)
+                .replace(tzinfo=None)
+                .isoformat()
+                + "Z",
                 "python_version": platform.python_version(),
                 "public_url": _get_public_base_url(),
             }
@@ -156,7 +159,10 @@ def register_routes(mcp: FastMCP) -> None:
             {
                 "service": "ffbb-mcp",
                 "version": _PACKAGE_VERSION,
-                "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+                "timestamp": datetime.datetime.now(datetime.UTC)
+                .replace(tzinfo=None)
+                .isoformat()
+                + "Z",
                 **snap,
             }
         )

@@ -49,9 +49,9 @@ class ParsedCategorie(NamedTuple):
     numero_equipe: int | None
 
 
-_CAT_PATTERN = re.compile(r"U(\d{2})")
-_M_PATTERN = re.compile(r"\bM\b|U\d{2}M|MASC")
-_F_PATTERN = re.compile(r"\bF\b|U\d{2}F|FÉM|FEM")
+_CAT_PATTERN = re.compile(r"U(\d{1,2})")
+_M_PATTERN = re.compile(r"\bM\b|U\d{1,2}M|MASC")
+_F_PATTERN = re.compile(r"\bF\b|U\d{1,2}F|FÉM|FEM")
 _NUM_PATTERN = re.compile(r"(\d+)")
 
 
