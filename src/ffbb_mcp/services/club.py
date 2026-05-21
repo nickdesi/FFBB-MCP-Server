@@ -552,11 +552,14 @@ async def ffbb_next_match_service(
 
     salle_details = next_match.get("salle_details") or {}
     lieu = (
-        salle_details.get("nom")
+        salle_details.get("libelle")
+        or salle_details.get("nom")
         or next_match.get("nomSalle")
         or next_match.get("nom_salle")
         or ""
     )
+    # Extraire la ville depuis l'adresse ou les champs dédiés
+    adresse_salle = salle_details.get("adresse") or ""
     ville = (
         salle_details.get("ville")
         or salle_details.get("commune")
@@ -564,6 +567,11 @@ async def ffbb_next_match_service(
         or next_match.get("ville_salle")
         or ""
     )
+    # Si pas de ville explicite, essayer de la parser depuis l'adresse
+    if not ville and adresse_salle:
+        parts = adresse_salle.split(",")
+        if len(parts) >= 2:
+            ville = parts[-1].strip()
 
     return {
         "status": "ok",
@@ -1188,11 +1196,13 @@ async def ffbb_last_result_service(
 
     salle_details = dernier.get("salle_details") or {}
     lieu = (
-        salle_details.get("nom")
+        salle_details.get("libelle")
+        or salle_details.get("nom")
         or dernier.get("nomSalle")
         or dernier.get("nom_salle")
         or ""
     )
+    adresse_salle = salle_details.get("adresse") or ""
     ville = (
         salle_details.get("ville")
         or salle_details.get("commune")
@@ -1200,6 +1210,10 @@ async def ffbb_last_result_service(
         or dernier.get("ville_salle")
         or ""
     )
+    if not ville and adresse_salle:
+        parts = adresse_salle.split(",")
+        if len(parts) >= 2:
+            ville = parts[-1].strip()
 
     return {
         "status": "ok",
