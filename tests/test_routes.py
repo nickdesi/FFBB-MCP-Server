@@ -128,25 +128,43 @@ def test_docs_redirect(client):
     assert response.headers["location"] == "/docs/"
 
 
-def test_docs_slash_local(client):
+def test_docs_slash_local(client, tmp_path):
     """Teste l'accès à /docs/ (index de la doc)."""
-    response = client.get("/docs/")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir(parents=True, exist_ok=True)
+    index_file = docs_dir / "index.html"
+    index_file.write_text("Mock index", encoding="utf-8")
+
+    with patch("ffbb_mcp.routes._WEBSITE_DIR", new=tmp_path):
+        response = client.get("/docs/")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
 
 
-def test_docs_wildcard_local_html(client):
+def test_docs_wildcard_local_html(client, tmp_path):
     """Teste l'accès à un fichier html de doc existant localement."""
-    response = client.get("/docs/404.html")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir(parents=True, exist_ok=True)
+    html_file = docs_dir / "404.html"
+    html_file.write_text("Mock 404", encoding="utf-8")
+
+    with patch("ffbb_mcp.routes._WEBSITE_DIR", new=tmp_path):
+        response = client.get("/docs/404.html")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
 
 
-def test_docs_wildcard_local_non_html(client):
+def test_docs_wildcard_local_non_html(client, tmp_path):
     """Teste l'accès à un fichier non html existant localement."""
-    response = client.get("/docs/vp-icons.css")
-    assert response.status_code == 200
-    assert "text/css" in response.headers["content-type"]
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir(parents=True, exist_ok=True)
+    css_file = docs_dir / "vp-icons.css"
+    css_file.write_text("body {}", encoding="utf-8")
+
+    with patch("ffbb_mcp.routes._WEBSITE_DIR", new=tmp_path):
+        response = client.get("/docs/vp-icons.css")
+        assert response.status_code == 200
+        assert "text/css" in response.headers["content-type"]
 
 
 def test_docs_wildcard_redirect_github(client):
