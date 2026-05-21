@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB-MCP-Server | server.py: 1123 lignes | services.py: 2915 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 1123 lignes | services.py: 3044 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -99,17 +99,24 @@ src/ffbb_mcp/
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
 ├── server.py              # Tools MCP + main() (≈1123 lignes)
-├── services.py            # Logique métier (≈2915 lignes)
+├── services/              # Logique métier modularisée (≈3044 lignes)
+│   ├── __init__.py        # Point d'entrée et factory de services
+│   ├── club.py            # Service de gestion des clubs
+│   ├── common.py          # Helpers et base services partagés
+│   ├── poule.py           # Service de gestion des poules
+│   ├── salle.py           # Service de gestion des salles
+│   ├── search.py          # Service de recherche multicritère
+│   └── warmup.py          # Service de préchauffage du cache
 └── utils.py               # serialize_model, parse_categorie, prune_payload
 ```
 
 ## Conventions de code
-- Services : `ffbb_<nom>_service` (dans services.py)
+- Services : `ffbb_<nom>_service` (dans services/)
 - Tools MCP : `ffbb_<nom>` (dans server.py, `@mcp.tool()`)
 - Pas de suffixe `_compact_` ou `_impl_` exposé
 - Modifier une fonction à la fois, seulement si test/usage échoue
 - Nouvelle fonction → test manuel validé avant exposition MCP
-- **God files** : `services.py` (2915 lignes) — refactoring différé (cycles d'import)
+- **Modularisation** : Le package `services/` (total ≈3044 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
 
 ## Commandes
 - Tests : `.venv/bin/python -m pytest -q` (pas `pytest` seul)
@@ -144,8 +151,8 @@ Avant push/tag/release :
 | `PORT` | `9123` | Port d'écoute HTTP |
 | `MAX_CONCURRENT_FFBB` | `8` | Concurrence max appels API FFBB |
 | `FFBB_MAX_CALENDAR_MATCHES` | `300` | Max rencontres retournées |
-| `FFBB_POULE_FETCH_CONCURRENCY` | `8` | Concurrence max fetch poules |
 | `FFBB_MCP_PRUNE_LIMIT` | `50` | Limite troncature payload |
+| `FFBB_POULE_FETCH_CONCURRENCY` | — | Concurrence max fetch poules |
 | `FFBB_CACHE_TTL_*` | — | TTL par type de cache (voir cache_strategy.py) |
 
 ## Notes workflow / outils

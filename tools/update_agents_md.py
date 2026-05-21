@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SERVER_PY = ROOT / "src" / "ffbb_mcp" / "server.py"
 RESOURCES_PY = ROOT / "src" / "ffbb_mcp" / "resources.py"
-SERVICES_PY = ROOT / "src" / "ffbb_mcp" / "services.py"
+SERVICES_DIR = ROOT / "src" / "ffbb_mcp" / "services"
 AGENTS_MD = ROOT / "AGENTS.md"
 
 
@@ -88,20 +88,23 @@ def _resource_uri(deco: ast.expr) -> str | None:
 
 
 def extract_services() -> list[dict]:
-    """Liste les fonctions publiques (async def ffbb_*) dans services.py."""
-    tree = ast.parse(SERVICES_PY.read_text())
+    """Liste les fonctions publiques (async def ffbb_*) dans le package services."""
     services = []
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.AsyncFunctionDef,)) and node.name.startswith("ffbb_"):
-            docstring = ast.get_docstring(node) or ""
-            first_line = docstring.strip().split("\n")[0] if docstring else ""
-            services.append(
-                {
-                    "name": node.name,
-                    "summary": first_line.strip().rstrip("."),
-                    "line": node.lineno,
-                }
-            )
+    for py_file in sorted(SERVICES_DIR.glob("*.py")):
+        tree = ast.parse(py_file.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.AsyncFunctionDef,)) and node.name.startswith(
+                "ffbb_"
+            ):
+                docstring = ast.get_docstring(node) or ""
+                first_line = docstring.strip().split("\n")[0] if docstring else ""
+                services.append(
+                    {
+                        "name": node.name,
+                        "summary": first_line.strip().rstrip("."),
+                        "line": node.lineno,
+                    }
+                )
     return services
 
 
@@ -109,7 +112,7 @@ def extract_env_vars() -> list[dict]:
     """Extrait les variables d'environnement de tous les fichiers src/ffbb_mcp/."""
     env_vars: dict[str, str] = {}
     src_dir = ROOT / "src" / "ffbb_mcp"
-    for py_file in sorted(src_dir.glob("*.py")):
+    for py_file in sorted(src_dir.rglob("*.py")):
         text = py_file.read_text()
         # os.environ.get("VAR", "default")
         for m in re.finditer(
@@ -148,20 +151,45 @@ def extract_architecture() -> str:
         "resources.py": "Resources MCP (ffbb://saisons, etc.)",
         "routes.py": "Routes HTTP (health, metrics, dashboard, docs, etc.)",
         "server.py": "Tools MCP + main()",
-        "services.py": "Logique métier",
+        "services/": "Logique métier modularisée",
         "utils.py": "serialize_model, parse_categorie, prune_payload",
     }
     lines = ["src/ffbb_mcp/"]
-    files = sorted(descriptions.keys())
-    for i, f in enumerate(files):
-        is_last = i == len(files) - 1
+    keys = sorted(descriptions.keys())
+    for i, k in enumerate(keys):
+        is_last = i == len(keys) - 1
         prefix = "└── " if is_last else "├── "
-        lines.append(f"{prefix}{f:<22s} # {descriptions[f]}")
+        if k == "services/":
+            lines.append(f"{prefix}{k:<22s} # {descriptions[k]}")
+            sub_files = sorted([f.name for f in SERVICES_DIR.glob("*.py")])
+            for j, sf in enumerate(sub_files):
+                sub_is_last = j == len(sub_files) - 1
+                sub_prefix = "│   └── " if sub_is_last else "│   ├── "
+                sub_desc = {
+                    "__init__.py": "Point d'entrée et factory de services",
+                    "club.py": "Service de gestion des clubs",
+                    "common.py": "Helpers et base services partagés",
+                    "poule.py": "Service de gestion des poules",
+                    "salle.py": "Service de gestion des salles",
+                    "search.py": "Service de recherche multicritère",
+                    "warmup.py": "Service de préchauffage du cache",
+                }.get(sf, "Module de service")
+                lines.append(f"{sub_prefix}{sf:<18s} # {sub_desc}")
+        else:
+            lines.append(f"{prefix}{k:<22s} # {descriptions[k]}")
     return "\n".join(lines)
 
 
 def count_lines(filepath: Path) -> int:
     return len(filepath.read_text().splitlines())
+
+
+def count_services_lines() -> int:
+    """Compte le nombre de lignes de tous les fichiers .py du package services."""
+    total = 0
+    for py_file in SERVICES_DIR.glob("*.py"):
+        total += len(py_file.read_text().splitlines())
+    return total
 
 
 def generate_agents_md() -> str:
@@ -171,7 +199,7 @@ def generate_agents_md() -> str:
     architecture = extract_architecture()
 
     server_lines = count_lines(SERVER_PY)
-    services_lines = count_lines(SERVICES_PY)
+    services_lines = count_services_lines()
 
     # Workflow FFBB — liste des tools dans l'ordre logique
     workflow_tools = [
@@ -203,9 +231,10 @@ def generate_agents_md() -> str:
             arch_lines[idx] = line.replace(
                 "# Tools MCP + main()", f"# Tools MCP + main() (≈{server_lines} lignes)"
             )
-        elif "services.py" in line:
+        elif "services/" in line:
             arch_lines[idx] = line.replace(
-                "# Logique métier", f"# Logique métier (≈{services_lines} lignes)"
+                "# Logique métier modularisée",
+                f"# Logique métier modularisée (≈{services_lines} lignes)",
             )
 
     # Variables d'environnement — whitelist avec descriptions
@@ -319,12 +348,12 @@ Règle de temps verbal :
 ```
 
 ## Conventions de code
-- Services : `ffbb_<nom>_service` (dans services.py)
+- Services : `ffbb_<nom>_service` (dans services/)
 - Tools MCP : `ffbb_<nom>` (dans server.py, `@mcp.tool()`)
 - Pas de suffixe `_compact_` ou `_impl_` exposé
 - Modifier une fonction à la fois, seulement si test/usage échoue
 - Nouvelle fonction → test manuel validé avant exposition MCP
-- **God files** : `services.py` ({services_lines} lignes) — refactoring différé (cycles d'import)
+- **Modularisation** : Le package `services/` (total ≈{services_lines} lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
 
 ## Commandes
 - Tests : `.venv/bin/python -m pytest -q` (pas `pytest` seul)
