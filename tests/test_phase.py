@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -231,8 +231,8 @@ async def test_resolve_poule_id_no_phase_returns_most_advanced():
 
 
 @pytest.mark.asyncio
-async def test_next_match_enriches_salle_from_id():
-    """ffbb_next_match doit enrichir salle/ville via get_salle quand idSalle est présent."""
+async def test_next_match_enriches_salle_from_rencontre():
+    """ffbb_next_match doit fetcher les détails de la rencontre pour avoir salle/ville."""
     equipes = [
         {
             "poule_id": "P1",
@@ -251,21 +251,14 @@ async def test_next_match_enriches_salle_from_id():
         "idEngagementEquipe1": "E1",
         "nomEquipe1": "Stade Clermontois",
         "nomEquipe2": "AS Montferrand",
-        "idSalle": "S42",
     }
 
-    salle_data = {
-        "id": "S42",
-        "nom": "Salle Jean Bouin",
-        "ville": "Clermont-Ferrand",
-        "adresse": "12 rue du sport",
+    rencontre_detail = {
+        "id": "M1",
+        "nomSalle": "Complexe Gauthière 1",
+        "villeSalle": "Clermont-Ferrand",
+        "adresseSalle": "84 boulevard Léon Jouhaux",
     }
-
-    salle_mock = MagicMock()
-    salle_mock.model_dump = MagicMock(return_value=salle_data)
-
-    client_mock = MagicMock()
-    client_mock.get_salle_async = AsyncMock(return_value=salle_mock)
 
     def poule_side_effect(poule_id, **kwargs):
         return {"id": poule_id, "rencontres": [match_data]}
@@ -286,8 +279,8 @@ async def test_next_match_enriches_salle_from_id():
             ),
         ),
         patch(
-            "ffbb_mcp.services.club.get_client_async",
-            AsyncMock(return_value=client_mock),
+            "ffbb_mcp.services.search.get_rencontre_service",
+            AsyncMock(return_value=rencontre_detail),
         ),
     ):
         result = await ffbb_next_match_service(
@@ -295,13 +288,13 @@ async def test_next_match_enriches_salle_from_id():
         )
 
         assert result["status"] == "ok"
-        assert result["match"]["salle"] == "Salle Jean Bouin"
+        assert result["match"]["salle"] == "Complexe Gauthière 1"
         assert result["match"]["ville"] == "Clermont-Ferrand"
 
 
 @pytest.mark.asyncio
-async def test_last_result_enriches_salle_from_id():
-    """ffbb_last_result doit enrichir salle/ville via get_salle quand idSalle est présent."""
+async def test_last_result_enriches_salle_from_rencontre():
+    """ffbb_last_result doit fetcher les détails de la rencontre pour avoir salle/ville."""
     equipes = [
         {
             "poule_id": "P1",
@@ -322,21 +315,14 @@ async def test_last_result_enriches_salle_from_id():
         "idEngagementEquipe1": "E1",
         "nomEquipe1": "Stade Clermontois",
         "nomEquipe2": "AS Montferrand",
-        "idSalle": "S99",
     }
 
-    salle_data = {
-        "id": "S99",
-        "nom": "Gymnase des Sports",
-        "ville": "Montferrand",
-        "adresse": "5 avenue du gymnase",
+    rencontre_detail = {
+        "id": "R1",
+        "nomSalle": "Gymnase des Sports",
+        "villeSalle": "Montferrand",
+        "adresseSalle": "5 avenue du gymnase",
     }
-
-    salle_mock = MagicMock()
-    salle_mock.model_dump = MagicMock(return_value=salle_data)
-
-    client_mock = MagicMock()
-    client_mock.get_salle_async = AsyncMock(return_value=salle_mock)
 
     def poule_side_effect(poule_id, **kwargs):
         return {"id": poule_id, "rencontres": [match_data]}
@@ -357,8 +343,8 @@ async def test_last_result_enriches_salle_from_id():
             ),
         ),
         patch(
-            "ffbb_mcp.services.club.get_client_async",
-            AsyncMock(return_value=client_mock),
+            "ffbb_mcp.services.search.get_rencontre_service",
+            AsyncMock(return_value=rencontre_detail),
         ),
     ):
         result = await ffbb_last_result_service(

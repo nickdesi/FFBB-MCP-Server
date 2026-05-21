@@ -23,7 +23,6 @@ from .common import (
     _coerce_numeric_id,
     _dedupe_inflight,
     _extract_and_accumulate_bilan,
-    _extract_salle_id,
     _freshness_meta,
     _new_bilan_totals,
     _normalize_name,
@@ -497,15 +496,6 @@ async def ffbb_next_match_service(
             "candidates": all_available_equipes,
         }
 
-    # Enrichir les matchs avec les détails de salle
-    for _dt, m, _eq in upcoming:
-        salle_id = _extract_salle_id(m)
-        if salle_id and not m.get("salle_details"):
-            from .salle import _enrich_with_salle_details
-
-            client = await get_client_async()
-            await _enrich_with_salle_details(m, client)
-
     phase_to_matches: dict[int, list[tuple[datetime, dict, dict]]] = {}
     for dt, m, eq in upcoming:
         p_num = _extract_phase_num(eq.get("phase_label"))
@@ -517,6 +507,15 @@ async def ffbb_next_match_service(
     active_phase_matches = phase_to_matches[max_active_phase]
     active_phase_matches.sort(key=lambda x: x[0])
     next_dt, next_match, source_team = active_phase_matches[0]
+
+    # Fetch full rencontre details (includes salle info not available in poule data)
+    match_id = next_match.get("id")
+    if match_id:
+        from .search import get_rencontre_service
+
+        rencontre_detail = await get_rencontre_service(match_id)
+        if rencontre_detail:
+            next_match.update(rencontre_detail)
 
     eng1 = next_match.get("idEngagementEquipe1")
     eng2 = next_match.get("idEngagementEquipe2")
@@ -1148,13 +1147,14 @@ async def ffbb_last_result_service(
             "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
         }
 
-    # Enrichir le dernier match avec les détails de salle
-    salle_id = _extract_salle_id(dernier)
-    if salle_id and not dernier.get("salle_details"):
-        from .salle import _enrich_with_salle_details
+    # Fetch full rencontre details (includes salle info not available in poule data)
+    dernier_id = dernier.get("id")
+    if dernier_id:
+        from .search import get_rencontre_service
 
-        client = await get_client_async()
-        await _enrich_with_salle_details(dernier, client)
+        rencontre_detail = await get_rencontre_service(dernier_id)
+        if rencontre_detail:
+            dernier.update(rencontre_detail)
 
     _numero_equipe_match = int(numero_equipe) if numero_equipe is not None else None
     est_domicile = _match_team_name(
