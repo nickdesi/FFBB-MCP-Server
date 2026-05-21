@@ -23,6 +23,7 @@ from .common import (
     _coerce_numeric_id,
     _dedupe_inflight,
     _extract_and_accumulate_bilan,
+    _extract_salle_id,
     _freshness_meta,
     _new_bilan_totals,
     _normalize_name,
@@ -496,6 +497,15 @@ async def ffbb_next_match_service(
             "candidates": all_available_equipes,
         }
 
+    # Enrichir les matchs avec les détails de salle
+    for _dt, m, _eq in upcoming:
+        salle_id = _extract_salle_id(m)
+        if salle_id and not m.get("salle_details"):
+            from .salle import _enrich_with_salle_details
+
+            client = await get_client_async()
+            await _enrich_with_salle_details(m, client)
+
     phase_to_matches: dict[int, list[tuple[datetime, dict, dict]]] = {}
     for dt, m, eq in upcoming:
         p_num = _extract_phase_num(eq.get("phase_label"))
@@ -541,8 +551,20 @@ async def ffbb_next_match_service(
             adversaire = eq2_name or eq1_name
             domicile = None
 
-    lieu = next_match.get("nomSalle") or next_match.get("nom_salle") or ""
-    ville = next_match.get("villeSalle") or next_match.get("ville_salle") or ""
+    salle_details = next_match.get("salle_details") or {}
+    lieu = (
+        salle_details.get("nom")
+        or next_match.get("nomSalle")
+        or next_match.get("nom_salle")
+        or ""
+    )
+    ville = (
+        salle_details.get("ville")
+        or salle_details.get("commune")
+        or next_match.get("villeSalle")
+        or next_match.get("ville_salle")
+        or ""
+    )
 
     return {
         "status": "ok",
@@ -1126,6 +1148,14 @@ async def ffbb_last_result_service(
             "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
         }
 
+    # Enrichir le dernier match avec les détails de salle
+    salle_id = _extract_salle_id(dernier)
+    if salle_id and not dernier.get("salle_details"):
+        from .salle import _enrich_with_salle_details
+
+        client = await get_client_async()
+        await _enrich_with_salle_details(dernier, client)
+
     _numero_equipe_match = int(numero_equipe) if numero_equipe is not None else None
     est_domicile = _match_team_name(
         str(dernier.get("nomEquipe1", "")), str(organisme_nom), _numero_equipe_match
@@ -1156,6 +1186,21 @@ async def ffbb_last_result_service(
     num1 = eng1.get("numeroEquipe") if isinstance(eng1, dict) else None
     num2 = eng2.get("numeroEquipe") if isinstance(eng2, dict) else None
 
+    salle_details = dernier.get("salle_details") or {}
+    lieu = (
+        salle_details.get("nom")
+        or dernier.get("nomSalle")
+        or dernier.get("nom_salle")
+        or ""
+    )
+    ville = (
+        salle_details.get("ville")
+        or salle_details.get("commune")
+        or dernier.get("villeSalle")
+        or dernier.get("ville_salle")
+        or ""
+    )
+
     return {
         "status": "ok",
         "club_resolu": club_resolu,
@@ -1165,6 +1210,8 @@ async def ffbb_last_result_service(
         "score_domicile": dernier.get("resultatEquipe1"),
         "exterieur": format_team_name(dernier.get("nomEquipe2", ""), num2),
         "score_exterieur": dernier.get("resultatEquipe2"),
+        "salle": lieu,
+        "ville": ville,
         "victoire": victoire,
         "_meta": _freshness_meta(cache="poule", force_refresh_supported=True),
     }
