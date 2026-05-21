@@ -573,6 +573,12 @@ async def ffbb_next_match_service(
         if len(parts) >= 2:
             ville = parts[-1].strip()
 
+    client = await get_client_async()
+    from .salle import _enrich_with_salle_details
+
+    await _enrich_with_salle_details(next_match, client)
+    adresse = next_match.get("adresse_salle", "")
+
     return {
         "status": "ok",
         "club_resolu": club_resolu,
@@ -587,7 +593,9 @@ async def ffbb_next_match_service(
             "equipe2": eq2_name,
             "salle": lieu,
             "ville": ville,
+            "adresse": adresse,
         },
+        "_meta": _freshness_meta(cache="poule", force_refresh_supported=True),
     }
 
 
@@ -1194,6 +1202,11 @@ async def ffbb_last_result_service(
     num1 = eng1.get("numeroEquipe") if isinstance(eng1, dict) else None
     num2 = eng2.get("numeroEquipe") if isinstance(eng2, dict) else None
 
+    client = await get_client_async()
+    from .salle import _enrich_with_salle_details
+
+    await _enrich_with_salle_details(dernier, client)
+
     salle_details = dernier.get("salle_details") or {}
     lieu = (
         salle_details.get("libelle")
@@ -1202,7 +1215,7 @@ async def ffbb_last_result_service(
         or dernier.get("nom_salle")
         or ""
     )
-    adresse_salle = salle_details.get("adresse") or ""
+    adresse_salle = dernier.get("adresse_salle") or salle_details.get("adresse") or ""
     ville = (
         salle_details.get("ville")
         or salle_details.get("commune")
@@ -1226,6 +1239,7 @@ async def ffbb_last_result_service(
         "score_exterieur": dernier.get("resultatEquipe2"),
         "salle": lieu,
         "ville": ville,
+        "adresse": adresse_salle,
         "victoire": victoire,
         "_meta": _freshness_meta(cache="poule", force_refresh_supported=True),
     }

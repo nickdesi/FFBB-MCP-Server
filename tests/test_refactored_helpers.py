@@ -284,7 +284,7 @@ class TestPrioritizePhase:
 
 
 class TestFormatPouleResponse:
-    def test_formats_classements_and_rencontres(self):
+    async def test_formats_classements_and_rencontres(self):
         poule_data = {
             "id": 42,
             "libelle": "Poule A",
@@ -307,14 +307,14 @@ class TestFormatPouleResponse:
                 }
             ],
         }
-        result = format_poule_response(poule_data)
+        result = await format_poule_response(poule_data)
         assert result["id"] == 42
         assert result["nom"] == "Poule A"
         assert result["classements"][0]["equipe"] == "CSB REVARD"
         assert "api.ffbb.com/assets/abc123" in result["classements"][0]["logo_url"]
         assert result["rencontres"][0]["nomEquipe1"] == "CLUB A"
 
-    def test_truncation(self, monkeypatch):
+    async def test_truncation(self, monkeypatch):
         monkeypatch.setattr("ffbb_mcp.services._MAX_CALENDAR_MATCHES", 2)
         poule_data = {
             "id": 1,
@@ -330,7 +330,7 @@ class TestFormatPouleResponse:
                 for i in range(5)
             ],
         }
-        result = format_poule_response(poule_data)
+        result = await format_poule_response(poule_data)
         assert result["_truncated"] is True
         assert result["_total"] == 5
         assert result["_omitted_count"] == 3
@@ -338,7 +338,7 @@ class TestFormatPouleResponse:
         assert len(result["rencontres"]) == 3
         assert "warning" in result["rencontres"][-1]
 
-    def test_truncation_invalid_env_falls_back(self, monkeypatch):
+    async def test_truncation_invalid_env_falls_back(self, monkeypatch):
         monkeypatch.setattr("ffbb_mcp.services._MAX_CALENDAR_MATCHES", 300)
         poule_data = {
             "id": 1,
@@ -353,10 +353,10 @@ class TestFormatPouleResponse:
                 }
             ],
         }
-        result = format_poule_response(poule_data)
+        result = await format_poule_response(poule_data)
         assert result["rencontres"][0]["nomEquipe1"] == "A"
 
-    def test_no_logo(self):
+    async def test_no_logo(self):
         poule_data = {
             "id": 1,
             "libelle": "P",
@@ -365,11 +365,11 @@ class TestFormatPouleResponse:
             ],
             "rencontres": [],
         }
-        result = format_poule_response(poule_data)
+        result = await format_poule_response(poule_data)
         assert result["classements"][0]["logo_url"] is None
 
-    def test_format_poule_response_adds_freshness_meta(self):
-        result = format_poule_response(
+    async def test_format_poule_response_adds_freshness_meta(self):
+        result = await format_poule_response(
             {"id": "p1", "libelle": "Poule A", "_ttl_seconds": 120}
         )
 

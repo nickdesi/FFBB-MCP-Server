@@ -45,6 +45,9 @@ async def get_lives_service() -> list[dict]:
     )
     lives_list = lives if isinstance(lives, list) else []
     result = [serialize_model(live) for live in lives_list]
+    from .salle import _enrich_matches_with_salle_details
+
+    await _enrich_matches_with_salle_details(result)
     _cache_set(state.cache_lives, "lives", result, "lives")
     return result
 
@@ -160,7 +163,7 @@ async def get_poule_service(
     )
 
 
-def format_poule_response(poule_data: dict) -> dict[str, Any]:
+async def format_poule_response(poule_data: dict) -> dict[str, Any]:
     classements = poule_data.get("classements", [])
     formatted_classements = []
     for c in classements or []:
@@ -186,6 +189,10 @@ def format_poule_response(poule_data: dict) -> dict[str, Any]:
         m["nomEquipe1"] = format_team_name(m.get("nomEquipe1", ""), num1)
         m["nomEquipe2"] = format_team_name(m.get("nomEquipe2", ""), num2)
         formatted_rencontres.append(m)
+
+    from .salle import _enrich_matches_with_salle_details
+
+    await _enrich_matches_with_salle_details(formatted_rencontres)
 
     res: dict[str, Any] = {
         "id": poule_data.get("id"),
