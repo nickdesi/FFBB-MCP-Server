@@ -1,0 +1,574 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+import random
+import re
+import threading
+import time
+import unicodedata
+from datetime import datetime
+from typing import TYPE_CHECKING, Any
+from zoneinfo import ZoneInfo
+
+from cachetools import TLRUCache, TTLCache
+from httpx import HTTPStatusError
+from mcp.shared.exceptions import ErrorData, McpError
+from mcp.types import INTERNAL_ERROR
+
+from ffbb_mcp._state import _read_positive_int_env, state
+from ffbb_mcp.cache_strategy import get_static_ttl
+
+
+async def get_client_async(*args, **kwargs):
+    import ffbb_mcp.services
+
+    return await ffbb_mcp.services.get_client_async(*args, **kwargs)
+
+
+from ffbb_mcp.metrics import (
+    dec_inflight,
+    inc_inflight,
+    record_cache_hit,
+    record_cache_miss,
+    record_call,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
+
+logger = logging.getLogger("ffbb-mcp")
+
+# ---------------------------------------------------------------------------
+# Expressions régulières pré-compilées (Optimisation des performances)
+# ---------------------------------------------------------------------------
+_PHASE_EXTRACT_PATTERN = re.compile(r"Phase\s*(\d+)", re.IGNORECASE)
+_NUMERIC_EXTRACT_PATTERN = re.compile(r"(\d+)")
+_ELIMINATION_KEYWORDS = re.compile(
+    r"(finale|1/2|demi[- ]fin|quart|play[- ]?off|coupe|barrage|promotion)",
+    re.IGNORECASE,
+)
+
+# Limiter globalement le nombre d'appels concurrents vers l'API FFBB.
+_MAX_CONCURRENT_FFBB = _read_positive_int_env("MAX_CONCURRENT_FFBB", 8)
+_MAX_CALENDAR_MATCHES = _read_positive_int_env("FFBB_MAX_CALENDAR_MATCHES", 300)
+_ffbb_semaphore = asyncio.Semaphore(_MAX_CONCURRENT_FFBB)
+
+# Hooks simples pour les metrics de cache.
+_cache_hit_hook: Callable[..., None] | None = record_cache_hit
+_cache_miss_hook: Callable[..., None] | None = record_cache_miss
+
+# Sentinel unique pour distinguer une clé absente d'une valeur falsy.
+_CACHE_MISS_SENTINEL: object = object()
+
+_PARIS_TZ = ZoneInfo("Europe/Paris")
+
+
+def _freshness_meta(
+    *,
+    source: str = "ffbb_api_live",
+    cache: str | None = None,
+    ttl_seconds: int | None = None,
+    force_refresh_supported: bool = False,
+) -> dict[str, Any]:
+    meta: dict[str, Any] = {
+        "source": source,
+        "generated_at": datetime.now(_PARIS_TZ).isoformat(),
+        "timezone": "Europe/Paris",
+    }
+    if cache:
+        meta["cache"] = cache
+    if ttl_seconds is not None:
+        meta["ttl_seconds"] = ttl_seconds
+    if force_refresh_supported:
+        meta["force_refresh_supported"] = True
+    return meta
+
+
+from functools import lru_cache
+
+
+@lru_cache(maxsize=512)
+def _normalize_name(value: str) -> str:
+    """Normalise un nom (strip, upper, supprime les accents sans perdre de caractères)."""
+    if not value:
+        return ""
+    s = value.strip().upper()
+    if s.isascii():
+        return s
+    s = unicodedata.normalize("NFD", s)
+    return "".join(c for c in s if unicodedata.category(c) not in ("Mn", "So"))
+
+
+def _coerce_numeric_id(value: int | str, label: str) -> int:
+    """Convertit un identifiant en entier avec message d'erreur explicite."""
+    try:
+        return int(value)
+    except (TypeError, ValueError) as e:
+        raise McpError(
+            error=ErrorData(
+                code=INTERNAL_ERROR,
+                message=(
+                    f"{label} invalide: '{value}'. Un identifiant numérique est requis. "
+                    "Utilisez l'id retourné par ffbb_search ou ffbb_club(action='equipes')."
+                ),
+            )
+        ) from e
+
+
+_BILAN_STAT_FIELDS: tuple[str, ...] = (
+    "match_joues",
+    "gagnes",
+    "perdus",
+    "nuls",
+    "paniers_marques",
+    "paniers_encaisses",
+    "difference",
+)
+
+
+def _new_bilan_totals() -> dict[str, int]:
+    return dict.fromkeys(_BILAN_STAT_FIELDS, 0)
+
+
+def _extract_and_accumulate_bilan(
+    entry: dict[str, Any], totaux: dict[str, int]
+) -> dict[str, int]:
+    stats: dict[str, int] = {}
+    for f in _BILAN_STAT_FIELDS:
+        v = int(entry.get(f) or 0)
+        stats[f] = v
+        totaux[f] += v
+    return stats
+
+
+def _extract_phase_num(label: str | None) -> int:
+    """Extrait le numéro de phase d'un libellé (ex: 'Phase 3' -> 3)."""
+    if not label:
+        return 1
+    match = _PHASE_EXTRACT_PATTERN.search(label)
+    if match:
+        try:
+            return int(match.group(1))
+        except ValueError:
+            pass
+    return 1
+
+
+def _detect_phase_type(competition: str | None) -> str:
+    """Détecte le type de phase à partir du nom de compétition."""
+    if not competition:
+        return "poule"
+    return "elimination" if _ELIMINATION_KEYWORDS.search(competition) else "poule"
+
+
+def _parse_dt(raw: str | None) -> datetime | None:
+    """Parse une date FFBB en datetime avec la timezone spécifiée."""
+    if not raw:
+        return None
+    tz = _PARIS_TZ
+
+    try:
+        dt = datetime.fromisoformat(raw)
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=tz)
+        return dt.astimezone(tz)
+    except ValueError:
+        pass
+
+    if type(raw) is str and len(raw) == 19 and raw[10] == " ":
+        try:
+            dt = datetime.fromisoformat(raw[:10] + "T" + raw[11:])
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=tz)
+            return dt.astimezone(tz)
+        except ValueError:
+            pass
+
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            dt = datetime.strptime(raw, fmt)
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=tz)
+            return dt.astimezone(tz)
+        except ValueError:
+            pass
+
+    return None
+
+
+def _notify_cache_hit(cache_name: str) -> None:
+    import ffbb_mcp.services
+
+    hook = getattr(ffbb_mcp.services, "_cache_hit_hook", None)
+    if hook is not None:
+        try:
+            hook(cache_name)
+        except Exception:
+            logger.debug("cache hit hook failed", exc_info=True)
+
+
+def _notify_cache_miss(cache_name: str, reason: str = "not_found") -> None:
+    import ffbb_mcp.services
+
+    hook = getattr(ffbb_mcp.services, "_cache_miss_hook", None)
+    if hook is not None:
+        try:
+            hook(cache_name, reason)
+        except TypeError:
+            hook(cache_name)
+        except Exception:
+            logger.debug("cache miss hook failed", exc_info=True)
+
+
+def _extract_salle_id(data: dict[str, Any]) -> str | None:
+    raw_salle = data.get("salle") or data.get("idSalle") or data.get("id_salle")
+    if isinstance(raw_salle, dict):
+        raw_salle = raw_salle.get("id") or raw_salle.get("salle_id")
+    if raw_salle in (None, ""):
+        return None
+    return str(raw_salle)
+
+
+def _format_salle_address(salle: dict[str, Any]) -> str | None:
+    parts = [
+        salle.get("adresse") or salle.get("adresse1"),
+        salle.get("code_postal") or salle.get("codePostal"),
+        salle.get("ville") or salle.get("commune"),
+    ]
+    address = " ".join(str(part).strip() for part in parts if part)
+    return address or None
+
+
+# TTL configurables pour les caches
+def _ttu_bilan(k, v, now):
+    ttl = (
+        v.get("_ttl", get_static_ttl("bilan"))
+        if isinstance(v, dict)
+        else get_static_ttl("bilan")
+    )
+    return now + ttl
+
+
+def _ttu_poule(k, v, now):
+    ttl = (
+        v.get("_ttl", get_static_ttl("poule"))
+        if isinstance(v, dict)
+        else get_static_ttl("poule")
+    )
+    return now + ttl
+
+
+def _ttu_calendrier(k, v, now):
+    return now + _read_positive_int_env(
+        "FFBB_CACHE_TTL_CALENDRIER", get_static_ttl("calendrier")
+    )
+
+
+# Initialisation des caches sur l'état global
+state.cache_lives = TTLCache(
+    maxsize=1,
+    ttl=_read_positive_int_env("FFBB_CACHE_TTL_LIVES", get_static_ttl("lives")),
+)
+state.cache_search = TTLCache(
+    maxsize=256,
+    ttl=_read_positive_int_env("FFBB_CACHE_TTL_SEARCH", get_static_ttl("search")),
+)
+state.cache_competition = TTLCache(
+    maxsize=128,
+    ttl=_read_positive_int_env("FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")),
+)
+state.cache_organisme = TTLCache(
+    maxsize=128,
+    ttl=_read_positive_int_env("FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")),
+)
+state.cache_saisons = TTLCache(
+    maxsize=128,
+    ttl=_read_positive_int_env("FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")),
+)
+state.cache_calendrier = TLRUCache(
+    maxsize=64,
+    ttu=_ttu_calendrier,
+)
+state.cache_bilan = TLRUCache(maxsize=64, ttu=_ttu_bilan)
+state.cache_poule = TLRUCache(maxsize=128, ttu=_ttu_poule)
+state.cache_classement = TLRUCache(maxsize=128, ttu=_ttu_poule)
+
+_inflight_lock: asyncio.Lock | None = None
+_inflight_lock_guard = threading.Lock()
+state.inflight_detail = {}
+state.inflight_search = {}
+state.inflight_calendrier = {}
+state.inflight_bilan = {}
+state.inflight_poule = {}
+
+
+def _get_inflight_lock() -> asyncio.Lock:
+    global _inflight_lock
+    if _inflight_lock is None:
+        with _inflight_lock_guard:
+            if _inflight_lock is None:
+                _inflight_lock = asyncio.Lock()
+    return _inflight_lock
+
+
+def get_cache_ttls() -> dict[str, int]:
+    return {
+        "lives": int(state.cache_lives.ttl) if state.cache_lives else -1,
+        "search": int(state.cache_search.ttl) if state.cache_search else -1,
+        "detail": int(state.cache_competition.ttl) if state.cache_competition else -1,
+        "competition": int(state.cache_competition.ttl)
+        if state.cache_competition
+        else -1,
+        "organisme": int(state.cache_organisme.ttl) if state.cache_organisme else -1,
+        "saisons": int(state.cache_saisons.ttl) if state.cache_saisons else -1,
+        "calendrier": _read_positive_int_env(
+            "FFBB_CACHE_TTL_CALENDRIER", get_static_ttl("calendrier")
+        ),
+        "bilan": _read_positive_int_env(
+            "FFBB_CACHE_TTL_BILAN", get_static_ttl("bilan")
+        ),
+        "poule": _read_positive_int_env(
+            "FFBB_CACHE_TTL_POULE", get_static_ttl("poule")
+        ),
+    }
+
+
+async def _with_ffbb_semaphore(coro):
+    async with _ffbb_semaphore:
+        return await coro
+
+
+def handle_api_error(e: Exception) -> McpError:
+    if isinstance(e, McpError):
+        return e
+
+    error_msg = str(e)
+    logger.error("FFBB API Error: %s", error_msg, exc_info=True)
+
+    if isinstance(e, HTTPStatusError):
+        status = e.response.status_code
+        if status == 404:
+            return McpError(
+                error=ErrorData(
+                    code=INTERNAL_ERROR,
+                    message=(
+                        "Ressource FFBB introuvable (404). Action conseillée: vérifiez l'identifiant "
+                        "numérique ou relancez ffbb_search(type='organismes') pour résoudre le club."
+                    ),
+                )
+            )
+        if status in (401, 403):
+            return McpError(
+                error=ErrorData(
+                    code=INTERNAL_ERROR,
+                    message=(
+                        "Accès FFBB refusé (401/403). Action conseillée: vérifiez la configuration "
+                        "d'accès FFBB et réessayez ensuite."
+                    ),
+                )
+            )
+        if status == 429:
+            return McpError(
+                error=ErrorData(
+                    code=INTERNAL_ERROR,
+                    message=(
+                        "Rate-limit FFBB atteint (429). Action conseillée: réduisez les appels parallèles "
+                        "et réessayez dans quelques secondes."
+                    ),
+                )
+            )
+
+    error_type = type(e).__name__
+    if "timeout" in error_type.lower() or "timeout" in error_msg.lower():
+        return McpError(
+            error=ErrorData(
+                code=INTERNAL_ERROR,
+                message=(
+                    "Timeout API FFBB. Action conseillée: réessayez dans quelques secondes; "
+                    "si la fraîcheur live n'est pas nécessaire, évitez force_refresh=True."
+                ),
+            )
+        )
+
+    return McpError(
+        error=ErrorData(
+            code=INTERNAL_ERROR,
+            message=(
+                f"Erreur API FFBB ({error_type}): {error_msg}. Action conseillée: "
+                "vérifiez les paramètres, puis réessayez ou relancez une recherche FFBB."
+            ),
+        )
+    )
+
+
+async def _safe_call(
+    operation_name: str,
+    coro: Callable[[], Coroutine[Any, Any, Any]],
+    *,
+    retries: int = 3,
+    base_delay: float = 0.5,
+    max_delay: float = 10.0,
+) -> Any:
+    logger.debug("Début exécution: %s", operation_name)
+
+    if not callable(coro):
+        raise ValueError(
+            f"'_safe_call' expects a callable factory (e.g. lambda: coro()), got {type(coro)}."
+        )
+    make_coro = coro
+
+    last_exc: Exception | None = None
+    for attempt in range(1, max(1, retries) + 1):
+        t0 = time.perf_counter()
+        try:
+            current_coro = make_coro()
+            result = await current_coro
+            record_call(time.perf_counter() - t0, is_error=False)
+            logger.debug("Succès: %s (attempt %d)", operation_name, attempt)
+            return result
+        except Exception as e:
+            record_call(time.perf_counter() - t0, is_error=True)
+            last_exc = e
+
+            retriable = _is_retriable_error(e)
+
+            if attempt >= retries or not retriable:
+                raise handle_api_error(e) from e
+
+            delay = min(max_delay, base_delay * (2 ** (attempt - 1)))
+            jitter = random.random() * (delay * 0.1)
+            sleep_for = delay + jitter
+            logger.warning(
+                "%s failed (attempt %d/%d) — retrying in %.2fs: %s",
+                operation_name,
+                attempt,
+                retries,
+                sleep_for,
+                e,
+            )
+            try:
+                await asyncio.sleep(sleep_for)
+            except asyncio.CancelledError:
+                raise
+
+    if last_exc is not None:
+        raise handle_api_error(last_exc) from last_exc
+    return None
+
+
+def _is_retriable_error(e: Exception) -> bool:
+    if isinstance(e, HTTPStatusError):
+        status = getattr(e.response, "status_code", None)
+        if status == 429:
+            return True
+        if status in (502, 503, 504):
+            return True
+
+    errname = type(e).__name__.lower()
+    msg = str(e).lower()
+    return any(
+        keyword in errname or keyword in msg
+        for keyword in ["timeout", "connection", "network", "temporary"]
+    )
+
+
+async def _safe_call_with_inflight(
+    operation_name: str,
+    coro_factory,
+    *,
+    retries: int = 3,
+    base_delay: float = 0.5,
+    max_delay: float = 10.0,
+) -> Any:
+    inc_inflight()
+    try:
+        return await _safe_call(
+            operation_name,
+            coro_factory,
+            retries=retries,
+            base_delay=base_delay,
+            max_delay=max_delay,
+        )
+    finally:
+        dec_inflight()
+
+
+def _cache_get(
+    cache: Any,
+    key: Any,
+    cache_name: str,
+    record_miss: bool = True,
+) -> Any | None:
+    if cache is None:
+        return None
+    val = cache.get(key, _CACHE_MISS_SENTINEL)
+    if val is not _CACHE_MISS_SENTINEL:
+        _notify_cache_hit(cache_name)
+        return val
+    if record_miss:
+        _notify_cache_miss(cache_name)
+    return None
+
+
+def _cache_set(cache: Any, key: Any, val: Any, cache_name: str) -> None:
+    if cache is None or val is None:
+        return
+    try:
+        cache[key] = val
+    except Exception:
+        logger.debug(
+            "Impossible d'écrire dans le cache %s pour la clé %s",
+            cache_name,
+            key,
+            exc_info=True,
+        )
+
+
+async def _dedupe_inflight(
+    *,
+    cache: TTLCache | TLRUCache | None,
+    cache_key: str,
+    inflight_map: dict[str, asyncio.Task[Any]],
+    make_coro,
+    cache_name: str,
+) -> Any:
+    if cache is not None:
+        cached = _cache_get(cache, cache_key, cache_name)
+        if cached is not None:
+            return cached
+
+    async with _get_inflight_lock():
+        if cache is not None:
+            cached = _cache_get(cache, cache_key, cache_name, record_miss=False)
+            if cached is not None:
+                return cached
+        existing = inflight_map.get(cache_key)
+        if existing is None:
+            existing = asyncio.create_task(make_coro())
+            inflight_map[cache_key] = existing
+
+    try:
+        result = await existing
+        if cache is not None:
+            _cache_set(cache, cache_key, result, cache_name)
+        return result
+    finally:
+        async with _get_inflight_lock():
+            if inflight_map.get(cache_key) is existing:
+                inflight_map.pop(cache_key, None)
+
+
+async def _dedupe_inflight_detail(
+    cache_key: str,
+    make_coro,
+    cache_name: str = "detail",
+    cache: TTLCache | TLRUCache | None = None,
+) -> Any:
+    return await _dedupe_inflight(
+        cache=cache,
+        cache_key=cache_key,
+        inflight_map=state.inflight_detail,
+        make_coro=make_coro,
+        cache_name=cache_name,
+    )
