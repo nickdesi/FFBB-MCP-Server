@@ -35,7 +35,14 @@ def patch_get_client(mock_client):
         "ffbb_mcp.client.get_client_async", new_callable=AsyncMock
     ) as mock_get_client:
         mock_get_client.return_value = mock_client
-        with patch("ffbb_mcp.services.get_client_async", mock_get_client):
+        with (
+            patch("ffbb_mcp.services.get_client_async", mock_get_client),
+            patch("ffbb_mcp.services.common.get_client_async", mock_get_client),
+            patch("ffbb_mcp.services.search.get_client_async", mock_get_client),
+            patch("ffbb_mcp.services.club.get_client_async", mock_get_client),
+            patch("ffbb_mcp.services.poule.get_client_async", mock_get_client),
+            patch("ffbb_mcp.services.salle.get_client_async", mock_get_client),
+        ):
             yield mock_get_client
 
 

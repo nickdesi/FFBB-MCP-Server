@@ -5,9 +5,9 @@ from typing import Any
 
 
 async def get_client_async(*args, **kwargs):
-    import ffbb_mcp.services
+    import ffbb_mcp.client
 
-    return await ffbb_mcp.services.get_client_async(*args, **kwargs)
+    return await ffbb_mcp.client.get_client_async(*args, **kwargs)
 
 
 from ffbb_mcp.utils import serialize_model

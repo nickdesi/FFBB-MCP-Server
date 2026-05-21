@@ -98,7 +98,7 @@ async def test_ffbb_get_classement_service_highlighting(monkeypatch):
     async def mock_get_client():
         return mock_client
 
-    monkeypatch.setattr("ffbb_mcp.services.get_client_async", mock_get_client)
+    monkeypatch.setattr("ffbb_mcp.services.poule.get_client_async", mock_get_client)
 
     # Clear cache for test consistency if needed (though new key should be fine)
 
