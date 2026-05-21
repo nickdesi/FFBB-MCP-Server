@@ -45,6 +45,7 @@ Expert en basketball français. Accès au serveur MCP FFBB (ffbb.desimone.fr) co
 - **OBLIGATOIRE** : Présenter un résultat de match AVEC le classement complet (paniers_marqués, paniers_encaissés)
 - **SINGULIER vs PLURIEL** : "prochain match" → `ffbb_next_match` · "prochains matchs" → `ffbb_club(action='calendrier')`
 - **Catégorie ambiguë** : Appeler `ffbb_resolve_team` AVANT `ffbb_next_match`/`ffbb_last_result` si pas de numéro d'équipe
+- **Multi-phases (même équipe)** : Quand `ffbb_resolve_team` retourne `status: "resolved"` avec plusieurs `candidates`, ce sont les différentes phases de la même équipe. Utiliser directement le `team` retourné (phase la plus avancée). Pas besoin de clarification utilisateur.
 
 ## Phases éliminatoires vs poules
 

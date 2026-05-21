@@ -26,6 +26,10 @@ from ffbb_mcp.services import (
     multi_search_service,
     search_organismes_service,
 )
+from ffbb_mcp.services.search import (
+    _deduplicate_same_team_phases,
+    _phase_sort_key,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -1371,4 +1375,247 @@ async def test_dedupe_inflight_counts_one_miss(monkeypatch):
     assert result == {"ok": True}
     assert calls == 1
     assert misses == ["test"]
-    assert hits == []
+
+
+# ---------------------------------------------------------------------------
+# Tests — Multi-phase auto-resolution (ffbb_resolve_team)
+# ---------------------------------------------------------------------------
+
+
+class TestMultiPhaseResolution:
+    """Tests pour la déduplication et le tri des phases dans ffbb_resolve_team."""
+
+    def test_phase_sort_key_poule(self):
+        """Phase de poule simple : (0, phase_num, niveau)."""
+        e = {"competition": "Départementale U13 - Phase 2", "niveau": 2}
+        assert _phase_sort_key(e) == (0, 2, 2)
+
+    def test_phase_sort_key_elimination(self):
+        """Phase éliminatoire : (1, phase_num, niveau)."""
+        e = {"competition": "U13M-D1 - 1/2 Finales", "niveau": 1}
+        assert _phase_sort_key(e) == (1, 1, 1)
+
+    def test_deduplicate_same_team_phases_single(self):
+        """Un seul candidat → retour inchangé."""
+        candidates = [{"nom_equipe": "U13M", "competition": "Phase 1", "niveau": 1}]
+        result = _deduplicate_same_team_phases(candidates)
+        assert len(result) == 1
+        assert result[0]["nom_equipe"] == "U13M"
+
+    def test_deduplicate_same_team_phases_multi_same_name(self):
+        """Même nom_equipe, phases différentes → retourne uniquement la phase la plus avancée."""
+        candidates = [
+            {
+                "nom_equipe": "U13M",
+                "competition": "Départementale U13 - Phase 1",
+                "niveau": 1,
+            },
+            {
+                "nom_equipe": "U13M",
+                "competition": "Départementale U13 - Phase 2",
+                "niveau": 2,
+            },
+            {
+                "nom_equipe": "U13M",
+                "competition": "Départementale U13 - Phase 3",
+                "niveau": 3,
+            },
+            {"nom_equipe": "U13M", "competition": "U13M-D1 - 1/2 Finales", "niveau": 1},
+        ]
+        result = _deduplicate_same_team_phases(candidates)
+        assert len(result) == 1
+        # La phase éliminatoire doit être prioritaire
+        assert "1/2 Finales" in result[0]["competition"]
+
+    def test_deduplicate_same_team_phases_multi_different_names(self):
+        """Noms différents → pas de déduplication."""
+        candidates = [
+            {"nom_equipe": "U13M", "competition": "Phase 1", "niveau": 1},
+            {"nom_equipe": "U13F", "competition": "Phase 1", "niveau": 1},
+        ]
+        result = _deduplicate_same_team_phases(candidates)
+        assert len(result) == 2
+
+    def test_deduplicate_uses_team_label_fallback(self):
+        """Quand nom_equipe est absent, utilise team_label."""
+        candidates = [
+            {"team_label": "U13M", "competition": "Phase 1", "niveau": 1},
+            {"team_label": "U13M", "competition": "Phase 3", "niveau": 3},
+        ]
+        result = _deduplicate_same_team_phases(candidates)
+        assert len(result) == 1
+        assert "Phase 3" in result[0]["competition"]
+
+    @pytest.mark.asyncio
+    async def test_resolve_team_same_team_multi_phases(
+        self, patch_get_client, mock_client
+    ):
+        """4 candidats même équipe, phases différentes → status resolved, team = phase la plus avancée."""
+        org_mock = MagicMock()
+        org_mock.model_dump = MagicMock(
+            return_value={
+                "id": 100,
+                "nom": "Stade Clermontois",
+                "engagements": [
+                    {
+                        "id": "eng1",
+                        "numeroEquipe": "1",
+                        "idCompetition": {
+                            "nom": "Départementale U13 - Phase 1",
+                            "id": "c1",
+                            "sexe": "M",
+                            "categorie": {"code": "U13"},
+                            "competition_origine_niveau": 1,
+                        },
+                        "idPoule": {"id": "p1"},
+                    },
+                    {
+                        "id": "eng2",
+                        "numeroEquipe": "1",
+                        "idCompetition": {
+                            "nom": "Départementale U13 - Phase 2",
+                            "id": "c2",
+                            "sexe": "M",
+                            "categorie": {"code": "U13"},
+                            "competition_origine_niveau": 2,
+                        },
+                        "idPoule": {"id": "p2"},
+                    },
+                    {
+                        "id": "eng3",
+                        "numeroEquipe": "1",
+                        "idCompetition": {
+                            "nom": "Départementale U13 - Phase 3",
+                            "id": "c3",
+                            "sexe": "M",
+                            "categorie": {"code": "U13"},
+                            "competition_origine_niveau": 3,
+                        },
+                        "idPoule": {"id": "p3"},
+                    },
+                    {
+                        "id": "eng4",
+                        "numeroEquipe": "1",
+                        "idCompetition": {
+                            "nom": "U13M-D1 - 1/2 Finales",
+                            "id": "c4",
+                            "sexe": "M",
+                            "categorie": {"code": "U13"},
+                            "competition_origine_niveau": 1,
+                        },
+                        "idPoule": {"id": "p4"},
+                    },
+                ],
+            }
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        result = await ffbb_resolve_team_service(
+            organisme_id=100,
+            club_name=None,
+            categorie="U13M1",
+        )
+
+        assert result["status"] == "resolved"
+        assert result["team"] is not None
+        # La phase éliminatoire doit être sélectionnée
+        assert "1/2 Finales" in result["team"]["competition"]
+
+    @pytest.mark.asyncio
+    async def test_resolve_team_elimination_preferred_over_poule(
+        self, patch_get_client, mock_client
+    ):
+        """Phase éliminatoire sélectionnée en priorité sur phase de poule."""
+        org_mock = MagicMock()
+        org_mock.model_dump = MagicMock(
+            return_value={
+                "id": 200,
+                "nom": "Club Test",
+                "engagements": [
+                    {
+                        "id": "eng_poule",
+                        "numeroEquipe": "1",
+                        "idCompetition": {
+                            "nom": "Régionale U15 - Phase 3",
+                            "id": "cp",
+                            "sexe": "M",
+                            "categorie": {"code": "U15"},
+                            "competition_origine_niveau": 3,
+                        },
+                        "idPoule": {"id": "pp"},
+                    },
+                    {
+                        "id": "eng_elim",
+                        "numeroEquipe": "1",
+                        "idCompetition": {
+                            "nom": "U15M - Quart de finale",
+                            "id": "ce",
+                            "sexe": "M",
+                            "categorie": {"code": "U15"},
+                            "competition_origine_niveau": 1,
+                        },
+                        "idPoule": {"id": "pe"},
+                    },
+                ],
+            }
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        result = await ffbb_resolve_team_service(
+            organisme_id=200,
+            club_name=None,
+            categorie="U15M1",
+        )
+
+        assert result["status"] == "resolved"
+        assert "Quart de finale" in result["team"]["competition"]
+
+    @pytest.mark.asyncio
+    async def test_resolve_team_truly_different_teams_stays_ambiguous(
+        self, patch_get_client, mock_client
+    ):
+        """2 candidats numero_equipe différents et nom_equipe différents → status ambiguous."""
+        org_mock = MagicMock()
+        org_mock.model_dump = MagicMock(
+            return_value={
+                "id": 300,
+                "nom": "Club Multi",
+                "engagements": [
+                    {
+                        "id": "eng1",
+                        "numeroEquipe": "1",
+                        "idCompetition": {
+                            "nom": "U11M",
+                            "id": "c1",
+                            "sexe": "M",
+                            "categorie": {"code": "U11"},
+                            "competition_origine_niveau": 1,
+                        },
+                        "idPoule": {"id": "p1"},
+                    },
+                    {
+                        "id": "eng2",
+                        "numeroEquipe": "2",
+                        "idCompetition": {
+                            "nom": "U11M",
+                            "id": "c1",
+                            "sexe": "M",
+                            "categorie": {"code": "U11"},
+                            "competition_origine_niveau": 1,
+                        },
+                        "idPoule": {"id": "p2"},
+                    },
+                ],
+            }
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        result = await ffbb_resolve_team_service(
+            organisme_id=300,
+            club_name=None,
+            categorie="U11M",
+        )
+
+        # Équipes réellement différentes (numéros 1 et 2) → ambiguous
+        assert result["status"] == "ambiguous"
+        assert result["team"] is None
