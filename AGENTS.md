@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB-MCP-Server | server.py: 1123 lignes | services.py: 2912 lignes
+> Dernière mise à jour : FFBB-MCP-Server | server.py: 1123 lignes | services.py: 2915 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -99,7 +99,7 @@ src/ffbb_mcp/
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
 ├── server.py              # Tools MCP + main() (≈1123 lignes)
-├── services.py            # Logique métier (≈2912 lignes)
+├── services.py            # Logique métier (≈2915 lignes)
 └── utils.py               # serialize_model, parse_categorie, prune_payload
 ```
 
@@ -109,7 +109,7 @@ src/ffbb_mcp/
 - Pas de suffixe `_compact_` ou `_impl_` exposé
 - Modifier une fonction à la fois, seulement si test/usage échoue
 - Nouvelle fonction → test manuel validé avant exposition MCP
-- **God files** : `services.py` (2912 lignes) — refactoring différé (cycles d'import)
+- **God files** : `services.py` (2915 lignes) — refactoring différé (cycles d'import)
 
 ## Commandes
 - Tests : `.venv/bin/python -m pytest -q` (pas `pytest` seul)

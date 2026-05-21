@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
+from urllib.parse import urlparse
 
 import pytest
 from starlette.testclient import TestClient
@@ -167,11 +168,35 @@ def test_docs_wildcard_local_non_html(client, tmp_path):
         assert "text/css" in response.headers["content-type"]
 
 
+def test_docs_slash_redirect(client):
+    """Teste la redirection de /docs/ vers GitHub quand index.html est absent."""
+    with patch("ffbb_mcp.routes._WEBSITE_DIR", new=Path("/nonexistent_path_docs")):
+        response = client.get("/docs/", follow_redirects=False)
+        assert response.status_code in (301, 302, 307)
+        assert urlparse(response.headers["location"]).hostname == "github.com"
+
+
+def test_docs_wildcard_html_redirect(client):
+    """Teste la redirection vers GitHub pour un fichier html inexistant localement."""
+    with patch("ffbb_mcp.routes._WEBSITE_DIR", new=Path("/nonexistent_path_docs")):
+        response = client.get("/docs/404.html", follow_redirects=False)
+        assert response.status_code in (301, 302, 307)
+        assert urlparse(response.headers["location"]).hostname == "github.com"
+
+
+def test_docs_wildcard_css_redirect(client):
+    """Teste la redirection vers GitHub pour un fichier css inexistant localement."""
+    with patch("ffbb_mcp.routes._WEBSITE_DIR", new=Path("/nonexistent_path_docs")):
+        response = client.get("/docs/vp-icons.css", follow_redirects=False)
+        assert response.status_code in (301, 302, 307)
+        assert urlparse(response.headers["location"]).hostname == "github.com"
+
+
 def test_docs_wildcard_redirect_github(client):
     """Teste la redirection vers GitHub pour un fichier inexistant localement."""
     response = client.get("/docs/not-found-anywhere.html", follow_redirects=False)
     assert response.status_code in (301, 302, 307)
-    assert "github.com" in response.headers["location"]
+    assert urlparse(response.headers["location"]).hostname == "github.com"
 
 
 def test_docs_wildcard_path_traversal_protection(client):
