@@ -255,9 +255,11 @@ async def test_next_match_enriches_salle_from_rencontre():
 
     rencontre_detail = {
         "id": "M1",
-        "nomSalle": "Complexe Gauthière 1",
-        "villeSalle": "Clermont-Ferrand",
-        "adresseSalle": "84 boulevard Léon Jouhaux",
+        "salle_details": {
+            "id": "S42",
+            "libelle": "Complexe Gauthière 1",
+            "adresse": "84 boulevard Léon Jouhaux, Clermont-Ferrand",
+        },
     }
 
     def poule_side_effect(poule_id, **kwargs):
@@ -319,9 +321,11 @@ async def test_last_result_enriches_salle_from_rencontre():
 
     rencontre_detail = {
         "id": "R1",
-        "nomSalle": "Gymnase des Sports",
-        "villeSalle": "Montferrand",
-        "adresseSalle": "5 avenue du gymnase",
+        "salle_details": {
+            "id": "S99",
+            "libelle": "Gymnase des Sports",
+            "adresse": "5 avenue du gymnase, Montferrand",
+        },
     }
 
     def poule_side_effect(poule_id, **kwargs):
