@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB-MCP-Server | server.py: 1123 lignes | services.py: 3044 lignes
+> Dernière mise à jour : FFBB-MCP-Server | server.py: 1123 lignes | services.py: 3172 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -45,7 +45,6 @@ Expert en basketball français. Accès au serveur MCP FFBB (ffbb.desimone.fr) co
 - **OBLIGATOIRE** : Présenter un résultat de match AVEC le classement complet (paniers_marqués, paniers_encaissés)
 - **SINGULIER vs PLURIEL** : "prochain match" → `ffbb_next_match` · "prochains matchs" → `ffbb_club(action='calendrier')`
 - **Catégorie ambiguë** : Appeler `ffbb_resolve_team` AVANT `ffbb_next_match`/`ffbb_last_result` si pas de numéro d'équipe
-- **Multi-phases (même équipe)** : Quand `ffbb_resolve_team` retourne `status: "resolved"` avec plusieurs `candidates`, ce sont les différentes phases de la même équipe. Utiliser directement le `team` retourné (phase la plus avancée). Pas besoin de clarification utilisateur.
 
 ## Phases éliminatoires vs poules
 
@@ -100,7 +99,7 @@ src/ffbb_mcp/
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
 ├── server.py              # Tools MCP + main() (≈1123 lignes)
-├── services/              # Logique métier modularisée (≈3044 lignes)
+├── services/              # Logique métier modularisée (≈3172 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── club.py            # Service de gestion des clubs
 │   ├── common.py          # Helpers et base services partagés
@@ -117,7 +116,7 @@ src/ffbb_mcp/
 - Pas de suffixe `_compact_` ou `_impl_` exposé
 - Modifier une fonction à la fois, seulement si test/usage échoue
 - Nouvelle fonction → test manuel validé avant exposition MCP
-- **Modularisation** : Le package `services/` (total ≈3044 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
+- **Modularisation** : Le package `services/` (total ≈3172 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
 
 ## Commandes
 - Tests : `.venv/bin/python -m pytest -q` (pas `pytest` seul)
