@@ -26,6 +26,7 @@ from ffbb_mcp.utils import (
 )
 
 from .common import (
+    _ELIMINATION_KEYWORDS,
     _coerce_numeric_id,
     _dedupe_inflight,
     _extract_phase_num,
@@ -38,6 +39,47 @@ from .salle import _enrich_with_salle_details
 logger = logging.getLogger("ffbb-mcp")
 
 _NUMERIC_EXTRACT_PATTERN = re.compile(r"(\d+)")
+
+
+def _phase_sort_key(e: dict) -> tuple[int, int, int]:
+    """Clé de tri pour sélectionner la phase la plus avancée.
+
+    Priorité :
+    1. Phase éliminatoire > phase de poule
+    2. Numéro de phase le plus élevé
+    3. Niveau le plus élevé
+    """
+    competition = e.get("competition") or ""
+    is_elimination = 1 if _ELIMINATION_KEYWORDS.search(competition) else 0
+    phase_num = _extract_phase_num(e.get("phase_label") or competition)
+    niveau = e.get("niveau") or 0
+    return (is_elimination, phase_num, niveau)
+
+
+def _deduplicate_same_team_phases(candidates: list[dict]) -> list[dict]:
+    """Déduplique les candidats qui sont la même équipe à travers différentes phases.
+
+    Si tous les candidats partagent le même nom_equipe (normalisé),
+    ils représentent la même équipe dans des phases successives.
+    On retourne uniquement l'entrée de la phase la plus avancée.
+    """
+    if len(candidates) <= 1:
+        return candidates
+
+    # Vérifier si tous les candidats ont le même nom_equipe
+    noms = [
+        _normalize_name(c.get("nom_equipe") or c.get("team_label") or "")
+        for c in candidates
+    ]
+    unique_noms = {n for n in noms if n}
+
+    if len(unique_noms) <= 1:
+        # Même équipe → retourner uniquement la phase la plus avancée
+        best = max(candidates, key=_phase_sort_key)
+        return [best]
+
+    return candidates
+
 
 # Mots génériques qui n'identifient pas un club de manière distinctive.
 _GENERIC_CLUB_WORDS: frozenset[str] = frozenset(
@@ -547,6 +589,9 @@ async def ffbb_resolve_team_service(
         if matched:
             candidates = matched
 
+    # 3.5) Déduplication sémantique : même équipe à travers différentes phases
+    candidates = _deduplicate_same_team_phases(candidates)
+
     # 4) Construire la réponse
     if not candidates:
         all_labels = sorted(list({t["team_label"] for t in equipes}))
@@ -571,9 +616,10 @@ async def ffbb_resolve_team_service(
     unique_nums = {str(c.get("numero_equipe") or "").strip() for c in candidates}
 
     if len(unique_nums) == 1:
+        best = max(candidates, key=_phase_sort_key)
         return {
             "status": "resolved",
-            "team": candidates[-1],
+            "team": best,
             "candidates": candidates,
             "ambiguity": None,
             "club_resolu": club_resolu,
