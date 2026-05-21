@@ -1,5 +1,10 @@
 from ffbb_mcp.aliases import _normalize_apostrophes, normalize_query
-from ffbb_mcp.utils import parse_categorie, prune_payload, serialize_model
+from ffbb_mcp.utils import (
+    jaro_winkler_similarity,
+    parse_categorie,
+    prune_payload,
+    serialize_model,
+)
 
 
 def test_serialize_simple_types():
@@ -187,3 +192,36 @@ class TestParseCategorie:
         assert parse_categorie("") == (None, None, None)
         assert parse_categorie(None) == (None, None, None)
         assert parse_categorie("   ") == (None, None, None)
+
+
+class TestJaroWinklerSimilarity:
+    """Vérifie le calcul de la similarité de Jaro-Winkler."""
+
+    def test_exact_match(self):
+        assert jaro_winkler_similarity("Vichy", "Vichy") == 1.0
+        assert jaro_winkler_similarity("  Vichy  ", "vichy") == 1.0
+
+    def test_completely_different(self):
+        assert jaro_winkler_similarity("ABC", "XYZ") == 0.0
+
+    def test_empty_cases(self):
+        assert jaro_winkler_similarity("", "") == 1.0
+        assert jaro_winkler_similarity(None, None) == 1.0
+        assert jaro_winkler_similarity("Vichy", "") == 0.0
+        assert jaro_winkler_similarity("", "Vichy") == 0.0
+
+    def test_standard_cases(self):
+        # Martha vs Marhta
+        sim1 = jaro_winkler_similarity("martha", "marhta")
+        assert 0.9 < sim1 < 1.0
+
+        # Dixon vs Dicksonx
+        sim2 = jaro_winkler_similarity("dixon", "dicksonx")
+        assert 0.7 < sim2 < 0.9
+
+    def test_club_names_prefix(self):
+        # Les préfixes identiques doivent donner un score élevé (grâce au Winkler boost)
+        sim_club = jaro_winkler_similarity(
+            "CS PONT DU CHATEAU", "CS PONT DU CHATEAU - 2"
+        )
+        assert sim_club > 0.85

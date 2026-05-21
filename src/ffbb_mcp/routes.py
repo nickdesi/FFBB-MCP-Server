@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import datetime
 import logging
 import os
@@ -30,6 +31,7 @@ _REMOTE_LOGO_URL = (
     "https://raw.githubusercontent.com/nickdesi/FFBB-MCP-Server/main/assets/logo.webp"
 )
 logger = logging.getLogger("ffbb-mcp")
+_background_tasks: set[asyncio.Task] = set()
 
 
 def _find_website_dir() -> Path:
@@ -155,6 +157,11 @@ def register_routes(mcp: FastMCP) -> None:
     async def metrics_json(request: Request) -> Response:
         """Snapshot des métriques au format JSON (pour le dashboard front-end)."""
         snap = get_snapshot()
+        if "cache_miss_reasons" in snap:
+            snap["cache_miss_reasons"] = {
+                f"{cache}:{reason}": count
+                for (cache, reason), count in snap["cache_miss_reasons"].items()
+            }
         return JSONResponse(
             {
                 "service": "ffbb-mcp",
@@ -259,6 +266,51 @@ def register_routes(mcp: FastMCP) -> None:
     @mcp.custom_route("/sitemap.xml", methods=["GET"])  # type: ignore[untyped-decorator]
     async def sitemap_xml(request: Request) -> Response:
         return Response(_build_sitemap_xml(), media_type="application/xml")
+
+    @mcp.custom_route("/cache/warmup", methods=["POST"])  # type: ignore[untyped-decorator]
+    async def cache_warmup_post(request: Request) -> Response:
+        """Déclenche le préchauffage du cache."""
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
+        organisme_ids = body.get("organisme_ids") if isinstance(body, dict) else None
+        sync_mode = body.get("sync", False) if isinstance(body, dict) else False
+
+        if sync_mode:
+            from .services.warmup import warmup_cache_service
+
+            res = await warmup_cache_service(organisme_ids=organisme_ids)
+            return JSONResponse(res, status_code=200)
+        else:
+            from .services.warmup import warmup_cache_service
+
+            task = asyncio.create_task(
+                warmup_cache_service(organisme_ids=organisme_ids)
+            )
+            _background_tasks.add(task)
+            task.add_done_callback(_background_tasks.discard)
+            return JSONResponse(
+                {
+                    "status": "accepted",
+                    "message": "Le préchauffage du cache a été déclenché en tâche de fond.",
+                },
+                status_code=202,
+            )
+
+    @mcp.custom_route("/cache/warmup", methods=["GET"])  # type: ignore[untyped-decorator]
+    async def cache_warmup_get(request: Request) -> Response:
+        """Informations sur l'endpoint de préchauffage du cache."""
+        return JSONResponse(
+            {
+                "endpoint": "/cache/warmup",
+                "methods": ["POST", "GET"],
+                "description": "Préchauffe proactivement le cache FFBB pour les clubs favoris.",
+                "usage_post": "POST {'organisme_ids': ['123', '456'], 'sync': false}",
+                "env_var_config": "FFBB_WARMUP_ORGANISMES",
+            }
+        )
 
     @mcp.custom_route("/", methods=["GET"])  # type: ignore[untyped-decorator]
     async def index(request: Request) -> Response:

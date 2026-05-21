@@ -88,6 +88,7 @@ ignore_missing_imports = true
 "src/ffbb_mcp/prompts.py" = ["RUF001", "RUF003"]
 "src/ffbb_mcp/cache_strategy.py" = ["RUF003"]
 "src/ffbb_mcp/server.py" = ["RUF001"]
+"src/ffbb_mcp/services/*" = ["E402"]
 
 [[tool.mypy.overrides]]
 module = ["cachetools"]

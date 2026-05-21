@@ -248,3 +248,72 @@ def prune_payload(obj: Any, depth: int = 0) -> Any:
         return final_list
 
     return obj
+
+
+def jaro_winkler_similarity(s1: str, s2: str) -> float:
+    """Calcule la similarité de Jaro-Winkler entre deux chaînes.
+
+    Retourne un float entre 0.0 (complètement différent) et 1.0 (exactement identique).
+    """
+    if not s1 or not s2:
+        return 0.0 if s1 != s2 else 1.0
+
+    # Normalisation basique : minuscules et espaces superflus
+    s1 = s1.strip().lower()
+    s2 = s2.strip().lower()
+
+    if s1 == s2:
+        return 1.0
+
+    len1, len2 = len(s1), len(s2)
+    # Fenêtre de correspondance maximale
+    match_bound = max(len1, len2) // 2 - 1
+    if match_bound < 0:
+        match_bound = 0
+
+    s1_matches = [False] * len1
+    s2_matches = [False] * len2
+
+    matches = 0
+    # Recherche des correspondances dans la fenêtre
+    for i in range(len1):
+        start = max(0, i - match_bound)
+        end = min(len2, i + match_bound + 1)
+        for j in range(start, end):
+            if not s2_matches[j] and s1[i] == s2[j]:
+                s1_matches[i] = True
+                s2_matches[j] = True
+                matches += 1
+                break
+
+    if matches == 0:
+        return 0.0
+
+    # Calcul des transpositions
+    transpositions = 0
+    k = 0
+    for i in range(len1):
+        if s1_matches[i]:
+            while not s2_matches[k]:
+                k += 1
+            if s1[i] != s2[k]:
+                transpositions += 1
+            k += 1
+
+    t = transpositions // 2
+
+    # Similarité de Jaro
+    jaro = (matches / len1 + matches / len2 + (matches - t) / matches) / 3.0
+
+    # Similarité de Jaro-Winkler
+    # Recherche de la longueur du préfixe commun (jusqu'à 4 caractères)
+    prefix_len = 0
+    for i in range(min(4, len1, len2)):
+        if s1[i] == s2[i]:
+            prefix_len += 1
+        else:
+            break
+
+    # Coefficient standard de Winkler : 0.1
+    winkler = jaro + prefix_len * 0.1 * (1.0 - jaro)
+    return winkler
