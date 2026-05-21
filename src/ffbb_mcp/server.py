@@ -432,7 +432,7 @@ async def ffbb_get(
         elif type == "poule":
             effective_refresh = force_refresh
             poule_data = await get_poule_service(id, force_refresh=effective_refresh)
-            return format_poule_response(poule_data)
+            return await format_poule_response(poule_data)
         elif type == "organisme":
             return await get_organisme_service(organisme_id=id)
         elif type == "rencontre":
