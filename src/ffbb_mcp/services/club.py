@@ -508,6 +508,15 @@ async def ffbb_next_match_service(
     active_phase_matches.sort(key=lambda x: x[0])
     next_dt, next_match, source_team = active_phase_matches[0]
 
+    # Fetch full rencontre details (includes salle info not available in poule data)
+    match_id = next_match.get("id")
+    if match_id:
+        from .search import get_rencontre_service
+
+        rencontre_detail = await get_rencontre_service(match_id)
+        if rencontre_detail:
+            next_match.update(rencontre_detail)
+
     eng1 = next_match.get("idEngagementEquipe1")
     eng2 = next_match.get("idEngagementEquipe2")
     id_eng1 = eng1.get("id") if isinstance(eng1, dict) else eng1
@@ -541,8 +550,28 @@ async def ffbb_next_match_service(
             adversaire = eq2_name or eq1_name
             domicile = None
 
-    lieu = next_match.get("nomSalle") or next_match.get("nom_salle") or ""
-    ville = next_match.get("villeSalle") or next_match.get("ville_salle") or ""
+    salle_details = next_match.get("salle_details") or {}
+    lieu = (
+        salle_details.get("libelle")
+        or salle_details.get("nom")
+        or next_match.get("nomSalle")
+        or next_match.get("nom_salle")
+        or ""
+    )
+    # Extraire la ville depuis l'adresse ou les champs dédiés
+    adresse_salle = salle_details.get("adresse") or ""
+    ville = (
+        salle_details.get("ville")
+        or salle_details.get("commune")
+        or next_match.get("villeSalle")
+        or next_match.get("ville_salle")
+        or ""
+    )
+    # Si pas de ville explicite, essayer de la parser depuis l'adresse
+    if not ville and adresse_salle:
+        parts = adresse_salle.split(",")
+        if len(parts) >= 2:
+            ville = parts[-1].strip()
 
     client = await get_client_async()
     from .salle import _enrich_with_salle_details
@@ -1134,6 +1163,15 @@ async def ffbb_last_result_service(
             "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
         }
 
+    # Fetch full rencontre details (includes salle info not available in poule data)
+    dernier_id = dernier.get("id")
+    if dernier_id:
+        from .search import get_rencontre_service
+
+        rencontre_detail = await get_rencontre_service(dernier_id)
+        if rencontre_detail:
+            dernier.update(rencontre_detail)
+
     _numero_equipe_match = int(numero_equipe) if numero_equipe is not None else None
     est_domicile = _match_team_name(
         str(dernier.get("nomEquipe1", "")), str(organisme_nom), _numero_equipe_match
@@ -1169,6 +1207,27 @@ async def ffbb_last_result_service(
 
     await _enrich_with_salle_details(dernier, client)
 
+    salle_details = dernier.get("salle_details") or {}
+    lieu = (
+        salle_details.get("libelle")
+        or salle_details.get("nom")
+        or dernier.get("nomSalle")
+        or dernier.get("nom_salle")
+        or ""
+    )
+    adresse_salle = dernier.get("adresse_salle") or salle_details.get("adresse") or ""
+    ville = (
+        salle_details.get("ville")
+        or salle_details.get("commune")
+        or dernier.get("villeSalle")
+        or dernier.get("ville_salle")
+        or ""
+    )
+    if not ville and adresse_salle:
+        parts = adresse_salle.split(",")
+        if len(parts) >= 2:
+            ville = parts[-1].strip()
+
     return {
         "status": "ok",
         "club_resolu": club_resolu,
@@ -1178,9 +1237,9 @@ async def ffbb_last_result_service(
         "score_domicile": dernier.get("resultatEquipe1"),
         "exterieur": format_team_name(dernier.get("nomEquipe2", ""), num2),
         "score_exterieur": dernier.get("resultatEquipe2"),
+        "salle": lieu,
+        "ville": ville,
+        "adresse": adresse_salle,
         "victoire": victoire,
-        "salle": dernier.get("nomSalle") or dernier.get("nom_salle", ""),
-        "ville": dernier.get("villeSalle") or dernier.get("ville_salle", ""),
-        "adresse": dernier.get("adresse_salle", ""),
         "_meta": _freshness_meta(cache="poule", force_refresh_supported=True),
     }

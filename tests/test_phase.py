@@ -223,3 +223,138 @@ async def test_resolve_poule_id_no_phase_returns_most_advanced():
         assert result == "P3", (
             f"Attendu 'P3' (phase la plus avancée), obtenu '{result}'"
         )
+
+
+# ---------------------------------------------------------------------------
+# Tests — Salle enrichment in next_match and last_result
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_next_match_enriches_salle_from_rencontre():
+    """ffbb_next_match doit fetcher les détails de la rencontre pour avoir salle/ville."""
+    equipes = [
+        {
+            "poule_id": "P1",
+            "engagement_id": "E1",
+            "phase_label": "Phase 1",
+            "niveau": 5,
+            "nom_equipe": "Stade Clermontois",
+            "numero_equipe": "1",
+        }
+    ]
+
+    match_data = {
+        "id": "M1",
+        "joue": 0,
+        "date": "2026-06-01T14:00:00",
+        "idEngagementEquipe1": "E1",
+        "nomEquipe1": "Stade Clermontois",
+        "nomEquipe2": "AS Montferrand",
+    }
+
+    rencontre_detail = {
+        "id": "M1",
+        "salle_details": {
+            "id": "S42",
+            "libelle": "Complexe Gauthière 1",
+            "adresse": "84 boulevard Léon Jouhaux, Clermont-Ferrand",
+        },
+    }
+
+    def poule_side_effect(poule_id, **kwargs):
+        return {"id": poule_id, "rencontres": [match_data]}
+
+    with (
+        patch(
+            "ffbb_mcp.services.ffbb_equipes_club_service",
+            AsyncMock(return_value=equipes),
+        ),
+        patch(
+            "ffbb_mcp.services.get_poule_service",
+            AsyncMock(side_effect=poule_side_effect),
+        ),
+        patch(
+            "ffbb_mcp.services._resolve_club_and_org",
+            AsyncMock(
+                return_value=([{"nom": "Stade Clermontois", "organisme_id": "123"}], {})
+            ),
+        ),
+        patch(
+            "ffbb_mcp.services.search.get_rencontre_service",
+            AsyncMock(return_value=rencontre_detail),
+        ),
+    ):
+        result = await ffbb_next_match_service(
+            organisme_id=123, categorie="U11M", numero_equipe=1
+        )
+
+        assert result["status"] == "ok"
+        assert result["match"]["salle"] == "Complexe Gauthière 1"
+        assert result["match"]["ville"] == "Clermont-Ferrand"
+
+
+@pytest.mark.asyncio
+async def test_last_result_enriches_salle_from_rencontre():
+    """ffbb_last_result doit fetcher les détails de la rencontre pour avoir salle/ville."""
+    equipes = [
+        {
+            "poule_id": "P1",
+            "engagement_id": "E1",
+            "phase_label": "Phase 1",
+            "niveau": 5,
+            "nom_equipe": "Stade Clermontois",
+            "numero_equipe": "1",
+        }
+    ]
+
+    match_data = {
+        "id": "R1",
+        "joue": 1,
+        "date_rencontre": "2026-05-15T18:00:00",
+        "resultatEquipe1": "75",
+        "resultatEquipe2": "68",
+        "idEngagementEquipe1": "E1",
+        "nomEquipe1": "Stade Clermontois",
+        "nomEquipe2": "AS Montferrand",
+    }
+
+    rencontre_detail = {
+        "id": "R1",
+        "salle_details": {
+            "id": "S99",
+            "libelle": "Gymnase des Sports",
+            "adresse": "5 avenue du gymnase, Montferrand",
+        },
+    }
+
+    def poule_side_effect(poule_id, **kwargs):
+        return {"id": poule_id, "rencontres": [match_data]}
+
+    with (
+        patch(
+            "ffbb_mcp.services.ffbb_equipes_club_service",
+            AsyncMock(return_value=equipes),
+        ),
+        patch(
+            "ffbb_mcp.services.get_poule_service",
+            AsyncMock(side_effect=poule_side_effect),
+        ),
+        patch(
+            "ffbb_mcp.services._resolve_club_and_org",
+            AsyncMock(
+                return_value=([{"nom": "Stade Clermontois", "organisme_id": "123"}], {})
+            ),
+        ),
+        patch(
+            "ffbb_mcp.services.search.get_rencontre_service",
+            AsyncMock(return_value=rencontre_detail),
+        ),
+    ):
+        result = await ffbb_last_result_service(
+            organisme_id=123, categorie="U11M", numero_equipe=1
+        )
+
+        assert result["status"] == "ok"
+        assert result["salle"] == "Gymnase des Sports"
+        assert result["ville"] == "Montferrand"
