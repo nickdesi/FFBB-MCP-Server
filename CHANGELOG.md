@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-05-21
+
+### Added
+- **Correction robuste U7/U9** : Parsing plus souple des catégories de jeunes dans `utils.py` pour éviter des crashs ou faux positifs.
+- **Suppression d'avertissements** : Correction de l'utilisation de `utcnow()` déprécié en Python.
+
+### Changed
+- **Modularisation de `services.py`** : Découpage du fichier monolithique en modules spécialisés sous `src/ffbb_mcp/services/` (`common.py`, `club.py`, `poule.py`, `salle.py`, `search.py`, `warmup.py`).
+- **Robustesse & Résolution d'imports** : Importation dynamique des services et du client pour assurer la compatibilité avec la suite de tests et le mocking `pytest`.
+- **Sécurisation des tâches en arrière-plan** : Maintien d'une référence forte (`_background_tasks` dans `routes.py`) pour la tâche asynchrone de `warm-up` afin d'éviter qu'elle soit collectée par le Garbage Collector (Règles RUF006).
+- **Correctifs CI/CD** : Adaptation de `tools/update_agents_md.py` pour supporter la structure modulaire et analyser récursivement tout le dossier `services/` (calcul de lignes globaux, parsing des variables d'environnement comme `FFBB_POULE_FETCH_CONCURRENCY`, et arbre d'architecture complet dans `AGENTS.md`).
+
 ## [1.3.0] - 2026-05-20
 
 ### Added
