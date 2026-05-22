@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2026-05-22
+
+### Fixed
+- Correction de l'auto-résolution multi-phases dans `ffbb_resolve_team`.
+- Correction d'une récursion infinie dans la résolution du client asynchrone.
+- Enrichissement plus fiable des informations de salle pour `ffbb_next_match` et `ffbb_last_result`.
+- Correction des champs de salle (`libelle`, ville, adresse) dans les réponses match.
+- Correctifs de robustesse CI/runtime : syntaxe Python, `MCP_MODE`, version Python et TTL.
+
+### Changed
+- Modernisation de l'audit PR automatique et des workflows CI.
+- Ajout de fichiers communautaires et de sécurité GitHub.
+
 ## [1.3.1] - 2026-05-21
 
 ### Added
