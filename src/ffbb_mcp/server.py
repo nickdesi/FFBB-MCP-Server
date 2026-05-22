@@ -796,7 +796,7 @@ async def ffbb_team_summary(
         if resolved_team:
             try:
                 resolved_num = int(resolved_team.get("numero_equipe") or 1)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):  # fmt: skip
                 resolved_num = 1
 
         # last_result et next_match nécessitent organisme_id

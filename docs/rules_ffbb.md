@@ -20,14 +20,17 @@
 
 ### Cache TTL — impact opérationnel
 
-| Donnée       | TTL     | Conséquence                                              |
-|--------------|---------|----------------------------------------------------------|
-| Lives        | 15s     | Quasi temps réel                                         |
-| Poule        | 15s     | Quasi temps réel pour `ffbb_get(type="poule")`          |
-| Bilan        | 30s     | Quasi temps réel                                         |
-| Calendrier   | 300s    | Cache court pour `ffbb_club(action="calendrier")`       |
-| Detail/Club  | 86400s  | ⚠️ Nouvelles phases peuvent mettre 24h à apparaître     |
-| Search       | 3600s   | ⚠️ Nouveaux clubs pas immédiatement visibles             |
+Les TTL sont **dynamiques** et s'adaptent aux fenêtres horaires de match (mercredi 13h-20h, vendredi 18h-23h, samedi 8h-21h, dimanche 8h-21h) :
+
+| Donnée       | TTL hors match        | TTL en fenêtre live | Conséquence                                              |
+|--------------|-----------------------|---------------------|----------------------------------------------------------|
+| Lives        | 15s                   | 15s                 | Quasi temps réel                                         |
+| Poule        | 86400s (24h)          | 5s à 1800s          | Dynamique : 15s si match live dans la poule, 300s en fenêtre WE, 1800s post-match, 24h sinon |
+| Bilan        | 86400s (24h)          | 1800s (30min)       | Rafraîchi toutes les 30min les jours de match            |
+| Classement   | 86400s (24h)          | 1800s (30min)       | Rafraîchi toutes les 30min les jours de match            |
+| Calendrier   | 86400s (24h)          | 300s à 1800s        | 300s (5min) en fenêtre live, 1800s (30min) post-match, 24h sinon |
+| Organisme    | 86400s (24h)          | 86400s (24h)        | ⚠️ Nouvelles phases peuvent mettre 24h à apparaître     |
+| Search       | 86400s (24h)          | 86400s (24h)        | ⚠️ Nouveaux clubs pas immédiatement visibles             |
 
 ---
 

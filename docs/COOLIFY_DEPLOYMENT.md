@@ -57,3 +57,60 @@ Tu peux aussi consulter :
 - `/metrics` pour Prometheus.
 - `/metrics.json` pour un snapshot JSON de supervision.
 - `/dashboard` pour le tableau de bord HTML.
+
+## 6. Sécurité des endpoints opérationnels
+
+Plusieurs endpoints exposent des données de supervision ou des actions administrateur. Il est **fortement recommandé** de les protéger au niveau du reverse proxy (Nginx Proxy Manager, Traefik, etc.) :
+
+| Endpoint | Méthode | Risque | Protection recommandée |
+|----------|---------|--------|------------------------|
+| `/metrics` | GET | Exposition de métriques Prometheus (cache, latences) | IP whitelist ou basic auth NPM |
+| `/metrics.json` | GET | Snapshot JSON de santé (version, transport, stats cache) | IP whitelist ou basic auth NPM |
+| `/dashboard` | GET | Dashboard HTML avec stats runtime | IP whitelist ou basic auth NPM |
+| `/benchmark` | GET | Page d'information benchmark | Pas critique, mais restreindre en production |
+| `/benchmark/run` | POST | Déclenche un run de benchmark (désactivé par défaut via `FFBB_ENABLE_BENCHMARK`) | Laisser désactivé en production |
+| `/cache/warmup` | POST/GET | Pré-chauffe ou lit l'état du cache | IP whitelist (usage CI/admin uniquement) |
+
+### Configuration recommandée Nginx Proxy Manager
+
+Dans l'onglet **Advanced** de ton proxy host NPM, ajouter :
+
+```nginx
+# Protéger les endpoints de supervision
+location /metrics {
+    allow 10.0.0.0/8;
+    allow 172.16.0.0/12;
+    allow 192.168.0.0/16;
+    deny all;
+    proxy_pass http://<container>:9123;
+}
+
+location /metrics.json {
+    allow 10.0.0.0/8;
+    allow 172.16.0.0/12;
+    allow 192.168.0.0/16;
+    deny all;
+    proxy_pass http://<container>:9123;
+}
+
+location /dashboard {
+    auth_basic "Admin Area";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+    proxy_pass http://<container>:9123;
+}
+
+location /cache/warmup {
+    allow 127.0.0.1;
+    deny all;
+    proxy_pass http://<container>:9123;
+}
+```
+
+### Variables d'environnement de sécurité
+
+| Variable | Rôle |
+|----------|------|
+| `ALLOWED_HOSTS` | Restreint les hosts acceptés (anti DNS rebinding). En production : `ffbb.desimone.fr` |
+| `ALLOWED_ORIGINS` | Restreint les origines CORS. En production : `https://ffbb.desimone.fr` |
+| `TRUSTED_PROXY_HOSTS` | IP des proxies de confiance (ex: NPM). Défaut : `127.0.0.1` |
+| `FFBB_ENABLE_BENCHMARK` | Active l'endpoint `/benchmark/run`. Laisser vide en production. |

@@ -97,7 +97,7 @@ async def ffbb_equipes_club_service(
         if numero_equipe is not None:
             try:
                 numero_equipe = str(int(numero_equipe))
-            except TypeError, ValueError:
+            except (TypeError, ValueError):  # fmt: skip
                 numero_equipe = str(numero_equipe)
 
         categorie_code = cat.get("code", "") or ""
@@ -1182,7 +1182,7 @@ async def ffbb_last_result_service(
             return None
         try:
             return int(val)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):  # fmt: skip
             return None
 
     score_nous_raw = (

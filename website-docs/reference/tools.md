@@ -307,18 +307,20 @@ la logique de désambiguïsation (U11M1, U13F-2, etc.).
     "mcp_sdk_version": "1.27.0",      // version du SDK MCP Python installé
     "python_version": "3.12.9",       // version de l'interpréteur Python
     "transport": "streamable-http",   // "streamable-http" ou "stdio"
-    "cache_ttls": {                   // TTL (secondes) de chaque cache service-level
+    "cache_ttls": {                   // TTL (secondes) de chaque cache — dynamiques selon les fenêtres de match
       "lives": 15,
-      "search": 3600,
+      "search": 86400,
       "detail": 86400,
-      "calendrier": 30,
-      "bilan": 30,
-      "poule": 15
+      "calendrier": 300,
+      "bilan": 1800,
+      "poule": 5
     }
   }
   ```
 
 - **Variables d'env** : Les TTL de cache sont configurables via `FFBB_CACHE_TTL_LIVES`, `FFBB_CACHE_TTL_SEARCH`, `FFBB_CACHE_TTL_DETAIL`, `FFBB_CACHE_TTL_CALENDRIER`, `FFBB_CACHE_TTL_BILAN`, `FFBB_CACHE_TTL_POULE`.
+
+- **TTL dynamiques** : Les caches `poule`, `bilan`, `classement` et `calendrier` utilisent une stratégie adaptative basée sur les fenêtres horaires de match. Hors fenêtre → 24h. En fenêtre → 5min à 30min selon l'activité live. Voir `cache_strategy.py`.
 
 ---
 

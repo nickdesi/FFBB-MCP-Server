@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python" alt="Version Python" />
+  <img src="https://img.shields.io/badge/Python-3.14%2B-blue?style=for-the-badge&logo=python" alt="Version Python" />
   <img src="https://img.shields.io/badge/version-1.3.1-green?style=for-the-badge" alt="Version" />
   <a href="https://smithery.ai/servers/nickdesi/mcpffbb"><img src="https://smithery.ai/badge/nickdesi/mcpffbb" alt="Badge Smithery" /></a>
   <img src="https://img.shields.io/github/actions/workflow/status/nickdesi/FFBB-MCP-Server/ci.yml?label=CI&style=for-the-badge" alt="Statut CI" />
@@ -105,7 +105,7 @@ flowchart LR
 
 Points clés :
 
-- serveur Python 3.10+ basé sur `mcp[cli]`, `starlette` et `uvicorn` ;
+- serveur Python 3.14+ basé sur `mcp[cli]`, `starlette` et `uvicorn` ;
 - agrégation métier pour limiter le nombre d'appels et réduire le contexte LLM ;
 - cache TTL adapté aux données live, calendriers et classements ;
 - dashboard, métriques JSON et healthcheck intégrés.
