@@ -1,0 +1,34 @@
+name: Feature request
+description: Proposer une amélioration ou nouvelle fonctionnalité
+title: "feat: "
+labels: ["enhancement", "triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problème ou besoin
+      description: Quel cas d'usage n'est pas bien couvert aujourd'hui ?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Solution proposée
+      description: Décrivez le comportement souhaité.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives envisagées
+      description: Indiquez les contournements ou options déjà testés.
+  - type: textarea
+    id: scope
+    attributes:
+      label: Périmètre
+      description: Précisez si cela concerne un outil MCP, la documentation, le dashboard, le déploiement, etc.
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation attendue
+      description: Comment vérifier que la demande est correctement traitée ?

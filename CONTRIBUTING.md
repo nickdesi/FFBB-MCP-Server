@@ -2,6 +2,10 @@
 
 Merci de l'intérêt que vous portez au projet ! Ce document explique comment configurer votre environnement et soumettre des modifications.
 
+## Règles communautaires
+
+Toute contribution doit respecter le [code de conduite](CODE_OF_CONDUCT.md). Pour les questions d'usage, consultez [SUPPORT.md](SUPPORT.md). Pour les vulnérabilités, suivez [SECURITY.md](SECURITY.md) et n'ouvrez pas d'issue publique.
+
 ## 🛠️ Configuration du Développement
 
 Ce projet utilise `uv` pour une gestion ultra-rapide des dépendances.
@@ -55,10 +59,18 @@ Avant de pousser vos changements :
 
 ## 🚀 Soumettre une modification
 
-1. Créez une branche descriptive (`git checkout -b fix/issue-name`).
-2. Commitez vos changements de manière atomique.
-3. Vérifiez que la CI (GitHub Actions) passe.
+1. Ouvrez d'abord une issue pour les changements importants ou ambigus.
+2. Créez une branche descriptive (`git checkout -b fix/issue-name`).
+3. Commitez vos changements de manière atomique avec des [Conventional Commits](https://www.conventionalcommits.org/).
 4. Ouvrez une Pull Request avec une description claire du "Pourquoi" et du "Comment".
+5. Vérifiez que la CI (GitHub Actions) passe.
+
+### Attentes de revue
+
+- Gardez les PR ciblées : pas de refactor non lié au changement.
+- Ajoutez ou mettez à jour les tests si le comportement change.
+- Mettez à jour la documentation lorsque l'usage, l'API ou le déploiement change.
+- Les mainteneurs peuvent demander des ajustements ou fermer une proposition hors périmètre.
 
 ---
 *Ensemble, codons le futur du basket français !* 🏀

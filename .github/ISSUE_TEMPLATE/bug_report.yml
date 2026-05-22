@@ -1,0 +1,68 @@
+name: Bug report
+description: Signaler un bug reproductible
+title: "bug: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de vérifier la documentation et les issues existantes avant de signaler un bug.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Résumé
+      description: Décrivez le problème en une ou deux phrases.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Étapes de reproduction
+      description: Donnez les étapes minimales pour reproduire le bug.
+      placeholder: |
+        1. Configurer ...
+        2. Exécuter ...
+        3. Observer ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportement attendu
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Comportement observé
+      description: Ajoutez la sortie d'erreur minimale, sans secret ni donnée personnelle.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version ou commit
+      placeholder: "1.3.1 / 84fa5a2"
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode MCP
+      options:
+        - streamable-http
+        - stdio
+        - autre / inconnu
+  - type: input
+    id: python
+    attributes:
+      label: Version Python
+      placeholder: "Python 3.14.x"
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: "macOS, Linux, Windows, Docker..."
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexte supplémentaire
+      description: Logs filtrés, configuration anonymisée, hypothèses.

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://ffbb.desimone.fr/docs/
+    about: Consultez la documentation avant d'ouvrir une issue.
+  - name: Politique de sécurité
+    url: https://github.com/nickdesi/FFBB-MCP-Server/security/policy
+    about: Ne signalez pas les vulnérabilités dans une issue publique.

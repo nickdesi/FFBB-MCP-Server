@@ -136,6 +136,13 @@ Voir [`CONTRIBUTING.md`](CONTRIBUTING.md) pour les règles de contribution.
 - [Performance et cache](docs/PERFORMANCE.md)
 - [Déploiement Coolify](docs/COOLIFY_DEPLOYMENT.md)
 
+## Communauté
+
+- [Contribuer](CONTRIBUTING.md)
+- [Code de conduite](CODE_OF_CONDUCT.md)
+- [Support](SUPPORT.md)
+- [Sécurité](SECURITY.md)
+
 ---
 
 <p align="center">

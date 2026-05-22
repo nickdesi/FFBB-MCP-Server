@@ -1,0 +1,22 @@
+name: Question
+description: Poser une question d'usage ou de configuration
+title: "question: "
+labels: ["question", "triage"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: Expliquez ce que vous essayez de faire.
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: Ce qui a déjà été essayé
+      description: Liens docs consultés, commandes, configuration anonymisée.
+  - type: input
+    id: environment
+    attributes:
+      label: Environnement
+      placeholder: "VS Code, Claude Desktop, Cursor, Docker, Coolify..."
