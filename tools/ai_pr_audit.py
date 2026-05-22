@@ -92,7 +92,7 @@ def post_github_comment(repo: str, pr_number: int, token: str, body: str) -> boo
         "body": f"### 🤖 Audit Automatique de la PR par Antigravity\n\n{body}\n\n*Note : Cet audit est généré automatiquement par l'IA via le Free Tier de Gemini. Répondez à ce commentaire ou modifiez votre code pour corriger les points signalés.*"
     }
     headers = {
-        "Authorization": f"token {token}",
+        "Authorization": f"Bearer {token}",
         "Accept": "application/vnd.github.v3+json",
         "Content-Type": "application/json",
     }
