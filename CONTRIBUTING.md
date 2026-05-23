@@ -53,6 +53,7 @@ Avant de pousser vos changements :
 - [ ] Code formaté : `uv run ruff format .`
 - [ ] Lint OK : `uv run ruff check .`
 - [ ] Tests unitaires OK : `uv run pytest`
+- [ ] Dépendances synchronisées : `uv.lock` mis à jour et commité (si modifications de dépendances)
 - [ ] (Optionnel) Performance critique modifiée : `uv run python tools/measure_services.py`
 
 - **Commits** : Nous suivons les [Conventional Commits](https://www.conventionalcommits.org/).
@@ -77,7 +78,11 @@ Avant de pousser vos changements :
 
 ## Gestion des Dépendances
 
-Nous utilisons `uv` pour gérer les dépendances. Le fichier `uv.lock` garantit la reproductibilité.
+Nous utilisons `uv` pour gérer les dépendances. Le fichier `uv.lock` garantit la reproductibilité absolue des environnements (notamment en production).
 
 - **Mettre à jour les dépendances** : `uv lock --upgrade`
 - **Ajouter une dépendance** : `uv add <package>`
+- **Supprimer une dépendance** : `uv remove <package>`
+
+> [!WARNING]
+> Après tout `uv add` ou `uv remove`, vous devez **obligatoirement commiter** le fichier `uv.lock` mis à jour avant de pusher. Le build Docker de production utilise `uv sync --frozen` et échouera systématiquement si le fichier `uv.lock` n'est pas synchronisé avec votre `pyproject.toml`.
