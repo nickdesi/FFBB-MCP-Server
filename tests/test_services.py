@@ -1619,3 +1619,38 @@ class TestMultiPhaseResolution:
         # Équipes réellement différentes (numéros 1 et 2) → ambiguous
         assert result["status"] == "ambiguous"
         assert result["team"] is None
+
+
+class TestSalleEnrichment:
+    @pytest.mark.asyncio
+    async def test_enrich_salle_data_with_meilisearch(
+        self, patch_get_client, mock_client
+    ):
+        from ffbb_mcp.services.salle import _enrich_salle_data_with_meilisearch
+
+        salle_data = {
+            "id": "salle123",
+            "libelle": "Gymnase Test",
+            "adresse": "1 rue du Test",
+        }
+
+        # Mock Commune
+        commune_mock = MagicMock()
+        commune_mock.libelle = "PARIS"
+        commune_mock.code_postal = "75001"
+
+        # Mock Hit
+        hit_mock = MagicMock()
+        hit_mock.id = "salle123"
+        hit_mock.commune = commune_mock
+
+        # Mock Search Result
+        search_res_mock = MagicMock()
+        search_res_mock.hits = [hit_mock]
+
+        mock_client.search_salles_async = AsyncMock(return_value=search_res_mock)
+
+        await _enrich_salle_data_with_meilisearch(salle_data, mock_client)
+
+        assert salle_data["ville"] == "PARIS"
+        assert salle_data["code_postal"] == "75001"

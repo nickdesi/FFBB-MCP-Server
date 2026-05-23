@@ -550,6 +550,11 @@ async def ffbb_next_match_service(
             adversaire = eq2_name or eq1_name
             domicile = None
 
+    client = await get_client_async()
+    from .salle import _enrich_with_salle_details
+
+    await _enrich_with_salle_details(next_match, client)
+
     salle_details = next_match.get("salle_details") or {}
     lieu = (
         salle_details.get("libelle")
@@ -558,8 +563,9 @@ async def ffbb_next_match_service(
         or next_match.get("nom_salle")
         or ""
     )
-    # Extraire la ville depuis l'adresse ou les champs dédiés
-    adresse_salle = salle_details.get("adresse") or ""
+    adresse_salle = (
+        next_match.get("adresse_salle") or salle_details.get("adresse") or ""
+    )
     ville = (
         salle_details.get("ville")
         or salle_details.get("commune")
@@ -567,17 +573,10 @@ async def ffbb_next_match_service(
         or next_match.get("ville_salle")
         or ""
     )
-    # Si pas de ville explicite, essayer de la parser depuis l'adresse
     if not ville and adresse_salle:
         parts = adresse_salle.split(",")
         if len(parts) >= 2:
             ville = parts[-1].strip()
-
-    client = await get_client_async()
-    from .salle import _enrich_with_salle_details
-
-    await _enrich_with_salle_details(next_match, client)
-    adresse = next_match.get("adresse_salle", "")
 
     return {
         "status": "ok",
@@ -593,7 +592,7 @@ async def ffbb_next_match_service(
             "equipe2": eq2_name,
             "salle": lieu,
             "ville": ville,
-            "adresse": adresse,
+            "adresse": adresse_salle,
         },
         "_meta": _freshness_meta(cache="poule", force_refresh_supported=True),
     }

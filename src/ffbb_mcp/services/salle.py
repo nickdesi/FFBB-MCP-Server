@@ -23,6 +23,32 @@ from .common import (
 )
 
 
+async def _enrich_salle_data_with_meilisearch(
+    salle_data: dict[str, Any], client: Any
+) -> None:
+    if not isinstance(salle_data, dict) or not salle_data:
+        return
+    if not salle_data.get("ville") and not salle_data.get("commune"):
+        libelle = salle_data.get("libelle")
+        if libelle:
+            try:
+                search_res = await client.search_salles_async(libelle)
+                if search_res and hasattr(search_res, "hits") and search_res.hits:
+                    for hit in search_res.hits:
+                        if getattr(hit, "id", None) == salle_data.get("id"):
+                            if getattr(hit, "commune", None):
+                                salle_data["ville"] = hit.commune.libelle
+                                salle_data["code_postal"] = hit.commune.code_postal
+                            break
+                    else:
+                        hit = search_res.hits[0]
+                        if getattr(hit, "commune", None):
+                            salle_data["ville"] = hit.commune.libelle
+                            salle_data["code_postal"] = hit.commune.code_postal
+            except Exception:
+                pass
+
+
 async def _enrich_with_salle_details(
     data: dict[str, Any], client: Any
 ) -> dict[str, Any]:
@@ -40,6 +66,7 @@ async def _enrich_with_salle_details(
         )
         salle_data = serialize_model(salle) if salle is not None else {}
         if isinstance(salle_data, dict) and salle_data:
+            await _enrich_salle_data_with_meilisearch(salle_data, client)
             _cache_set(state.cache_salle, salle_id, salle_data, "salle")
 
     if isinstance(salle_data, dict) and salle_data:
@@ -78,6 +105,8 @@ async def _enrich_matches_with_salle_details(matches: list[dict[str, Any]]) -> N
                 )
             )
             salle_data = serialize_model(salle) if salle is not None else {}
+            if isinstance(salle_data, dict) and salle_data:
+                await _enrich_salle_data_with_meilisearch(salle_data, client)
             return salle_id, salle_data
 
         results = await asyncio.gather(
