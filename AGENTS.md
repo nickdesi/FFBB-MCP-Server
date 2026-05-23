@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB MCP server | server.py: 1123 lignes | services.py: 3245 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 1123 lignes | services.py: 3247 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -75,6 +75,7 @@ Règle de temps verbal :
 - 📍 Domicile / Extérieur
 - 🏆 Phase éliminatoire OU 📊 Phase de poule (numéro)
 - ⚠️ Si `salle` ou `ville` vides → écrire "Salle non encore renseignée"
+- 📍 Format d'adresse standardisé : `[Nom de la Salle] - [Adresse Postale], [Ville]` (gérer proprement les valeurs manquantes sans séparateurs orphelins)
 
 ## Développement MCP (FastMCP)
 - Cycle de vie : `mcp.run()` ou `mcp.run_streamable_http_async()` — pas de montage manuel via `app.mount()`
@@ -99,7 +100,7 @@ src/ffbb_mcp/
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
 ├── server.py              # Tools MCP + main() (≈1123 lignes)
-├── services/              # Logique métier modularisée (≈3245 lignes)
+├── services/              # Logique métier modularisée (≈3247 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── club.py            # Service de gestion des clubs
 │   ├── common.py          # Helpers et base services partagés
@@ -116,10 +117,13 @@ src/ffbb_mcp/
 - Pas de suffixe `_compact_` ou `_impl_` exposé
 - Modifier une fonction à la fois, seulement si test/usage échoue
 - Nouvelle fonction → test manuel validé avant exposition MCP
-- **Modularisation** : Le package `services/` (total ≈3245 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
+- **Modularisation** : Le package `services/` (total ≈3247 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
 
 ## Commandes
-- Tests : `.venv/bin/python -m pytest -q` (pas `pytest` seul)
+- Démarrer le serveur MCP (stdio) : `rtk uv run python -m ffbb_mcp` (recommandé pour Claude Desktop)
+- Démarrer le serveur MCP (HTTP/SSE) : `MCP_MODE=streamable-http rtk uv run python -m ffbb_mcp` (port `9123` par défaut)
+- Inspecter/Tester localement : `rtk npx -y @modelcontextprotocol/inspector uv run python -m ffbb_mcp`
+- Tests unitaires : `.venv/bin/python -m pytest -q` (pas `pytest` seul)
 - Pre-merge :
   1. pytest -q → 0 failed
   2. Test manuel du service : status='ok'
@@ -134,17 +138,20 @@ Avant push/tag/release :
 - `rtk uv run mypy src`
 - `rtk uv run pytest`
 - Si version files modifiés : `rtk uv run tools/sync_version.py` + vérifier diff docs/website
-- Vérifier cache (`acronyms_cache.json`) — revert mutations non liées
+- Vérifier cache (`src/ffbb_mcp/acronyms_cache.json`) — revert impératif de toute modification non liée à votre tâche
 - Après push : inspecter les GitHub Actions
 
 ## Variables d'environnement
 | Variable | Défaut | Usage |
 |----------|--------|-------|
 | `TRUSTED_PROXY_HOSTS` | `127.0.0.1` | Proxies de confiance |
+| `FFBB_CACHE_BACKEND` | `sqlite` | Choix du backend de cache HTTP (`sqlite` ou `redis`) |
+| `FFBB_REDIS_URL` | `` | URL de connexion à l'instance Redis si backend=redis |
 | `FFBB_ENABLE_BENCHMARK` | `` | Activer endpoint `/benchmark/run` (sécurité) |
 | `ALLOWED_HOSTS` | `*` | Hosts autorisés (DNS rebinding protection) |
 | `ALLOWED_ORIGINS` | `*` | Origins CORS |
 | `PUBLIC_URL` | `https://ffbb.desimone.fr` | URL publique pour liens/sitemap |
+| `ENABLE_DNS_PROTECTION` | `` | Activer/désactiver explicitement la protection contre le DNS rebinding |
 | `MCP_MODE` | `stdio` | Mode de transport (`stdio` / `streamable-http`) |
 | `FFBB_LOG_LEVEL` | `INFO` | Niveau de log |
 | `HOST` | `0.0.0.0` | Interface d'écoute |
@@ -154,6 +161,7 @@ Avant push/tag/release :
 | `FFBB_MCP_PRUNE_LIMIT` | `50` | Limite troncature payload |
 | `FFBB_POULE_FETCH_CONCURRENCY` | — | Concurrence max fetch poules |
 | `FFBB_CACHE_TTL_*` | — | TTL par type de cache (voir cache_strategy.py) |
+| `FFBB_CACHE_EXPIRE_AFTER` | — | TTL en secondes pour le cache HTTP court de session (défaut : 30) |
 
 ## Notes workflow / outils
 

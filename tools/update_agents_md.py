@@ -253,6 +253,10 @@ def generate_agents_md() -> str:
         "FFBB_POULE_FETCH_CONCURRENCY": "Concurrence max fetch poules",
         "FFBB_CACHE_TTL_*": "TTL par type de cache (voir cache_strategy.py)",
         "TRUSTED_PROXY_HOSTS": "Proxies de confiance",
+        "FFBB_CACHE_BACKEND": "Choix du backend de cache HTTP (`sqlite` ou `redis`)",
+        "FFBB_REDIS_URL": "URL de connexion à l'instance Redis si backend=redis",
+        "FFBB_CACHE_EXPIRE_AFTER": "TTL en secondes pour le cache HTTP court de session (défaut : 30)",
+        "ENABLE_DNS_PROTECTION": "Activer/désactiver explicitement la protection contre le DNS rebinding",
     }
 
     # Merge: extracted vars + whitelist fallback
@@ -335,6 +339,7 @@ Règle de temps verbal :
 - 📍 Domicile / Extérieur
 - 🏆 Phase éliminatoire OU 📊 Phase de poule (numéro)
 - ⚠️ Si `salle` ou `ville` vides → écrire "Salle non encore renseignée"
+- 📍 Format d'adresse standardisé : `[Nom de la Salle] - [Adresse Postale], [Ville]` (gérer proprement les valeurs manquantes sans séparateurs orphelins)
 
 ## Développement MCP (FastMCP)
 - Cycle de vie : `mcp.run()` ou `mcp.run_streamable_http_async()` — pas de montage manuel via `app.mount()`
@@ -356,7 +361,10 @@ Règle de temps verbal :
 - **Modularisation** : Le package `services/` (total ≈{services_lines} lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
 
 ## Commandes
-- Tests : `.venv/bin/python -m pytest -q` (pas `pytest` seul)
+- Démarrer le serveur MCP (stdio) : `rtk uv run python -m ffbb_mcp` (recommandé pour Claude Desktop)
+- Démarrer le serveur MCP (HTTP/SSE) : `MCP_MODE=streamable-http rtk uv run python -m ffbb_mcp` (port `9123` par défaut)
+- Inspecter/Tester localement : `rtk npx -y @modelcontextprotocol/inspector uv run python -m ffbb_mcp`
+- Tests unitaires : `.venv/bin/python -m pytest -q` (pas `pytest` seul)
 - Pre-merge :
   1. pytest -q → 0 failed
   2. Test manuel du service : status='ok'
@@ -371,7 +379,7 @@ Avant push/tag/release :
 - `rtk uv run mypy src`
 - `rtk uv run pytest`
 - Si version files modifiés : `rtk uv run tools/sync_version.py` + vérifier diff docs/website
-- Vérifier cache (`acronyms_cache.json`) — revert mutations non liées
+- Vérifier cache (`src/ffbb_mcp/acronyms_cache.json`) — revert impératif de toute modification non liée à votre tâche
 - Après push : inspecter les GitHub Actions
 
 ## Variables d'environnement
