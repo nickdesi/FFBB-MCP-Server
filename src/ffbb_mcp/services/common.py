@@ -318,14 +318,20 @@ def _get_inflight_lock() -> asyncio.Lock:
 
 def get_cache_ttls() -> dict[str, int]:
     return {
-        "lives": int(state.cache_lives.ttl) if state.cache_lives else -1,
-        "search": int(state.cache_search.ttl) if state.cache_search else -1,
-        "detail": int(state.cache_competition.ttl) if state.cache_competition else -1,
-        "competition": int(state.cache_competition.ttl)
-        if state.cache_competition
+        "lives": int(state.cache_lives.ttl) if state.cache_lives is not None else -1,
+        "search": int(state.cache_search.ttl) if state.cache_search is not None else -1,
+        "detail": int(state.cache_competition.ttl)
+        if state.cache_competition is not None
         else -1,
-        "organisme": int(state.cache_organisme.ttl) if state.cache_organisme else -1,
-        "saisons": int(state.cache_saisons.ttl) if state.cache_saisons else -1,
+        "competition": int(state.cache_competition.ttl)
+        if state.cache_competition is not None
+        else -1,
+        "organisme": int(state.cache_organisme.ttl)
+        if state.cache_organisme is not None
+        else -1,
+        "saisons": int(state.cache_saisons.ttl)
+        if state.cache_saisons is not None
+        else -1,
         "calendrier": _read_positive_int_env(
             "FFBB_CACHE_TTL_CALENDRIER", get_static_ttl("calendrier")
         ),

@@ -66,7 +66,9 @@ def test_get_cache_ttls_lives_report(mock_get_static):
     from ffbb_mcp._state import state
 
     ttls = get_cache_ttls()
-    assert ttls["lives"] == (int(state.cache_lives.ttl) if state.cache_lives else -1)
+    assert ttls["lives"] == (
+        int(state.cache_lives.ttl) if state.cache_lives is not None else -1
+    )
 
 
 @patch("ffbb_mcp.services.get_static_ttl")
