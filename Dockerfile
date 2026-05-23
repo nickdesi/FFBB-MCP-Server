@@ -14,7 +14,7 @@ COPY src/ ./src/
 COPY assets/ ./assets/
 COPY website/ ./website/
 
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --no-editable
 
 FROM python:3.14-slim
 
