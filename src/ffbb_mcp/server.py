@@ -14,6 +14,8 @@ from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
+from ffbb_mcp.models import BilanResponse, CalendrierMatch  # noqa: TC001
+
 from . import __version__ as _PACKAGE_VERSION
 from .metrics import record_tool_call
 from .prompts import ROUTING_PROMPT, register_prompts
@@ -341,7 +343,7 @@ async def ffbb_bilan(
         ),
     ] = False,
     ctx: Context[Any, Any, Any] | None = None,
-) -> dict[str, Any]:
+) -> dict[str, Any] | BilanResponse:
     """Bilan complet d'une équipe toutes phases confondues en UN seul appel.
 
     ⚡ C'est l'outil à utiliser en priorité pour toute question de type
@@ -524,6 +526,24 @@ async def ffbb_club(
             )
         ),
     ] = None,
+    date_debut: Annotated[
+        str | None,
+        Field(
+            description="Date de début de filtrage au format YYYY-MM-DD (ex: '2026-05-01')."
+        ),
+    ] = None,
+    date_fin: Annotated[
+        str | None,
+        Field(
+            description="Date de fin de filtrage au format YYYY-MM-DD (ex: '2026-05-31')."
+        ),
+    ] = None,
+    limit: Annotated[
+        int | None,
+        Field(
+            description="Nombre maximum de matchs de calendrier à retourner (pagination/limite)."
+        ),
+    ] = None,
     force_refresh: Annotated[
         bool,
         Field(
@@ -533,7 +553,7 @@ async def ffbb_club(
             )
         ),
     ] = False,
-) -> list[dict[str, Any]]:
+) -> list[dict[str, Any]] | list[CalendrierMatch]:
     """Outils agreges autour d'un club (calendrier, equipes, classement).
 
     ✅ Outil de référence pour toute demande au pluriel :
@@ -585,13 +605,20 @@ async def ffbb_club(
             if not target_org_id and not club_name:
                 return [{"error": "Fournir organisme_id ou club_name"}]
             effective_refresh = force_refresh
-            return await get_calendrier_club_service(
-                club_name=club_name,
-                organisme_id=target_org_id,
-                categorie=filtre,
-                numero_equipe=numero_equipe,
-                force_refresh=effective_refresh,
-            )
+            kwargs: dict[str, Any] = {
+                "club_name": club_name,
+                "organisme_id": target_org_id,
+                "categorie": filtre,
+                "numero_equipe": numero_equipe,
+                "force_refresh": effective_refresh,
+            }
+            if date_debut is not None:
+                kwargs["date_debut"] = date_debut
+            if date_fin is not None:
+                kwargs["date_fin"] = date_fin
+            if limit is not None:
+                kwargs["limit"] = limit
+            return await get_calendrier_club_service(**kwargs)
         elif action == "equipes":
             if not target_org_id:
                 return [

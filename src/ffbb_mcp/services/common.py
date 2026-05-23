@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import random
 import re
 import threading
@@ -266,36 +267,170 @@ def _ttu_calendrier(k, v, now):
 
 
 # Initialisation des caches sur l'état global
-state.cache_lives = TTLCache(
-    maxsize=1,
-    ttl=_read_positive_int_env("FFBB_CACHE_TTL_LIVES", get_static_ttl("lives")),
+
+
+class RedisCacheWrapper:
+    """Wrapper de cache résilient pour utiliser Redis comme cache d'agrégation tout en conservant
+    un fallback mémoire local robuste en cas d'erreur ou d'absence de configuration.
+    """
+
+    def __init__(self, cache_name: str, fallback_cache: Any) -> None:
+        self.cache_name = cache_name
+        self.fallback = fallback_cache
+        self.redis_url = os.environ.get("FFBB_REDIS_URL")
+        self.backend = os.environ.get("FFBB_CACHE_BACKEND", "sqlite").lower()
+        self._client = None
+        self._enabled = self.backend == "redis" and bool(self.redis_url)
+
+        if self._enabled and self.redis_url:
+            try:
+                import redis
+
+                self._client = redis.Redis.from_url(
+                    self.redis_url, decode_responses=True, socket_timeout=2.0
+                )
+                # Test de connexion rapide
+                self._client.ping()
+                logger.info(f"Cache Redis d'agrégation connecté pour {cache_name}")
+            except Exception as e:
+                logger.warning(
+                    f"Impossible de se connecter à Redis pour le cache {cache_name}, "
+                    f"fallback sur le cache mémoire: {e}"
+                )
+                self._client = None
+
+    def get(self, key: Any, default: Any = None) -> Any:
+        if self._client is not None:
+            try:
+                import json
+
+                val = self._client.get(f"ffbb_mcp:{self.cache_name}:{key}")
+                if isinstance(val, (str, bytes, bytearray)):
+                    return json.loads(val)
+            except Exception as e:
+                logger.debug(f"Erreur de lecture Redis ({self.cache_name}): {e}")
+        return self.fallback.get(key, default)
+
+    def __setitem__(self, key: Any, val: Any) -> None:
+        if self._client is not None:
+            try:
+                import json
+
+                from ffbb_mcp.cache_strategy import get_static_ttl
+
+                ttl = get_static_ttl(self.cache_name)
+                if isinstance(val, dict) and "_ttl" in val:
+                    ttl = val["_ttl"]
+                self._client.setex(
+                    f"ffbb_mcp:{self.cache_name}:{key}", ttl, json.dumps(val)
+                )
+            except Exception as e:
+                logger.debug(f"Erreur d'écriture Redis ({self.cache_name}): {e}")
+        import contextlib
+
+        with contextlib.suppress(Exception):
+            self.fallback[key] = val
+
+    def __getitem__(self, key: Any) -> Any:
+        val = self.get(key, _CACHE_MISS_SENTINEL)
+        if val is _CACHE_MISS_SENTINEL:
+            raise KeyError(key)
+        return val
+
+    def pop(self, key: Any, default: Any = None) -> Any:
+        if self._client is not None:
+            try:
+                self._client.delete(f"ffbb_mcp:{self.cache_name}:{key}")
+            except Exception as e:
+                logger.debug(f"Erreur de suppression Redis ({self.cache_name}): {e}")
+        try:
+            return self.fallback.pop(key, default)
+        except Exception:
+            return default
+
+    def clear(self) -> None:
+        if self._client is not None:
+            try:
+                keys: Any = self._client.keys(f"ffbb_mcp:{self.cache_name}:*")
+                if keys:
+                    for k in keys:
+                        self._client.delete(k)
+            except Exception as e:
+                logger.debug(f"Erreur lors du clear de Redis ({self.cache_name}): {e}")
+        import contextlib
+
+        with contextlib.suppress(Exception):
+            self.fallback.clear()
+
+    @property
+    def ttl(self) -> Any:
+        return getattr(self.fallback, "ttl", -1)
+
+    def __len__(self) -> int:
+        try:
+            return len(self.fallback)
+        except Exception:
+            return 0
+
+    def __contains__(self, key: Any) -> bool:
+        return self.get(key, _CACHE_MISS_SENTINEL) is not _CACHE_MISS_SENTINEL
+
+
+state.cache_lives = RedisCacheWrapper(
+    "lives",
+    TTLCache(
+        maxsize=1,
+        ttl=_read_positive_int_env("FFBB_CACHE_TTL_LIVES", get_static_ttl("lives")),
+    ),
 )
-state.cache_search = TTLCache(
-    maxsize=256,
-    ttl=_read_positive_int_env("FFBB_CACHE_TTL_SEARCH", get_static_ttl("search")),
+state.cache_search = RedisCacheWrapper(
+    "search",
+    TTLCache(
+        maxsize=256,
+        ttl=_read_positive_int_env("FFBB_CACHE_TTL_SEARCH", get_static_ttl("search")),
+    ),
 )
-state.cache_competition = TTLCache(
-    maxsize=128,
-    ttl=_read_positive_int_env("FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")),
+state.cache_competition = RedisCacheWrapper(
+    "competition",
+    TTLCache(
+        maxsize=128,
+        ttl=_read_positive_int_env(
+            "FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")
+        ),
+    ),
 )
-state.cache_organisme = TTLCache(
-    maxsize=128,
-    ttl=_read_positive_int_env("FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")),
+state.cache_organisme = RedisCacheWrapper(
+    "organisme",
+    TTLCache(
+        maxsize=128,
+        ttl=_read_positive_int_env(
+            "FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")
+        ),
+    ),
 )
-state.cache_saisons = TTLCache(
-    maxsize=128,
-    ttl=_read_positive_int_env("FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")),
+state.cache_saisons = RedisCacheWrapper(
+    "saisons",
+    TTLCache(
+        maxsize=128,
+        ttl=_read_positive_int_env(
+            "FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")
+        ),
+    ),
 )
-state.cache_calendrier = TLRUCache(
-    maxsize=64,
-    ttu=_ttu_calendrier,
+state.cache_calendrier = RedisCacheWrapper(
+    "calendrier", TLRUCache(maxsize=64, ttu=_ttu_calendrier)
 )
-state.cache_bilan = TLRUCache(maxsize=64, ttu=_ttu_bilan)
-state.cache_poule = TLRUCache(maxsize=128, ttu=_ttu_poule)
-state.cache_classement = TLRUCache(maxsize=128, ttu=_ttu_poule)
-state.cache_salle = TTLCache(
-    maxsize=1024,
-    ttl=_read_positive_int_env("FFBB_CACHE_TTL_SALLE", get_static_ttl("salle")),
+state.cache_bilan = RedisCacheWrapper("bilan", TLRUCache(maxsize=64, ttu=_ttu_bilan))
+state.cache_poule = RedisCacheWrapper("poule", TLRUCache(maxsize=128, ttu=_ttu_poule))
+state.cache_classement = RedisCacheWrapper(
+    "classement", TLRUCache(maxsize=128, ttu=_ttu_poule)
+)
+state.cache_salle = RedisCacheWrapper(
+    "salle",
+    TTLCache(
+        maxsize=1024,
+        ttl=_read_positive_int_env("FFBB_CACHE_TTL_SALLE", get_static_ttl("salle")),
+    ),
 )
 
 _inflight_lock: asyncio.Lock | None = None

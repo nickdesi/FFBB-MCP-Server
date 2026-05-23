@@ -7,8 +7,6 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     import asyncio
 
-    from cachetools import TLRUCache, TTLCache
-
 
 def _read_positive_int_env(key: str, default: int) -> int:
     val_str = os.environ.get(key)
@@ -31,16 +29,16 @@ class _ServiceState:
     inflight_search: dict[str, asyncio.Task[Any]] = field(default_factory=dict)
 
     # Caches in-memory globaux
-    cache_lives: TTLCache[Any, Any] | None = None
-    cache_search: TTLCache[Any, Any] | None = None
-    cache_competition: TTLCache[Any, Any] | None = None
-    cache_organisme: TTLCache[Any, Any] | None = None
-    cache_saisons: TTLCache[Any, Any] | None = None
-    cache_calendrier: TTLCache[Any, Any] | TLRUCache[Any, Any] | None = None
-    cache_bilan: TLRUCache[Any, Any] | None = None
-    cache_classement: TLRUCache[Any, Any] | None = None
-    cache_poule: TLRUCache[Any, Any] | None = None
-    cache_salle: TTLCache[Any, Any] | None = None
+    cache_lives: Any = None
+    cache_search: Any = None
+    cache_competition: Any = None
+    cache_organisme: Any = None
+    cache_saisons: Any = None
+    cache_calendrier: Any = None
+    cache_bilan: Any = None
+    cache_classement: Any = None
+    cache_poule: Any = None
+    cache_salle: Any = None
 
 
 state = _ServiceState()

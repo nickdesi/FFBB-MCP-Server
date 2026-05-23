@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from ffbb_mcp._state import state
+from ffbb_mcp.models import BilanResponse, CalendrierMatch
 
 
 async def get_client_async(*args, **kwargs):
@@ -869,7 +870,7 @@ async def ffbb_bilan_service(
             ]
             phase_courante = target_phases[-1] if target_phases else phases[-1]
 
-        return {
+        res_dict = {
             "club": club_nom,
             "categorie": categorie or "",
             "bilan_total": totaux,
@@ -878,6 +879,8 @@ async def ffbb_bilan_service(
             "phases": phases,
             "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
         }
+        # Validation stricte via Pydantic
+        return BilanResponse(**res_dict).model_dump(by_alias=True)  # type: ignore[arg-type]
 
     if force_refresh and state.cache_bilan is not None:
         logger.debug(f"force_refresh=True, bypass cache pour {cache_key}")
@@ -898,11 +901,14 @@ async def get_calendrier_club_service(
     categorie: str | None = None,
     numero_equipe: int | None = None,
     *,
+    date_debut: str | None = None,
+    date_fin: str | None = None,
+    limit: int | None = None,
     force_refresh: bool = False,
 ) -> list[dict]:
     from .search import _resolve_club_and_org
 
-    cache_key = f"calendrier:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}:{numero_equipe or ''}"
+    cache_key = f"calendrier:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}:{numero_equipe or ''}:{date_debut or ''}:{date_fin or ''}:{limit or ''}"
 
     async def _fetch() -> list[dict]:
         resolved_clubs, _ = await _resolve_club_and_org(
@@ -1031,9 +1037,27 @@ async def get_calendrier_club_service(
         for m in all_matches:
             m["_dt"] = _parse_dt(m.get("date"))
 
+        # Filtrage par dates
+        if date_debut:
+            all_matches = [
+                m
+                for m in all_matches
+                if m["_dt"] and m["_dt"].strftime("%Y-%m-%d") >= date_debut
+            ]
+        if date_fin:
+            all_matches = [
+                m
+                for m in all_matches
+                if m["_dt"] and m["_dt"].strftime("%Y-%m-%d") <= date_fin
+            ]
+
         all_matches.sort(
             key=lambda x: (x["_dt"] is None, x["_dt"] or now), reverse=True
         )
+
+        # Limitation optionnelle
+        if limit is not None:
+            all_matches = all_matches[:limit]
 
         played_indices: list[int] = []
         future_indices: list[int] = []
@@ -1069,10 +1093,26 @@ async def get_calendrier_club_service(
                 "total_initial": len(all_matches),
                 "limite_appliquee": max_matches,
             }
-            truncated.append(warning)
-            return truncated
+            # Validation stricte via Pydantic
+            validated_trunc = []
+            for m in truncated:
+                if "warning" in m:
+                    validated_trunc.append(m)
+                else:
+                    validated_trunc.append(
+                        CalendrierMatch(**m).model_dump(by_alias=True)
+                    )
+            validated_trunc.append(warning)
+            return validated_trunc
 
-        return effective
+        # Validation stricte via Pydantic
+        validated_matches = []
+        for m in effective:
+            if "warning" in m:
+                validated_matches.append(m)
+            else:
+                validated_matches.append(CalendrierMatch(**m).model_dump(by_alias=True))
+        return validated_matches
 
     if force_refresh and state.cache_calendrier is not None:
         state.cache_calendrier.pop(cache_key, None)
