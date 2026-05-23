@@ -29,7 +29,18 @@ def create_app(mcp: FastMCP, allowed_origins: list[str]) -> Starlette:
     @contextlib.asynccontextmanager
     async def lifespan(app: Starlette) -> AsyncGenerator[None]:
         async with mcp.session_manager.run():
-            yield
+            try:
+                yield
+            finally:
+                try:
+                    from ffbb_mcp.client import FFBBClientFactory
+
+                    FFBBClientFactory.reset()
+                except Exception as e:
+                    logger.warning(
+                        "Erreur lors de la réinitialisation du client au shutdown : %s",
+                        e,
+                    )
 
     mcp_app = mcp.streamable_http_app()
 

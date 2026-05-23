@@ -3,8 +3,10 @@ import re
 from functools import lru_cache
 from typing import Any, NamedTuple
 
+type JSONValue = Any
 
-def serialize_model(obj: Any) -> Any:
+
+def serialize_model(obj: Any) -> JSONValue:
     """Convertit un objet FFBB en dict JSON-serializable."""
     if obj is None:
         return None
@@ -205,7 +207,7 @@ _ESSENTIAL_KEYS = frozenset(
 _PRUNE_LIMIT = int(os.environ.get("FFBB_MCP_PRUNE_LIMIT", "50"))
 
 
-def prune_payload(obj: Any, depth: int = 0) -> Any:
+def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
     """Réduit agressivement la taille des payloads JSON (ZipAI Surgical Logic).
     - Supprime les valeurs vides (None, [], {}).
     - Limite les dictionnaires à ~10 clés non-essentielles.
