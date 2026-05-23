@@ -188,6 +188,16 @@ _ESSENTIAL_KEYS = frozenset(
         "poule_id",
         "match_id",
         "team",
+        "rencontres",
+        "classements",
+        "classement",
+        "engagements",
+        "nom",
+        "phase",
+        "saisons",
+        "saison",
+        "poule",
+        "salles",
     }
 )
 

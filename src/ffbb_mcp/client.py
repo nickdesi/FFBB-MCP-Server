@@ -39,6 +39,57 @@ class FFBBClientFactory:
     # pour éviter les DeprecationWarning sur Python < 3.10 (Lock lié
     # à la running loop, pas à la loop au moment de la définition de classe).
     _init_lock: asyncio.Lock | None = None
+    _refresh_task: asyncio.Task[None] | None = None
+
+    @classmethod
+    def _start_background_refresh(cls) -> None:
+        """Démarre la tâche de fond pour rafraîchir proactivement le token avant expiration."""
+        if cls._refresh_task is not None and not cls._refresh_task.done():
+            return
+
+        async def _refresher() -> None:
+            logger.debug(
+                "Tâche de fond de rafraîchissement proactive des tokens démarrée."
+            )
+            while True:
+                try:
+                    await asyncio.sleep(60)
+                    if cls._instance is not None:
+                        elapsed = time.monotonic() - cls._token_created_at
+                        # Rafraîchir à 23 minutes (1380s) pour un TTL de 25 minutes (1500s)
+                        if elapsed >= 23 * 60:
+                            logger.info(
+                                "Rafraîchissement proactif du token en tâche de fond..."
+                            )
+                            if cls._init_lock is None:
+                                cls._init_lock = asyncio.Lock()
+                            async with cls._init_lock:
+                                elapsed_under_lock = (
+                                    time.monotonic() - cls._token_created_at
+                                )
+                                if elapsed_under_lock >= 23 * 60:
+                                    cls._instance = await asyncio.to_thread(
+                                        cls._create_client
+                                    )
+                                    cls._token_created_at = time.monotonic()
+                                    logger.info(
+                                        "Token rafraîchi proactivement avec succès en tâche de fond."
+                                    )
+                except asyncio.CancelledError:
+                    logger.debug("Tâche de fond de rafraîchissement proactive annulée.")
+                    break
+                except Exception as e:
+                    logger.error(
+                        "Erreur dans la tâche de fond de rafraîchissement proactive: %s",
+                        e,
+                    )
+
+        try:
+            loop = asyncio.get_running_loop()
+            cls._refresh_task = loop.create_task(_refresher())
+        except RuntimeError:
+            # Pas de loop en cours d'exécution (ex: import global ou environnement de test)
+            pass
 
     @classmethod
     def _is_token_expired(cls) -> bool:
@@ -59,11 +110,18 @@ class FFBBClientFactory:
         # On force use_cache=True pour le token manager
         tokens = TokenManager.get_tokens(use_cache=True)
 
-        # Cache mémoire court (30s) pour éviter les doublons réseau stricts.
-        # On n'utilise pas SQLite car les données live (poules, scores) doivent
-        # être rafraîchies au rythme du service layer (force_refresh compris).
+        # Configuration dynamique du cache HTTP (Persistance SQLite/Redis)
+        cache_backend = os.environ.get("FFBB_CACHE_BACKEND", "sqlite")
+        redis_url = os.environ.get("FFBB_REDIS_URL")
+        cache_expire = int(
+            os.environ.get("FFBB_CACHE_EXPIRE_AFTER", str(_CACHE_TTL_SECONDS))
+        )
+
         cache_config = CacheConfig(
-            backend="memory", enabled=True, expire_after=_CACHE_TTL_SECONDS
+            backend=cache_backend,
+            enabled=True,
+            expire_after=cache_expire,
+            redis_url=redis_url,
         )
         cache_manager = CacheManager(config=cache_config)
 
@@ -79,6 +137,8 @@ class FFBBClientFactory:
     @classmethod
     async def get_client_async(cls) -> FFBBDataClient:
         """Retourne le client FFBB en asynchrone, en le créant ou rafraîchissant si nécessaire."""
+        cls._start_background_refresh()
+
         # Première vérification rapide sans lock
         if not cls._is_token_expired():
             return cls._instance  # type: ignore
@@ -107,6 +167,9 @@ class FFBBClientFactory:
     @classmethod
     def reset(cls) -> None:
         """Force la réinitialisation du client (utile pour les tests)."""
+        if cls._refresh_task is not None:
+            cls._refresh_task.cancel()
+            cls._refresh_task = None
         cls._instance = None
         cls._token_created_at = 0.0
         cls._init_lock = None

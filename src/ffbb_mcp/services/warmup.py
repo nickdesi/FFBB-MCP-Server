@@ -6,9 +6,13 @@ import os
 from typing import Any
 
 from .club import ffbb_equipes_club_service, get_calendrier_club_service
+from .common import _read_positive_int_env
 from .poule import get_organisme_service, get_poule_service
 
 logger = logging.getLogger("ffbb-mcp")
+
+# Limiter la concurrence de planification pour le préchauffage proactive (charge Event Loop)
+_WARMUP_CONCURRENCY = _read_positive_int_env("FFBB_WARMUP_CONCURRENCY", 5)
 
 
 async def warmup_cache_service(
@@ -37,20 +41,37 @@ async def warmup_cache_service(
             },
         }
 
-    logger.info("Début du préchauffage du cache pour les organismes: %s", organisme_ids)
+    logger.info(
+        "Début du préchauffage du cache pour les organismes: %s (Limiteur concurrence: %d)",
+        organisme_ids,
+        _WARMUP_CONCURRENCY,
+    )
 
-    # 1. Préchauffer les détails des organismes en parallèle
+    sem = asyncio.Semaphore(_WARMUP_CONCURRENCY)
+
+    async def _with_warmup_semaphore(coro):
+        async with sem:
+            return await coro
+
+    # 1. Préchauffer les détails des organismes en parallèle régulé
     org_results = await asyncio.gather(
-        *[get_organisme_service(org_id) for org_id in organisme_ids],
+        *[
+            _with_warmup_semaphore(get_organisme_service(org_id))
+            for org_id in organisme_ids
+        ],
         return_exceptions=True,
     )
 
-    # 2. Préchauffer les équipes et calendriers de chaque organisme
+    # 2. Préchauffer les équipes et calendriers de chaque organisme en parallèle régulé
     cal_tasks = []
     eq_tasks = []
     for org_id in organisme_ids:
-        cal_tasks.append(get_calendrier_club_service(organisme_id=org_id))
-        eq_tasks.append(ffbb_equipes_club_service(organisme_id=org_id))
+        cal_tasks.append(
+            _with_warmup_semaphore(get_calendrier_club_service(organisme_id=org_id))
+        )
+        eq_tasks.append(
+            _with_warmup_semaphore(ffbb_equipes_club_service(organisme_id=org_id))
+        )
 
     cal_results = await asyncio.gather(*cal_tasks, return_exceptions=True)
     eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
@@ -65,11 +86,11 @@ async def warmup_cache_service(
 
     logger.info("Poules uniques détectées pour préchauffage : %s", list(poule_ids))
 
-    # 4. Préchauffer toutes les poules en parallèle
+    # 4. Préchauffer toutes les poules en parallèle régulé
     poule_results = []
     if poule_ids:
         poule_results = await asyncio.gather(
-            *[get_poule_service(pid) for pid in poule_ids],
+            *[_with_warmup_semaphore(get_poule_service(pid)) for pid in poule_ids],
             return_exceptions=True,
         )
 

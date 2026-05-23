@@ -40,6 +40,7 @@ class _ServiceState:
     cache_bilan: TLRUCache[Any, Any] | None = None
     cache_classement: TLRUCache[Any, Any] | None = None
     cache_poule: TLRUCache[Any, Any] | None = None
+    cache_salle: TTLCache[Any, Any] | None = None
 
 
 state = _ServiceState()
@@ -70,3 +71,5 @@ def reset_service_state() -> None:
         state.cache_classement.clear()
     if state.cache_poule is not None:
         state.cache_poule.clear()
+    if state.cache_salle is not None:
+        state.cache_salle.clear()

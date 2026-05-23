@@ -41,6 +41,7 @@ def test_get_cache_ttls_structure():
         "calendrier",
         "bilan",
         "poule",
+        "salle",
     }
     assert set(ttls.keys()) == expected_keys
     for val in ttls.values():

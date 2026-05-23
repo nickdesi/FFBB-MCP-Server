@@ -293,6 +293,10 @@ state.cache_calendrier = TLRUCache(
 state.cache_bilan = TLRUCache(maxsize=64, ttu=_ttu_bilan)
 state.cache_poule = TLRUCache(maxsize=128, ttu=_ttu_poule)
 state.cache_classement = TLRUCache(maxsize=128, ttu=_ttu_poule)
+state.cache_salle = TTLCache(
+    maxsize=1024,
+    ttl=_read_positive_int_env("FFBB_CACHE_TTL_SALLE", get_static_ttl("salle")),
+)
 
 _inflight_lock: asyncio.Lock | None = None
 _inflight_lock_guard = threading.Lock()
@@ -330,6 +334,9 @@ def get_cache_ttls() -> dict[str, int]:
         ),
         "poule": _read_positive_int_env(
             "FFBB_CACHE_TTL_POULE", get_static_ttl("poule")
+        ),
+        "salle": _read_positive_int_env(
+            "FFBB_CACHE_TTL_SALLE", get_static_ttl("salle")
         ),
     }
 
