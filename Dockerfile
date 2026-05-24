@@ -10,10 +10,11 @@ COPY --from=ghcr.io/astral-sh/uv:0.11 /uv /uvx /bin/
 WORKDIR /build
 
 COPY pyproject.toml uv.lock README.md ./
+RUN uv sync --frozen --no-dev --no-editable --no-install-project
+
 COPY src/ ./src/
 COPY assets/ ./assets/
 COPY website/ ./website/
-
 RUN uv sync --frozen --no-dev --no-editable
 
 FROM python:3.14-slim
