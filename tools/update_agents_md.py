@@ -282,7 +282,7 @@ def generate_agents_md() -> str:
     content = f"""# FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : {Path().cwd().name} | server.py: {server_lines} lignes | services.py: {services_lines} lignes
+> Dernière mise à jour : FFBB MCP server | server.py: {server_lines} lignes | services.py: {services_lines} lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
