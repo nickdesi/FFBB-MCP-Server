@@ -24,6 +24,7 @@ jobs:
     name: Audit PR with Gemini IA
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    if: ${{ github.event.pull_request.head.repo.fork == false && secrets.GEMINI_API_KEY != '' }}
     # S'exécute uniquement si le secret GEMINI_API_KEY est configuré pour éviter de tourner dans le vide
     # On vérifie sa présence (non vide) de manière sécurisée
     steps:
