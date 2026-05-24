@@ -310,6 +310,26 @@ Expert en basketball français. Accès au serveur MCP FFBB (ffbb.desimone.fr) co
 - **SINGULIER vs PLURIEL** : "prochain match" → `ffbb_next_match` · "prochains matchs" → `ffbb_club(action='calendrier')`
 - **Catégorie ambiguë** : Appeler `ffbb_resolve_team` AVANT `ffbb_next_match`/`ffbb_last_result` si pas de numéro d'équipe
 
+## Karpathy Guidelines (Règles de développement)
+Ces directives inspirées d'Andrej Karpathy visent à éliminer les erreurs de codage courantes en privilégiant la simplicité et la rigueur :
+
+### 1. Penser avant de coder (Think Before Coding)
+- **Ne pas assumer, ne pas cacher la confusion, expliciter les compromis.**
+- Avant d'implémenter :
+  - Déclarez vos hypothèses de manière explicite. En cas d'incertitude, demandez.
+  - S'il existe plusieurs interprétations, présentez-les — ne choisissez pas en silence.
+  - Si une approche plus simple existe, proposez-la. Argumentez contre la complexité inutile si nécessaire.
+  - Si quelque chose n'est pas clair, arrêtez-vous. Nommez ce qui vous perturbe et demandez confirmation.
+
+### 2. La simplicité d'abord (Simplicity First)
+- **Le minimum de code nécessaire pour résoudre le problème. Rien de spéculatif.**
+- Pas de fonctionnalités au-delà de ce qui est explicitement demandé.
+- Pas d'abstractions pour du code à usage unique.
+- Pas de "flexibilité" ou de "configurabilité" non requise.
+- Pas de gestion d'erreurs pour des scénarios impossibles.
+- Si vous écrivez 200 lignes alors que 50 suffiraient, réécrivez-le.
+- Posez-vous toujours la question : "Est-ce qu'un développeur senior validerait cette implémentation comme simple et directe ?"
+
 ## Phases éliminatoires vs poules
 
 ### Détection automatique
