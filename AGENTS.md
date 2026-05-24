@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB-MCP-Server | server.py: 1150 lignes | services.py: 3428 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 1150 lignes | services.py: 3428 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -70,7 +70,7 @@ Ces directives inspirées d'Andrej Karpathy visent à éliminer les erreurs de c
 
 ### Détection automatique
 Si le champ `competition` contient (insensible à la casse) l'un de ces
-termes : `finale`, `1/2`, `quart`, `play`, `coupe`, `barrage`, `promotion`
+termes : `finale`, `1/2`, `demi-finale`, `demi-fin`, `quart`, `play-off`, `playoff`, `coupe`, `barrage`, `promotion`
 → **Phase éliminatoire** 🏆
 Sinon (Phase 1, Phase 2, Phase 3…) → **Phase de poule** 📊
 
@@ -164,6 +164,7 @@ Avant push/tag/release :
 ## Variables d'environnement
 | Variable | Défaut | Usage |
 |----------|--------|-------|
+| `XDG_CACHE_HOME` | `` | Dossier racine pour stocker les fichiers de cache persistants (ex: acronymes, benchmark) |
 | `TRUSTED_PROXY_HOSTS` | `127.0.0.1` | Proxies de confiance |
 | `FFBB_CACHE_BACKEND` | `sqlite` | Choix du backend de cache HTTP (`sqlite` ou `redis`) |
 | `FFBB_REDIS_URL` | `` | URL de connexion à l'instance Redis si backend=redis |
@@ -178,6 +179,8 @@ Avant push/tag/release :
 | `PORT` | `9123` | Port d'écoute HTTP |
 | `MAX_CONCURRENT_FFBB` | `8` | Concurrence max appels API FFBB |
 | `FFBB_MAX_CALENDAR_MATCHES` | `300` | Max rencontres retournées |
+| `FFBB_WARMUP_ORGANISMES` | `` | Liste d'organisme_id séparés par des virgules à préchauffer au démarrage |
+| `FFBB_WARMUP_CONCURRENCY` | `5` | Concurrence maximale lors du préchauffage du cache |
 | `FFBB_MCP_PRUNE_LIMIT` | `50` | Limite troncature payload |
 | `FFBB_POULE_FETCH_CONCURRENCY` | — | Concurrence max fetch poules |
 | `FFBB_CACHE_TTL_*` | — | TTL par type de cache (voir cache_strategy.py) |

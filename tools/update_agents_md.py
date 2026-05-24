@@ -192,6 +192,31 @@ def count_services_lines() -> int:
     return total
 
 
+ENV_DESCRIPTIONS = {
+    "MCP_MODE": "Mode de transport (`stdio` / `streamable-http`)",
+    "PORT": "Port d'écoute HTTP",
+    "HOST": "Interface d'écoute",
+    "PUBLIC_URL": "URL publique pour liens/sitemap",
+    "ALLOWED_HOSTS": "Hosts autorisés (DNS rebinding protection)",
+    "ALLOWED_ORIGINS": "Origins CORS",
+    "FFBB_LOG_LEVEL": "Niveau de log",
+    "MAX_CONCURRENT_FFBB": "Concurrence max appels API FFBB",
+    "FFBB_ENABLE_BENCHMARK": "Activer endpoint `/benchmark/run` (sécurité)",
+    "FFBB_MCP_PRUNE_LIMIT": "Limite troncature payload",
+    "FFBB_MAX_CALENDAR_MATCHES": "Max rencontres retournées",
+    "FFBB_POULE_FETCH_CONCURRENCY": "Concurrence max fetch poules",
+    "FFBB_CACHE_TTL_*": "TTL par type de cache (voir cache_strategy.py)",
+    "TRUSTED_PROXY_HOSTS": "Proxies de confiance",
+    "FFBB_CACHE_BACKEND": "Choix du backend de cache HTTP (`sqlite` ou `redis`)",
+    "FFBB_REDIS_URL": "URL de connexion à l'instance Redis si backend=redis",
+    "FFBB_CACHE_EXPIRE_AFTER": "TTL en secondes pour le cache HTTP court de session (défaut : 30)",
+    "ENABLE_DNS_PROTECTION": "Activer/désactiver explicitement la protection contre le DNS rebinding",
+    "XDG_CACHE_HOME": "Dossier racine pour stocker les fichiers de cache persistants (ex: acronymes, benchmark)",
+    "FFBB_WARMUP_ORGANISMES": "Liste d'organisme_id séparés par des virgules à préchauffer au démarrage",
+    "FFBB_WARMUP_CONCURRENCY": "Concurrence maximale lors du préchauffage du cache",
+}
+
+
 def generate_agents_md() -> str:
     tools = extract_tools()
     resources = extract_resources()
@@ -237,36 +262,14 @@ def generate_agents_md() -> str:
                 f"# Logique métier modularisée (≈{services_lines} lignes)",
             )
 
-    # Variables d'environnement — whitelist avec descriptions
-    env_descriptions = {
-        "MCP_MODE": "Mode de transport (`stdio` / `streamable-http`)",
-        "PORT": "Port d'écoute HTTP",
-        "HOST": "Interface d'écoute",
-        "PUBLIC_URL": "URL publique pour liens/sitemap",
-        "ALLOWED_HOSTS": "Hosts autorisés (DNS rebinding protection)",
-        "ALLOWED_ORIGINS": "Origins CORS",
-        "FFBB_LOG_LEVEL": "Niveau de log",
-        "MAX_CONCURRENT_FFBB": "Concurrence max appels API FFBB",
-        "FFBB_ENABLE_BENCHMARK": "Activer endpoint `/benchmark/run` (sécurité)",
-        "FFBB_MCP_PRUNE_LIMIT": "Limite troncature payload",
-        "FFBB_MAX_CALENDAR_MATCHES": "Max rencontres retournées",
-        "FFBB_POULE_FETCH_CONCURRENCY": "Concurrence max fetch poules",
-        "FFBB_CACHE_TTL_*": "TTL par type de cache (voir cache_strategy.py)",
-        "TRUSTED_PROXY_HOSTS": "Proxies de confiance",
-        "FFBB_CACHE_BACKEND": "Choix du backend de cache HTTP (`sqlite` ou `redis`)",
-        "FFBB_REDIS_URL": "URL de connexion à l'instance Redis si backend=redis",
-        "FFBB_CACHE_EXPIRE_AFTER": "TTL en secondes pour le cache HTTP court de session (défaut : 30)",
-        "ENABLE_DNS_PROTECTION": "Activer/désactiver explicitement la protection contre le DNS rebinding",
-    }
-
     # Merge: extracted vars + whitelist fallback
     extracted_names = {ev["name"] for ev in env_vars}
     env_table_rows = []
     for ev in env_vars:
-        desc = env_descriptions.get(ev["name"], "")
+        desc = ENV_DESCRIPTIONS.get(ev["name"], "")
         if desc:
             env_table_rows.append(f"| `{ev['name']}` | `{ev['default']}` | {desc} |")
-    for name, desc in env_descriptions.items():
+    for name, desc in ENV_DESCRIPTIONS.items():
         if name not in extracted_names:
             env_table_rows.append(f"| `{name}` | — | {desc} |")
 
@@ -334,7 +337,7 @@ Ces directives inspirées d'Andrej Karpathy visent à éliminer les erreurs de c
 
 ### Détection automatique
 Si le champ `competition` contient (insensible à la casse) l'un de ces
-termes : `finale`, `1/2`, `quart`, `play`, `coupe`, `barrage`, `promotion`
+termes : `finale`, `1/2`, `demi-finale`, `demi-fin`, `quart`, `play-off`, `playoff`, `coupe`, `barrage`, `promotion`
 → **Phase éliminatoire** 🏆
 Sinon (Phase 1, Phase 2, Phase 3…) → **Phase de poule** 📊
 
@@ -419,6 +422,20 @@ Avant push/tag/release :
 
 def main():
     """Génère AGENTS.md et retourne 0 si le fichier a changé, 1 sinon."""
+    # Détecter les variables d'environnement manquantes dans la description
+    env_vars = extract_env_vars()
+    missing_desc = [
+        ev["name"]
+        for ev in env_vars
+        if ev["name"] not in ENV_DESCRIPTIONS
+        and not ev["name"].startswith("FFBB_CACHE_TTL_")
+    ]
+    if missing_desc:
+        print(
+            f"⚠️ ATTENTION : Les variables d'environnement suivantes ont été détectées dans le code mais ne sont pas documentées dans ENV_DESCRIPTIONS de update_agents_md.py : {', '.join(missing_desc)}",
+            file=sys.stderr,
+        )
+
     new_content = generate_agents_md()
     existing = AGENTS_MD.read_text() if AGENTS_MD.exists() else ""
 
