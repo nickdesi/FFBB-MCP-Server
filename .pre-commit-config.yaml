@@ -15,7 +15,7 @@ repos:
       - id: check-useless-excludes
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.15.0
+    rev: v2.1.0
     hooks:
       - id: mypy
         args: ["src/ffbb_mcp", "--explicit-package-bases"]
