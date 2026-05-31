@@ -61,7 +61,9 @@ Les versions récentes de Claude permettent d'ajouter des connecteurs directemen
 3. Renseignez l'URL publique : `https://ffbb.desimone.fr/mcp` et validez.
 
 #### Option B : Via `claude_desktop_config.json`
-Pour une intégration via le fichier de configuration de Claude Desktop, vous devez utiliser le bridge SSE officiel (via `npx`) pour assurer la compatibilité et éviter les erreurs de validation (Claude Desktop n'acceptant que le transport `stdio` local) :
+Pour une intégration via le fichier de configuration de Claude Desktop, vous devez utiliser le bridge SSE officiel (via `npx`) pour assurer la compatibilité et éviter les erreurs de validation (Claude Desktop n'acceptant que le transport `stdio` local).
+
+> ⚠️ **Prérequis** : **Node.js** (qui inclut `npm` et `npx`) doit être installé sur votre machine. Si vous ne souhaitez pas installer Node.js, privilégiez l'**Option A** (sans prérequis).
 
 ```json
 {
