@@ -35,7 +35,7 @@ _background_tasks: set[asyncio.Task] = set()
 
 
 def _find_website_dir() -> Path:
-    """Détecte le dossier website/ en local ou en production."""
+    # Détecte le dossier website/ en local ou en production (mis à jour pour déclencher le déploiement)
     repo_path = Path(__file__).resolve().parents[2] / "website"
     if repo_path.exists():
         return repo_path
