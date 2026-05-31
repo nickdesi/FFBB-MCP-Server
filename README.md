@@ -60,23 +60,34 @@ Les versions récentes de Claude permettent d'ajouter des connecteurs directemen
 2. Cliquez sur **Ajouter un connecteur personnalisé**.
 3. Renseignez l'URL publique : `https://ffbb.desimone.fr/mcp` et validez.
 
-#### Option B : Via `claude_desktop_config.json`
-Pour une intégration via le fichier de configuration de Claude Desktop, utilisez le bridge SSE officiel (via `npx`) pour assurer la compatibilité et éviter les erreurs de schéma :
+#### Option B : Via `claude_desktop_config.json` (Configuration SSE native)
+Ajoutez simplement le transport natif SSE dans votre fichier de configuration :
 
 ```json
 {
   "mcpServers": {
     "ffbb": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/client-sse",
-        "https://ffbb.desimone.fr/mcp"
-      ]
+      "transport": {
+        "type": "sse",
+        "url": "https://ffbb.desimone.fr/mcp"
+      }
     }
   }
 }
 ```
+
+*Note : Si votre version de Claude Desktop ne supporte pas encore le transport SSE natif, vous pouvez utiliser le bridge officiel en secours :*
+```json
+{
+  "mcpServers": {
+    "ffbb": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/client-sse", "https://ffbb.desimone.fr/mcp"]
+    }
+  }
+}
+```
+
 
 ### Cursor / autres clients MCP
 
