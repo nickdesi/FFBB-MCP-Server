@@ -242,6 +242,10 @@
 
             <!-- Tab: Claude Desktop -->
             <div class="tab-panel tab-panel-hidden" id="tab-claude" role="tabpanel" aria-labelledby="btn-claude">
+                <p style="margin-bottom: 1.5rem; color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6; text-align: left;">
+                    <strong>Option A (Recommandé) :</strong> Dans Claude, allez dans <em>Paramètres &rarr; Connecteurs</em> &rarr; <em>Ajouter un connecteur personnalisé</em> et saisissez l'URL <code>https://ffbb.desimone.fr/mcp</code>.<br>
+                    <strong>Option B :</strong> Si vous préférez utiliser le fichier de configuration de Claude Desktop, ajoutez cette entrée stable avec le bridge SSE officiel :
+                </p>
                 <div class="code-terminal">
                     <div class="terminal-header" aria-hidden="true">
                         <div class="dot dot-red"></div>
@@ -254,7 +258,12 @@
 {
   <span class="code-keyword">"mcpServers"</span>: {
     <span class="code-keyword">"ffbb"</span>: {
-      <span class="code-keyword">"httpUrl"</span>: <span class="code-string">"https://ffbb.desimone.fr/mcp"</span>
+      <span class="code-keyword">"command"</span>: <span class="code-string">"npx"</span>,
+      <span class="code-keyword">"args"</span>: [
+        <span class="code-string">"-y"</span>,
+        <span class="code-string">"@modelcontextprotocol/client-sse"</span>,
+        <span class="code-string">"https://ffbb.desimone.fr/mcp"</span>
+      ]
     }
   }
 }</code></pre>

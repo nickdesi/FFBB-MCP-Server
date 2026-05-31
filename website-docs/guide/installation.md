@@ -7,13 +7,27 @@ L'instance publique est prête à l'emploi. Voici comment l'intégrer dans vos o
 
 ## 🤖 Claude Desktop
 
-Ajoutez cette configuration dans votre fichier `claude_desktop_config.json` :
+Il existe deux manières d'ajouter le serveur MCP FFBB à Claude :
+
+### Option A : Via l'interface de Claude (Recommandé)
+Si votre version de Claude dispose de l'écran des connecteurs :
+1. Allez dans les **Paramètres** de Claude puis dans **Connecteurs** (ou **Plugins**).
+2. Cliquez sur **Ajouter un connecteur personnalisé**.
+3. Renseignez l'URL publique : `https://ffbb.desimone.fr/mcp` et validez.
+
+### Option B : Via `claude_desktop_config.json`
+Pour une intégration stable par fichier de configuration, utilisez le bridge SSE officiel via `npx` pour éviter les erreurs de schéma ou de compatibilité :
 
 ```json
 {
   "mcpServers": {
     "ffbb": {
-      "httpUrl": "https://ffbb.desimone.fr/mcp"
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/client-sse",
+        "https://ffbb.desimone.fr/mcp"
+      ]
     }
   }
 }
