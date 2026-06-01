@@ -1,10 +1,69 @@
-"""Définition des prompts MCP réutilisables pour le serveur FFBB."""
+"""Définition des prompts MCP réutilisables pour le serveur FFBB.
 
+Ce module injecte le prompt système dans l'instance FastMCP. Il reste
+volontairement **concis** pour limiter la consommation de tokens LLM.
+
+**Source canonique de maintenance** : les règles métier détaillées
+(scoring, exclusions, désambiguïsation, nomenclature) vivent dans
+`docs/rules_ffbb.md`. Toute modification d'une règle doit y être faite
+en premier, puis reportée ici sous forme condensée.
+
+Organisation des blocs :
+- `ROUTING_PROMPT` (string) : prompt d'instructions FastMCP
+- `expert_basket()` (cached) : prompt complet (12 blocs) exposé comme MCP prompt
+- Fonctions de prompt MCP : `analyser_match`, `trouver_club`, etc.
+- `register_prompts(mcp)` : enregistre tous les prompts sur l'instance FastMCP
+"""
+
+import json
+import os
 from typing import Any
 
 _PROMPT_VERSION = "3.8.0"
 
-ROUTING_PROMPT = """\
+# Hints d'organisme_id pour les clubs fréquents.
+# ⚠️ Ces IDs peuvent changer côté FFBB — servent UNIQUEMENT de raccourci de
+# conversation. L'agent DOIT toujours valider via `ffbb_search` si l'ID a
+# plus de 6 mois.
+#
+# Override possible via la variable d'environnement FFBB_KNOWN_CLUB_IDS
+# (JSON: `{"Nom du club": 1234, ...}`).
+_DEFAULT_KNOWN_CLUB_IDS: dict[str, int] = {
+    "Stade Clermontois Basket Auvergne": 9326,
+    "Stade Clermontois Basket Féminin": 9269,
+    "Gerzat Basket": 9282,
+}
+
+
+def _load_known_club_ids() -> dict[str, int]:
+    """Charge les hints d'IDs, avec override par variable d'environnement.
+
+    Fallback sur _DEFAULT_KNOWN_CLUB_IDS si FFBB_KNOWN_CLUB_IDS est absent
+    ou mal formé.
+    """
+    raw = os.environ.get("FFBB_KNOWN_CLUB_IDS")
+    if not raw:
+        return dict(_DEFAULT_KNOWN_CLUB_IDS)
+    try:
+        data = json.loads(raw)
+        if isinstance(data, dict):
+            return {str(k): int(v) for k, v in data.items()}
+    except json.JSONDecodeError, ValueError, TypeError:
+        pass
+    return dict(_DEFAULT_KNOWN_CLUB_IDS)
+
+
+def _format_known_club_ids() -> str:
+    """Formate le bloc de hints d'IDs pour injection dans le prompt."""
+    lines = []
+    for name, oid in _load_known_club_ids().items():
+        lines.append(f"  - {name} → organisme_id: {oid}")
+    return "\n".join(lines)
+
+
+_KNOWN_CLUBS_HINTS = _format_known_club_ids()
+
+ROUTING_PROMPT = f"""\
 ## RÈGLES DE ROUTAGE DES OUTILS FFBB
 
 ### RÈGLE 1 — Matchs : choisir le bon outil selon la cardinalité
@@ -34,10 +93,8 @@ mémorisé et réutilisé pour tous les appels suivants concernant ce club.
 
 NE JAMAIS repasser par `club_name` si l'`organisme_id` est déjà connu.
 
-Référence des clubs fréquents (à utiliser comme hints, ces IDs peuvent changer) :
-  - Stade Clermontois Basket Auvergne → organisme_id: 9326
-  - Stade Clermontois Basket Féminin  → organisme_id: 9269
-  - Gerzat Basket                     → organisme_id: 9282
+Référence des clubs fréquents (hints, IDs susceptibles de changer) :
+{_KNOWN_CLUBS_HINTS}
 
 Si un club produit une erreur d'ambiguïté malgré un `club_name` clair,
 sélectionner le premier candidat dont le nom correspond exactement,
@@ -284,8 +341,9 @@ Pour tout bilan détaillé, toujours chaîner ces 3 appels dans l'ordre :
 2. `ffbb_team_summary` → dernier match joué + prochain match + contexte équipe.
 3. `ffbb_club(action="calendrier")` → tous les scores match par match (base pour calculs).
 
-### 2. Calculs enrichis via code execution
-À partir du calendrier complet, utiliser obligatoirement `execute_code` pour calculer :
+### 2. Calculs enrichis (si capacités d'exécution de code disponibles)
+**Si l'agent dispose d'un outil `execute_code` (sandbox Python)** : calculer
+à partir du calendrier complet :
 - Moyennes PM/PE par phase (et non uniquement les totaux).
 - Ratio PM/PE global (ex: ×2,57).
 - Plus grosse victoire (score + adversaire + date).
@@ -293,16 +351,20 @@ Pour tout bilan détaillé, toujours chaîner ces 3 appels dans l'ordre :
 - Record de points marqués / record de défense (min encaissé).
 - Comparaison domicile vs extérieur (PM moy, PE moy).
 
+**Sinon (fallback texte)** : présenter directement les totaux `bilan_total`
+retournés par `ffbb_bilan` et lister les matchs dans l'ordre chronologique.
+S'abstenir de toute interprétation "moyenne" — ne pas inventer de chiffres.
+
 ### 3. Interprétation des données
-- Ne jamais conclure à une "montée en puissance" sur la base des totaux (qui augmentent mécaniquement). Utiliser exclusivement les MOYENNES.
+- Ne jamais conclure à une "montée en puissance" sur la base des totaux (qui augmentent mécaniquement). Utiliser exclusivement les MOYENNES (si code dispo).
 - **Catégorie U11** : Les scores sont cappés (~40 pts d'écart). Ne pas sur-interpréter les gros écarts. Signaler les écarts > 42 pts comme potentiellement hors-norme.
 - **Géographie** : Ne jamais inférer la ville ou le département d'un club s'il n'est pas explicitement retourné par le MCP (rester factuel).
 
 ### 4. Structure du rendu final (Ordre strict)
 1. **Bilan global** (Tableau : MJ, V/D, PM/PE/Diff, Ratio, Moyennes).
-2. **Détail par phase** (Tableau avec moyennes par match et position).
-3. **Records de la saison** (Plus grosse victoire, match serré, min encaissé).
-4. **Domicile vs Extérieur** (Tableau comparatif).
+2. **Détail par phase** (Tableau avec moyennes par match et position, ou totaux si pas de code).
+3. **Records de la saison** (Plus grosse victoire, match serré, min encaissé — si code dispo).
+4. **Domicile vs Extérieur** (Tableau comparatif — si code dispo).
 5. **Calendrier détaillé** (Focus sur la phase courante).
 6. **Prochain match** (Date, heure, adversaire, lieu).\
 """

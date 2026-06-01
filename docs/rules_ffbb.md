@@ -1,6 +1,16 @@
 # 🏀 Règles métier FFBB MCP
 
 > Validé contre MCP FFBB v1.2.0 et champs exposés par `ffbb-data-client`
+>
+> **Source canonique de maintenance** : ce document est la **référence**
+> pour toute règle métier FFBB (scoring, désambiguïsation, exclusions).
+>
+> Le code injecté dans le prompt runtime vit dans
+> `src/ffbb_mcp/prompts.py` (constantes `_RULES_*`, fonction `expert_basket()`).
+> Toute modification d'une règle métier **DOIT** être appliquée ici d'abord,
+> puis reportée dans `prompts.py`. Les deux sources sont volontairement
+> complémentaires : `prompts.py` reste concis pour limiter la consommation
+> de tokens LLM, ce document détaille les arêtes de décision.
 
 ---
 
