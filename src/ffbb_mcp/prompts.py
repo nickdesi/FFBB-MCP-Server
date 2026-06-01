@@ -2,7 +2,7 @@
 
 from typing import Any
 
-_PROMPT_VERSION = "3.7.0"
+_PROMPT_VERSION = "3.8.0"
 
 ROUTING_PROMPT = """\
 ## RÈGLES DE ROUTAGE DES OUTILS FFBB
@@ -310,17 +310,14 @@ Pour tout bilan détaillé, toujours chaîner ces 3 appels dans l'ordre :
 _RULES_PHASES = """\
 ## 📈 SCORING DES ENGAGEMENTS
 
-Quand plusieurs engagements coexistent, retenir celui avec le score le plus élevé :
-
-| Critère | Valeur → Points |
-|:---|:---|
-| Phase | Phase 3 → +30 · Phase 2 → +20 · Phase 1 → +10 · Initial → +5 |
-| Niveau | Nationale → +10 · Interrégionale → +7 · Régionale → +5 · Départementale → +3 |
-| Division | Basse (ex: D6) → -5 |
+> **Source canonique** : voir `docs/rules_ffbb.md` §Règle 4 (scoring complet,
+> exclusions, égalités). Cette section est volontairement concise pour éviter
+> la dérive entre les deux sources.
 
 - **Exclusions** : Ignorer "Amical", "Brassage", "Tournoi", "Coupe" (sauf demande explicite).
 - **Égalité** : Prendre l'`engagement_id` le plus élevé (le plus récent).
 - ⚠️ Ne jamais inventer un `poule_id` : toujours l'extraire de `raw.phases[]`.\
+
 """
 
 _SEQUENCE = """\
@@ -431,8 +428,7 @@ _EXAMPLES = """\
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def expert_basket() -> str:
-    """Active l'assistant expert en basketball français (prompt système complet)."""
+def _build_expert_basket_prompt() -> str:
     blocks = [
         _INTRO,
         _RULES_DISAMBIGUATION,
@@ -448,6 +444,17 @@ def expert_basket() -> str:
         _EXAMPLES,
     ]
     return "\n\n".join(b for b in blocks if b)
+
+
+_EXPERT_BASKET_PROMPT: str | None = None
+
+
+def expert_basket() -> str:
+    """Active l'assistant expert en basketball français (prompt système complet)."""
+    global _EXPERT_BASKET_PROMPT
+    if _EXPERT_BASKET_PROMPT is None:
+        _EXPERT_BASKET_PROMPT = _build_expert_basket_prompt()
+    return _EXPERT_BASKET_PROMPT
 
 
 def analyser_match(match_id: str) -> str:
