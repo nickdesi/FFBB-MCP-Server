@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB MCP server | server.py: 1150 lignes | services.py: 3428 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 1156 lignes | services.py: 3428 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -119,7 +119,7 @@ src/ffbb_mcp/
 ├── prompts.py             # Prompts MCP réutilisables
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
-├── server.py              # Tools MCP + main() (≈1150 lignes)
+├── server.py              # Tools MCP + main() (≈1156 lignes)
 ├── services/              # Logique métier modularisée (≈3428 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── club.py            # Service de gestion des clubs
@@ -166,6 +166,7 @@ Avant push/tag/release :
 |----------|--------|-------|
 | `XDG_CACHE_HOME` | `` | Dossier racine pour stocker les fichiers de cache persistants (ex: acronymes, benchmark) |
 | `TRUSTED_PROXY_HOSTS` | `127.0.0.1` | Proxies de confiance |
+| `MCP_MODE` | `stdio` | Mode de transport (`stdio` / `streamable-http`) |
 | `FFBB_CACHE_BACKEND` | `sqlite` | Choix du backend de cache HTTP (`sqlite` ou `redis`) |
 | `FFBB_REDIS_URL` | `` | URL de connexion à l'instance Redis si backend=redis |
 | `FFBB_ENABLE_BENCHMARK` | `` | Activer endpoint `/benchmark/run` (sécurité) |
@@ -173,7 +174,6 @@ Avant push/tag/release :
 | `ALLOWED_ORIGINS` | `*` | Origins CORS |
 | `PUBLIC_URL` | `https://ffbb.desimone.fr` | URL publique pour liens/sitemap |
 | `ENABLE_DNS_PROTECTION` | `` | Activer/désactiver explicitement la protection contre le DNS rebinding |
-| `MCP_MODE` | `stdio` | Mode de transport (`stdio` / `streamable-http`) |
 | `FFBB_LOG_LEVEL` | `INFO` | Niveau de log |
 | `HOST` | `0.0.0.0` | Interface d'écoute |
 | `PORT` | `9123` | Port d'écoute HTTP |
