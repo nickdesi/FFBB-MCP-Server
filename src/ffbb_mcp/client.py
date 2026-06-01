@@ -46,6 +46,9 @@ class FFBBClientFactory:
         """Démarre la tâche de fond pour rafraîchir proactivement le token avant expiration."""
         if cls._refresh_task is not None and not cls._refresh_task.done():
             return
+        # Ne pas gaspiller de cycles en mode stdio (1 client = 1 requête à la fois)
+        if os.environ.get("MCP_MODE", "stdio").lower() in ("stdio", ""):
+            return
 
         async def _refresher() -> None:
             logger.debug(

@@ -54,6 +54,12 @@ def zipai_surgical(func: Any) -> Any:
     @wraps(func)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
         res = await func(*args, **kwargs)
+        if res is None or isinstance(res, (str, int, float, bool)):
+            return res
+        if isinstance(res, list) and len(res) <= 5:
+            return res
+        if isinstance(res, dict) and len(res) <= 5:
+            return res
         return prune_payload(res)
 
     return wrapper

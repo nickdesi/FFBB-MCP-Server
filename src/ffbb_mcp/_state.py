@@ -71,3 +71,20 @@ def reset_service_state() -> None:
         state.cache_poule.clear()
     if state.cache_salle is not None:
         state.cache_salle.clear()
+    _clear_lru_caches()
+
+
+def _clear_lru_caches() -> None:
+    """Vide les caches LRU Python des helpers utils/services (parse_categorie, etc.)."""
+    try:
+        from ffbb_mcp.utils import parse_categorie
+
+        parse_categorie.cache_clear()
+    except ImportError, AttributeError:
+        pass
+    try:
+        from ffbb_mcp.services.common import _normalize_name
+
+        _normalize_name.cache_clear()
+    except ImportError, AttributeError:
+        pass
