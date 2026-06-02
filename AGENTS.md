@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB MCP server | server.py: 1156 lignes | services.py: 3428 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 1156 lignes | services.py: 3291 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -120,7 +120,7 @@ src/ffbb_mcp/
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
 ├── server.py              # Tools MCP + main() (≈1156 lignes)
-├── services/              # Logique métier modularisée (≈3428 lignes)
+├── services/              # Logique métier modularisée (≈3291 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── club.py            # Service de gestion des clubs
 │   ├── common.py          # Helpers et base services partagés
@@ -137,7 +137,7 @@ src/ffbb_mcp/
 - Pas de suffixe `_compact_` ou `_impl_` exposé
 - Modifier une fonction à la fois, seulement si test/usage échoue
 - Nouvelle fonction → test manuel validé avant exposition MCP
-- **Modularisation** : Le package `services/` (total ≈3428 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
+- **Modularisation** : Le package `services/` (total ≈3291 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
 
 ## Commandes
 - Démarrer le serveur MCP (stdio) : `rtk uv run python -m ffbb_mcp` (recommandé pour Claude Desktop)
@@ -168,7 +168,6 @@ Avant push/tag/release :
 | `TRUSTED_PROXY_HOSTS` | `127.0.0.1` | Proxies de confiance |
 | `MCP_MODE` | `stdio` | Mode de transport (`stdio` / `streamable-http`) |
 | `FFBB_CACHE_BACKEND` | `sqlite` | Choix du backend de cache HTTP (`sqlite` ou `redis`) |
-| `FFBB_REDIS_URL` | `` | URL de connexion à l'instance Redis si backend=redis |
 | `FFBB_ENABLE_BENCHMARK` | `` | Activer endpoint `/benchmark/run` (sécurité) |
 | `ALLOWED_HOSTS` | `*` | Hosts autorisés (DNS rebinding protection) |
 | `ALLOWED_ORIGINS` | `*` | Origins CORS |
@@ -184,6 +183,7 @@ Avant push/tag/release :
 | `FFBB_MCP_PRUNE_LIMIT` | `50` | Limite troncature payload |
 | `FFBB_POULE_FETCH_CONCURRENCY` | — | Concurrence max fetch poules |
 | `FFBB_CACHE_TTL_*` | — | TTL par type de cache (voir cache_strategy.py) |
+| `FFBB_REDIS_URL` | — | URL de connexion à l'instance Redis si backend=redis |
 | `FFBB_CACHE_EXPIRE_AFTER` | — | TTL en secondes pour le cache HTTP court de session (défaut : 30) |
 
 ## Notes workflow / outils

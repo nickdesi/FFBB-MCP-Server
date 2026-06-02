@@ -3,6 +3,8 @@ import re
 from functools import lru_cache
 from typing import Any, NamedTuple
 
+from starlette.responses import JSONResponse
+
 type JSONValue = Any
 
 
@@ -363,3 +365,12 @@ def jaro_winkler_similarity(s1: str, s2: str) -> float:
     # Coefficient standard de Winkler : 0.1
     winkler = jaro + prefix_len * 0.1 * (1.0 - jaro)
     return winkler
+
+
+class OrjsonResponse(JSONResponse):
+    """JSONResponse subclass using orjson for high-performance JSON serialization."""
+
+    def render(self, content: Any) -> bytes:
+        import orjson
+
+        return orjson.dumps(content)

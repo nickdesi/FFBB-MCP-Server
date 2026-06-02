@@ -113,9 +113,8 @@ class FFBBClientFactory:
         # On force use_cache=True pour le token manager
         tokens = TokenManager.get_tokens(use_cache=True)
 
-        # Configuration dynamique du cache HTTP (Persistance SQLite/Redis)
+        # Configuration dynamique du cache HTTP (Persistance SQLite)
         cache_backend = os.environ.get("FFBB_CACHE_BACKEND", "sqlite")
-        redis_url = os.environ.get("FFBB_REDIS_URL")
         cache_expire = int(
             os.environ.get("FFBB_CACHE_EXPIRE_AFTER", str(_CACHE_TTL_SECONDS))
         )
@@ -124,7 +123,6 @@ class FFBBClientFactory:
             backend=cache_backend,
             enabled=True,
             expire_after=cache_expire,
-            redis_url=redis_url,
         )
         cache_manager = CacheManager(config=cache_config)
 

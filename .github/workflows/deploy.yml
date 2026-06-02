@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: deploy-${{ github.workflow }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   deploy:

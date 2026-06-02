@@ -15,7 +15,6 @@ if TYPE_CHECKING:
 from starlette.responses import (
     FileResponse,
     HTMLResponse,
-    JSONResponse,
     PlainTextResponse,
     RedirectResponse,
     Response,
@@ -25,6 +24,7 @@ from . import __version__ as _PACKAGE_VERSION
 from .benchmark import get_benchmark_trends, run_benchmark
 from .dashboard import _build_dashboard_html
 from .metrics import generate_prometheus_metrics, get_snapshot, summarize_health
+from .utils import OrjsonResponse
 
 _DEFAULT_PUBLIC_URL = "https://ffbb.desimone.fr"
 _REMOTE_LOGO_URL = (
@@ -120,7 +120,7 @@ def register_routes(mcp: FastMCP) -> None:
         hours = int((uptime_s % 86400) // 3600)
         minutes = int((uptime_s % 3600) // 60)
         seconds = int(uptime_s % 60)
-        return JSONResponse(
+        return OrjsonResponse(
             {
                 "status": summary["status"],
                 "service": "ffbb-mcp",
@@ -162,7 +162,7 @@ def register_routes(mcp: FastMCP) -> None:
                 f"{cache}:{reason}": count
                 for (cache, reason), count in snap["cache_miss_reasons"].items()
             }
-        return JSONResponse(
+        return OrjsonResponse(
             {
                 "service": "ffbb-mcp",
                 "version": _PACKAGE_VERSION,
@@ -188,13 +188,13 @@ def register_routes(mcp: FastMCP) -> None:
             trends["hint"] = "Set FFBB_ENABLE_BENCHMARK=true to run benchmarks"
         else:
             trends["benchmark_enabled"] = True
-        return JSONResponse(trends)
+        return OrjsonResponse(trends)
 
     @mcp.custom_route("/benchmark/run", methods=["POST"])  # type: ignore[untyped-decorator]
     async def benchmark_post(request: Request) -> Response:
         """Exécute un benchmark de performance."""
         if os.environ.get("FFBB_ENABLE_BENCHMARK", "").lower() != "true":
-            return JSONResponse(
+            return OrjsonResponse(
                 {
                     "error": "Benchmark endpoint disabled. Set FFBB_ENABLE_BENCHMARK=true to enable."
                 },
@@ -202,10 +202,10 @@ def register_routes(mcp: FastMCP) -> None:
             )
         try:
             result = await run_benchmark()
-            return JSONResponse(result, status_code=201)
+            return OrjsonResponse(result, status_code=201)
         except Exception as e:
             logger.exception("Benchmark failed")
-            return JSONResponse(
+            return OrjsonResponse(
                 {"error": str(e), "error_type": type(e).__name__}, status_code=500
             )
 
@@ -282,7 +282,7 @@ def register_routes(mcp: FastMCP) -> None:
             from .services.warmup import warmup_cache_service
 
             res = await warmup_cache_service(organisme_ids=organisme_ids)
-            return JSONResponse(res, status_code=200)
+            return OrjsonResponse(res, status_code=200)
         else:
             from .services.warmup import warmup_cache_service
 
@@ -291,7 +291,7 @@ def register_routes(mcp: FastMCP) -> None:
             )
             _background_tasks.add(task)
             task.add_done_callback(_background_tasks.discard)
-            return JSONResponse(
+            return OrjsonResponse(
                 {
                     "status": "accepted",
                     "message": "Le préchauffage du cache a été déclenché en tâche de fond.",
@@ -302,7 +302,7 @@ def register_routes(mcp: FastMCP) -> None:
     @mcp.custom_route("/cache/warmup", methods=["GET"])  # type: ignore[untyped-decorator]
     async def cache_warmup_get(request: Request) -> Response:
         """Informations sur l'endpoint de préchauffage du cache."""
-        return JSONResponse(
+        return OrjsonResponse(
             {
                 "endpoint": "/cache/warmup",
                 "methods": ["POST", "GET"],

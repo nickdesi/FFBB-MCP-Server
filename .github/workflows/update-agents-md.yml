@@ -13,7 +13,7 @@ permissions:
 
 concurrency:
   group: agents-md-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   update:

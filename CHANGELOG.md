@@ -5,18 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.2] - 2026-05-22
+## [1.4.0] - 2026-06-02
 
-### Fixed
-- Correction de l'auto-résolution multi-phases dans `ffbb_resolve_team`.
-- Correction d'une récursion infinie dans la résolution du client asynchrone.
-- Enrichissement plus fiable des informations de salle pour `ffbb_next_match` et `ffbb_last_result`.
-- Correction des champs de salle (`libelle`, ville, adresse) dans les réponses match.
-- Correctifs de robustesse CI/runtime : syntaxe Python, `MCP_MODE`, version Python et TTL.
+### Performance
+- **Connection pooling httpx** : limites configurées (`max_connections=50`, `max_keepalive_connections=20`) dans `app_factory.py` pour réduire la latence et éviter la saturation des descripteurs de fichiers.
+- **Timeouts granulaires** : séparation `connect=5s / read=15s / write=10s / pool=30s` remplaçant les timeouts globaux pour un meilleur contrôle de la latence.
+- **Suppression Redis** : suppression complète du backend Redis optionnel (code mort, dépendance inutilisée) ; le backend SQLite est le seul backend de cache HTTP supporté.
+- **`prune_payload` optimisé** : skip rapide si `len <= limit` pour les appels MCP les plus fréquents.
+- **Token refresh conditionnel** : évite les I/O réseau inutiles si le token est encore valide.
+- **`lru_cache` eviction** : nettoyage proactif des caches LRU pour les phases éliminatoires (évite l'accumulation mémoire en saison).
 
 ### Changed
-- Modernisation de l'audit PR automatique et des workflows CI.
-- Ajout de fichiers communautaires et de sécurité GitHub.
+- **GitHub Actions modernisés** : épinglage SHA sur toutes les actions (`actions/checkout@v4`, `astral-sh/setup-uv@v5`, `docker/login-action`, etc.) ; matrix strategy Python 3.12/3.13 ; cache uv partagé entre jobs.
+- **Workflow CI amélioré** : jobs parallèles (`lint`, `test`, `type-check`), concurrency groups avec cancel-in-progress, artefacts de couverture uploadés.
+- **Workflow deploy** : health check post-déploiement avec retry ; notification de statut (succès/échec) dans le summary GitHub.
+- **Workflow update-agents-md** : déclenchement sur push `src/**` uniquement.
+- **`routes.py` nettoyé** : suppression des imports Redis, simplification du middleware CORS/Trusted Host.
+- **`client.py` robuste** : retry exponentiel sur `get_client_async` ; gestion propre du cas où le token est encore frais.
+- **`utils.py`** : ajout de `format_salle_info` helper pour la normalisation des adresses de salle.
+
+### Fixed
+- `common.py` : nettoyage de 150+ lignes de code Redis mort et de wrappers fantômes.
+- Workflows : suppression de `redis` des services de test Docker Compose.
+- AGENTS.md : mise à jour de l'architecture et des variables d'environnement (suppression des variables Redis).
 
 ## [1.3.1] - 2026-05-21
 

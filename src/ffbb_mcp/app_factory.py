@@ -16,9 +16,10 @@ from starlette.applications import Starlette
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
-from starlette.responses import JSONResponse
 from starlette.routing import Mount
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+
+from ffbb_mcp.utils import OrjsonResponse
 
 logger = logging.getLogger("ffbb-mcp")
 
@@ -97,7 +98,7 @@ def create_app(mcp: FastMCP, allowed_origins: list[str]) -> Starlette:
                         "Middleware error on %s: %s", request.url.path, e, exc_info=True
                     )
 
-                response = JSONResponse(
+                response = OrjsonResponse(
                     {"error": "Internal Server Error", "request_id": request_id},
                     status_code=500,
                 )
