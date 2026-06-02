@@ -98,6 +98,7 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
     #  Bolt: Regex direct (moteur C) — plus rapide que l'itération manuelle Python.
     num_match = _NUM_PATTERN.search(remainder)
     if num_match:
+        # _NUM_PATTERN captures only digits (\d+), so ValueError is impossible here
         numero_equipe = int(num_match.group(1))
 
     return ParsedCategorie(categorie=categorie, sexe=sexe, numero_equipe=numero_equipe)
