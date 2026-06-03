@@ -28,17 +28,13 @@ def serialize_model(obj: Any) -> JSONValue:
         return obj
 
     # Let Pydantic do the heavy lifting natively in C/Rust (V2)
-    if hasattr(obj, "model_dump"):  # Pydantic v2
-        return obj.model_dump(mode="json")
-    if hasattr(obj, "dict"):  # Pydantic v1
-        return obj.dict()
+    if (val := getattr(obj, "model_dump", None)) is not None:  # Pydantic v2
+        return val(mode="json")
+    if (val := getattr(obj, "dict", None)) is not None:  # Pydantic v1
+        return val()
 
-    if hasattr(obj, "__dict__"):
-        return {
-            k: serialize_model(v)
-            for k, v in obj.__dict__.items()
-            if not k.startswith("_")
-        }
+    if (val := getattr(obj, "__dict__", None)) is not None:
+        return {k: serialize_model(v) for k, v in val.items() if not k.startswith("_")}
     return str(obj)
 
 
