@@ -87,7 +87,7 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
     sexe: str | None = None
     if "M" in s and _M_PATTERN.search(s):
         sexe = "M"
-    if "F" in s and _F_PATTERN.search(s):
+    elif "F" in s and _F_PATTERN.search(s):
         sexe = "F"
 
     # 3) Numéro d'équipe (chiffre final non lié à Uxx)
@@ -100,10 +100,8 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
     #  Bolt: Regex direct (moteur C) — plus rapide que l'itération manuelle Python.
     num_match = _NUM_PATTERN.search(remainder)
     if num_match:
-        try:
-            numero_equipe = int(num_match.group(1))
-        except ValueError:
-            numero_equipe = None
+        # _NUM_PATTERN captures only digits (\d+), so ValueError is impossible here
+        numero_equipe = int(num_match.group(1))
 
     return ParsedCategorie(categorie=categorie, sexe=sexe, numero_equipe=numero_equipe)
 
