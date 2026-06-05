@@ -232,12 +232,13 @@ def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
             if v is None:
                 continue
             vt = type(v)
-            if not v and (vt is list or vt is dict):
-                continue
 
             # Fast path for primitives to avoid expensive recursion
             if vt is str or vt is int or vt is float or vt is bool:
                 cleaned[k] = v
+                continue
+
+            if not v and (vt is list or vt is dict):
                 continue
 
             cleaned_v = prune_payload(v, depth + 1)
