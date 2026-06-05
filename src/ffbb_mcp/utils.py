@@ -229,15 +229,24 @@ def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
         # Fusion du nettoyage récursif et de l'élagage en une seule passe
         cleaned: dict[str, Any] = {}
         for k, v in obj.items():
-            if v is None or (not v and (type(v) is list or type(v) is dict)):
+            if v is None:
                 continue
+            vt = type(v)
+
+            # Fast path for primitives to avoid expensive recursion
+            if vt is str or vt is int or vt is float or vt is bool:
+                cleaned[k] = v
+                continue
+
+            if not v and (vt is list or vt is dict):
+                continue
+
             cleaned_v = prune_payload(v, depth + 1)
             # Post-pruning check
-            if cleaned_v is not None and (
-                cleaned_v
-                or (type(cleaned_v) is not list and type(cleaned_v) is not dict)
-            ):
-                cleaned[k] = cleaned_v
+            if cleaned_v is not None:
+                cvt = type(cleaned_v)
+                if cleaned_v or (cvt is not list and cvt is not dict):
+                    cleaned[k] = cleaned_v
 
         # 2. Élagage chirurgical si trop de clés
         if len(cleaned) > _PRUNE_LIMIT:
@@ -266,17 +275,24 @@ def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
         for i, item in enumerate(obj):
             if i >= limit:
                 break
-            if item is None or (
-                not item and (type(item) is list or type(item) is dict)
-            ):
+            if item is None:
                 continue
+            it = type(item)
+
+            # Fast path for primitives to avoid expensive recursion
+            if it is str or it is int or it is float or it is bool:
+                final_list.append(item)
+                continue
+
+            if not item and (it is list or it is dict):
+                continue
+
             cleaned_item = prune_payload(item, depth + 1)
             # Post-pruning check
-            if cleaned_item is not None and (
-                cleaned_item
-                or (type(cleaned_item) is not list and type(cleaned_item) is not dict)
-            ):
-                final_list.append(cleaned_item)
+            if cleaned_item is not None:
+                cit = type(cleaned_item)
+                if cleaned_item or (cit is not list and cit is not dict):
+                    final_list.append(cleaned_item)
 
         if len(obj) > limit:
             # On ajoute un champ _omitted_count à la fin de la liste pour prévenir l'agent
