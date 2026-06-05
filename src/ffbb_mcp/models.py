@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class BilanTotal(BaseModel):
@@ -115,3 +115,10 @@ class CalendrierMatch(BaseModel):
     is_next_match: bool = Field(
         default=False, description="Indique s'il s'agit du prochain match à venir."
     )
+
+    @field_validator("score_equipe1", "score_equipe2", "joue", mode="before")
+    @classmethod
+    def clean_scores(cls, v: Any) -> Any:
+        if v == "None" or v == "null" or v == "":
+            return None
+        return v
