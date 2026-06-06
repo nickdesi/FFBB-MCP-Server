@@ -1,0 +1,6 @@
+[
+  {
+    "comment_id": "4640773345",
+    "reply": "Understood. Acknowledging that the prune_payload comprehension changes introduced a performance regression due to double-pass allocations, but the getattr optimizations are beneficial. I will revert the prune_payload changes to restore the single-pass for-loop, while keeping the getattr optimizations and Python 3 syntax error fixes, and update the PR."
+  }
+]

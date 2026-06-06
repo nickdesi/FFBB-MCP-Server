@@ -540,7 +540,7 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
             )
         )
 
-        if not raw or not hasattr(raw, "results") or not raw.results:
+        if not getattr(raw, "results", None):
             return []
 
         output: list[dict[str, Any]] = []
