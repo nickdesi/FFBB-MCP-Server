@@ -154,3 +154,19 @@ jobs:
         run: |
           npm ci
           npm run package
+
+  notify:
+    name: Notify on failure
+    runs-on: ubuntu-24.04
+    needs: [quality, test, security, vscode-extension]
+    if: failure()
+    steps:
+      - name: Send failure notification
+        run: |
+          echo "❌ CI Pipeline failed!"
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Branch: ${{ github.ref }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Actor: ${{ github.actor }}"
+          echo ""
+          echo "Check: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
