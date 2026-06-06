@@ -12,10 +12,23 @@ import json
 import logging
 import os
 import re
+import unicodedata
 from pathlib import Path
 from threading import Lock
 
 logger = logging.getLogger("ffbb-mcp")
+
+
+def _strip_accents(text: str) -> str:
+    """Supprime les accents d'un texte (NFD → filtrage des marques diacritiques)."""
+    if text.isascii():
+        return text
+    return "".join(
+        c
+        for c in unicodedata.normalize("NFD", text)
+        if unicodedata.category(c) not in ("Mn", "So")
+    )
+
 
 # ---------------------------------------------------------------------------
 # Dictionnaire statique d'alias (toujours en lowercase)
@@ -362,6 +375,9 @@ def normalize_query(query: str) -> str:
     # 2. Normalisation via le dictionnaire statique
     normalized = query.lower().strip()
 
+    # 3. Suppression des accents pour matching Meilisearch (accent-insensitive)
+    normalized = _strip_accents(normalized)
+
     # Try exact match first
     if normalized in CLUB_ALIASES:
         return CLUB_ALIASES[normalized]
@@ -392,3 +408,24 @@ def _try_fallback_query(query: str) -> str | None:
     if len(words) >= 2 and words[0].upper() in _GENERIC_PREFIXES:
         return " ".join(words[1:])
     return None
+
+
+def _build_fallback_queries(query: str) -> list[str]:
+    """Construit une liste de requêtes de fallback ordonnées par pertinence.
+
+    Stratégie :
+    1. Retirer le préfixe générique (CS, AS, US…) si présent
+    2. Pour les requêtes multi-mots sans préfixe générique, essayer des
+       variantes plus courtes (ex: 'Pont du Château' → ['Pont du Château'])
+    """
+    words = query.strip().split()
+    fallbacks: list[str] = []
+
+    if len(words) < 2:
+        return fallbacks
+
+    # 1. Retrait préfixe générique
+    if words[0].upper() in _GENERIC_PREFIXES:
+        fallbacks.append(" ".join(words[1:]))
+
+    return fallbacks

@@ -18,7 +18,11 @@ async def get_client_async(*args, **kwargs):
     return await ffbb_mcp.client.get_client_async(*args, **kwargs)
 
 
-from ffbb_mcp.aliases import _try_fallback_query, enrich_acronym_cache, normalize_query
+from ffbb_mcp.aliases import (
+    _build_fallback_queries,
+    enrich_acronym_cache,
+    normalize_query,
+)
 from ffbb_mcp.utils import (
     jaro_winkler_similarity,
     parse_categorie,
@@ -437,13 +441,15 @@ async def _search_generic(
             )
         )
         if not results or not results.hits:
-            # Fallback : retirer le préfixe générique
-            fallback = _try_fallback_query(query)
-            if fallback and fallback != query:
+            # Fallback : essayer les variantes de requête
+            fallbacks = _build_fallback_queries(query)
+            for fb in fallbacks:
+                if fb == query:
+                    continue
                 results = await _with_ffbb_semaphore(
                     _safe_call_with_inflight(
-                        f"Search {operation} (fallback): {fallback}",
-                        lambda: method(fallback, **call_kwargs),
+                        f"Search {operation} (fallback): {fb}",
+                        lambda fb=fb: method(fb, **call_kwargs),
                     )
                 )
                 if results and results.hits:
