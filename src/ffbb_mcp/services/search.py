@@ -161,6 +161,138 @@ def _extract_club_key_word(club_name: str) -> str | None:
     return candidate
 
 
+def _filter_orgs_by_gender(
+    orgs: list[dict],
+    categorie: str,
+    club_name: str,
+) -> list[dict]:
+    """Filtre la liste d'organismes selon le genre (M/F) extrait de la catégorie.
+
+    Règles :
+    - Si le nom du club contient déjà "FEMININ", pas de filtrage (choix explicite).
+    - Genre 'F' → priorise les organismes dont le nom contient "FEMININ".
+    - Genre 'M' → priorise les organismes ne contenant PAS "FEMININ".
+    - Si aucun organisme ne matche le genre demandé, la liste originale est retournée.
+    """
+    if len(orgs) <= 1:
+        return orgs
+
+    parsed = parse_categorie(categorie)
+    gender = parsed.sexe  # 'M' or 'F' or None
+
+    # Si le nom fourni contient déjà "FEMININ", on ne filtre pas (choix explicite)
+    name_norm = _normalize_name(club_name)
+    is_explicit_fem = "FEMININ" in name_norm
+
+    if not gender or is_explicit_fem:
+        return orgs
+
+    fem_orgs = [o for o in orgs if "FEMININ" in _normalize_name(str(o.get("nom", "")))]
+    gen_orgs = [
+        o for o in orgs if "FEMININ" not in _normalize_name(str(o.get("nom", "")))
+    ]
+
+    if gender == "F" and fem_orgs:
+        return fem_orgs
+    elif gender == "M" and gen_orgs:
+        return gen_orgs
+
+    return orgs
+
+
+def _build_resolved_entries(orgs: list[dict]) -> list[dict[str, Any]]:
+    """Convertit la liste brute d'organismes en entrées résolues standardisées.
+
+    Chaque entrée contient les clés 'nom', 'organisme_id' et 'code'.
+    Enrichit automatiquement le cache d'acronymes pour chaque nom rencontré.
+    """
+    resolved: list[dict[str, Any]] = []
+    for org in orgs:
+        if isinstance(org, dict) and org.get("id"):
+            nom = org.get("nom", "")
+            resolved.append(
+                {
+                    "nom": nom,
+                    "organisme_id": org.get("id"),
+                    "code": org.get("code", ""),
+                }
+            )
+            if nom:
+                enrich_acronym_cache(nom)
+    return resolved
+
+
+def _resolve_ententes(
+    ent_orgs_raw: list[dict],
+    existing_ids: set[str],
+    key_word: str,
+    club_name: str,
+) -> list[dict[str, Any]]:
+    """Extrait les ententes (ENT.) d'une recherche secondaire et les ajoute aux résultats.
+
+    Une entente est un organisme dont le nom normalisé commence par "ENT." ou "ENT "
+    et qui contient le mot-clé distinctif du club recherché.
+    Retourne les nouvelles entrées résolues à ajouter.
+    """
+    additions: list[dict[str, Any]] = []
+    key_word_norm = _normalize_name(key_word)
+
+    for ent_org in ent_orgs_raw:
+        if not isinstance(ent_org, dict):
+            continue
+        oid = str(ent_org.get("id", ""))
+        if not oid or oid in existing_ids:
+            continue
+        nom_norm = _normalize_name(str(ent_org.get("nom", "")))
+        # Inclure uniquement les ententes (nom commençant par "ENT.")
+        # qui contiennent le mot-clé distinctif du club recherché.
+        is_entente = nom_norm.startswith("ENT.") or nom_norm.startswith("ENT ")
+        if is_entente and key_word_norm in nom_norm:
+            nom = ent_org.get("nom", "")
+            additions.append(
+                {
+                    "nom": nom,
+                    "organisme_id": oid,
+                    "code": ent_org.get("code", ""),
+                }
+            )
+            existing_ids.add(oid)
+            logger.debug(
+                "ffbb_resolve: entente détectée '%s' (id=%s) pour club_name='%s'",
+                nom,
+                oid,
+                club_name,
+            )
+
+    return additions
+
+
+def _resolve_team_number(
+    equipes: list[dict],
+    target_num: str | None,
+) -> list[dict]:
+    """Filtre les équipes par numéro avec fallback sur équipe sans numéro explicite.
+
+    Si target_num est fourni, cherche d'abord les équipes dont numero_equipe
+    correspond exactement. En l'absence de match, fallback sur les équipes sans
+    numéro (None ou chaîne vide).
+    Retourne la liste filtrée (vide si aucun match).
+    """
+    if not target_num:
+        return equipes
+
+    # Filtre exact sur le numéro
+    matched = [
+        e for e in equipes if (e.get("numero_equipe") or "").strip() == target_num
+    ]
+
+    if not matched:
+        # Fallback sur équipe sans numéro
+        matched = [e for e in equipes if not (e.get("numero_equipe") or "").strip()]
+
+    return matched
+
+
 async def _resolve_club_and_org(
     club_name: str | None,
     organisme_id: int | str | None,
@@ -221,30 +353,8 @@ async def _resolve_club_and_org(
         )
 
         # Application du Smart Resolution M/F
-        if len(orgs) > 1 and categorie:
-            parsed = parse_categorie(categorie)
-            gender = parsed.sexe  # 'M' or 'F' or None
-
-            # Si le nom fourni contient déjà "FEMININ", on ne filtre pas (choix explicite)
-            name_norm = _normalize_name(club_name)
-            is_explicit_fem = "FEMININ" in name_norm
-
-            if gender and not is_explicit_fem:
-                fem_orgs = [
-                    o
-                    for o in orgs
-                    if "FEMININ" in _normalize_name(str(o.get("nom", "")))
-                ]
-                gen_orgs = [
-                    o
-                    for o in orgs
-                    if "FEMININ" not in _normalize_name(str(o.get("nom", "")))
-                ]
-
-                if gender == "F" and fem_orgs:
-                    orgs = fem_orgs  # On priorise les clubs féminins
-                elif gender == "M" and gen_orgs:
-                    orgs = gen_orgs  # On priorise les clubs généraux/masculins
+        if categorie:
+            orgs = _filter_orgs_by_gender(orgs, categorie, club_name)
 
         if orgs:
             # On récupère le détail du premier pour avoir les métadonnées riches
@@ -261,50 +371,15 @@ async def _resolve_club_and_org(
                     exc_info=True,
                 )
 
-        for org in orgs:
-            if isinstance(org, dict) and org.get("id"):
-                nom = org.get("nom", "")
-                resolved.append(
-                    {
-                        "nom": nom,
-                        "organisme_id": org.get("id"),
-                        "code": org.get("code", ""),
-                    }
-                )
-                # Enrichissement auto du cache d'acronymes
-                if nom:
-                    enrich_acronym_cache(nom)
+        resolved = _build_resolved_entries(orgs)
 
         # Ajout des ententes associées issues de la recherche secondaire.
         if key_word and ent_orgs_raw:
             existing_ids = {str(r["organisme_id"]) for r in resolved}
-            key_word_norm = _normalize_name(key_word)
-            for ent_org in ent_orgs_raw:
-                if not isinstance(ent_org, dict):
-                    continue
-                oid = str(ent_org.get("id", ""))
-                if not oid or oid in existing_ids:
-                    continue
-                nom_norm = _normalize_name(str(ent_org.get("nom", "")))
-                # Inclure uniquement les ententes (nom commençant par "ENT.")
-                # qui contiennent le mot-clé distinctif du club recherché.
-                is_entente = nom_norm.startswith("ENT.") or nom_norm.startswith("ENT ")
-                if is_entente and key_word_norm in nom_norm:
-                    nom = ent_org.get("nom", "")
-                    resolved.append(
-                        {
-                            "nom": nom,
-                            "organisme_id": oid,
-                            "code": ent_org.get("code", ""),
-                        }
-                    )
-                    existing_ids.add(oid)
-                    logger.debug(
-                        "ffbb_resolve: entente détectée '%s' (id=%s) pour club_name='%s'",
-                        nom,
-                        oid,
-                        club_name,
-                    )
+            ententes = _resolve_ententes(
+                ent_orgs_raw, existing_ids, key_word, club_name
+            )
+            resolved.extend(ententes)
 
         # Jaro-Winkler Sorting Optimization
         if len(resolved) > 1 and club_name:
@@ -574,20 +649,10 @@ async def ffbb_resolve_team_service(
     parsed = parse_categorie(categorie)
     target_num = str(parsed.numero_equipe) if parsed.numero_equipe else None
 
-    # On cherche d'abord le numéro exact
-    if target_num:
-        matched = [
-            e
-            for e in candidates
-            if (e.get("numero_equipe") or "").strip() == target_num
-        ]
-        if not matched:
-            # Fallback sur équipe sans numéro
-            matched = [
-                e for e in candidates if not (e.get("numero_equipe") or "").strip()
-            ]
-        if matched:
-            candidates = matched
+    # On cherche d'abord le numéro exact, fallback sur équipe sans numéro
+    matched = _resolve_team_number(candidates, target_num)
+    if matched:
+        candidates = matched
 
     # 3.5) Déduplication sémantique : même équipe à travers différentes phases
     candidates = _deduplicate_same_team_phases(candidates)
