@@ -226,27 +226,27 @@ def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
         return obj
 
     if obj_type is dict or isinstance(obj, dict):
-        # 1. Nettoyage initial : supprime les None, [], {} de base,
-        # puis nettoie le reste. On utilise une dictionary comprehension pour la performance C.
-        cleaned = {
-            k: (
-                v
-                if type(v) is str
-                or type(v) is int
-                or type(v) is float
-                or type(v) is bool
-                else prune_payload(v, depth + 1)
-            )
-            for k, v in obj.items()
-            if v is not None and (v or (type(v) is not list and type(v) is not dict))
-        }
+        # Fusion du nettoyage récursif et de l'élagage en une seule passe
+        cleaned: dict[str, Any] = {}
+        for k, v in obj.items():
+            if v is None:
+                continue
+            vt = type(v)
 
-        # 1b. Filtrer les None apparus APRÈS récursion et les conteneurs devenus vides
-        cleaned = {
-            k: v
-            for k, v in cleaned.items()
-            if v is not None and (v or (type(v) is not list and type(v) is not dict))
-        }
+            # Fast path for primitives to avoid expensive recursion
+            if vt is str or vt is int or vt is float or vt is bool:
+                cleaned[k] = v
+                continue
+
+            if not v and (vt is list or vt is dict):
+                continue
+
+            cleaned_v = prune_payload(v, depth + 1)
+            # Post-pruning check
+            if cleaned_v is not None:
+                cvt = type(cleaned_v)
+                if cleaned_v or (cvt is not list and cvt is not dict):
+                    cleaned[k] = cleaned_v
 
         # 2. Élagage chirurgical si trop de clés
         if len(cleaned) > _PRUNE_LIMIT:
@@ -269,30 +269,30 @@ def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
     elif obj_type is list or isinstance(obj, list):
         # 1. Limitation de taille (ZipAI Surgical)
         limit = _PRUNE_LIMIT
-        truncated = obj[:limit]
 
-        # 2. Nettoyage via list comprehension pour la performance C.
-        cleaned_list = [
-            (
-                item
-                if type(item) is str
-                or type(item) is int
-                or type(item) is float
-                or type(item) is bool
-                else prune_payload(item, depth + 1)
-            )
-            for item in truncated
-            if item is not None
-            and (item or (type(item) is not list and type(item) is not dict))
-        ]
+        # 2. Fusion de la troncature et du nettoyage en une seule passe
+        final_list = []
+        for i, item in enumerate(obj):
+            if i >= limit:
+                break
+            if item is None:
+                continue
+            it = type(item)
 
-        # 2b. Filtrer les None apparus APRÈS récursion et les conteneurs devenus vides
-        final_list = [
-            item
-            for item in cleaned_list
-            if item is not None
-            and (item or (type(item) is not list and type(item) is not dict))
-        ]
+            # Fast path for primitives to avoid expensive recursion
+            if it is str or it is int or it is float or it is bool:
+                final_list.append(item)
+                continue
+
+            if not item and (it is list or it is dict):
+                continue
+
+            cleaned_item = prune_payload(item, depth + 1)
+            # Post-pruning check
+            if cleaned_item is not None:
+                cit = type(cleaned_item)
+                if cleaned_item or (cit is not list and cit is not dict):
+                    final_list.append(cleaned_item)
 
         if len(obj) > limit:
             # On ajoute un champ _omitted_count à la fin de la liste pour prévenir l'agent
