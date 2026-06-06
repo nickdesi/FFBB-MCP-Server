@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-06-07
+
+### Fixed
+- **CI/CD** : Correction de la matrix de tests GitHub Actions pour n'exécuter que Python 3.14 (alignement avec `requires-python >= 3.14`).
+- **CI/CD** : Mise à jour du commit SHA de `aquasecurity/trivy-action` vers `v0.36.0` suite à la dépréciation et suppression du commit obsolète par Aqua Security.
+- **CI/CD** : Suppression de l'étape de vérification de santé du graphe obsolète (les rapports Graphify ne sont plus suivis dans le dépôt git).
+
 ## [1.5.0] - 2026-06-07
 
 ### Added

@@ -1,6 +1,6 @@
 # 📚 Référence Complète des Outils FFBB MCP
 
-> Version courante : **1.5.0**
+> Version courante : **1.5.1**
 
 Ce document fournit une documentation technique exhaustive pour les outils exposés par le serveur FFBB MCP. Il est destiné aux développeurs et aux agents IA pour comprendre les capacités et les schémas de données du serveur.
 
@@ -321,7 +321,7 @@ la logique de désambiguïsation (U11M1, U13F-2, etc.).
 
   ```jsonc
   {
-    "package_version": "1.5.0",       // version du package ffbb-mcp
+    "package_version": "1.5.1",       // version du package ffbb-mcp
     "mcp_sdk_version": "1.27.0",      // version du SDK MCP Python installé
     "python_version": "3.12.9",       // version de l'interpréteur Python
     "transport": "streamable-http",   // "streamable-http" ou "stdio"
