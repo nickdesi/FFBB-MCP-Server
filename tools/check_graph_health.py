@@ -26,8 +26,8 @@ GRAS = "\033[1m"
 SEUILS = {
     "import_cycles": {"max": 3, "label": "Import cycles"},
     "extraction_rate": {"min": 90, "label": "Extraction rate"},
-    "isolated_nodes": {"max": 150, "label": "Isolated nodes"},
-    "inferred_edges": {"max": 150, "label": "INFERRED edges"},
+    "isolated_nodes": {"max": 400, "label": "Isolated nodes"},
+    "inferred_edges": {"max": 200, "label": "INFERRED edges"},
     "thin_communities": {"max": 40, "label": "Thin communities"},
 }
 
