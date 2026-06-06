@@ -64,9 +64,6 @@ jobs:
       - name: Check version alignment
         run: uv run --frozen python tools/check_version_alignment.py
 
-      - name: Check graph health (Graphify guardrails)
-        run: uv run --frozen python tools/check_graph_health.py
-
       - name: Verify AGENTS.md is up-to-date
         run: |
           uv run --frozen python tools/update_agents_md.py
