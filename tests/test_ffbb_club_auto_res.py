@@ -86,6 +86,7 @@ async def test_ffbb_club_calendrier_with_numero_equipe():
             organisme_id=123,
             categorie="U11M",
             numero_equipe=1,
+            adversaire=None,
             force_refresh=False,
         )
 
@@ -111,5 +112,6 @@ async def test_ffbb_club_calendrier_match_day_does_not_force_refresh():
             organisme_id=123,
             categorie="U11M",
             numero_equipe=None,
+            adversaire=None,
             force_refresh=False,
         )

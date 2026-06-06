@@ -901,6 +901,7 @@ async def get_calendrier_club_service(
     categorie: str | None = None,
     numero_equipe: int | None = None,
     *,
+    adversaire: str | None = None,
     date_debut: str | None = None,
     date_fin: str | None = None,
     limit: int | None = None,
@@ -908,7 +909,7 @@ async def get_calendrier_club_service(
 ) -> list[dict]:
     from .search import _resolve_club_and_org
 
-    cache_key = f"calendrier:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}:{numero_equipe or ''}:{date_debut or ''}:{date_fin or ''}:{limit or ''}"
+    cache_key = f"calendrier:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}:{numero_equipe or ''}:{_normalize_name(adversaire or '')}:{date_debut or ''}:{date_fin or ''}:{limit or ''}"
 
     async def _fetch() -> list[dict]:
         resolved_clubs, _ = await _resolve_club_and_org(
@@ -918,6 +919,9 @@ async def get_calendrier_club_service(
         target_org_ids = list(dict.fromkeys(oid for oid in target_org_ids if oid))
         if not target_org_ids:
             return []
+
+        # Extraire le nom du club résolu pour le filtrage par adversaire
+        club_nom_resolu = resolved_clubs[0].get("nom", "") if resolved_clubs else ""
 
         import ffbb_mcp.services
 
@@ -1058,6 +1062,29 @@ async def get_calendrier_club_service(
                 m
                 for m in all_matches
                 if m["_dt"] and m["_dt"].strftime("%Y-%m-%d") <= date_fin
+            ]
+
+        # Filtrage par adversaire (confrontations directes)
+        if adversaire:
+            adversaire_norm = _normalize_name(adversaire)
+            club_norm = _normalize_name(club_nom_resolu)
+
+            # Ne garder que les matchs où le club ET l'adversaire se rencontrent
+            all_matches = [
+                m
+                for m in all_matches
+                if (
+                    # Cas 1: club est equipe1, adversaire est equipe2
+                    (
+                        club_norm in _normalize_name(m.get("equipe1", ""))
+                        and adversaire_norm in _normalize_name(m.get("equipe2", ""))
+                    )
+                    # Cas 2: club est equipe2, adversaire est equipe1
+                    or (
+                        club_norm in _normalize_name(m.get("equipe2", ""))
+                        and adversaire_norm in _normalize_name(m.get("equipe1", ""))
+                    )
+                )
             ]
 
         all_matches.sort(

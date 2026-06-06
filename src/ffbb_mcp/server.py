@@ -507,6 +507,16 @@ async def ffbb_club(
             )
         ),
     ] = None,
+    adversaire: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Nom de l'équipe adversaire pour filtrer uniquement les confrontations directes "
+                "(ex: 'Royat Orcines', 'Stade Clermontois'). "
+                "Utilisé avec action='calendrier'. Insensible à la casse et aux accents."
+            )
+        ),
+    ] = None,
     poule_id: Annotated[
         int | None,
         Field(
@@ -571,6 +581,12 @@ async def ffbb_club(
     ⚡ `action="calendrier"` est l'outil le plus fiable pour obtenir TOUTES les rencontres
     passées et futures d'une équipe/catégorie, sans les limitations de `ffbb_get(poule)`.
 
+    🎯 Pour isoler les confrontations directes entre deux équipes :
+    Utilise le paramètre `adversaire` avec `action="calendrier"`.
+    Exemple : confrontations Royat vs Pont-du-Château en phase 3
+    → ffbb_club(action="calendrier", club_name="Pont du Chateau", filtre="U11M",
+                adversaire="Royat Orcines", numero_equipe=1)
+
     Avertissement: ne pas utiliser pour obtenir un score ou un prochain match
     d'une equipe specifique. Utiliser `ffbb_last_result` et `ffbb_next_match` a la place.
     """
@@ -618,6 +634,7 @@ async def ffbb_club(
                 "organisme_id": target_org_id,
                 "categorie": filtre,
                 "numero_equipe": numero_equipe,
+                "adversaire": adversaire,
                 "force_refresh": effective_refresh,
             }
             if date_debut is not None:
