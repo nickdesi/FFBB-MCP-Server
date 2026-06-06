@@ -27,6 +27,7 @@ from ffbb_mcp.services import (
     search_organismes_service,
 )
 from ffbb_mcp.services.search import (
+    _add_truncation_meta,
     _deduplicate_same_team_phases,
     _phase_sort_key,
 )
@@ -814,6 +815,87 @@ class TestSearchCaching:
         assert result_1 == []
         assert result_2 == []
         mock_client.search_organismes_async.assert_awaited_once()
+
+
+class TestTruncationMeta:
+    """Tests pour la méta-donnée de troncature _meta dans ffbb_search."""
+
+    def test_add_truncation_meta_with_total(self):
+        result = [{"nom": "A", "_total_hits": 50}, {"nom": "B"}]
+        out = _add_truncation_meta(result)
+        assert out[0]["_meta"] is True
+        assert out[0]["total"] == 50
+        assert out[0]["returned"] == 2
+        assert out[0]["truncated"] is True
+        assert "_total_hits" not in out[0]
+        assert "_total_hits" not in out[1]
+
+    def test_add_truncation_meta_no_truncation(self):
+        result = [{"nom": "A"}, {"nom": "B"}]
+        out = _add_truncation_meta(result)
+        assert len(out) == 2
+        assert "_meta" not in out[0]
+
+    def test_add_truncation_meta_empty(self):
+        assert _add_truncation_meta([]) == []
+
+    def test_add_truncation_meta_strips_total_hits(self):
+        result = [{"nom": "A", "_total_hits": 10}, {"nom": "B", "_total_hits": 10}]
+        out = _add_truncation_meta(result)
+        for item in out:
+            assert "_total_hits" not in item
+
+    @pytest.mark.asyncio
+    async def test_multi_search_truncated(self, patch_get_client, mock_client):
+        from ffbb_mcp.services import multi_search_service
+
+        mock_res = MagicMock(spec=MultiSearchResults)
+        res1 = MagicMock(spec=MultiSearchResult)
+        res1.index_uid = "organismes"
+        res1.estimated_total_hits = 50
+        res1.hits = [{"id": i, "nom": f"Club {i}"} for i in range(20)]
+        mock_res.results = [res1]
+        mock_client.multi_search_async = AsyncMock(return_value=mock_res)
+
+        result = await multi_search_service("test", limit=10)
+        assert len(result) == 10
+        assert result[0]["_total_hits"] == 50
+
+    @pytest.mark.asyncio
+    async def test_multi_search_not_truncated(self, patch_get_client, mock_client):
+        from ffbb_mcp.services import multi_search_service
+
+        mock_res = MagicMock(spec=MultiSearchResults)
+        res1 = MagicMock(spec=MultiSearchResult)
+        res1.index_uid = "organismes"
+        res1.estimated_total_hits = 5
+        res1.hits = [{"id": i, "nom": f"Club {i}"} for i in range(5)]
+        mock_res.results = [res1]
+        mock_client.multi_search_async = AsyncMock(return_value=mock_res)
+
+        result = await multi_search_service("test", limit=20)
+        assert len(result) == 5
+        assert "_total_hits" not in result[0]
+
+    @pytest.mark.asyncio
+    async def test_ffbb_search_adds_meta_when_truncated(
+        self, patch_get_client, mock_client
+    ):
+        from ffbb_mcp.services import ffbb_search_service
+
+        mock_res = MagicMock(spec=MultiSearchResults)
+        res1 = MagicMock(spec=MultiSearchResult)
+        res1.index_uid = "organismes"
+        res1.estimated_total_hits = 50
+        res1.hits = [{"id": i, "nom": f"Club {i}"} for i in range(20)]
+        mock_res.results = [res1]
+        mock_client.multi_search_async = AsyncMock(return_value=mock_res)
+
+        result = await ffbb_search_service(query="test", type="all", limit=10)
+        assert result[0]["_meta"] is True
+        assert result[0]["total"] == 50
+        assert result[0]["truncated"] is True
+        assert len(result) == 11  # _meta + 10 results
 
 
 class TestGetPouleService:

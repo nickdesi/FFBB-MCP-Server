@@ -395,6 +395,18 @@ async def _resolve_club_and_org(
     return resolved, org_data
 
 
+def _build_search_results(results: Any, limit: int) -> list[dict]:
+    """Construit la liste de résultats et attache _total_hits si troncature."""
+    if not results or not results.hits:
+        return []
+    result_list = [serialize_model(hit) for hit in results.hits[:limit]]
+    total = getattr(results, "estimated_total_hits", None)
+    if total is not None and total > len(result_list):
+        for item in result_list:
+            item["_total_hits"] = total
+    return result_list
+
+
 async def _search_generic(
     operation: str,
     method_name: str,
@@ -435,9 +447,9 @@ async def _search_generic(
                     )
                 )
                 if results and results.hits:
-                    return [serialize_model(hit) for hit in results.hits[:limit]]
+                    return _build_search_results(results, limit)
             return []
-        return [serialize_model(hit) for hit in results.hits[:limit]]
+        return _build_search_results(results, limit)
 
     return await _dedupe_inflight(
         cache=state.cache_search,
@@ -526,13 +538,20 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
             return []
 
         output: list[dict[str, Any]] = []
+        total_hits = 0
         for res in raw.results:
             category = res.index_uid
+            est = getattr(res, "estimated_total_hits", None)
+            if est is not None:
+                total_hits += est
             for hit in res.hits:
                 item = serialize_model(hit)
                 item["_type"] = category
                 output.append(item)
                 if len(output) >= limit:
+                    if total_hits > len(output):
+                        for out_item in output:
+                            out_item["_total_hits"] = total_hits
                     return output
         return output
 
@@ -543,6 +562,30 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
         make_coro=_fetch,
         cache_name="search",
     )
+
+
+def _add_truncation_meta(result: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Ajoute un objet _meta en tête de liste si les résultats sont tronqués."""
+    if not result:
+        return result
+    total = result[0].pop("_total_hits", None)
+    for item in result[1:]:
+        item.pop("_total_hits", None)
+    if total is not None and total > len(result):
+        result.insert(
+            0,
+            {
+                "_meta": True,
+                "total": total,
+                "returned": len(result),
+                "truncated": True,
+                "message": (
+                    f"{total} résultats trouvés, {len(result)} retournés. "
+                    "Utilisez ffbb_club(action='calendrier') pour les données complètes."
+                ),
+            },
+        )
+    return result
 
 
 async def ffbb_search_service(
@@ -561,13 +604,15 @@ async def ffbb_search_service(
         result = await multi_search_service(nom=query, limit=limit)
         if not isinstance(result, list):
             return []
-        return result
+        return _add_truncation_meta(result)
 
     if type == "organismes":
-        return await search_organismes_service(query, limit, filter_by, sort)
+        result = await search_organismes_service(query, limit, filter_by, sort)
+        return _add_truncation_meta(result)
 
     if method_name := _SEARCH_TYPE_METHOD.get(type):
-        return await _search_generic(type, method_name, query, limit, filter_by, sort)
+        result = await _search_generic(type, method_name, query, limit, filter_by, sort)
+        return _add_truncation_meta(result)
 
     raise McpError(
         error=ErrorData(
