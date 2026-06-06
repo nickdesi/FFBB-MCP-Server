@@ -375,3 +375,20 @@ def normalize_query(query: str) -> str:
     # Remove excessive spaces
     normalized = " ".join(normalized.split())
     return normalized
+
+
+# Mots génériques à potentiellement retirer pour améliorer le matching
+_GENERIC_PREFIXES = frozenset(
+    {"CS", "AS", "US", "AC", "JS", "SS", "SC", "RC", "OC", "FC"}
+)
+
+
+def _try_fallback_query(query: str) -> str | None:
+    """Construit une requête de fallback en retirant le préfixe générique.
+
+    Ex: 'CS PONT DU CHATEAU' → 'PONT DU CHATEAU' (meilleur matching Meilisearch).
+    """
+    words = query.strip().split()
+    if len(words) >= 2 and words[0].upper() in _GENERIC_PREFIXES:
+        return " ".join(words[1:])
+    return None

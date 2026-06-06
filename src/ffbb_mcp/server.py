@@ -54,8 +54,10 @@ def zipai_surgical(func: Any) -> Any:
     @wraps(func)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
         res = await func(*args, **kwargs)
-        if res is None or isinstance(res, (str, int, float, bool)):
-            return res
+        if res is None:
+            return []
+        if isinstance(res, (str, int, float, bool)):
+            return [] if res == "" else res
         if isinstance(res, list) and len(res) <= 5:
             return res
         if isinstance(res, dict) and len(res) <= 5:
@@ -488,10 +490,10 @@ async def ffbb_club(
         ),
     ] = None,
     organisme_id: Annotated[
-        int | None,
+        int | str | None,
         Field(
             description=(
-                "Identifiant FFBB du club. Si absent, `club_name` est utilise pour "
+                "Identifiant FFBB du club (ex: 1234 ou 'ARA0063058'). Si absent, `club_name` est utilise pour "
                 "effectuer une recherche."
             )
         ),
@@ -632,9 +634,18 @@ async def ffbb_club(
                         "error": "organisme_id requis pour l'action 'equipes' (la résolution du club_name a échoué)."
                     }
                 ]
-            return await ffbb_equipes_club_service(
+            result = await ffbb_equipes_club_service(
                 organisme_id=target_org_id, filtre=filtre
             )
+            if not result:
+                return [
+                    {
+                        "status": "ok",
+                        "message": f"Le club (organisme_id={target_org_id}) existe mais n'a pas d'équipes actives.",
+                        "equipes": [],
+                    }
+                ]
+            return result
         elif action == "classement":
             effective_poule_id = poule_id
             target_num = None
@@ -853,7 +864,7 @@ async def ffbb_team_summary(
 
         if effective_org_id and categorie:
             last_coro = ffbb_last_result_service(
-                organisme_id=int(effective_org_id),
+                organisme_id=effective_org_id,
                 categorie=categorie,
                 numero_equipe=resolved_num,
             )
@@ -913,7 +924,10 @@ async def ffbb_last_result(
         str | None, Field(description="Nom du club (ex: 'Stade Clermontois')")
     ] = None,
     organisme_id: Annotated[
-        int | None, Field(description="Identifiant FFBB du club (organisme_id)")
+        int | str | None,
+        Field(
+            description="Identifiant FFBB du club (organisme_id, ex: 1234 ou 'ARA0063058')"
+        ),
     ] = None,
     numero_equipe: Annotated[
         int,
@@ -975,7 +989,10 @@ async def ffbb_next_match(
         str | None, Field(description="Nom du club (ex: 'Stade Clermontois')")
     ] = None,
     organisme_id: Annotated[
-        int | None, Field(description="Identifiant FFBB du club (organisme_id)")
+        int | str | None,
+        Field(
+            description="Identifiant FFBB du club (organisme_id, ex: 1234 ou 'ARA0063058')"
+        ),
     ] = None,
     numero_equipe: Annotated[
         int,

@@ -124,8 +124,8 @@ class TestGetOrganismeService:
         self, patch_get_client, mock_client
     ):
         mock_client.get_organisme_async = AsyncMock(return_value=None)
-        result = await get_organisme_service(organisme_id=99999)
-        assert result == {}
+        with pytest.raises(McpError):
+            await get_organisme_service(organisme_id=99999)
 
 
 class TestGetRencontreService:
@@ -178,8 +178,8 @@ class TestEquipesClubService:
     @pytest.mark.asyncio
     async def test_returns_empty_when_no_org(self, patch_get_client, mock_client):
         mock_client.get_organisme_async = AsyncMock(return_value=None)
-        result = await ffbb_equipes_club_service(organisme_id=123)
-        assert result == []
+        with pytest.raises(McpError):
+            await ffbb_equipes_club_service(organisme_id=123)
 
     @pytest.mark.asyncio
     async def test_extracts_engagements_flattened(self, patch_get_client, mock_client):
@@ -494,7 +494,10 @@ class TestCalendrierClubService:
         mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
 
         result = await get_calendrier_club_service(organisme_id=123)
-        assert result == []
+        assert len(result) == 1
+        assert "warning" in result[0]
+        assert "équipes engagées" in result[0]["warning"]
+        assert result[0]["equipes"] == []
 
     @pytest.mark.asyncio
     async def test_full_workflow(self, patch_get_client, mock_client):

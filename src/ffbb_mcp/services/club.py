@@ -949,7 +949,16 @@ async def get_calendrier_club_service(
             ]
 
         if not equipes:
-            return []
+            return [
+                {
+                    "warning": (
+                        f"Aucune équipe active pour '{club_name or organisme_id}' "
+                        f"(catégorie: '{categorie or 'toutes'}'). "
+                        "Le club existe mais n'a pas d'équipes engagées."
+                    ),
+                    "equipes": [],
+                }
+            ]
 
         equipes = _dedup_equipes_by_engagement(equipes)
 

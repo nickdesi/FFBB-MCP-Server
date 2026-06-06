@@ -18,7 +18,7 @@ async def get_client_async(*args, **kwargs):
     return await ffbb_mcp.client.get_client_async(*args, **kwargs)
 
 
-from ffbb_mcp.aliases import enrich_acronym_cache, normalize_query
+from ffbb_mcp.aliases import _try_fallback_query, enrich_acronym_cache, normalize_query
 from ffbb_mcp.utils import (
     jaro_winkler_similarity,
     parse_categorie,
@@ -321,6 +321,10 @@ async def _resolve_club_and_org(
                         "code": org_info.get("code", ""),
                     }
                 )
+            else:
+                logger.warning(
+                    "Organisme_id %s retourné vide ou invalide", organisme_id
+                )
         except Exception:
             logger.debug(
                 "Impossible de charger l'organisme_id %s",
@@ -421,6 +425,17 @@ async def _search_generic(
             )
         )
         if not results or not results.hits:
+            # Fallback : retirer le préfixe générique
+            fallback = _try_fallback_query(query)
+            if fallback and fallback != query:
+                results = await _with_ffbb_semaphore(
+                    _safe_call_with_inflight(
+                        f"Search {operation} (fallback): {fallback}",
+                        lambda: method(fallback, **call_kwargs),
+                    )
+                )
+                if results and results.hits:
+                    return [serialize_model(hit) for hit in results.hits[:limit]]
             return []
         return [serialize_model(hit) for hit in results.hits[:limit]]
 
@@ -543,7 +558,10 @@ async def ffbb_search_service(
     Recherche dans les données FFBB en fonction de plusieurs types de données.
     """
     if type == "all":
-        return await multi_search_service(nom=query, limit=limit)
+        result = await multi_search_service(nom=query, limit=limit)
+        if not isinstance(result, list):
+            return []
+        return result
 
     if type == "organismes":
         return await search_organismes_service(query, limit, filter_by, sort)

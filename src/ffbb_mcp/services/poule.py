@@ -3,6 +3,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from mcp.shared.exceptions import ErrorData, McpError
+from mcp.types import INTERNAL_ERROR
+
 from ffbb_mcp._state import state
 from ffbb_mcp.cache_strategy import get_poule_ttl
 
@@ -236,7 +239,15 @@ async def get_organisme_service(organisme_id: int | str) -> dict:
                 lambda: client.get_organisme_async(organisme_id=organisme_id_int),
             ),
         )
-        return serialize_model(org) or {}
+        data = serialize_model(org) or {}
+        if not data.get("nom") and not data.get("engagements"):
+            raise McpError(
+                error=ErrorData(
+                    code=INTERNAL_ERROR,
+                    message=f"Organisme_id {organisme_id_int} introuvable ou vide.",
+                )
+            )
+        return data
 
     return await _dedupe_inflight_detail(
         cache_key,
