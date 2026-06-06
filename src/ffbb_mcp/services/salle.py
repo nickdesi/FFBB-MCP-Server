@@ -33,7 +33,7 @@ async def _enrich_salle_data_with_meilisearch(
         if libelle:
             try:
                 search_res = await client.search_salles_async(libelle)
-                if search_res and hasattr(search_res, "hits") and search_res.hits:
+                if getattr(search_res, "hits", None):
                     for hit in search_res.hits:
                         if getattr(hit, "id", None) == salle_data.get("id"):
                             if getattr(hit, "commune", None):

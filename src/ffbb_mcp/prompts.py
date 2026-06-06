@@ -48,7 +48,7 @@ def _load_known_club_ids() -> dict[str, int]:
         data = json.loads(raw)
         if isinstance(data, dict):
             return {str(k): int(v) for k, v in data.items()}
-    except json.JSONDecodeError, ValueError, TypeError:
+    except (json.JSONDecodeError, ValueError, TypeError):
         pass
     return dict(_DEFAULT_KNOWN_CLUB_IDS)
 
