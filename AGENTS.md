@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB MCP server | server.py: 1173 lignes | services.py: 3394 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 1173 lignes | services.py: 3439 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -37,7 +37,6 @@ Expert en basketball français. Accès au serveur MCP FFBB (ffbb.desimone.fr) co
 - Si API ne répond pas, dis-le clairement
 - Scores live : précise "données en temps réel, mises à jour toutes les 30s"
 - Réutilise les `organisme_id` résolus dans la conversation (ne pas re-rechercher)
-- **Troncature ffbb_search** : Si `_meta.truncated` est `true`, il y a plus de résultats. Pour des données exhaustives (ex: matchs entre 2 clubs), utiliser `ffbb_club(action='calendrier')` avec filtre catégorie. Ne JAMAIS conclure "c'est le seul match" depuis ffbb_search seul.
 
 ## Règles strictes (outils FFBB)
 - **INTERDIT** : `ffbb_get(type='poule')` pour chercher un score ou match
@@ -121,7 +120,7 @@ src/ffbb_mcp/
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
 ├── server.py              # Tools MCP + main() (≈1173 lignes)
-├── services/              # Logique métier modularisée (≈3394 lignes)
+├── services/              # Logique métier modularisée (≈3439 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── club.py            # Service de gestion des clubs
 │   ├── common.py          # Helpers et base services partagés
@@ -138,7 +137,7 @@ src/ffbb_mcp/
 - Pas de suffixe `_compact_` ou `_impl_` exposé
 - Modifier une fonction à la fois, seulement si test/usage échoue
 - Nouvelle fonction → test manuel validé avant exposition MCP
-- **Modularisation** : Le package `services/` (total ≈3394 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
+- **Modularisation** : Le package `services/` (total ≈3439 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
 
 ## Commandes
 - Démarrer le serveur MCP (stdio) : `rtk uv run python -m ffbb_mcp` (recommandé pour Claude Desktop)
