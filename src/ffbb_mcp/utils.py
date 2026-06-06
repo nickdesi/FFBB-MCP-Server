@@ -116,7 +116,7 @@ def format_team_name(name: str | None, number: int | str | None) -> str:
         num_int = int(number)
         if num_int > 1:
             return f"{name} - {num_int}"
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         pass
 
     return name
@@ -231,7 +231,10 @@ def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
         cleaned = {
             k: (
                 v
-                if type(v) is str or type(v) is int or type(v) is float or type(v) is bool
+                if type(v) is str
+                or type(v) is int
+                or type(v) is float
+                or type(v) is bool
                 else prune_payload(v, depth + 1)
             )
             for k, v in obj.items()
@@ -240,7 +243,8 @@ def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
 
         # 1b. Filtrer les None apparus APRÈS récursion et les conteneurs devenus vides
         cleaned = {
-            k: v for k, v in cleaned.items()
+            k: v
+            for k, v in cleaned.items()
             if v is not None and (v or (type(v) is not list and type(v) is not dict))
         }
 
@@ -271,17 +275,23 @@ def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
         cleaned_list = [
             (
                 item
-                if type(item) is str or type(item) is int or type(item) is float or type(item) is bool
+                if type(item) is str
+                or type(item) is int
+                or type(item) is float
+                or type(item) is bool
                 else prune_payload(item, depth + 1)
             )
             for item in truncated
-            if item is not None and (item or (type(item) is not list and type(item) is not dict))
+            if item is not None
+            and (item or (type(item) is not list and type(item) is not dict))
         ]
 
         # 2b. Filtrer les None apparus APRÈS récursion et les conteneurs devenus vides
         final_list = [
-            item for item in cleaned_list
-            if item is not None and (item or (type(item) is not list and type(item) is not dict))
+            item
+            for item in cleaned_list
+            if item is not None
+            and (item or (type(item) is not list and type(item) is not dict))
         ]
 
         if len(obj) > limit:
