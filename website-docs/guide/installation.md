@@ -42,6 +42,17 @@ Dans l'interface de gestion MCP de votre éditeur :
 1. **Type** : `Streamable HTTP` (ou `HTTP` selon le client)
 2. **URL** : `https://ffbb.desimone.fr/mcp`
 
+## 🪐 Google Antigravity
+
+Dans votre fichier de configuration MCP :
+
+```json
+    "ffbb": {
+      "type": "http",
+      "serverUrl": "https://ffbb.desimone.fr/mcp"
+    }
+```
+
 ## 🛠️ Smithery (Installation auto)
 
 Pour une installation automatisée via Smithery :

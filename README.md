@@ -89,6 +89,17 @@ Configurez un serveur MCP distant :
 - Type : `Streamable HTTP`
 - URL : `https://ffbb.desimone.fr/mcp`
 
+### Google Antigravity
+
+Ajoutez la configuration suivante dans votre fichier de configuration MCP :
+
+```json
+    "ffbb": {
+      "type": "http",
+      "serverUrl": "https://ffbb.desimone.fr/mcp"
+    }
+```
+
 ---
 
 ## Outils principaux
