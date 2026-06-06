@@ -108,6 +108,7 @@ Le serveur a été refondu pour proposer des outils polyvalents qui réduisent l
   - `organisme_id` (integer, optionnel) : ID du club (préféré pour la précision).
   - `club_name` (string, optionnel) : Nom du club (utilisé si l'ID est inconnu).
   - `filtre` (string, optionnel) : Filtre textuel pour la catégorie (ex: "U13", "U11M", "Senior F", "NM1").
+  - `adversaire` (string, optionnel) : **Nouveau en v1.5.0** — Nom de l'équipe adversaire pour filtrer uniquement les confrontations directes (ex: "Royat Orcines", "Stade Clermontois"). Utilisé avec `action="calendrier"`. Insensible à la casse et aux accents, supporte les noms partiels.
   - `poule_id` (integer, requis si action=`classement` et si l'auto-résolution échoue) : L'identifiant de la poule.
   - `numero_equipe` (integer, optionnel) : Numéro d'équipe (`1`, `2`, etc.) pour cibler une équipe précise, notamment avec `action="calendrier"`.
   - `phase` (string, optionnel) : Nom ou numéro de phase (ex: `"Phase 3"`, `"2"`) pour auto-résoudre la bonne poule avec `action="classement"`.
@@ -132,6 +133,21 @@ Le serveur a été refondu pour proposer des outils polyvalents qui réduisent l
   ```json
   { "action": "calendrier", "club_name": "JAV", "filtre": "U13M" }
   ```
+
+
+- **Exemple : Récupérer uniquement les confrontations directes entre deux équipes** :
+
+  ```json
+  {
+    "action": "calendrier",
+    "club_name": "CS Pont du Chateau",
+    "filtre": "U11M",
+    "numero_equipe": 1,
+    "adversaire": "Royat Orcines"
+  }
+  ```
+
+  Cet appel retourne **uniquement** les matchs où Pont-du-Château U11M-1 affronte Royat Orcines (toutes phases confondues). Le filtre est insensible à la casse et aux accents, et supporte les noms partiels (ex: `"Royat"` trouve `"ROYAT ORCINES CLUB BASKET BALL - 1"`).
 
 ### action="calendrier" — calendrier d’un club
 
