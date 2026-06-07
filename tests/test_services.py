@@ -1852,3 +1852,119 @@ class TestResolveClubAndOrgCache:
 
         finally:
             svc.search_organismes_service = original
+
+
+class TestBilanSortingByAge:
+    """Vérifie que les phases du bilan d'un club sont triées de la plus jeune catégorie aux Seniors."""
+
+    @pytest.mark.asyncio
+    async def test_bilan_sorting_by_age(self, patch_get_client, mock_client):
+        from unittest.mock import AsyncMock, MagicMock
+
+        from ffbb_mcp._state import reset_service_state
+        from ffbb_mcp.services import ffbb_bilan_service
+
+        reset_service_state()
+
+        org_mock = MagicMock()
+        org_mock.model_dump = MagicMock(
+            return_value={
+                "id": 100,
+                "nom": "Club Test",
+                "engagements": [
+                    {
+                        "id": "eng_senior",
+                        "numeroEquipe": "1",
+                        "idCompetition": {
+                            "nom": "Seniors Masculins - Division 1",
+                            "id": "c_senior",
+                            "sexe": "M",
+                            "categorie": {"code": "SENIOR"},
+                            "competition_origine_niveau": 1,
+                        },
+                        "idPoule": {"id": "1001"},
+                    },
+                    {
+                        "id": "eng_u11",
+                        "numeroEquipe": "1",
+                        "idCompetition": {
+                            "nom": "U11 Masculins",
+                            "id": "c_u11",
+                            "sexe": "M",
+                            "categorie": {"code": "U11"},
+                            "competition_origine_niveau": 1,
+                        },
+                        "idPoule": {"id": "1002"},
+                    },
+                    {
+                        "id": "eng_u15",
+                        "numeroEquipe": "1",
+                        "idCompetition": {
+                            "nom": "U15 Féminines",
+                            "id": "c_u15",
+                            "sexe": "F",
+                            "categorie": {"code": "U15"},
+                            "competition_origine_niveau": 1,
+                        },
+                        "idPoule": {"id": "1003"},
+                    },
+                ],
+            }
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        # Mocks pour get_poule_async
+        def make_poule_mock(poule_id, eng_id):
+            pm = MagicMock()
+            pm.model_dump = MagicMock(
+                return_value={
+                    "id": poule_id,
+                    "rencontres": [],
+                    "classements": [
+                        {
+                            "id_engagement": {"id": eng_id, "numero_equipe": "1"},
+                            "organisme_id": "100",
+                            "position": 1,
+                            "match_joues": 1,
+                            "gagnes": 1,
+                            "perdus": 0,
+                            "nuls": 0,
+                            "paniers_marques": 50,
+                            "paniers_encaisses": 40,
+                            "difference": 10,
+                        }
+                    ],
+                }
+            )
+            return pm
+
+        poule_senior = make_poule_mock("1001", "eng_senior")
+        poule_u11 = make_poule_mock("1002", "eng_u11")
+        poule_u15 = make_poule_mock("1003", "eng_u15")
+
+        async def get_poule_side_effect(poule_id):
+            p_id = str(poule_id)
+            mapping = {
+                "1001": poule_senior,
+                "1002": poule_u11,
+                "1003": poule_u15,
+            }
+            return mapping.get(p_id)
+
+        mock_client.get_poule_async = AsyncMock(side_effect=get_poule_side_effect)
+
+        result = await ffbb_bilan_service(organisme_id=100)
+
+        # Vérifier que les phases sont triées U11 -> U15 -> Seniors
+        phases = result["phases"]
+        assert len(phases) == 3
+        assert "U11" in phases[0]["competition"]
+        assert "U15" in phases[1]["competition"]
+        assert "Seniors" in phases[2]["competition"]
+
+        # Vérifier competitions_incluses
+        comps = result["competitions_incluses"]
+        assert len(comps) == 3
+        assert "U11" in comps[0]
+        assert "U15" in comps[1]
+        assert "Seniors" in comps[2]

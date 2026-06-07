@@ -40,6 +40,8 @@ async def get_client_async(*args, **kwargs):
     return await ffbb_mcp.client.get_client_async(*args, **kwargs)
 
 
+import contextlib
+
 from ffbb_mcp.utils import ParsedCategorie, format_team_name, parse_categorie
 
 from .common import (
@@ -117,7 +119,7 @@ def _compute_bilan_from_rencontres(
 
         try:
             s1, s2 = int(score1), int(score2)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             continue
 
         # Déterminer quel côté est notre équipe
@@ -1011,7 +1013,34 @@ async def _build_bilan_payload(
                     }
                 )
 
-    phases.sort(key=lambda x: (x["competition"], x["numero_equipe"] or ""))
+    def _phase_sort_key_by_age(p: dict) -> tuple[int, str, int, str]:
+        comp = p.get("competition") or ""
+        parsed = parse_categorie(comp)
+
+        # 1. Âge (catégorie) : plus jeune en premier (U9 < U11 < Seniors)
+        age = 999
+        cat = parsed.categorie
+        if cat and cat.startswith("U"):
+            with contextlib.suppress(ValueError):
+                age = int(cat[1:])
+        elif "SENIOR" in comp.upper():
+            age = 100
+        else:
+            age = 90
+
+        # 2. Sexe
+        sexe = parsed.sexe or ""
+
+        # 3. Numéro d'équipe
+        num = p.get("numero_equipe")
+        try:
+            num_int = int(num) if num else 1
+        except ValueError:
+            num_int = 1
+
+        return (age, sexe, num_int, comp)
+
+    phases.sort(key=_phase_sort_key_by_age)
 
     equipes_bilan: dict[str, Any] = {}
     for p in phases:
@@ -1036,8 +1065,22 @@ async def _build_bilan_payload(
         all(p.get("phase_terminee", True) for p in phases) if phases else True
     )
 
+    def _comp_sort_key_by_age(comp_name: str) -> tuple[int, str]:
+        parsed = parse_categorie(comp_name)
+        age = 999
+        cat = parsed.categorie
+        if cat and cat.startswith("U"):
+            with contextlib.suppress(ValueError):
+                age = int(cat[1:])
+        elif "SENIOR" in comp_name.upper():
+            age = 100
+        else:
+            age = 90
+        return (age, comp_name)
+
     competitions_incluses = sorted(
-        {p["competition"] for p in phases if p.get("competition")}
+        {p["competition"] for p in phases if p.get("competition")},
+        key=_comp_sort_key_by_age,
     )
 
     res_dict = {

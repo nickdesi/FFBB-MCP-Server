@@ -58,7 +58,7 @@ def _extraire_valeur(pattern: str, texte: str, cast: type = int) -> float | int 
     valeur = match.group(1).replace(",", "").replace("%", "")
     try:
         return cast(valeur)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
 
 
