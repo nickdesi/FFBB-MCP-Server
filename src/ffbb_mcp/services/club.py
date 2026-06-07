@@ -720,11 +720,16 @@ async def ffbb_saison_bilan_service(
 
     phases.sort(key=lambda x: x["competition"])
 
+    saison_terminee = (
+        all(p.get("phase_terminee", True) for p in phases) if phases else True
+    )
+
     return {
         "status": "ok",
         "club": club_nom,
         "categorie": categorie or "",
         "bilan_total": totaux,
+        "saison_terminee": saison_terminee,
         "phases": phases,
         "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
     }
@@ -893,11 +898,16 @@ async def _build_bilan_payload(
         target_phases = [p for p in phases if str(p.get("numero_equipe", "1")) == "1"]
         phase_courante = target_phases[-1] if target_phases else phases[-1]
 
+    saison_terminee = (
+        all(p.get("phase_terminee", True) for p in phases) if phases else True
+    )
+
     res_dict = {
         "club": club_nom,
         "categorie": categorie or "",
         "bilan_total": totaux,
         "phase_courante": phase_courante,
+        "saison_terminee": saison_terminee,
         "equipes_bilan": equipes_bilan,
         "phases": phases,
         "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
@@ -1061,6 +1071,7 @@ async def _build_calendar_matches(
                 "score_equipe1": score1,
                 "score_equipe2": score2,
                 "competition_nom": equipe.get("competition", ""),
+                "competition_type": poule_data.get("phase_type", "poule"),
                 "num_journee": journee,
             }
             if salle:

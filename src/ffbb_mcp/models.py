@@ -56,6 +56,10 @@ class BilanResponse(BaseModel):
     phase_courante: PhaseBilan | None = Field(
         default=None, description="Détails de la dernière phase en cours."
     )
+    saison_terminee: bool = Field(
+        default=True,
+        description="Indique si la saison est terminée pour cette équipe (toutes les phases jouées).",
+    )
     equipes_bilan: dict[str, Any] = Field(
         default_factory=dict, description="Bilans ventilés par numéro d'équipe."
     )
@@ -90,6 +94,10 @@ class CalendrierMatch(BaseModel):
     score_equipe2: int | None = Field(default=None, description="Score de l'équipe 2.")
     competition_nom: str = Field(
         default="", description="Nom de la compétition associée."
+    )
+    competition_type: str = Field(
+        default="poule",
+        description="Type de phase (poule ou élimination).",
     )
     num_journee: int | str = Field(
         default="", description="Numéro de la journée de championnat."
