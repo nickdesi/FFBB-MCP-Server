@@ -1,0 +1,11 @@
+# Graphify exclusions — format gitignore
+# Dossier legacy non-tracké (contient external/antigravity-awesome-skills/ parasite)
+FFBB-MCP-Server/
+
+# Dépendances et artefacts build
+.venv/
+graphify-out/
+__pycache__/
+*.pyc
+dist/
+build/
