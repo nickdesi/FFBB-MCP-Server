@@ -48,6 +48,7 @@ from .common import (
     _PARIS_TZ,
     _coerce_numeric_id,
     _dedupe_inflight,
+    _detect_phase_type,
     _extract_and_accumulate_bilan,
     _freshness_meta,
     _new_bilan_totals,
@@ -1071,7 +1072,7 @@ async def _build_calendar_matches(
                 "score_equipe1": score1,
                 "score_equipe2": score2,
                 "competition_nom": equipe.get("competition", ""),
-                "competition_type": poule_data.get("phase_type", "poule"),
+                "competition_type": _detect_phase_type(equipe.get("competition", "")),
                 "num_journee": journee,
             }
             if salle:
