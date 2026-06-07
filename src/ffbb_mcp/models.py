@@ -32,6 +32,9 @@ class PhaseBilan(BaseModel):
     position: int | None = Field(
         default=None, description="Position actuelle au classement."
     )
+    total_equipes: int | None = Field(
+        default=None, description="Nombre total d'équipes dans la poule."
+    )
     phase_type: str = Field(
         default="poule", description="Type de phase (poule ou élimination)."
     )

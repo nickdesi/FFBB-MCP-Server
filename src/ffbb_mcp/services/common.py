@@ -139,6 +139,15 @@ def _extract_and_accumulate_bilan(
         v = int(entry.get(f) or 0)
         stats[f] = v
         totaux[f] += v
+
+    # Intégrer les forfaits et défauts aux défaites ("perdus") pour la cohérence J = V + D + N
+    forfaits = int(entry.get("nombre_forfaits") or 0)
+    defauts = int(entry.get("nombre_defauts") or 0)
+    if forfaits or defauts:
+        addition = forfaits + defauts
+        stats["perdus"] += addition
+        totaux["perdus"] += addition
+
     return stats
 
 

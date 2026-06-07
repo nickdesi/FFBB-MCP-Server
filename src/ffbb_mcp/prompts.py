@@ -226,7 +226,7 @@ Bilan toutes équipes confondues : {V} V / {D} D en {MJ} matchs — différentie
 1. Regrouper d'abord par catégorie (U9, U11M, U11F, …, SeniorF, SeniorM), puis par numéro d'équipe, puis par phase (Phase 1 → 2 → 3).
 2. Utiliser la structure `equipes_bilan` retournée par `ffbb_bilan` (keyed par numéro d'équipe) pour ne jamais mélanger les équipes.
 3. Pour chaque entrée, afficher :
-   - La **position** avec médaille si ≤ 3 : 🥇 1 · 🥈 2 · 🥉 3
+   - La **position** avec médaille si ≤ 3 : 🥇 1 · 🥈 2 · 🥉 3. Si `total_equipes` est disponible dans les données, l'afficher sous le format `position / total_equipes` (ex : `🥈 2 / 6` ou `4e / 8`).
    - Le **différentiel** avec signe : `+62` en **gras** si positif, `-203` en normal si négatif
    - Ajouter ✨ sur la ligne avec le meilleur diff positif du tableau (performance remarquable)
 

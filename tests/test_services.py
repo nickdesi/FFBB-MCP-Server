@@ -256,7 +256,17 @@ class TestBilanService:
         return m
 
     def _make_poule_mock(
-        self, poule_id, engagement_id, org_id, gagnes, perdus, pm, pe, numero_equipe="1"
+        self,
+        poule_id,
+        engagement_id,
+        org_id,
+        gagnes,
+        perdus,
+        pm,
+        pe,
+        numero_equipe="1",
+        nombre_forfaits=0,
+        nombre_defauts=0,
     ):
         m = MagicMock()
         m.model_dump = MagicMock(
@@ -271,13 +281,18 @@ class TestBilanService:
                         },
                         "organisme_id": org_id,
                         "position": 1,
-                        "match_joues": gagnes + perdus,
+                        "match_joues": gagnes
+                        + perdus
+                        + nombre_forfaits
+                        + nombre_defauts,
                         "gagnes": gagnes,
                         "perdus": perdus,
                         "nuls": 0,
                         "paniers_marques": pm,
                         "paniers_encaisses": pe,
                         "difference": pm - pe,
+                        "nombre_forfaits": nombre_forfaits,
+                        "nombre_defauts": nombre_defauts,
                     }
                 ],
             }
@@ -463,6 +478,50 @@ class TestBilanService:
 
         # L'organisme n'est appelé qu'une fois grâce au cache bilan
         mock_client.get_organisme_async.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_aggregates_with_forfaits_and_defauts(
+        self, patch_get_client, mock_client
+    ):
+        """Bilan avec forfait et défaut : J = V + D bruts + forfaits + defauts."""
+        org_mock = self._make_org_mock(
+            org_id="9326",
+            engagements=[
+                {
+                    "id": "eng1",
+                    "numeroEquipe": "1",
+                    "idCompetition": {
+                        "nom": "Dépt U11M",
+                        "id": "c1",
+                        "sexe": "M",
+                        "categorie": {"code": "u11"},
+                        "competition_origine_niveau": 1,
+                    },
+                    "idPoule": {"id": "1001"},
+                }
+            ],
+        )
+        poule1 = self._make_poule_mock(
+            "1001",
+            "eng1",
+            "9326",
+            gagnes=4,
+            perdus=1,
+            pm=226,
+            pe=201,
+            nombre_forfaits=1,
+            nombre_defauts=1,
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+        mock_client.get_poule_async = AsyncMock(return_value=poule1)
+
+        result = await ffbb_bilan_service(organisme_id=9326, categorie="U11M1")
+
+        assert result["bilan_total"]["match_joues"] == 7
+        assert result["bilan_total"]["gagnes"] == 4
+        assert result["bilan_total"]["perdus"] == 3  # 1 perdus + 1 forfait + 1 défaut
+        assert result["bilan_total"]["difference"] == 25
+        assert result["phases"][0]["total_equipes"] == 1
 
 
 # ---------------------------------------------------------------------------

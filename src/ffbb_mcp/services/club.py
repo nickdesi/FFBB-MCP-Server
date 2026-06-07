@@ -117,7 +117,7 @@ def _compute_bilan_from_rencontres(
 
         try:
             s1, s2 = int(score1), int(score2)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             continue
 
         # Déterminer quel côté est notre équipe
@@ -796,6 +796,7 @@ async def ffbb_saison_bilan_service(
                     "competition": poule_to_comp.get(pid, poule_data.get("nom", "")),
                     "poule_id": pid,
                     "position": entry.get("position"),
+                    "total_equipes": len(classements),
                     "phase_type": _detect_phase_type(poule_to_comp.get(pid, "")),
                     "phase_terminee": poule_data.get("phase_terminee", False),
                     **stats,
@@ -811,9 +812,12 @@ async def ffbb_saison_bilan_service(
                     totaux[k] += v
                 phases.append(
                     {
-                        "competition": poule_to_comp.get(pid, poule_data.get("nom", "")),
+                        "competition": poule_to_comp.get(
+                            pid, poule_data.get("nom", "")
+                        ),
                         "poule_id": pid,
                         "position": None,
+                        "total_equipes": None,
                         "phase_type": _detect_phase_type(poule_to_comp.get(pid, "")),
                         "phase_terminee": poule_data.get("phase_terminee", False),
                         **stats_from_rencontres,
@@ -979,6 +983,7 @@ async def _build_bilan_payload(
                     "poule_id": pid,
                     "numero_equipe": num_equipe,
                     "position": entry.get("position"),
+                    "total_equipes": len(classements),
                     "phase_type": poule_data.get("phase_type", "poule"),
                     "phase_terminee": poule_data.get("phase_terminee", False),
                     **stats,
@@ -999,9 +1004,8 @@ async def _build_bilan_payload(
                         "poule_id": pid,
                         "numero_equipe": num_equipe,
                         "position": None,
-                        "phase_type": _detect_phase_type(
-                            poule_to_comp.get(pid, "")
-                        ),
+                        "total_equipes": None,
+                        "phase_type": _detect_phase_type(poule_to_comp.get(pid, "")),
                         "phase_terminee": poule_data.get("phase_terminee", False),
                         **stats_from_rencontres,
                     }
