@@ -22,6 +22,7 @@ from .prompts import ROUTING_PROMPT, register_prompts
 from .resources import register_resources
 from .routes import register_routes
 from .services import (
+    _resolve_club_and_org,
     ffbb_bilan_service,
     ffbb_equipes_club_service,
     ffbb_get_classement_service,
@@ -43,7 +44,6 @@ from .services import (
     get_saisons_service,
     handle_api_error,
     resolve_poule_id_service,
-    search_organismes_service,
 )
 from .utils import prune_payload
 
@@ -594,26 +594,30 @@ async def ffbb_club(
         # Résolution automatique de l'organisme_id si manquant mais club_name fourni
         target_org_id = organisme_id
         if not target_org_id and club_name:
-            # On cherche plusieurs candidats pour détecter l'ambiguïté
-            orgs = await search_organismes_service(nom=club_name, limit=3)
+            resolved_clubs, _ = await _resolve_club_and_org(
+                club_name=club_name, organisme_id=None, categorie=filtre, limit=3
+            )
 
-            if not orgs:
+            if not resolved_clubs:
                 return [
                     {
                         "error": f"Aucun club trouvé pour '{club_name}'. Vérifie l'orthographe ou utilise ffbb_search."
                     }
                 ]
 
-            if len(orgs) > 1:
+            if len(resolved_clubs) > 1:
                 # Ambiguïté détectée : plusieurs candidats
                 candidates = [
                     {
-                        "id": o.get("id"),
-                        "nom": o.get("nom"),
-                        "ville": o.get("ville_salle") or o.get("ville"),
+                        "id": c.get("organisme_id"),
+                        "nom": c.get("nom"),
+                        "ville": c.get("ville"),
+                        "code_postal": c.get("code_postal"),
+                        "departement": c.get("departement"),
+                        "genre": c.get("genre"),
                     }
-                    for o in orgs
-                    if isinstance(o, dict)
+                    for c in resolved_clubs
+                    if isinstance(c, dict)
                 ]
                 return [
                     {
@@ -622,8 +626,7 @@ async def ffbb_club(
                     }
                 ]
 
-            if orgs and isinstance(orgs[0], dict):
-                target_org_id = orgs[0].get("id")
+            target_org_id = resolved_clubs[0].get("organisme_id")
 
         if action == "calendrier":
             if not target_org_id and not club_name:

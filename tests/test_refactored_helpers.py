@@ -83,7 +83,17 @@ async def test_resolve_club_and_org_logs_first_org_detail_error(caplog):
         caplog.set_level("DEBUG", logger="ffbb-mcp")
         resolved, org_data = await _resolve_club_and_org("Club", None)
 
-    assert resolved == [{"nom": "Club", "organisme_id": 456, "code": ""}]
+    assert resolved == [
+        {
+            "nom": "Club",
+            "organisme_id": 456,
+            "code": "",
+            "ville": None,
+            "code_postal": None,
+            "departement": None,
+            "genre": None,
+        }
+    ]
     assert org_data is None
     assert (
         "Impossible de charger les détails du premier organisme pour Club"

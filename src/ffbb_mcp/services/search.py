@@ -145,6 +145,26 @@ class SupportsAssetUrl(Protocol):
     ) -> str: ...
 
 
+def _build_club_candidate(
+    org: dict[str, Any], nom: str, fallback_id: Any = None
+) -> dict[str, Any]:
+    """Construit un dict candidat enrichi à partir d'un organisme (hit ou détail)."""
+    if not isinstance(org, dict):
+        org = {}
+    commune = org.get("commune")
+    if not isinstance(commune, dict):
+        commune = {}
+    return {
+        "nom": nom,
+        "organisme_id": org.get("id") or fallback_id,
+        "code": org.get("code", ""),
+        "ville": commune.get("libelle"),
+        "code_postal": commune.get("code_postal") or commune.get("codePostal"),
+        "departement": commune.get("departement"),
+        "genre": "F" if "FEMININ" in _normalize_name(nom) else None,
+    }
+
+
 @lru_cache(maxsize=512)
 def _extract_club_key_word(club_name: str) -> str | None:
     """Extrait le mot distinctif d'un nom de club en supprimant les termes génériques.
@@ -207,20 +227,15 @@ def _filter_orgs_by_gender(
 def _build_resolved_entries(orgs: list[dict]) -> list[dict[str, Any]]:
     """Convertit la liste brute d'organismes en entrées résolues standardisées.
 
-    Chaque entrée contient les clés 'nom', 'organisme_id' et 'code'.
+    Chaque entrée contient les clés 'nom', 'organisme_id', 'code', 'ville',
+    'code_postal', 'departement' et 'genre'.
     Enrichit automatiquement le cache d'acronymes pour chaque nom rencontré.
     """
     resolved: list[dict[str, Any]] = []
     for org in orgs:
         if isinstance(org, dict) and org.get("id"):
             nom = org.get("nom", "")
-            resolved.append(
-                {
-                    "nom": nom,
-                    "organisme_id": org.get("id"),
-                    "code": org.get("code", ""),
-                }
-            )
+            resolved.append(_build_club_candidate(org, nom))
             if nom:
                 enrich_acronym_cache(nom)
     return resolved
@@ -253,13 +268,7 @@ def _resolve_ententes(
         is_entente = nom_norm.startswith("ENT.") or nom_norm.startswith("ENT ")
         if is_entente and key_word_norm in nom_norm:
             nom = ent_org.get("nom", "")
-            additions.append(
-                {
-                    "nom": nom,
-                    "organisme_id": oid,
-                    "code": ent_org.get("code", ""),
-                }
-            )
+            additions.append(_build_club_candidate(ent_org, nom))
             existing_ids.add(oid)
             logger.debug(
                 "ffbb_resolve: entente détectée '%s' (id=%s) pour club_name='%s'",
@@ -319,11 +328,11 @@ async def _resolve_club_and_org(
             if org_info and isinstance(org_info, dict):
                 org_data = org_info
                 resolved.append(
-                    {
-                        "nom": org_info.get("nom", ""),
-                        "organisme_id": org_info.get("id") or organisme_id,
-                        "code": org_info.get("code", ""),
-                    }
+                    _build_club_candidate(
+                        org_info,
+                        org_info.get("nom", "") or str(organisme_id),
+                        fallback_id=organisme_id,
+                    )
                 )
             else:
                 logger.warning(
