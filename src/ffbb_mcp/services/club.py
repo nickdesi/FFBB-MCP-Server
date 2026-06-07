@@ -1068,6 +1068,46 @@ async def _build_calendar_matches(
 
     await _enrich_matches_with_salle_details(all_matches)
 
+    # Enrichissement salle via get_rencontre_service pour les matchs sans salle_details
+    # (l'endpoint poule ne retourne pas les salle_id, on doit appeler la rencontre individuelle)
+    matches_without_salle = [
+        m for m in all_matches if not m.get("salle_details") and m.get("id")
+    ]
+    if matches_without_salle:
+
+        async def _fetch_rencontre_salle(match: dict) -> None:
+            try:
+                from .search import get_rencontre_service
+
+                detail = await get_rencontre_service(str(match["id"]))
+                if detail and isinstance(detail, dict):
+                    if detail.get("salle_details"):
+                        match["salle_details"] = detail["salle_details"]
+                    if detail.get("adresse_salle"):
+                        match["adresse_salle"] = detail["adresse_salle"]
+                    if detail.get("salle"):
+                        match["salle"] = detail.get("salle")
+            except Exception:
+                pass  # Ne pas planter le calendrier si une rencontre est inaccessible
+
+        await asyncio.gather(
+            *[_fetch_rencontre_salle(m) for m in matches_without_salle]
+        )
+
+    # Extraction ville/adresse depuis salle_details vers les champs plats
+    for m in all_matches:
+        sd = m.get("salle_details") or {}
+        if sd:
+            if not m.get("ville"):
+                m["ville"] = sd.get("ville") or sd.get("commune") or ""
+            if not m.get("adresse"):
+                m["adresse"] = (
+                    m.get("adresse_salle")
+                    or sd.get("adresse")
+                    or sd.get("adresse1")
+                    or ""
+                )
+
     tz = _PARIS_TZ
     now = datetime.now(tz)
 
