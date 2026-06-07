@@ -394,6 +394,15 @@ Règle de temps verbal :
   2. Test manuel du service : status='ok'
   3. `grep "compact\\|fantôme" src/ffbb_mcp/*.py` → 0 résultat
 
+## Graphify
+
+Outil d'analyse de graphe de code installé via `uv tools` (`rtk graphify`).
+- `graphify-out/` est gitignore — artefacts locaux, jamais versionnés
+- **Après chaque push modifiant le code source** : `rtk graphify update .`
+- En cas de refactor majeur (moins de nœuds) : `rtk graphify update . --force`
+- Interroger le graphe : `rtk graphify query "<question>"`
+- Modules impactés : `rtk graphify affected <fichier>`
+
 ## Push / Tag / Release Gate
 ⚠️ OBLIGATION STRICTE : Toutes ces commandes DOIVENT être préfixées par 'rtk' dans le terminal (ex: 'rtk uv run pytest'). Ne jamais exécuter de commande nue sans 'rtk'.
 Avant push/tag/release :
