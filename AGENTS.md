@@ -152,11 +152,25 @@ src/ffbb_mcp/
 ## Graphify
 
 Outil d'analyse de graphe de code installé via `uv tools` (`rtk graphify`).
-- `graphify-out/` est gitignore — artefacts locaux, jamais versionnés
-- **Après chaque push modifiant le code source** : `rtk graphify update .`
-- En cas de refactor majeur (moins de nœuds) : `rtk graphify update . --force`
+`graphify-out/` est gitignore — artefacts locaux, jamais versionnés.
+
+**Sorties** : `graph.html` (visualisation interactive) · `GRAPH_REPORT.md` (god nodes, connexions surprenantes, questions suggérées) · `graph.json` (graphe persistant)
+
+**Mise à jour du graphe**
+- Après chaque push modifiant le code source : `rtk graphify update .`
+- Après un refactor majeur (moins de nœuds) : `rtk graphify update . --force`
+- Recalcul des clusters sans re-extraction : `rtk graphify cluster-only .`
+
+**Requêtes**
 - Interroger le graphe : `rtk graphify query "<question>"`
-- Modules impactés : `rtk graphify affected <fichier>`
+- Chemin entre deux nœuds : `rtk graphify path "ServiceA" "ServiceB"`
+- Explication d'un nœud : `rtk graphify explain "NomDuModule"`
+- Modules impactés par un fichier : `rtk graphify affected <fichier>`
+
+**Architecture & automatisation**
+- Page Mermaid call-flow : `rtk graphify export callflow-html`
+- Hook post-commit (rebuild auto) : `rtk graphify hook install`
+- Statut du hook : `rtk graphify hook status`
 
 ## Push / Tag / Release Gate
 ⚠️ OBLIGATION STRICTE : Toutes ces commandes DOIVENT être préfixées par 'rtk' dans le terminal (ex: 'rtk uv run pytest'). Ne jamais exécuter de commande nue sans 'rtk'.
