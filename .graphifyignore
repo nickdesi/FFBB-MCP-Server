@@ -1,6 +1,20 @@
 # Graphify exclusions — format gitignore
+
 # Dossier legacy non-tracké (contient external/antigravity-awesome-skills/ parasite)
 FFBB-MCP-Server/
+
+# Skills — exclusion explicite (tous patterns connus)
+skills/
+*/skills/
+**/skills/
+antigravity-awesome-skills/
+SKILL.md
+*.skill.md
+*.skill.*
+
+# Agents / opencode config (pas du code métier analysable)
+.agents/
+.opencode/
 
 # Dépendances et artefacts build
 .venv/
