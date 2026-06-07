@@ -1968,3 +1968,127 @@ class TestBilanSortingByAge:
         assert "U11" in comps[0]
         assert "U15" in comps[1]
         assert "Seniors" in comps[2]
+
+
+class TestBilanEliminatoireTeamAssignment:
+    """Vérifie qu'une phase éliminatoire sans classement est correctement attribuée à la bonne équipe."""
+
+    @pytest.mark.asyncio
+    async def test_eliminatoire_assigned_to_correct_team(
+        self, patch_get_client, mock_client
+    ):
+        from unittest.mock import AsyncMock, MagicMock
+
+        from ffbb_mcp._state import reset_service_state
+        from ffbb_mcp.services import ffbb_bilan_service
+
+        reset_service_state()
+
+        org_mock = MagicMock()
+        org_mock.model_dump = MagicMock(
+            return_value={
+                "id": 100,
+                "nom": "Club Test",
+                "engagements": [
+                    {
+                        "id": "eng_u15_eq1",
+                        "numeroEquipe": "1",
+                        "idCompetition": {
+                            "nom": "U15 Féminines Phase 1",
+                            "id": "c_u15_1",
+                            "sexe": "F",
+                            "categorie": {"code": "U15"},
+                            "competition_origine_niveau": 1,
+                        },
+                        "idPoule": {"id": "1001"},
+                    },
+                    {
+                        "id": "eng_u15_eq2",
+                        "numeroEquipe": "2",
+                        "idCompetition": {
+                            "nom": "U15 Féminines Finale",
+                            "id": "c_u15_2",
+                            "sexe": "F",
+                            "categorie": {"code": "U15"},
+                            "competition_origine_niveau": 1,
+                        },
+                        "idPoule": {"id": "1002"},
+                    },
+                ],
+            }
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        # La poule 1001 de l'équipe 1 a un classement
+        poule_1001 = MagicMock()
+        poule_1001.model_dump = MagicMock(
+            return_value={
+                "id": "1001",
+                "rencontres": [],
+                "classements": [
+                    {
+                        "id_engagement": {"id": "eng_u15_eq1", "numero_equipe": "1"},
+                        "organisme_id": "100",
+                        "position": 2,
+                        "match_joues": 2,
+                        "gagnes": 1,
+                        "perdus": 1,
+                        "nuls": 0,
+                        "paniers_marques": 80,
+                        "paniers_encaisses": 80,
+                        "difference": 0,
+                    }
+                ],
+            }
+        )
+
+        # La poule 1002 (finale) de l'équipe 2 n'a PAS de classement, mais des rencontres
+        poule_1002 = MagicMock()
+        poule_1002.model_dump = MagicMock(
+            return_value={
+                "id": "1002",
+                "classements": [],
+                "rencontres": [
+                    {
+                        "id": "m1",
+                        "joue": 1,
+                        "date_rencontre": "2026-05-15",
+                        "nomEquipe1": "Club Test",
+                        "nomEquipe2": "Adversaire",
+                        "idEngagementEquipe1": {"id": "eng_u15_eq2"},
+                        "idEngagementEquipe2": {"id": "eng_other"},
+                        "resultatEquipe1": 60,
+                        "resultatEquipe2": 50,
+                        "numeroJournee": 1,
+                    }
+                ],
+            }
+        )
+
+        async def get_poule_side_effect(poule_id):
+            p_id = str(poule_id)
+            mapping = {
+                "1001": poule_1001,
+                "1002": poule_1002,
+            }
+            return mapping.get(p_id)
+
+        mock_client.get_poule_async = AsyncMock(side_effect=get_poule_side_effect)
+
+        result = await ffbb_bilan_service(organisme_id=100)
+
+        # On vérifie que la phase de finale (sans classement, donc issue de rencontres)
+        # est bien attribuée à l'équipe 2 !
+        equipes = result["equipes_bilan"]
+        assert "1" in equipes
+        assert "2" in equipes
+
+        eq1_phases = equipes["1"]["phases"]
+        eq2_phases = equipes["2"]["phases"]
+
+        assert len(eq1_phases) == 1
+        assert eq1_phases[0]["poule_id"] == "1001"
+
+        assert len(eq2_phases) == 1
+        assert eq2_phases[0]["poule_id"] == "1002"
+        assert eq2_phases[0]["competition"] == "U15 Féminines Finale"

@@ -999,7 +999,10 @@ async def _build_bilan_payload(
             if stats_from_rencontres:
                 for k, v in stats_from_rencontres.items():
                     totaux[k] += v
-                num_equipe = next(iter(eng_to_num.values()), "1") if eng_to_num else "1"
+                matching_nums = [
+                    eng_to_num[eid] for eid in eng_ids_here if eid in eng_to_num
+                ]
+                num_equipe = matching_nums[0] if matching_nums else "1"
                 phases.append(
                     {
                         "competition": poule_to_comp.get(pid, ""),
