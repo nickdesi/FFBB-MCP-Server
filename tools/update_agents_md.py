@@ -214,6 +214,7 @@ ENV_DESCRIPTIONS = {
     "XDG_CACHE_HOME": "Dossier racine pour stocker les fichiers de cache persistants (ex: acronymes, benchmark)",
     "FFBB_WARMUP_ORGANISMES": "Liste d'organisme_id séparés par des virgules à préchauffer au démarrage",
     "FFBB_WARMUP_CONCURRENCY": "Concurrence maximale lors du préchauffage du cache",
+    "FFBB_KNOWN_CLUB_IDS": "Override JSON de la liste d'organisme_id connus pour les prompts MCP (fallback : _DEFAULT_KNOWN_CLUB_IDS)",
 }
 
 

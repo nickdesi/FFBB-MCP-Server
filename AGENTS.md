@@ -168,6 +168,7 @@ Avant push/tag/release :
 | `TRUSTED_PROXY_HOSTS` | `127.0.0.1` | Proxies de confiance |
 | `MCP_MODE` | `stdio` | Mode de transport (`stdio` / `streamable-http`) |
 | `FFBB_CACHE_BACKEND` | `sqlite` | Choix du backend de cache HTTP (`sqlite` ou `redis`) |
+| `FFBB_KNOWN_CLUB_IDS` | `` | Override JSON de la liste d'organisme_id connus pour les prompts MCP (fallback : _DEFAULT_KNOWN_CLUB_IDS) |
 | `FFBB_ENABLE_BENCHMARK` | `` | Activer endpoint `/benchmark/run` (sécurité) |
 | `ALLOWED_HOSTS` | `*` | Hosts autorisés (DNS rebinding protection) |
 | `ALLOWED_ORIGINS` | `*` | Origins CORS |
