@@ -2,6 +2,12 @@
 
 Extrait les métriques critiques du fichier GRAPH_REPORT.md et compare
 aux seuils définis. Retourne exit 0 si OK, 1 si échec.
+
+Note d'usage (depuis 1.5.1) :
+- Ce script n'est plus exécuté par la CI (rapport Graphify non versionné).
+- Il reste appelé en pré-déploiement par tools/deploy.sh (non-bloquant)
+  et exposé via tools/helpers.sh:run_graph_health() pour diagnostic manuel.
+- Pour le rafraîchir avant ce check : `rtk graphify update .` (no LLM cost).
 """
 
 from __future__ import annotations
