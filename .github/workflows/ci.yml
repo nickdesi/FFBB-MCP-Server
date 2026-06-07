@@ -6,7 +6,6 @@ on:
     paths-ignore:
       - 'docs/**'
       - 'website/**'
-      - '*.md'
       - 'LICENSE'
       - '.gitignore'
   pull_request:
@@ -14,7 +13,6 @@ on:
     paths-ignore:
       - 'docs/**'
       - 'website/**'
-      - '*.md'
       - 'LICENSE'
       - '.gitignore'
   workflow_dispatch:
