@@ -1,3 +1,27 @@
+"""Services orientés "club" / "équipe" pour le serveur FFBB MCP.
+
+Ce module est intentionnellement monolithique : un découpage en sous-modules
+a été évalué et écarté (mauvais ratio bénéfice/risque, dépendances croisées
+internes, couplage fort autour des helpers `_resolve_team_equipes` /
+`_fetch_poule_matches`).
+
+Trois sections logiques cohabitent :
+
+1. Résolution d'équipe (≈ L43 → L318)
+   ``_dedup_equipes_by_engagement``, ``ffbb_equipes_club_service``,
+   ``_match_team_name``, ``_resolve_team_equipes`` : retrouvent un club puis
+   filtrent ses équipes par catégorie / numéro d'équipe.
+
+2. Bilan (``ffbb_saison_bilan_service`` ≈ L602, ``ffbb_bilan_service`` ≈ L708 → L895)
+   Agrégation des statistiques (victoires, paniers, etc.) par phase et par
+   équipe via les classements de poules.
+
+3. Match & Calendrier (``ffbb_next_match_service`` ≈ L398, ``_fetch_poule_matches`` ≈ L321,
+   ``get_calendrier_club_service`` ≈ L898, ``ffbb_last_result_service`` ≈ L1165)
+   Récupération et formatage des rencontres (prochain match, dernier
+   résultat, calendrier complet) avec enrichissement salle/adresse.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -705,182 +729,189 @@ async def ffbb_saison_bilan_service(
     }
 
 
+async def _build_bilan_payload(
+    club_name: str | None,
+    organisme_id: int | str | None,
+    categorie: str | None,
+) -> dict[str, Any]:
+    """Calcule le payload complet d'un bilan pour un club / catégorie.
+
+    Extrait de la closure `_fetch` historiquement définie dans
+    `ffbb_bilan_service`. Pas de logique de cache ici : la mise en cache /
+    déduplication est entièrement gérée par l'appelant via `_dedupe_inflight`.
+    """
+    from .poule import get_poule_service
+    from .search import _resolve_club_and_org
+
+    resolved_clubs, org_data = await _resolve_club_and_org(
+        club_name=club_name, organisme_id=organisme_id, categorie=categorie
+    )
+    target_org_ids = [str(c["organisme_id"]) for c in resolved_clubs]
+    club_nom = resolved_clubs[0]["nom"] if resolved_clubs else (club_name or "")
+
+    if not target_org_ids:
+        return {
+            "error": f"Club '{club_name}' introuvable",
+            "suggestion": "Vérifiez l'orthographe ou résolvez d'abord le club avec ffbb_search.",
+            "next_call": f"ffbb_search(type='organismes', query='{club_name or ''}')",
+            "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
+        }
+
+    eq_tasks = []
+    for oid in target_org_ids:
+        is_target = organisme_id and str(oid) == str(organisme_id)
+        pass_org = org_data if is_target else None
+        eq_tasks.append(
+            ffbb_equipes_club_service(
+                organisme_id=oid, filtre=categorie, org_data=pass_org
+            )
+        )
+    eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
+
+    equipes: list[dict[str, Any]] = []
+    for res in eq_results:
+        if isinstance(res, list):
+            equipes.extend([e for e in res if isinstance(e, dict) and "error" not in e])
+        elif isinstance(res, Exception):
+            logger.error("Erreur lors de la récupération des équipes: %s", res)
+
+    if not equipes:
+        return {
+            "error": f"Aucune équipe trouvée pour la catégorie '{categorie}'",
+            "suggestion": "Listez les équipes disponibles puis choisissez la catégorie et le numéro exacts.",
+            "next_call": (
+                f"ffbb_club(action='equipes', organisme_id={target_org_ids[0]})"
+                if target_org_ids
+                else "ffbb_club(action='equipes', club_name='<club>')"
+            ),
+            "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
+        }
+
+    equipes = _dedup_equipes_by_engagement(equipes)
+
+    unique_poule_ids = list(
+        dict.fromkeys(str(e.get("poule_id")) for e in equipes if e.get("poule_id"))
+    )
+    logger.debug(f"ffbb_bilan: club_nom={club_nom} cible_orgs={target_org_ids}")
+    logger.debug(
+        f"ffbb_bilan: equipes_count={len(equipes)} unique_poules={unique_poule_ids}"
+    )
+
+    async def _fetch_poule_bilan(pid: str) -> dict[str, Any] | Exception:
+        try:
+            return await get_poule_service(pid)
+        except Exception as e:
+            return e
+
+    poules_raw = await asyncio.gather(
+        *[_fetch_poule_bilan(pid) for pid in unique_poule_ids],
+        return_exceptions=True,
+    )
+    poules_map: dict[str, dict[str, Any]] = {
+        pid: pd
+        for pid, pd in zip(unique_poule_ids, poules_raw, strict=False)
+        if isinstance(pd, dict)
+    }
+
+    poule_to_eng: dict[str, set[str]] = {}
+    poule_to_comp: dict[str, str] = {}
+    eng_to_num: dict[str, str] = {}
+    org_ids_str = set(target_org_ids)
+    for e in equipes:
+        pid = str(e.get("poule_id", ""))
+        eid = str(e.get("engagement_id", ""))
+        num = str(e.get("numero_equipe") or "")
+        if pid and eid:
+            poule_to_eng.setdefault(pid, set()).add(eid)
+            if num:
+                eng_to_num[eid] = num
+        if pid and e.get("competition"):
+            poule_to_comp[pid] = e["competition"]
+
+    phases: list[dict[str, Any]] = []
+    totaux = _new_bilan_totals()
+
+    for pid, poule_data in poules_map.items():
+        if not isinstance(poule_data, dict):
+            continue
+        eng_ids_here = poule_to_eng.get(pid, set())
+        for entry in poule_data.get("classements", []) or []:
+            if not isinstance(entry, dict):
+                continue
+            eng = entry.get("id_engagement", {}) or {}
+            entry_eng_id = str(eng.get("id", ""))
+            entry_org_id = str(entry.get("organisme_id", ""))
+
+            if entry_eng_id in eng_ids_here:
+                pass
+            elif entry_org_id in org_ids_str:
+                logger.debug(
+                    "ffbb_bilan: fallback org_id utilisé pour entry_eng_id=%s org_id=%s",
+                    entry_eng_id,
+                    entry_org_id,
+                )
+            else:
+                continue
+
+            stats = _extract_and_accumulate_bilan(entry, totaux)
+
+            num_equipe = eng_to_num.get(entry_eng_id) or str(
+                eng.get("numero_equipe") or ""
+            )
+
+            phases.append(
+                {
+                    "competition": poule_to_comp.get(pid, ""),
+                    "poule_id": pid,
+                    "numero_equipe": num_equipe,
+                    "position": entry.get("position"),
+                    "phase_type": poule_data.get("phase_type", "poule"),
+                    "phase_terminee": poule_data.get("phase_terminee", False),
+                    **stats,
+                }
+            )
+
+    phases.sort(key=lambda x: (x["competition"], x["numero_equipe"] or ""))
+
+    equipes_bilan: dict[str, Any] = {}
+    for p in phases:
+        num = p["numero_equipe"] or "1"
+        if num not in equipes_bilan:
+            equipes_bilan[num] = {
+                "numero_equipe": num,
+                "bilan": _new_bilan_totals(),
+                "phases": [],
+            }
+        equipes_bilan[num]["phases"].append(p)
+        b = equipes_bilan[num]["bilan"]
+        for f in _BILAN_STAT_FIELDS:
+            b[f] += p[f]
+
+    phase_courante = None
+    if phases:
+        target_phases = [p for p in phases if str(p.get("numero_equipe", "1")) == "1"]
+        phase_courante = target_phases[-1] if target_phases else phases[-1]
+
+    res_dict = {
+        "club": club_nom,
+        "categorie": categorie or "",
+        "bilan_total": totaux,
+        "phase_courante": phase_courante,
+        "equipes_bilan": equipes_bilan,
+        "phases": phases,
+        "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
+    }
+    # Validation stricte via Pydantic
+    return BilanResponse(**res_dict).model_dump(by_alias=True)  # type: ignore[arg-type]
+
+
 async def ffbb_bilan_service(
     club_name: str | None = None,
     organisme_id: int | str | None = None,
     categorie: str | None = None,
     force_refresh: bool = False,
 ) -> dict[str, Any]:
-    from .poule import get_poule_service
-    from .search import _resolve_club_and_org
-
     cache_key = f"bilan:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}"
-
-    async def _fetch() -> dict[str, Any]:
-        resolved_clubs, org_data = await _resolve_club_and_org(
-            club_name=club_name, organisme_id=organisme_id, categorie=categorie
-        )
-        target_org_ids = [str(c["organisme_id"]) for c in resolved_clubs]
-        club_nom = resolved_clubs[0]["nom"] if resolved_clubs else (club_name or "")
-
-        if not target_org_ids:
-            return {
-                "error": f"Club '{club_name}' introuvable",
-                "suggestion": "Vérifiez l'orthographe ou résolvez d'abord le club avec ffbb_search.",
-                "next_call": f"ffbb_search(type='organismes', query='{club_name or ''}')",
-                "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
-            }
-
-        eq_tasks = []
-        for oid in target_org_ids:
-            is_target = organisme_id and str(oid) == str(organisme_id)
-            pass_org = org_data if is_target else None
-            eq_tasks.append(
-                ffbb_equipes_club_service(
-                    organisme_id=oid, filtre=categorie, org_data=pass_org
-                )
-            )
-        eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
-
-        equipes: list[dict[str, Any]] = []
-        for res in eq_results:
-            if isinstance(res, list):
-                equipes.extend(
-                    [e for e in res if isinstance(e, dict) and "error" not in e]
-                )
-            elif isinstance(res, Exception):
-                logger.error("Erreur lors de la récupération des équipes: %s", res)
-
-        if not equipes:
-            return {
-                "error": f"Aucune équipe trouvée pour la catégorie '{categorie}'",
-                "suggestion": "Listez les équipes disponibles puis choisissez la catégorie et le numéro exacts.",
-                "next_call": (
-                    f"ffbb_club(action='equipes', organisme_id={target_org_ids[0]})"
-                    if target_org_ids
-                    else "ffbb_club(action='equipes', club_name='<club>')"
-                ),
-                "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
-            }
-
-        equipes = _dedup_equipes_by_engagement(equipes)
-
-        unique_poule_ids = list(
-            dict.fromkeys(str(e.get("poule_id")) for e in equipes if e.get("poule_id"))
-        )
-        logger.debug(f"ffbb_bilan: club_nom={club_nom} cible_orgs={target_org_ids}")
-        logger.debug(
-            f"ffbb_bilan: equipes_count={len(equipes)} unique_poules={unique_poule_ids}"
-        )
-
-        async def _fetch_poule_bilan(pid: str) -> dict[str, Any] | Exception:
-            try:
-                return await get_poule_service(pid)
-            except Exception as e:
-                return e
-
-        poules_raw = await asyncio.gather(
-            *[_fetch_poule_bilan(pid) for pid in unique_poule_ids],
-            return_exceptions=True,
-        )
-        poules_map: dict[str, dict[str, Any]] = {
-            pid: pd
-            for pid, pd in zip(unique_poule_ids, poules_raw, strict=False)
-            if isinstance(pd, dict)
-        }
-
-        poule_to_eng: dict[str, set[str]] = {}
-        poule_to_comp: dict[str, str] = {}
-        eng_to_num: dict[str, str] = {}
-        org_ids_str = set(target_org_ids)
-        for e in equipes:
-            pid = str(e.get("poule_id", ""))
-            eid = str(e.get("engagement_id", ""))
-            num = str(e.get("numero_equipe") or "")
-            if pid and eid:
-                poule_to_eng.setdefault(pid, set()).add(eid)
-                if num:
-                    eng_to_num[eid] = num
-            if pid and e.get("competition"):
-                poule_to_comp[pid] = e["competition"]
-
-        phases: list[dict[str, Any]] = []
-        totaux = _new_bilan_totals()
-
-        for pid, poule_data in poules_map.items():
-            if not isinstance(poule_data, dict):
-                continue
-            eng_ids_here = poule_to_eng.get(pid, set())
-            for entry in poule_data.get("classements", []) or []:
-                if not isinstance(entry, dict):
-                    continue
-                eng = entry.get("id_engagement", {}) or {}
-                entry_eng_id = str(eng.get("id", ""))
-                entry_org_id = str(entry.get("organisme_id", ""))
-
-                if entry_eng_id in eng_ids_here:
-                    pass
-                elif entry_org_id in org_ids_str:
-                    logger.debug(
-                        "ffbb_bilan: fallback org_id utilisé pour entry_eng_id=%s org_id=%s",
-                        entry_eng_id,
-                        entry_org_id,
-                    )
-                else:
-                    continue
-
-                stats = _extract_and_accumulate_bilan(entry, totaux)
-
-                num_equipe = eng_to_num.get(entry_eng_id) or str(
-                    eng.get("numero_equipe") or ""
-                )
-
-                phases.append(
-                    {
-                        "competition": poule_to_comp.get(pid, ""),
-                        "poule_id": pid,
-                        "numero_equipe": num_equipe,
-                        "position": entry.get("position"),
-                        "phase_type": poule_data.get("phase_type", "poule"),
-                        "phase_terminee": poule_data.get("phase_terminee", False),
-                        **stats,
-                    }
-                )
-
-        phases.sort(key=lambda x: (x["competition"], x["numero_equipe"] or ""))
-
-        equipes_bilan: dict[str, Any] = {}
-        for p in phases:
-            num = p["numero_equipe"] or "1"
-            if num not in equipes_bilan:
-                equipes_bilan[num] = {
-                    "numero_equipe": num,
-                    "bilan": _new_bilan_totals(),
-                    "phases": [],
-                }
-            equipes_bilan[num]["phases"].append(p)
-            b = equipes_bilan[num]["bilan"]
-            for f in _BILAN_STAT_FIELDS:
-                b[f] += p[f]
-
-        phase_courante = None
-        if phases:
-            target_phases = [
-                p for p in phases if str(p.get("numero_equipe", "1")) == "1"
-            ]
-            phase_courante = target_phases[-1] if target_phases else phases[-1]
-
-        res_dict = {
-            "club": club_nom,
-            "categorie": categorie or "",
-            "bilan_total": totaux,
-            "phase_courante": phase_courante,
-            "equipes_bilan": equipes_bilan,
-            "phases": phases,
-            "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
-        }
-        # Validation stricte via Pydantic
-        return BilanResponse(**res_dict).model_dump(by_alias=True)  # type: ignore[arg-type]
 
     if force_refresh and state.cache_bilan is not None:
         logger.debug(f"force_refresh=True, bypass cache pour {cache_key}")
@@ -890,9 +921,254 @@ async def ffbb_bilan_service(
         cache=state.cache_bilan,
         cache_key=cache_key,
         inflight_map=state.inflight_bilan,
-        make_coro=_fetch,
+        make_coro=lambda: _build_bilan_payload(club_name, organisme_id, categorie),
         cache_name="bilan",
     )
+
+
+async def _build_calendar_matches(
+    club_name: str | None,
+    organisme_id: int | str | None,
+    categorie: str | None,
+    numero_equipe: int | None,
+    adversaire: str | None,
+    date_debut: str | None,
+    date_fin: str | None,
+    limit: int | None,
+) -> list[dict]:
+    """Construit la liste des matchs (calendrier complet) pour un club / catégorie.
+
+    Extrait de la closure `_fetch` historiquement définie dans
+    `get_calendrier_club_service`. Pas de logique de cache ici : la mise en
+    cache / déduplication est entièrement gérée par l'appelant via
+    `_dedupe_inflight`.
+    """
+    from .search import _resolve_club_and_org
+
+    resolved_clubs, _ = await _resolve_club_and_org(
+        club_name=club_name, organisme_id=organisme_id, categorie=categorie, limit=5
+    )
+    target_org_ids = [str(c["organisme_id"]) for c in resolved_clubs]
+    target_org_ids = list(dict.fromkeys(oid for oid in target_org_ids if oid))
+    if not target_org_ids:
+        return []
+
+    # Extraire le nom du club résolu pour le filtrage par adversaire
+    club_nom_resolu = resolved_clubs[0].get("nom", "") if resolved_clubs else ""
+
+    import ffbb_mcp.services
+
+    eq_tasks = [
+        ffbb_mcp.services.ffbb_equipes_club_service(organisme_id=oid, filtre=categorie)
+        for oid in target_org_ids
+    ]
+    eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
+
+    equipes: list[dict[str, Any]] = []
+    for res in eq_results:
+        if isinstance(res, list):
+            equipes.extend([e for e in res if isinstance(e, dict) and "error" not in e])
+        elif isinstance(res, Exception):
+            logger.error("Erreur lors de la récupération des équipes: %s", res)
+
+    if numero_equipe is not None:
+        equipes = [
+            e
+            for e in equipes
+            if str(e.get("numero_equipe", "")) == str(numero_equipe)
+            or str(e.get("nom", "")).endswith(f"- {numero_equipe}")
+            or f" - {numero_equipe} " in str(e.get("nom", ""))
+            or f"-{numero_equipe} " in str(e.get("nom", ""))
+        ]
+
+    if not equipes:
+        return [
+            {
+                "warning": (
+                    f"Aucune équipe active pour '{club_name or organisme_id}' "
+                    f"(catégorie: '{categorie or 'toutes'}'). "
+                    "Le club existe mais n'a pas d'équipes engagées."
+                ),
+                "equipes": [],
+            }
+        ]
+
+    equipes = _dedup_equipes_by_engagement(equipes)
+
+    seen_match_ids: set[Any] = set()
+    all_matches: list[dict[str, Any]] = []
+
+    unique_poule_ids = list(
+        dict.fromkeys(str(e.get("poule_id")) for e in equipes if e.get("poule_id"))
+    )
+
+    poule_tasks = [
+        ffbb_mcp.services.get_poule_service(poule_id) for poule_id in unique_poule_ids
+    ]
+    poules_data = await asyncio.gather(*poule_tasks, return_exceptions=True)
+    poules_by_id = {
+        poule_id: poule_data
+        for poule_id, poule_data in zip(unique_poule_ids, poules_data, strict=False)
+    }
+
+    for equipe in equipes:
+        poule_id = equipe.get("poule_id")
+        if not poule_id:
+            continue
+
+        poule_data = poules_by_id.get(str(poule_id))
+        if (
+            not isinstance(poule_data, dict)
+            or not poule_data
+            or "rencontres" not in poule_data
+        ):
+            continue
+
+        for match in poule_data.get("rencontres", []) or []:
+            if not isinstance(match, dict):
+                continue
+            match_id = match.get("id")
+            if not match_id or match_id in seen_match_ids:
+                continue
+
+            seen_match_ids.add(match_id)
+
+            eng1 = match.get("idEngagementEquipe1")
+            eng2 = match.get("idEngagementEquipe2")
+            num1 = eng1.get("numeroEquipe") if isinstance(eng1, dict) else None
+            num2 = eng2.get("numeroEquipe") if isinstance(eng2, dict) else None
+
+            eq1 = format_team_name(
+                match.get("nomEquipe1", match.get("nom_equipe1", "")), num1
+            )
+            eq2 = format_team_name(
+                match.get("nomEquipe2", match.get("nom_equipe2", "")), num2
+            )
+            score1 = match.get("resultatEquipe1", match.get("resultat_equipe1"))
+            score2 = match.get("resultatEquipe2", match.get("resultat_equipe2"))
+            date_match = match.get("date_rencontre", match.get("date", ""))
+            journee = match.get("numeroJournee", match.get("numero_journee", ""))
+            joue = match.get("joue")
+            salle = match.get("salle") or match.get("idSalle") or match.get("id_salle")
+
+            calendar_match = {
+                "id": match_id,
+                "date": date_match,
+                "joue": joue,
+                "equipe1": eq1,
+                "equipe2": eq2,
+                "score_equipe1": score1,
+                "score_equipe2": score2,
+                "competition_nom": equipe.get("competition", ""),
+                "num_journee": journee,
+            }
+            if salle:
+                calendar_match["salle"] = salle
+            all_matches.append(calendar_match)
+
+    await _enrich_matches_with_salle_details(all_matches)
+
+    tz = _PARIS_TZ
+    now = datetime.now(tz)
+
+    for m in all_matches:
+        m["_dt"] = _parse_dt(m.get("date"))
+
+    # Filtrage par dates
+    if date_debut:
+        all_matches = [
+            m
+            for m in all_matches
+            if m["_dt"] and m["_dt"].strftime("%Y-%m-%d") >= date_debut
+        ]
+    if date_fin:
+        all_matches = [
+            m
+            for m in all_matches
+            if m["_dt"] and m["_dt"].strftime("%Y-%m-%d") <= date_fin
+        ]
+
+    # Filtrage par adversaire (confrontations directes)
+    if adversaire:
+        adversaire_norm = _normalize_name(adversaire)
+        club_norm = _normalize_name(club_nom_resolu)
+
+        # Ne garder que les matchs où le club ET l'adversaire se rencontrent
+        all_matches = [
+            m
+            for m in all_matches
+            if (
+                # Cas 1: club est equipe1, adversaire est equipe2
+                (
+                    club_norm in _normalize_name(m.get("equipe1", ""))
+                    and adversaire_norm in _normalize_name(m.get("equipe2", ""))
+                )
+                # Cas 2: club est equipe2, adversaire est equipe1
+                or (
+                    club_norm in _normalize_name(m.get("equipe2", ""))
+                    and adversaire_norm in _normalize_name(m.get("equipe1", ""))
+                )
+            )
+        ]
+
+    all_matches.sort(key=lambda x: (x["_dt"] is None, x["_dt"] or now), reverse=True)
+
+    # Limitation optionnelle
+    if limit is not None:
+        all_matches = all_matches[:limit]
+
+    played_indices: list[int] = []
+    future_indices: list[int] = []
+
+    for idx, m in enumerate(all_matches):
+        m["played"] = (
+            m.get("joue") == 1 or m.get("joue") == "1" or m.get("joue") is True
+        )
+        if m["played"]:
+            played_indices.append(idx)
+        else:
+            future_indices.append(idx)
+
+    last_played_idx = played_indices[0] if played_indices else None
+    next_future_idx = future_indices[-1] if future_indices else None
+
+    for idx, m in enumerate(all_matches):
+        m["is_last_match"] = last_played_idx is not None and idx == last_played_idx
+        m["is_next_match"] = next_future_idx is not None and idx == next_future_idx
+        m.pop("_dt", None)
+
+    effective = all_matches
+
+    max_matches = _get_max_calendar_matches()
+    if len(effective) > max_matches:
+        truncated = effective[:max_matches]
+        warning = {
+            "warning": (
+                "Résultat tronqué côté MCP: trop de matchs pour ce club/catégorie. "
+                "Affichage limité pour protéger les performances. "
+                "Affinez votre requête (catégorie précise, équipe 1/2, phase, etc.)."
+            ),
+            "total_initial": len(all_matches),
+            "limite_appliquee": max_matches,
+        }
+        # Validation stricte via Pydantic
+        validated_trunc = []
+        for m in truncated:
+            if "warning" in m:
+                validated_trunc.append(m)
+            else:
+                validated_trunc.append(CalendrierMatch(**m).model_dump(by_alias=True))
+        validated_trunc.append(warning)
+        return validated_trunc
+
+    # Validation stricte via Pydantic
+    validated_matches = []
+    for m in effective:
+        if "warning" in m:
+            validated_matches.append(m)
+        else:
+            validated_matches.append(CalendrierMatch(**m).model_dump(by_alias=True))
+    return validated_matches
 
 
 async def get_calendrier_club_service(
@@ -907,248 +1183,7 @@ async def get_calendrier_club_service(
     limit: int | None = None,
     force_refresh: bool = False,
 ) -> list[dict]:
-    from .search import _resolve_club_and_org
-
     cache_key = f"calendrier:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}:{numero_equipe or ''}:{_normalize_name(adversaire or '')}:{date_debut or ''}:{date_fin or ''}:{limit or ''}"
-
-    async def _fetch() -> list[dict]:
-        resolved_clubs, _ = await _resolve_club_and_org(
-            club_name=club_name, organisme_id=organisme_id, categorie=categorie, limit=5
-        )
-        target_org_ids = [str(c["organisme_id"]) for c in resolved_clubs]
-        target_org_ids = list(dict.fromkeys(oid for oid in target_org_ids if oid))
-        if not target_org_ids:
-            return []
-
-        # Extraire le nom du club résolu pour le filtrage par adversaire
-        club_nom_resolu = resolved_clubs[0].get("nom", "") if resolved_clubs else ""
-
-        import ffbb_mcp.services
-
-        eq_tasks = [
-            ffbb_mcp.services.ffbb_equipes_club_service(
-                organisme_id=oid, filtre=categorie
-            )
-            for oid in target_org_ids
-        ]
-        eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
-
-        equipes: list[dict[str, Any]] = []
-        for res in eq_results:
-            if isinstance(res, list):
-                equipes.extend(
-                    [e for e in res if isinstance(e, dict) and "error" not in e]
-                )
-            elif isinstance(res, Exception):
-                logger.error("Erreur lors de la récupération des équipes: %s", res)
-
-        if numero_equipe is not None:
-            equipes = [
-                e
-                for e in equipes
-                if str(e.get("numero_equipe", "")) == str(numero_equipe)
-                or str(e.get("nom", "")).endswith(f"- {numero_equipe}")
-                or f" - {numero_equipe} " in str(e.get("nom", ""))
-                or f"-{numero_equipe} " in str(e.get("nom", ""))
-            ]
-
-        if not equipes:
-            return [
-                {
-                    "warning": (
-                        f"Aucune équipe active pour '{club_name or organisme_id}' "
-                        f"(catégorie: '{categorie or 'toutes'}'). "
-                        "Le club existe mais n'a pas d'équipes engagées."
-                    ),
-                    "equipes": [],
-                }
-            ]
-
-        equipes = _dedup_equipes_by_engagement(equipes)
-
-        seen_match_ids: set[Any] = set()
-        all_matches: list[dict[str, Any]] = []
-
-        unique_poule_ids = list(
-            dict.fromkeys(str(e.get("poule_id")) for e in equipes if e.get("poule_id"))
-        )
-
-        import ffbb_mcp.services
-
-        poule_tasks = [
-            ffbb_mcp.services.get_poule_service(poule_id)
-            for poule_id in unique_poule_ids
-        ]
-        poules_data = await asyncio.gather(*poule_tasks, return_exceptions=True)
-        poules_by_id = {
-            poule_id: poule_data
-            for poule_id, poule_data in zip(unique_poule_ids, poules_data, strict=False)
-        }
-
-        for equipe in equipes:
-            poule_id = equipe.get("poule_id")
-            if not poule_id:
-                continue
-
-            poule_data = poules_by_id.get(str(poule_id))
-            if (
-                not isinstance(poule_data, dict)
-                or not poule_data
-                or "rencontres" not in poule_data
-            ):
-                continue
-
-            for match in poule_data.get("rencontres", []) or []:
-                if not isinstance(match, dict):
-                    continue
-                match_id = match.get("id")
-                if not match_id or match_id in seen_match_ids:
-                    continue
-
-                seen_match_ids.add(match_id)
-
-                eng1 = match.get("idEngagementEquipe1")
-                eng2 = match.get("idEngagementEquipe2")
-                num1 = eng1.get("numeroEquipe") if isinstance(eng1, dict) else None
-                num2 = eng2.get("numeroEquipe") if isinstance(eng2, dict) else None
-
-                eq1 = format_team_name(
-                    match.get("nomEquipe1", match.get("nom_equipe1", "")), num1
-                )
-                eq2 = format_team_name(
-                    match.get("nomEquipe2", match.get("nom_equipe2", "")), num2
-                )
-                score1 = match.get("resultatEquipe1", match.get("resultat_equipe1"))
-                score2 = match.get("resultatEquipe2", match.get("resultat_equipe2"))
-                date_match = match.get("date_rencontre", match.get("date", ""))
-                journee = match.get("numeroJournee", match.get("numero_journee", ""))
-                joue = match.get("joue")
-                salle = (
-                    match.get("salle") or match.get("idSalle") or match.get("id_salle")
-                )
-
-                calendar_match = {
-                    "id": match_id,
-                    "date": date_match,
-                    "joue": joue,
-                    "equipe1": eq1,
-                    "equipe2": eq2,
-                    "score_equipe1": score1,
-                    "score_equipe2": score2,
-                    "competition_nom": equipe.get("competition", ""),
-                    "num_journee": journee,
-                }
-                if salle:
-                    calendar_match["salle"] = salle
-                all_matches.append(calendar_match)
-
-        await _enrich_matches_with_salle_details(all_matches)
-
-        tz = _PARIS_TZ
-        now = datetime.now(tz)
-
-        for m in all_matches:
-            m["_dt"] = _parse_dt(m.get("date"))
-
-        # Filtrage par dates
-        if date_debut:
-            all_matches = [
-                m
-                for m in all_matches
-                if m["_dt"] and m["_dt"].strftime("%Y-%m-%d") >= date_debut
-            ]
-        if date_fin:
-            all_matches = [
-                m
-                for m in all_matches
-                if m["_dt"] and m["_dt"].strftime("%Y-%m-%d") <= date_fin
-            ]
-
-        # Filtrage par adversaire (confrontations directes)
-        if adversaire:
-            adversaire_norm = _normalize_name(adversaire)
-            club_norm = _normalize_name(club_nom_resolu)
-
-            # Ne garder que les matchs où le club ET l'adversaire se rencontrent
-            all_matches = [
-                m
-                for m in all_matches
-                if (
-                    # Cas 1: club est equipe1, adversaire est equipe2
-                    (
-                        club_norm in _normalize_name(m.get("equipe1", ""))
-                        and adversaire_norm in _normalize_name(m.get("equipe2", ""))
-                    )
-                    # Cas 2: club est equipe2, adversaire est equipe1
-                    or (
-                        club_norm in _normalize_name(m.get("equipe2", ""))
-                        and adversaire_norm in _normalize_name(m.get("equipe1", ""))
-                    )
-                )
-            ]
-
-        all_matches.sort(
-            key=lambda x: (x["_dt"] is None, x["_dt"] or now), reverse=True
-        )
-
-        # Limitation optionnelle
-        if limit is not None:
-            all_matches = all_matches[:limit]
-
-        played_indices: list[int] = []
-        future_indices: list[int] = []
-
-        for idx, m in enumerate(all_matches):
-            m["played"] = (
-                m.get("joue") == 1 or m.get("joue") == "1" or m.get("joue") is True
-            )
-            if m["played"]:
-                played_indices.append(idx)
-            else:
-                future_indices.append(idx)
-
-        last_played_idx = played_indices[0] if played_indices else None
-        next_future_idx = future_indices[-1] if future_indices else None
-
-        for idx, m in enumerate(all_matches):
-            m["is_last_match"] = last_played_idx is not None and idx == last_played_idx
-            m["is_next_match"] = next_future_idx is not None and idx == next_future_idx
-            m.pop("_dt", None)
-
-        effective = all_matches
-
-        max_matches = _get_max_calendar_matches()
-        if len(effective) > max_matches:
-            truncated = effective[:max_matches]
-            warning = {
-                "warning": (
-                    "Résultat tronqué côté MCP: trop de matchs pour ce club/catégorie. "
-                    "Affichage limité pour protéger les performances. "
-                    "Affinez votre requête (catégorie précise, équipe 1/2, phase, etc.)."
-                ),
-                "total_initial": len(all_matches),
-                "limite_appliquee": max_matches,
-            }
-            # Validation stricte via Pydantic
-            validated_trunc = []
-            for m in truncated:
-                if "warning" in m:
-                    validated_trunc.append(m)
-                else:
-                    validated_trunc.append(
-                        CalendrierMatch(**m).model_dump(by_alias=True)
-                    )
-            validated_trunc.append(warning)
-            return validated_trunc
-
-        # Validation stricte via Pydantic
-        validated_matches = []
-        for m in effective:
-            if "warning" in m:
-                validated_matches.append(m)
-            else:
-                validated_matches.append(CalendrierMatch(**m).model_dump(by_alias=True))
-        return validated_matches
 
     if force_refresh and state.cache_calendrier is not None:
         state.cache_calendrier.pop(cache_key, None)
@@ -1157,7 +1192,16 @@ async def get_calendrier_club_service(
         cache=state.cache_calendrier,
         cache_key=cache_key,
         inflight_map=state.inflight_calendrier,
-        make_coro=_fetch,
+        make_coro=lambda: _build_calendar_matches(
+            club_name,
+            organisme_id,
+            categorie,
+            numero_equipe,
+            adversaire,
+            date_debut,
+            date_fin,
+            limit,
+        ),
         cache_name="calendrier",
     )
 

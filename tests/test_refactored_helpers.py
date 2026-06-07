@@ -13,6 +13,7 @@ from ffbb_mcp.services import (
     _resolve_team_equipes,
     format_poule_response,
 )
+from ffbb_mcp.services.club import _match_team_name
 
 
 @pytest.fixture(autouse=True)
@@ -276,6 +277,61 @@ class TestPrioritizePhase:
         ]
         result = _prioritize_phase(matches)
         assert len(result) == 2  # both are phase 1
+
+
+# ---------------------------------------------------------------------------
+# _match_team_name (fonction pure : normalisation + matching numéro d'équipe)
+# ---------------------------------------------------------------------------
+
+
+class TestMatchTeamName:
+    @pytest.mark.parametrize(
+        "nom_rencontre,organisme_nom,numero_equipe,expected",
+        [
+            # Match simple : nom identique, équipe par défaut (1), pas de chiffre
+            ("CSB", "CSB", None, True),
+            # Casse différente : la normalisation upper-case les deux côtés
+            ("csb", "CSB", None, True),
+            ("CSB", "csb", None, True),
+            # Accents : la normalisation retire les diacritiques
+            ("Élan Sportif", "Elan Sportif", None, True),
+            ("ELAN SPORTIF", "Élan Sportif", None, True),
+            # Substring (club_norm doit être inclus dans nom_norm)
+            ("CSB ANNECY", "CSB", None, True),
+            # Pas de match : club absent du nom de l'équipe
+            ("AUTRE CLUB", "CSB", None, False),
+            # numero_equipe=2 : exige le suffixe "- 2"
+            ("CSB - 2", "CSB", 2, True),
+            ("CSB", "CSB", 2, False),  # pas de suffixe "- 2"
+            ("CSB - 3", "CSB", 2, False),  # mauvais suffixe
+            # numero_equipe=1 (ou None) : OK si pas de chiffre OU suffixe "- 1"
+            ("CSB - 1", "CSB", 1, True),
+            ("CSB - 2", "CSB", 1, False),  # has_digit + endswith("- 1") False
+            ("CSB - 2", "CSB", None, False),  # idem via défaut None→1
+            # Chaînes vides : doivent renvoyer False
+            ("", "CSB", None, False),
+            ("CSB", "", None, False),
+            ("", "", None, False),
+        ],
+    )
+    def test_match_team_name_cases(
+        self, nom_rencontre, organisme_nom, numero_equipe, expected
+    ):
+        assert _match_team_name(nom_rencontre, organisme_nom, numero_equipe) is expected
+
+    def test_is_organisme_nom_normalized_skips_normalization(self):
+        # Avec is_organisme_nom_normalized=True, organisme_nom est utilisé tel quel ;
+        # une chaîne déjà normalisée (UPPER, sans accents) doit matcher.
+        assert (
+            _match_team_name("CSB", "CSB", None, is_organisme_nom_normalized=True)
+            is True
+        )
+        # En revanche, une chaîne non-normalisée (lower) ne matche pas car le
+        # nom de la rencontre est upper-case après _normalize_name.
+        assert (
+            _match_team_name("CSB", "csb", None, is_organisme_nom_normalized=True)
+            is False
+        )
 
 
 # ---------------------------------------------------------------------------
