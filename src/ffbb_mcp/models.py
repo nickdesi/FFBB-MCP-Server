@@ -60,6 +60,10 @@ class BilanResponse(BaseModel):
         default=True,
         description="Indique si la saison est terminée pour cette équipe (toutes les phases jouées).",
     )
+    competitions_incluses: list[str] = Field(
+        default_factory=list,
+        description="Liste des noms de compétitions incluses dans le bilan.",
+    )
     equipes_bilan: dict[str, Any] = Field(
         default_factory=dict, description="Bilans ventilés par numéro d'équipe."
     )

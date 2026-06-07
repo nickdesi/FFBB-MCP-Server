@@ -84,6 +84,82 @@ def _dedup_equipes_by_engagement(equipes: list[dict[str, Any]]) -> list[dict[str
     return deduped_equipes
 
 
+def _compute_bilan_from_rencontres(
+    poule_data: dict[str, Any],
+    eng_ids: set[str],
+    club_nom: str,
+) -> dict[str, int] | None:
+    """Calcule le bilan d'une équipe depuis les rencontres quand les classements sont vides.
+
+    Utilisé pour les phases finales (demi-finales, finales) où le serveur FFBB
+    ne fournit pas de classement mais les résultats de matchs sont disponibles.
+    Retourne None si aucun match joué n'est trouvé pour l'équipe.
+    """
+    rencontres = poule_data.get("rencontres", []) or []
+    if not rencontres:
+        return None
+
+    stats = _new_bilan_totals()
+    club_norm = _normalize_name(club_nom)
+    found = False
+
+    for r in rencontres:
+        if r.get("joue") not in (1, "1"):
+            continue
+
+        eq1 = r.get("nomEquipe1", "")
+        eq2 = r.get("nomEquipe2", "")
+        score1 = r.get("resultatEquipe1")
+        score2 = r.get("resultatEquipe2")
+
+        if score1 is None or score2 is None:
+            continue
+
+        try:
+            s1, s2 = int(score1), int(score2)
+        except (TypeError, ValueError):
+            continue
+
+        # Déterminer quel côté est notre équipe
+        eng1 = r.get("idEngagementEquipe1") or {}
+        eng2 = r.get("idEngagementEquipe2") or {}
+        eng1_id = str(eng1.get("id", "")) if isinstance(eng1, dict) else ""
+        eng2_id = str(eng2.get("id", "")) if isinstance(eng2, dict) else ""
+
+        our_side = None
+        if eng1_id and eng1_id in eng_ids:
+            our_side = 1
+        elif eng2_id and eng2_id in eng_ids:
+            our_side = 2
+        else:
+            # Fallback: matching par nom
+            eq1_norm = _normalize_name(eq1)
+            eq2_norm = _normalize_name(eq2)
+            if club_norm and club_norm in eq1_norm:
+                our_side = 1
+            elif club_norm and club_norm in eq2_norm:
+                our_side = 2
+
+        if our_side is None:
+            continue
+
+        found = True
+        our_score = s1 if our_side == 1 else s2
+        their_score = s2 if our_side == 1 else s1
+
+        stats["match_joues"] += 1
+        stats["paniers_marques"] += our_score
+        stats["paniers_encaisses"] += their_score
+        if our_score > their_score:
+            stats["gagnes"] += 1
+        elif our_score < their_score:
+            stats["perdus"] += 1
+        else:
+            stats["nuls"] += 1
+
+    return stats if found else None
+
+
 async def ffbb_equipes_club_service(
     organisme_id: int | str | None = None,
     filtre: str | None = None,
@@ -698,6 +774,13 @@ async def ffbb_saison_bilan_service(
     totaux = _new_bilan_totals()
 
     club_nom = equipes[0].get("nom_equipe", "")
+    eng_ids = {str(e["engagement_id"]) for e in equipes if e.get("engagement_id")}
+
+    poule_to_comp: dict[str, str] = {}
+    for e in equipes:
+        pid = str(e.get("poule_id", ""))
+        if pid and e.get("competition"):
+            poule_to_comp[pid] = e["competition"]
 
     for pid, poule_data in poules_map.items():
         classements = poule_data.get("classements", []) or []
@@ -710,19 +793,41 @@ async def ffbb_saison_bilan_service(
             stats = _extract_and_accumulate_bilan(entry, totaux)
             phases.append(
                 {
-                    "competition": poule_data.get("nom", ""),
+                    "competition": poule_to_comp.get(pid, poule_data.get("nom", "")),
                     "poule_id": pid,
                     "position": entry.get("position"),
-                    "phase_type": poule_data.get("phase_type", "poule"),
+                    "phase_type": _detect_phase_type(poule_to_comp.get(pid, "")),
                     "phase_terminee": poule_data.get("phase_terminee", False),
                     **stats,
                 }
             )
 
+        if not classements:
+            stats_from_rencontres = _compute_bilan_from_rencontres(
+                poule_data, eng_ids, club_nom
+            )
+            if stats_from_rencontres:
+                for k, v in stats_from_rencontres.items():
+                    totaux[k] += v
+                phases.append(
+                    {
+                        "competition": poule_to_comp.get(pid, poule_data.get("nom", "")),
+                        "poule_id": pid,
+                        "position": None,
+                        "phase_type": _detect_phase_type(poule_to_comp.get(pid, "")),
+                        "phase_terminee": poule_data.get("phase_terminee", False),
+                        **stats_from_rencontres,
+                    }
+                )
+
     phases.sort(key=lambda x: x["competition"])
 
     saison_terminee = (
         all(p.get("phase_terminee", True) for p in phases) if phases else True
+    )
+
+    competitions_incluses = sorted(
+        {p["competition"] for p in phases if p.get("competition")}
     )
 
     return {
@@ -731,6 +836,7 @@ async def ffbb_saison_bilan_service(
         "categorie": categorie or "",
         "bilan_total": totaux,
         "saison_terminee": saison_terminee,
+        "competitions_incluses": competitions_incluses,
         "phases": phases,
         "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
     }
@@ -842,7 +948,8 @@ async def _build_bilan_payload(
         if not isinstance(poule_data, dict):
             continue
         eng_ids_here = poule_to_eng.get(pid, set())
-        for entry in poule_data.get("classements", []) or []:
+        classements = poule_data.get("classements", []) or []
+        for entry in classements:
             if not isinstance(entry, dict):
                 continue
             eng = entry.get("id_engagement", {}) or {}
@@ -878,6 +985,28 @@ async def _build_bilan_payload(
                 }
             )
 
+        if not classements:
+            stats_from_rencontres = _compute_bilan_from_rencontres(
+                poule_data, eng_ids_here, club_nom
+            )
+            if stats_from_rencontres:
+                for k, v in stats_from_rencontres.items():
+                    totaux[k] += v
+                num_equipe = next(iter(eng_to_num.values()), "1") if eng_to_num else "1"
+                phases.append(
+                    {
+                        "competition": poule_to_comp.get(pid, ""),
+                        "poule_id": pid,
+                        "numero_equipe": num_equipe,
+                        "position": None,
+                        "phase_type": _detect_phase_type(
+                            poule_to_comp.get(pid, "")
+                        ),
+                        "phase_terminee": poule_data.get("phase_terminee", False),
+                        **stats_from_rencontres,
+                    }
+                )
+
     phases.sort(key=lambda x: (x["competition"], x["numero_equipe"] or ""))
 
     equipes_bilan: dict[str, Any] = {}
@@ -903,12 +1032,17 @@ async def _build_bilan_payload(
         all(p.get("phase_terminee", True) for p in phases) if phases else True
     )
 
+    competitions_incluses = sorted(
+        {p["competition"] for p in phases if p.get("competition")}
+    )
+
     res_dict = {
         "club": club_nom,
         "categorie": categorie or "",
         "bilan_total": totaux,
         "phase_courante": phase_courante,
         "saison_terminee": saison_terminee,
+        "competitions_incluses": competitions_incluses,
         "equipes_bilan": equipes_bilan,
         "phases": phases,
         "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
