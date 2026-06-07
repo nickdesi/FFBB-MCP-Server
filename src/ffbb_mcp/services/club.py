@@ -25,6 +25,7 @@ Trois sections logiques cohabitent :
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from datetime import datetime, timedelta
 from typing import Any
@@ -1066,33 +1067,48 @@ async def _build_calendar_matches(
                 calendar_match["salle"] = salle
             all_matches.append(calendar_match)
 
-    await _enrich_matches_with_salle_details(all_matches)
-
-    # Enrichissement salle via get_rencontre_service pour les matchs sans salle_details
-    # (l'endpoint poule ne retourne pas les salle_id, on doit appeler la rencontre individuelle)
-    matches_without_salle = [
-        m for m in all_matches if not m.get("salle_details") and m.get("id")
-    ]
-    if matches_without_salle:
-
-        async def _fetch_rencontre_salle(match: dict) -> None:
-            try:
-                from .search import get_rencontre_service
-
-                detail = await get_rencontre_service(str(match["id"]))
-                if detail and isinstance(detail, dict):
-                    if detail.get("salle_details"):
-                        match["salle_details"] = detail["salle_details"]
-                    if detail.get("adresse_salle"):
-                        match["adresse_salle"] = detail["adresse_salle"]
-                    if detail.get("salle"):
-                        match["salle"] = detail.get("salle")
-            except Exception:
-                pass  # Ne pas planter le calendrier si une rencontre est inaccessible
-
-        await asyncio.gather(
-            *[_fetch_rencontre_salle(m) for m in matches_without_salle]
+    # Enrichissement bulk des salle_ids via list_rencontres_async par poule
+    # (l'endpoint poule ne retourne pas les salle_id → 1 appel async par poule)
+    _matches_need_salle = [m for m in all_matches if not m.get("salle") and m.get("id")]
+    if _matches_need_salle:
+        _poule_ids = list(
+            dict.fromkeys(
+                str(e.get("poule_id") or "") for e in equipes if e.get("poule_id")
+            )
         )
+        if _poule_ids:
+            try:
+                from .common import get_client_async as _get_client
+
+                _client = await _get_client()
+
+                async def _fetch_by_poule(pid: str) -> list:
+                    fc = json.dumps({"idPoule": {"_eq": int(pid)}})
+                    try:
+                        return await _client.list_rencontres_async(
+                            limit=500, filter_criteria=fc
+                        )
+                    except Exception:
+                        return []
+
+                _rencontres_lists = await asyncio.gather(
+                    *[_fetch_by_poule(pid) for pid in _poule_ids],
+                    return_exceptions=True,
+                )
+                _salle_map: dict[str, str] = {}
+                for _res in _rencontres_lists:
+                    if isinstance(_res, list):
+                        for _r in _res:
+                            if _r.id and _r.salle:
+                                _salle_map[str(_r.id)] = str(_r.salle)
+                for m in _matches_need_salle:
+                    _sid = _salle_map.get(str(m["id"]))
+                    if _sid:
+                        m["salle"] = _sid
+            except Exception:
+                pass  # Fallback silencieux
+
+    await _enrich_matches_with_salle_details(all_matches)
 
     # Extraction ville/adresse depuis salle_details vers les champs plats
     for m in all_matches:
