@@ -304,6 +304,10 @@ state.cache_salle = TTLCache(
     maxsize=1024,
     ttl=_read_positive_int_env("FFBB_CACHE_TTL_SALLE", get_static_ttl("salle")),
 )
+state.cache_resolve_club = TTLCache(
+    maxsize=256,
+    ttl=_read_positive_int_env("FFBB_CACHE_TTL_RESOLVE_CLUB", 3600),
+)
 
 _inflight_lock: asyncio.Lock | None = None
 _inflight_lock_guard = threading.Lock()
@@ -351,6 +355,7 @@ def get_cache_ttls() -> dict[str, int]:
         "salle": _read_positive_int_env(
             "FFBB_CACHE_TTL_SALLE", get_static_ttl("salle")
         ),
+        "resolve_club": _read_positive_int_env("FFBB_CACHE_TTL_RESOLVE_CLUB", 3600),
     }
 
 

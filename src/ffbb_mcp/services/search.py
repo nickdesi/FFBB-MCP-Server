@@ -317,6 +317,15 @@ async def _resolve_club_and_org(
 
     Si categorie est fournie, applique une logique de filtrage M/F.
     """
+    import copy
+
+    from ffbb_mcp.services.common import _cache_get, _cache_set
+
+    cache_key = f"resolve_club:{club_name}:{organisme_id}:{categorie}:{limit}"
+    cached = _cache_get(state.cache_resolve_club, cache_key, "resolve_club")
+    if cached is not None:
+        return copy.deepcopy(cached)
+
     import ffbb_mcp.services
 
     resolved: list[dict[str, Any]] = []
@@ -405,7 +414,14 @@ async def _resolve_club_and_org(
                 reverse=True,
             )
 
-    return resolved, org_data
+    result = (resolved, org_data)
+    _cache_set(
+        state.cache_resolve_club,
+        cache_key,
+        copy.deepcopy(result),
+        "resolve_club",
+    )
+    return result
 
 
 def _build_search_results(results: Any, limit: int) -> list[dict]:

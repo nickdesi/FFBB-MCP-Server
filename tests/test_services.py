@@ -1798,3 +1798,57 @@ class TestSalleEnrichment:
 
         assert salle_data["ville"] == "PARIS"
         assert salle_data["code_postal"] == "75001"
+
+
+class TestResolveClubAndOrgCache:
+    """Vérifie le fonctionnement du cache sur _resolve_club_and_org."""
+
+    @pytest.mark.asyncio
+    async def test_resolve_club_and_org_uses_cache(self, patch_get_client, mock_client):
+        from unittest.mock import AsyncMock, MagicMock
+
+        from ffbb_mcp._state import reset_service_state
+        from ffbb_mcp.services import _resolve_club_and_org
+
+        reset_service_state()
+        call_count = {"n": 0}
+
+        async def mock_search(nom, limit=20):
+            call_count["n"] += 1
+            return [{"id": 1001, "nom": "GERZAT BASKET", "code": "123"}]
+
+        org_mock = MagicMock()
+        org_mock.model_dump = MagicMock(
+            return_value={"nom": "GERZAT BASKET", "id": 1001, "code": "123"}
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        import ffbb_mcp.services as svc
+
+        original = svc.search_organismes_service
+        svc.search_organismes_service = mock_search
+
+        try:
+            # Premier appel -> cache miss, recherche (recherche principale + recherche mot-clé)
+            resolved1, _ = await _resolve_club_and_org(
+                club_name="Gerzat Basket",
+                organisme_id=None,
+                categorie=None,
+            )
+            assert call_count["n"] == 2
+
+            # Deuxième appel -> cache hit, pas de recherche supplémentaire
+            resolved2, _ = await _resolve_club_and_org(
+                club_name="Gerzat Basket",
+                organisme_id=None,
+                categorie=None,
+            )
+            assert call_count["n"] == 2
+            assert resolved1 == resolved2
+
+            # Vérification du deepcopy : modifier resolved2 ne doit pas modifier resolved1
+            resolved2[0]["nom"] = "MUTATED"
+            assert resolved1[0]["nom"] == "GERZAT BASKET"
+
+        finally:
+            svc.search_organismes_service = original

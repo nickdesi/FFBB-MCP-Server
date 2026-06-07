@@ -39,6 +39,7 @@ class _ServiceState:
     cache_classement: Any = None
     cache_poule: Any = None
     cache_salle: Any = None
+    cache_resolve_club: Any = None
 
 
 state = _ServiceState()
@@ -71,6 +72,8 @@ def reset_service_state() -> None:
         state.cache_poule.clear()
     if state.cache_salle is not None:
         state.cache_salle.clear()
+    if state.cache_resolve_club is not None:
+        state.cache_resolve_club.clear()
     _clear_lru_caches()
 
 
