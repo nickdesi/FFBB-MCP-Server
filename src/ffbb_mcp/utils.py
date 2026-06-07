@@ -116,7 +116,7 @@ def format_team_name(name: str | None, number: int | str | None) -> str:
         num_int = int(number)
         if num_int > 1:
             return f"{name} - {num_int}"
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         pass
 
     return name
