@@ -106,6 +106,13 @@ class CalendrierMatch(BaseModel):
         default=None, description="Détails enrichis de la salle de sport."
     )
     adresse_salle: str | None = Field(default=None, description="Adresse de la salle.")
+    nom_salle: str | None = Field(
+        default=None, description="Nom de la salle (libelle)."
+    )
+    lieu_complet: str | None = Field(
+        default=None,
+        description="Adresse formatée complète : 'Nom Salle - Adresse, CP Ville'.",
+    )
     played: bool = Field(
         default=False, description="Indique si le match est déjà joué."
     )

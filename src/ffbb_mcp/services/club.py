@@ -1123,6 +1123,23 @@ async def _build_calendar_matches(
                     or sd.get("adresse1")
                     or ""
                 )
+            # nom_salle = libelle de la salle
+            m["nom_salle"] = sd.get("libelle") or ""
+            # lieu_complet = "Nom Salle - Adresse, CP Ville"
+            commune = sd.get("commune") or {}
+            cp = (
+                sd.get("code_postal")
+                or commune.get("code_postal")
+                or commune.get("codePostal")
+                or ""
+            )
+            nom = m.get("nom_salle") or ""
+            adr = sd.get("adresse") or m.get("adresse_salle") or ""
+            vil = m.get("ville") or ""
+            cp_ville = " ".join(filter(None, [cp, vil]))
+            adresse_postale = ", ".join(filter(None, [adr, cp_ville]))
+            parts = [p for p in [nom, adresse_postale] if p]
+            m["lieu_complet"] = " - ".join(parts)
 
     tz = _PARIS_TZ
     now = datetime.now(tz)
