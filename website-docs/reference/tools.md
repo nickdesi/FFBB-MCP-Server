@@ -474,6 +474,9 @@ Deux nouveaux outils sont disponibles pour interroger facilement les résultats 
 Permet d'obtenir en un seul appel :
 
 - la date et la journée du dernier match joué,
+- le nom complet de la compétition (ex: "Coupe U11M Auvergne"),
+- le type de phase (`poule` ou `elimination`),
+- le label de la phase (ex: "1/4 de finale"),
 - les équipes domicile / extérieur,
 - les scores,
 - un indicateur de victoire/défaite pour l'équipe suivie.
@@ -490,7 +493,11 @@ Permet d'obtenir en un seul appel :
   {
     "status": "ok",                    // ou "no_result" si aucun match trouvé
     "date": "2025-12-13 13:00:00",    // date du match
-    "journee": "5",                   // numéro de journée
+    "journee": "1",                   // numéro de journée ou tour
+    "competition": "Coupe U11M Auvergne",  // nom complet de la compétition
+    "competition_id": "1234",          // ID de la compétition (pour ffbb_get)
+    "phase_type": "elimination",       // "poule" ou "elimination"
+    "phase_label": "1/4 de finale",    // label lisible de la phase
     "domicile": "Club A - 1",
     "score_domicile": "19",
     "exterieur": "Club B - 1",
