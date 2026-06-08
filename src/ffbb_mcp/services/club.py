@@ -1495,7 +1495,9 @@ async def ffbb_last_result_service(
 
     organisme_nom = str(club_resolu.get("nom", "")) if club_resolu is not None else ""
 
-    async def _get_latest_match(refresh: bool) -> dict[str, Any] | None:
+    async def _get_latest_match(
+        refresh: bool,
+    ) -> tuple[dict[str, Any], dict[str, Any]] | None:
         all_matches = await _fetch_poule_matches(
             equipes,
             organisme_nom=organisme_nom,
@@ -1518,9 +1520,13 @@ async def ffbb_last_result_service(
             ),
             reverse=True,
         )
-        return active_phase[0][0]
+        return active_phase[0][0], active_phase[0][1]
 
-    dernier: dict[str, Any] | None = await _get_latest_match(force_refresh)
+    latest_tuple: tuple[dict[str, Any], dict[str, Any]] | None = (
+        await _get_latest_match(force_refresh)
+    )
+    dernier: dict[str, Any] | None = latest_tuple[0] if latest_tuple else None
+    source_eq: dict[str, Any] = latest_tuple[1] if latest_tuple else {}
 
     if dernier and not force_refresh:
         date_str = dernier.get("date_rencontre", "")
@@ -1530,9 +1536,10 @@ async def ffbb_last_result_service(
                 logger.info(
                     f"ffbb_last_result: match > 30 jours ({date_str[:10]} < {seuil_str}), force_refresh déclenché."
                 )
-                dernier_refresh = await _get_latest_match(True)
-                if dernier_refresh:
-                    dernier = dernier_refresh
+                dernier_refresh_tuple = await _get_latest_match(True)
+                if dernier_refresh_tuple:
+                    dernier = dernier_refresh_tuple[0]
+                    source_eq = dernier_refresh_tuple[1]
 
     if not dernier:
         all_available_equipes = sorted(
@@ -1616,11 +1623,18 @@ async def ffbb_last_result_service(
         if len(parts) >= 2:
             ville = parts[-1].strip()
 
+    competition_name = source_eq.get("competition", "")
+    phase_label = source_eq.get("phase_label")
+
     return {
         "status": "ok",
         "club_resolu": club_resolu,
         "date": dernier.get("date_rencontre", ""),
         "journee": dernier.get("numeroJournee"),
+        "competition": competition_name,
+        "competition_id": source_eq.get("competition_id"),
+        "phase_type": _detect_phase_type(competition_name),
+        "phase_label": phase_label,
         "domicile": format_team_name(dernier.get("nomEquipe1", ""), num1),
         "score_domicile": dernier.get("resultatEquipe1"),
         "exterieur": format_team_name(dernier.get("nomEquipe2", ""), num2),
