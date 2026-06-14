@@ -199,6 +199,7 @@ _ESSENTIAL_KEYS = frozenset(
     }
 )
 
+_ESSENTIAL_KEYS_LEN = len(_ESSENTIAL_KEYS)
 
 _PRUNE_LIMIT = int(os.environ.get("FFBB_MCP_PRUNE_LIMIT", "50"))
 
@@ -252,11 +253,14 @@ def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
         if len(cleaned) > _PRUNE_LIMIT:
             kept: dict[str, Any] = {}
             overflow_count = 0
+            # ⚡ Bolt: Fast path computation. Pre-calculate the allowed non-essentials outside the loop.
+            # Avoids re-computing (_PRUNE_LIMIT - len(_ESSENTIAL_KEYS)) repeatedly.
+            allowed_non_essentials = _PRUNE_LIMIT - _ESSENTIAL_KEYS_LEN
             non_essential_count = 0
             for k, v in cleaned.items():
                 if k in _ESSENTIAL_KEYS:
                     kept[k] = v
-                elif non_essential_count < (_PRUNE_LIMIT - len(_ESSENTIAL_KEYS)):
+                elif non_essential_count < allowed_non_essentials:
                     kept[k] = v
                     non_essential_count += 1
                 else:
