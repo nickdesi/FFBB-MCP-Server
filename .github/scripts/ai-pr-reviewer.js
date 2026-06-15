@@ -26,6 +26,7 @@ const IGNORED_FILES = [
 ];
 
 // Fonction utilitaire pour faire des requêtes HTTPS asynchrones
+// Fonction utilitaire pour faire des requêtes HTTPS asynchrones avec rejets gérés
 function makeRequest(options, postData = null) {
   return new Promise((resolve, reject) => {
     const req = https.request(options, (res) => {
@@ -33,7 +34,7 @@ function makeRequest(options, postData = null) {
       res.on('data', (chunk) => { data += chunk; });
       res.on('end', () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(data);
+          resolve({ status: res.statusCode, data: data });
         } else {
           reject(new Error(`Status Code: ${res.statusCode}. Response: ${data}`));
         }
@@ -47,6 +48,24 @@ function makeRequest(options, postData = null) {
     }
     req.end();
   });
+}
+
+// Fonction utilitaire pour faire des requêtes avec retry pour les 5xx (et 429)
+async function makeRequestWithRetry(options, postData = null, retries = 3, baseDelay = 1000) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const response = await makeRequest(options, postData);
+      return response.data;
+    } catch (error) {
+      const isRetryable = error.message.includes('Status Code: 5') || error.message.includes('Status Code: 429');
+      if (attempt === retries || !isRetryable) {
+        throw error;
+      }
+      const delay = baseDelay * Math.pow(2, attempt - 1);
+      console.warn(`Tentative ${attempt}/${retries} échouée (${error.message}). Nouvelle tentative dans ${delay}ms...`);
+      await new Promise(res => setTimeout(res, delay));
+    }
+  }
 }
 
 // Fonction pour récupérer la liste des lignes ajoutées ou modifiées dans un patch
@@ -94,7 +113,7 @@ async function run() {
         'User-Agent': 'AI-PR-Reviewer-Action'
       }
     };
-    const prDetailsRaw = await makeRequest(prDetailsOptions);
+    const prDetailsRaw = await makeRequestWithRetry(prDetailsOptions);
     const prDetails = JSON.parse(prDetailsRaw);
     const commitSha = prDetails.head.sha;
     console.log(`SHA du dernier commit: ${commitSha}`);
@@ -111,7 +130,7 @@ async function run() {
         'User-Agent': 'AI-PR-Reviewer-Action'
       }
     };
-    const prFilesRaw = await makeRequest(prFilesOptions);
+    const prFilesRaw = await makeRequestWithRetry(prFilesOptions);
     const files = JSON.parse(prFilesRaw);
 
     // Filtrer les fichiers de code pertinents
@@ -203,7 +222,7 @@ ${JSON.stringify(fileDiffData, null, 2)}`;
       }
     };
 
-    const geminiResponseRaw = await makeRequest(geminiOptions, geminiPayload);
+    const geminiResponseRaw = await makeRequestWithRetry(geminiOptions, geminiPayload, 3, 2000);
     const geminiResponse = JSON.parse(geminiResponseRaw);
     
     // Extraire le texte de la réponse
@@ -261,7 +280,7 @@ _Cette revue a été générée automatiquement par l'agent IA._`,
       }
     };
 
-    await makeRequest(submitReviewOptions, reviewPayload);
+    await makeRequestWithRetry(submitReviewOptions, reviewPayload);
     console.log("Revue publiée avec succès !");
 
   } catch (error) {
