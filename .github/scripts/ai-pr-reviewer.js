@@ -245,7 +245,7 @@ ${JSON.stringify(fileDiffData, null, 2)}`;
 ${reviewResult.summary}
 
 _Cette revue a été générée automatiquement par l'agent IA._`,
-      event: reviewResult.verdict,
+      event: reviewResult.verdict === 'APPROVE' ? 'COMMENT' : reviewResult.verdict,
       comments: validComments
     };
 
