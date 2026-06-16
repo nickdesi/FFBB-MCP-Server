@@ -1522,9 +1522,9 @@ async def ffbb_last_result_service(
         )
         return active_phase[0][0], active_phase[0][1]
 
-    latest_tuple: tuple[dict[str, Any], dict[str, Any]] | None = (
-        await _get_latest_match(force_refresh)
-    )
+    latest_tuple: (
+        tuple[dict[str, Any], dict[str, Any]] | None
+    ) = await _get_latest_match(force_refresh)
     dernier: dict[str, Any] | None = latest_tuple[0] if latest_tuple else None
     source_eq: dict[str, Any] = latest_tuple[1] if latest_tuple else {}
 
