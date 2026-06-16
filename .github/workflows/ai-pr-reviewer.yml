@@ -30,20 +30,16 @@ jobs:
     
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0 # Nécessaire pour avoir l'historique et faire le merge
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 18
+          node-version: 24
 
-      - name: Resolve bolt.md Merge Conflicts
-        env:
-          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
-          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
-        run: node .github/scripts/resolve-bolt-conflict.js
+
 
       - name: Run AI Reviewer
         if: env.GEMINI_API_KEY != ''
