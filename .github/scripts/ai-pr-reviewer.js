@@ -49,6 +49,25 @@ function makeRequest(options, postData = null) {
   });
 }
 
+// Fonction utilitaire avec retry et exponential backoff pour l'API Gemini
+async function makeRequestWithRetry(options, postData = null, retries = 5, initialDelay = 2000) {
+  let delay = initialDelay;
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await makeRequest(options, postData);
+    } catch (error) {
+      const isRetryable = error.message.includes('Status Code: 503') || error.message.includes('Status Code: 429');
+      if (isRetryable && i < retries - 1) {
+        console.warn(`Avertissement: Erreur de l'API (Retry ${i + 1}/${retries}). Attente de ${delay}ms... Détails: ${error.message}`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2; // Exponential backoff
+      } else {
+        throw error;
+      }
+    }
+  }
+}
+
 // Fonction pour récupérer la liste des lignes ajoutées ou modifiées dans un patch
 function getAddedLines(patch) {
   if (!patch) return [];
@@ -203,7 +222,7 @@ ${JSON.stringify(fileDiffData, null, 2)}`;
       }
     };
 
-    const geminiResponseRaw = await makeRequest(geminiOptions, geminiPayload);
+    const geminiResponseRaw = await makeRequestWithRetry(geminiOptions, geminiPayload);
     const geminiResponse = JSON.parse(geminiResponseRaw);
     
     // Extraire le texte de la réponse
