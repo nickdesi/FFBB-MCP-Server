@@ -116,7 +116,7 @@ def format_team_name(name: str | None, number: int | str | None) -> str:
         num_int = int(number)
         if num_int > 1:
             return f"{name} - {num_int}"
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         pass
 
     return name
@@ -253,10 +253,12 @@ def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
             kept: dict[str, Any] = {}
             overflow_count = 0
             non_essential_count = 0
+            # ⚡ Bolt: Pre-calculate max_non_essential to avoid repeated calculation inside loop
+            max_non_essential = _PRUNE_LIMIT - len(_ESSENTIAL_KEYS)
             for k, v in cleaned.items():
                 if k in _ESSENTIAL_KEYS:
                     kept[k] = v
-                elif non_essential_count < (_PRUNE_LIMIT - len(_ESSENTIAL_KEYS)):
+                elif non_essential_count < max_non_essential:
                     kept[k] = v
                     non_essential_count += 1
                 else:
