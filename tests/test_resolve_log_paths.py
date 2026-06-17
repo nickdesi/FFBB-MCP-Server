@@ -30,7 +30,7 @@ async def test_resolve_logs_debug_when_organisme_id_fetch_fails(caplog):
 
     assert resolved == []
     assert org_data is None
-    assert "9999" in caplog.text
+    assert "Impossible de charger l'organisme" in caplog.text
     assert "timeout" in caplog.text
 
 

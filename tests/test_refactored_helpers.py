@@ -63,7 +63,7 @@ async def test_resolve_club_and_org_logs_organisme_load_error(caplog):
 
     assert resolved == []
     assert org_data is None
-    assert "Impossible de charger l'organisme_id 123" in caplog.text
+    assert "Impossible de charger l'organisme" in caplog.text
 
 
 @pytest.mark.asyncio

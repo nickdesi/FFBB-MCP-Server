@@ -344,13 +344,10 @@ async def _resolve_club_and_org(
                     )
                 )
             else:
-                logger.warning(
-                    "Organisme_id %s retourné vide ou invalide", organisme_id
-                )
+                logger.warning("Organisme retourné vide ou invalide")
         except Exception:
             logger.debug(
-                "Impossible de charger l'organisme_id %s",
-                organisme_id,
+                "Impossible de charger l'organisme",
                 exc_info=True,
             )
     elif club_name:

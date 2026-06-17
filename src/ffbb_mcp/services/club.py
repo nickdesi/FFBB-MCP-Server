@@ -911,7 +911,9 @@ async def _build_bilan_payload(
     unique_poule_ids = list(
         dict.fromkeys(str(e.get("poule_id")) for e in equipes if e.get("poule_id"))
     )
-    logger.debug(f"ffbb_bilan: club_nom={club_nom} cible_orgs={target_org_ids}")
+    logger.debug(
+        f"ffbb_bilan: club_nom={club_nom} cible_orgs_count={len(target_org_ids)}"
+    )
     logger.debug(
         f"ffbb_bilan: equipes_count={len(equipes)} unique_poules={unique_poule_ids}"
     )
@@ -1110,7 +1112,7 @@ async def ffbb_bilan_service(
     cache_key = f"bilan:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}"
 
     if force_refresh and state.cache_bilan is not None:
-        logger.debug(f"force_refresh=True, bypass cache pour {cache_key}")
+        logger.debug("force_refresh=True, bypass cache pour bilan")
         state.cache_bilan.pop(cache_key, None)
 
     return await _dedupe_inflight(
