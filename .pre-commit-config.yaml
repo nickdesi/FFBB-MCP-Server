@@ -24,3 +24,12 @@ repos:
             "types-cachetools>=7.0.0.20260503",
             "types-setuptools",
         ]
+
+  - repo: local
+    hooks:
+      - id: update-agents-md
+        name: Régénère AGENTS.md (compteurs de lignes)
+        entry: uv run python tools/update_agents_md.py
+        language: system
+        pass_filenames: false
+        files: ^(src/ffbb_mcp/.*\.py|tools/update_agents_md\.py)$

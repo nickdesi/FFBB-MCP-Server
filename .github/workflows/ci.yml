@@ -65,10 +65,9 @@ jobs:
       - name: Check version alignment
         run: uv run --frozen python tools/check_version_alignment.py
 
-      - name: Verify AGENTS.md is up-to-date
-        run: |
-          uv run --frozen python tools/update_agents_md.py
-          git diff --exit-code AGENTS.md || (echo "❌ AGENTS.md n'est pas à jour. Lancez 'rtk uv run python tools/update_agents_md.py' localement et commitez les modifications." && exit 1)
+      # AGENTS.md est un artefact généré : il est maintenu automatiquement par
+      # le hook pre-commit local et par le workflow "Update AGENTS.md".
+      # On ne bloque donc pas la CI dessus (évite les faux échecs + rebases).
 
       - name: Lint with ruff
         run: uv run --frozen ruff check .
