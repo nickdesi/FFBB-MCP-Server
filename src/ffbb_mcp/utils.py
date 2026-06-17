@@ -203,6 +203,10 @@ _ESSENTIAL_KEYS = frozenset(
 
 _PRUNE_LIMIT = int(os.environ.get("FFBB_MCP_PRUNE_LIMIT", "50"))
 
+# Bolt: Pre-calculate the maximum non-essential keys to avoid redundant calculation
+# and length determination inside the recursive prune_payload hot path.
+_MAX_NON_ESSENTIAL = _PRUNE_LIMIT - len(_ESSENTIAL_KEYS)
+
 
 def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
     """Réduit agressivement la taille des payloads JSON (ZipAI Surgical Logic).
@@ -257,7 +261,7 @@ def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
             for k, v in cleaned.items():
                 if k in _ESSENTIAL_KEYS:
                     kept[k] = v
-                elif non_essential_count < (_PRUNE_LIMIT - len(_ESSENTIAL_KEYS)):
+                elif non_essential_count < _MAX_NON_ESSENTIAL:
                     kept[k] = v
                     non_essential_count += 1
                 else:
