@@ -23,18 +23,19 @@ def serialize_model(obj: Any) -> JSONValue:
     if obj_type is list:
         return [serialize_model(item) for item in obj]
 
-    # Fallback: isinstance pour supporter les sous-classes (ex: IntEnum)
-    if isinstance(obj, str | int | float | bool):
-        return obj
-
     # Let Pydantic do the heavy lifting natively in C/Rust (V2)
     if (val := getattr(obj, "model_dump", None)) is not None:  # Pydantic v2
         return val(mode="json")
     if (val := getattr(obj, "dict", None)) is not None:  # Pydantic v1
         return val()
 
+    # Fallback: isinstance pour supporter les sous-classes (ex: IntEnum)
+    if isinstance(obj, str | int | float | bool):
+        return obj
+
     if (val := getattr(obj, "__dict__", None)) is not None:
         return {k: serialize_model(v) for k, v in val.items() if not k.startswith("_")}
+
     return str(obj)
 
 
