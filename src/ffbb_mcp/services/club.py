@@ -562,7 +562,7 @@ async def ffbb_next_match_service(
 
     if not upcoming and not force_refresh:
         logger.info(
-            f"ffbb_next_match: aucun match trouvé en cache pour {categorie}, "
+            "ffbb_next_match: aucun match trouvé en cache, "
             "tentative de rafraîchissement..."
         )
         all_matches = await _fetch_poule_matches(
@@ -912,7 +912,7 @@ async def _build_bilan_payload(
         dict.fromkeys(str(e.get("poule_id")) for e in equipes if e.get("poule_id"))
     )
     logger.debug(
-        f"ffbb_bilan: club_nom={club_nom} cible_orgs_count={len(target_org_ids)} "
+        f"ffbb_bilan: cible_orgs_count={len(target_org_ids)} "
         f"equipes_count={len(equipes)} unique_poules_count={len(unique_poule_ids)}"
     )
 
@@ -965,11 +965,7 @@ async def _build_bilan_payload(
             if entry_eng_id in eng_ids_here:
                 pass
             elif entry_org_id in org_ids_str:
-                logger.debug(
-                    "ffbb_bilan: fallback org_id utilisé pour entry_eng_id=%s org_id=%s",
-                    entry_eng_id,
-                    entry_org_id,
-                )
+                logger.debug("ffbb_bilan: fallback org_id utilisé")
             else:
                 continue
 
@@ -1534,7 +1530,7 @@ async def ffbb_last_result_service(
             seuil_str = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
             if date_str[:10] < seuil_str:
                 logger.info(
-                    f"ffbb_last_result: match > 30 jours ({date_str[:10]} < {seuil_str}), force_refresh déclenché."
+                    "ffbb_last_result: match > 30 jours, force_refresh déclenché."
                 )
                 dernier_refresh_tuple = await _get_latest_match(True)
                 if dernier_refresh_tuple:
