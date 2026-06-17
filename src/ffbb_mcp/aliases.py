@@ -336,7 +336,7 @@ def enrich_acronym_cache(official_name: str) -> None:
         cache[initials] = official_name
         _acronyms_cache_upper[initials_upper] = official_name
         _save_acronyms_cache()
-        logger.info("Acronyme auto-enrichi: %s", initials)
+        logger.info("Acronyme auto-enrichi")
 
 
 _APOSTROPHES_MAP = str.maketrans("\u2019\u2018\u201b\u0060", "''''")

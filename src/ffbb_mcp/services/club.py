@@ -912,10 +912,8 @@ async def _build_bilan_payload(
         dict.fromkeys(str(e.get("poule_id")) for e in equipes if e.get("poule_id"))
     )
     logger.debug(
-        f"ffbb_bilan: club_nom={club_nom} cible_orgs_count={len(target_org_ids)}"
-    )
-    logger.debug(
-        f"ffbb_bilan: equipes_count={len(equipes)} unique_poules={unique_poule_ids}"
+        f"ffbb_bilan: club_nom={club_nom} cible_orgs_count={len(target_org_ids)} "
+        f"equipes_count={len(equipes)} unique_poules_count={len(unique_poule_ids)}"
     )
 
     async def _fetch_poule_bilan(pid: str) -> dict[str, Any] | Exception:
