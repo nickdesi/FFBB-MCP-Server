@@ -86,6 +86,11 @@ def _dedup_equipes_by_engagement(equipes: list[dict[str, Any]]) -> list[dict[str
     return deduped_equipes
 
 
+def _engagement_numero(eng: Any) -> Any:
+    """Extrait le numéro d'équipe d'un engagement (dict ou valeur brute)."""
+    return eng.get("numeroEquipe") if isinstance(eng, dict) else None
+
+
 def _compute_bilan_from_rencontres(
     poule_data: dict[str, Any],
     eng_ids: set[str],
@@ -628,8 +633,8 @@ async def ffbb_next_match_service(
     id_eng2 = eng2.get("id") if isinstance(eng2, dict) else eng2
     my_eng = source_team.get("engagement_id")
 
-    num1 = eng1.get("numeroEquipe") if isinstance(eng1, dict) else None
-    num2 = eng2.get("numeroEquipe") if isinstance(eng2, dict) else None
+    num1 = _engagement_numero(eng1)
+    num2 = _engagement_numero(eng2)
     eq1_name = format_team_name(
         next_match.get("nomEquipe1", next_match.get("nom_equipe1", "")), num1
     )
@@ -1227,8 +1232,8 @@ async def _build_calendar_matches(
 
             eng1 = match.get("idEngagementEquipe1")
             eng2 = match.get("idEngagementEquipe2")
-            num1 = eng1.get("numeroEquipe") if isinstance(eng1, dict) else None
-            num2 = eng2.get("numeroEquipe") if isinstance(eng2, dict) else None
+            num1 = _engagement_numero(eng1)
+            num2 = _engagement_numero(eng2)
 
             eq1 = format_team_name(
                 match.get("nomEquipe1", match.get("nom_equipe1", "")), num1
@@ -1590,8 +1595,8 @@ async def ffbb_last_result_service(
 
     eng1 = dernier.get("idEngagementEquipe1")
     eng2 = dernier.get("idEngagementEquipe2")
-    num1 = eng1.get("numeroEquipe") if isinstance(eng1, dict) else None
-    num2 = eng2.get("numeroEquipe") if isinstance(eng2, dict) else None
+    num1 = _engagement_numero(eng1)
+    num2 = _engagement_numero(eng2)
 
     client = await get_client_async()
     from .salle import _enrich_with_salle_details

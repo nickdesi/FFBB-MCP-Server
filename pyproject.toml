@@ -52,7 +52,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "--cov=ffbb_mcp --cov-fail-under=65"
+addopts = "--cov=ffbb_mcp --cov-fail-under=78"
 
 [tool.ruff]
 line-length = 88
