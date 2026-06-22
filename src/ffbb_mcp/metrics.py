@@ -380,6 +380,9 @@ def _save_metrics_to_disk() -> None:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             os.replace(temp_path, metrics_file)
+            print(
+                f"[metrics] Sauvegarde OK -> {metrics_file} ({data['calls_success']}s/{data['calls_error']}e)"
+            )
         except Exception:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
@@ -417,6 +420,7 @@ def _mark_dirty() -> None:
 def load_metrics() -> None:
     """Charge les métriques persistées depuis le disque au démarrage."""
     import json
+    import os
 
     global \
         _calls_success, \
@@ -427,7 +431,19 @@ def load_metrics() -> None:
     global _cache_hits, _cache_misses, _cache_miss_reasons, _tool_calls
 
     metrics_file = _get_metrics_file()
+    data_dir = _resolve_data_dir()
+    print(
+        f"[metrics] Data dir: {data_dir} (exists={data_dir.exists()}, writable={os.access(data_dir, os.W_OK) if data_dir.exists() else 'N/A'})"
+    )
+    print(f"[metrics] Fichier: {metrics_file} (exists={metrics_file.exists()})")
+
     if not metrics_file.exists():
+        # List contents of data_dir for debug
+        if data_dir.exists():
+            contents = list(data_dir.iterdir())
+            print(f"[metrics] Contenu de {data_dir}: {[p.name for p in contents]}")
+        else:
+            print(f"[metrics] Répertoire {data_dir} n'existe PAS")
         return
 
     try:
@@ -453,6 +469,9 @@ def load_metrics() -> None:
                     _cache_miss_reasons[(parts[0], parts[1])] = v
 
             _tool_calls.update(data.get("tool_calls", {}))
+        print(
+            f"[metrics] Chargement OK: {_calls_success}s/{_calls_error}e, {sum(_cache_hits.values())} hits, {sum(_cache_misses.values())} misses"
+        )
     except Exception as e:
         print(f"[metrics] Erreur chargement metrics: {e}")
 
