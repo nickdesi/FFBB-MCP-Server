@@ -26,8 +26,6 @@ ENV PORT=9123
 ENV HOST=0.0.0.0
 ENV PATH="/opt/venv/bin:$PATH"
 
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-
 WORKDIR /app
 ENV HOME=/app
 
@@ -36,13 +34,12 @@ COPY assets/ ./assets/
 COPY website/ ./website/
 
 # Création du répertoire de données persistant
-RUN mkdir -p /app/data && chown -R appuser:appuser /app/data
+RUN mkdir -p /app/data
 
 ENV FFBB_DATA_DIR=/app/data
 ENV XDG_CACHE_HOME=/app/data/.cache
 
-RUN chown -R appuser:appuser /app
-USER appuser
+
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
   CMD python -c "import urllib.request, sys; sys.exit(0) if urllib.request.urlopen('http://localhost:9123/health').getcode() == 200 else sys.exit(1)"
