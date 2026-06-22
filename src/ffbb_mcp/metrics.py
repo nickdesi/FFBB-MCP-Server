@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import atexit
 import bisect
+import threading
 import time
+from pathlib import Path
 from threading import Lock
 from typing import TYPE_CHECKING, Any
 
@@ -60,6 +63,7 @@ def record_call(latency: float, is_error: bool) -> None:
             _latency_bucket_counts[i] += 1
         # +Inf bucket : toujours incrémenté
         _latency_bucket_counts[len(_LATENCY_BUCKETS)] += 1
+    _mark_dirty()
 
 
 def inc_inflight() -> None:
@@ -80,6 +84,7 @@ def record_cache_hit(cache_name: str) -> None:
     """Enregistre un hit de cache."""
     with _metrics_lock:
         _cache_hits[cache_name] = _cache_hits.get(cache_name, 0) + 1
+    _mark_dirty()
 
 
 def record_cache_miss(cache_name: str, reason: str = "not_found") -> None:
@@ -92,12 +97,14 @@ def record_cache_miss(cache_name: str, reason: str = "not_found") -> None:
         _cache_misses[cache_name] = _cache_misses.get(cache_name, 0) + 1
         key = (cache_name, reason)
         _cache_miss_reasons[key] = _cache_miss_reasons.get(key, 0) + 1
+    _mark_dirty()
 
 
 def record_tool_call(tool_name: str) -> None:
     """Enregistre un appel d'outil MCP par nom d'outil exposé."""
     with _metrics_lock:
         _tool_calls[tool_name] = _tool_calls.get(tool_name, 0) + 1
+    _mark_dirty()
 
 
 def reset_metrics() -> None:
@@ -117,6 +124,7 @@ def reset_metrics() -> None:
         _cache_misses.clear()
         _cache_miss_reasons.clear()
         _tool_calls.clear()
+    _mark_dirty()
 
 
 # ---------------------------------------------------------------------------
@@ -315,3 +323,148 @@ def summarize_health(snapshot: Mapping[str, Any] | None = None) -> dict[str, Any
         "cache_misses_total": cache_misses,
         "cache_hit_ratio_global": cache_hits / cache_total if cache_total else 0.0,
     }
+
+
+# ---------------------------------------------------------------------------
+# Persistance des métriques
+# ---------------------------------------------------------------------------
+
+_dirty: bool = False
+_save_thread: threading.Thread | None = None
+_stop_save_thread: bool = False
+
+
+def _resolve_data_dir() -> Path:
+    import os
+
+    data_dir = os.environ.get(
+        "FFBB_DATA_DIR", "/app/data" if os.path.exists("/app/data") else "./data"
+    )
+    return Path(data_dir).resolve()
+
+
+def _get_metrics_file() -> Path:
+    return _resolve_data_dir() / "metrics_store.json"
+
+
+def _save_metrics_to_disk() -> None:
+    import json
+    import os
+    import tempfile
+
+    metrics_file = _get_metrics_file()
+    data_dir = _resolve_data_dir()
+    try:
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        with _metrics_lock:
+            data = {
+                "calls_success": _calls_success,
+                "calls_error": _calls_error,
+                "latency_bucket_counts": _latency_bucket_counts,
+                "latency_sum": _latency_sum,
+                "latency_count": _latency_count,
+                "cache_hits": _cache_hits,
+                "cache_misses": _cache_misses,
+                "cache_miss_reasons": {
+                    f"{k[0]}|{k[1]}": v for k, v in _cache_miss_reasons.items()
+                },
+                "tool_calls": _tool_calls,
+            }
+
+        # Écriture atomique
+        fd, temp_path = tempfile.mkstemp(
+            dir=str(data_dir), prefix="metrics_tmp_", suffix=".json"
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            os.replace(temp_path, metrics_file)
+        except Exception:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+            raise
+    except Exception as e:
+        print(f"[metrics] Erreur écriture metrics: {e}")
+
+
+def _save_loop() -> None:
+    global _dirty
+    import time
+
+    while not _stop_save_thread:
+        time.sleep(5)
+        if _dirty:
+            _dirty = False
+            _save_metrics_to_disk()
+
+
+def _start_save_thread() -> None:
+    global _save_thread
+    if _save_thread is None:
+        with _metrics_lock:
+            if _save_thread is None:
+                _save_thread = threading.Thread(target=_save_loop, daemon=True)
+                _save_thread.start()
+
+
+def _mark_dirty() -> None:
+    global _dirty
+    _dirty = True
+    _start_save_thread()
+
+
+def load_metrics() -> None:
+    """Charge les métriques persistées depuis le disque au démarrage."""
+    import json
+
+    global \
+        _calls_success, \
+        _calls_error, \
+        _latency_bucket_counts, \
+        _latency_sum, \
+        _latency_count
+    global _cache_hits, _cache_misses, _cache_miss_reasons, _tool_calls
+
+    metrics_file = _get_metrics_file()
+    if not metrics_file.exists():
+        return
+
+    try:
+        data = json.loads(metrics_file.read_text(encoding="utf-8"))
+        with _metrics_lock:
+            _calls_success = data.get("calls_success", 0)
+            _calls_error = data.get("calls_error", 0)
+
+            loaded_buckets = data.get("latency_bucket_counts")
+            if loaded_buckets and len(loaded_buckets) == len(_latency_bucket_counts):
+                _latency_bucket_counts = list(loaded_buckets)
+
+            _latency_sum = data.get("latency_sum", 0.0)
+            _latency_count = data.get("latency_count", 0)
+
+            _cache_hits.update(data.get("cache_hits", {}))
+            _cache_misses.update(data.get("cache_misses", {}))
+
+            reasons = data.get("cache_miss_reasons", {})
+            for k_str, v in reasons.items():
+                if "|" in k_str:
+                    parts = k_str.split("|", 1)
+                    _cache_miss_reasons[(parts[0], parts[1])] = v
+
+            _tool_calls.update(data.get("tool_calls", {}))
+    except Exception as e:
+        print(f"[metrics] Erreur chargement metrics: {e}")
+
+
+def _cleanup_metrics() -> None:
+    global _stop_save_thread, _dirty
+    _stop_save_thread = True
+    if _dirty:
+        _save_metrics_to_disk()
+
+
+atexit.register(_cleanup_metrics)
+
+# Chargement automatique des métriques au démarrage
+load_metrics()

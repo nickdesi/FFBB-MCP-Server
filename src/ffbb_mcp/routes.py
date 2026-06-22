@@ -35,13 +35,16 @@ _background_tasks: set[asyncio.Task] = set()
 
 
 def _find_website_dir() -> Path:
-    # Détecte le dossier website/ en local ou en production (mis à jour pour le support responsive mobile et prérequis Node.js)
+    # Détecte le dossier website/ en local ou en production
     repo_path = Path(__file__).resolve().parents[2] / "website"
     if repo_path.exists():
         return repo_path
     pkg_path = Path(__file__).resolve().parent / "website"
     if pkg_path.exists():
         return pkg_path
+    prod_path = Path("/app/website")
+    if prod_path.exists():
+        return prod_path
     return Path.cwd() / "website"
 
 

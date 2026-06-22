@@ -1149,6 +1149,21 @@ register_resources(mcp)
 
 
 def main() -> None:
+    # Configuration du répertoire de persistance principal (CWD)
+    from pathlib import Path
+
+    data_dir = os.environ.get(
+        "FFBB_DATA_DIR", "/app/data" if os.path.exists("/app/data") else "./data"
+    )
+    data_path = Path(data_dir).resolve()
+    try:
+        data_path.mkdir(parents=True, exist_ok=True)
+        os.chdir(data_path)
+    except Exception as e:
+        print(
+            f"[warning] Impossible de changer le répertoire courant vers {data_path}: {e}"
+        )
+
     app_log_level = _resolve_log_level(os.environ.get("FFBB_LOG_LEVEL", "INFO"))
     logging.basicConfig(
         level=app_log_level,

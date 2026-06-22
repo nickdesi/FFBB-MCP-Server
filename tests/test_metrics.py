@@ -86,3 +86,40 @@ def test_tool_calls_present_in_snapshot_and_prometheus():
     assert "ffbb_mcp_tool_calls_total" in prom
     assert 'ffbb_mcp_tool_calls_total{tool="ffbb_version"} 2' in prom
     assert 'ffbb_mcp_tool_calls_total{tool="ffbb_search"} 1' in prom
+
+
+def test_metrics_persistence(tmp_path, monkeypatch):
+    from ffbb_mcp.metrics import (
+        _get_metrics_file,
+        _save_metrics_to_disk,
+        get_snapshot,
+        load_metrics,
+        record_tool_call,
+        reset_metrics,
+    )
+
+    # Configurer le répertoire de données vers le dossier temporaire
+    monkeypatch.setenv("FFBB_DATA_DIR", str(tmp_path))
+
+    reset_metrics()
+    record_tool_call("ffbb_resolve_team")
+    record_tool_call("ffbb_resolve_team")
+    record_tool_call("ffbb_next_match")
+
+    # Forcer la sauvegarde immédiate sur le disque
+    _save_metrics_to_disk()
+
+    metrics_file = _get_metrics_file()
+    assert metrics_file.exists()
+
+    # Réinitialiser en mémoire
+    reset_metrics()
+    snapshot_empty = get_snapshot()
+    assert "ffbb_resolve_team" not in snapshot_empty["tool_calls"]
+
+    # Charger depuis le disque
+    load_metrics()
+
+    snapshot_restored = get_snapshot()
+    assert snapshot_restored["tool_calls"]["ffbb_resolve_team"] == 2
+    assert snapshot_restored["tool_calls"]["ffbb_next_match"] == 1

@@ -35,6 +35,12 @@ COPY --from=builder /opt/venv /opt/venv
 COPY assets/ ./assets/
 COPY website/ ./website/
 
+# Création du répertoire de données persistant
+RUN mkdir -p /app/data && chown -R appuser:appuser /app/data
+
+ENV FFBB_DATA_DIR=/app/data
+ENV XDG_CACHE_HOME=/app/data/.cache
+
 RUN chown -R appuser:appuser /app
 USER appuser
 
