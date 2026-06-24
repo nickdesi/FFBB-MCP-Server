@@ -209,8 +209,8 @@ mcp: FastMCP = FastMCP(
     # Streamable HTTP transport (MCP spec 2025-11-25)
     # stateless_http=True → pas de session persistante (scalabilité horizontale)
     # json_response=True  → répond en application/json (plus simple que SSE pour POST)
-    stateless_http=True,
-    json_response=True,
+    stateless_http=False,
+    json_response=False,
     transport_security=TransportSecuritySettings(
         enable_dns_rebinding_protection=_dns_protection,
         allowed_hosts=_allowed_hosts,
@@ -429,6 +429,7 @@ async def ffbb_get(
     - `type="competition"` equivaut a `get_competition`.
     - `type="poule"` charge la poule (classements + rencontres).
     - `type="organisme"` charge les details d'un club.
+    - `type="rencontre"` charge une rencontre précise.
 
     ⚠️ Attention: `type="poule"` peut être tronqué si la poule est grande.
     Pour un calendrier exhaustif, préférez `ffbb_club(action="calendrier")`.
@@ -770,8 +771,7 @@ async def ffbb_get_saisons(
 @zipai_surgical
 async def ffbb_resolve_team(
     club_name: Annotated[
-        str | None,
-        Field(description="Nom du club (ex: 'Stade Clermontois', 'ASVEL')."),
+        str | None, Field(description="Nom du club (ex: 'Stade Clermontois', 'ASVEL')."),
     ] = None,
     organisme_id: Annotated[
         int | str | None,
