@@ -25,11 +25,13 @@ def _strip_accents(text: str) -> str:
         return text
     # ⚡ Bolt: Fast-path via C-optimized list comprehension instead of generator expression
     # yields an ~11-15% speedup for strings containing accents.
-    return "".join([
-        c
-        for c in unicodedata.normalize("NFD", text)
-        if unicodedata.category(c) not in ("Mn", "So")
-    ])
+    return "".join(
+        [
+            c
+            for c in unicodedata.normalize("NFD", text)
+            if unicodedata.category(c) not in ("Mn", "So")
+        ]
+    )
 
 
 # ---------------------------------------------------------------------------
