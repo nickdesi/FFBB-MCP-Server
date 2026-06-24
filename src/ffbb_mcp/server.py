@@ -209,8 +209,8 @@ mcp: FastMCP = FastMCP(
     # Streamable HTTP transport (MCP spec 2025-11-25)
     # stateless_http=True → pas de session persistante (scalabilité horizontale)
     # json_response=True  → répond en application/json (plus simple que SSE pour POST)
-    stateless_http=False,
-    json_response=False,
+    stateless_http=True,
+    json_response=True,
     transport_security=TransportSecuritySettings(
         enable_dns_rebinding_protection=_dns_protection,
         allowed_hosts=_allowed_hosts,
@@ -771,7 +771,8 @@ async def ffbb_get_saisons(
 @zipai_surgical
 async def ffbb_resolve_team(
     club_name: Annotated[
-        str | None, Field(description="Nom du club (ex: 'Stade Clermontois', 'ASVEL')."),
+        str | None,
+        Field(description="Nom du club (ex: 'Stade Clermontois', 'ASVEL')."),
     ] = None,
     organisme_id: Annotated[
         int | str | None,
