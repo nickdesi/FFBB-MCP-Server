@@ -250,7 +250,7 @@ ${JSON.stringify(fileDiffData, null, 2)}`;
 ${reviewResult.summary}
 
 _Revue générée automatiquement._`,
-      event: reviewResult.verdict,
+      event: 'COMMENT',
       comments: validComments
     };
 
