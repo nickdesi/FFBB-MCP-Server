@@ -101,3 +101,21 @@ def test_request_id_middleware_returns_json_error():
         "request_id": "req-500",
     }
     assert response.headers["X-Request-ID"] == "req-500"
+
+
+def test_request_id_middleware_logs_no_response_returned_as_disconnect(caplog):
+    async def failing_app(scope, receive, send):
+        raise RuntimeError("No response returned.")
+
+    mcp = MagicMock()
+    mcp.session_manager.run.return_value.__aenter__ = AsyncMock(return_value=None)
+    mcp.session_manager.run.return_value.__aexit__ = AsyncMock(return_value=None)
+    mcp.streamable_http_app.return_value = failing_app
+    client = TestClient(create_app(mcp, allowed_origins=["https://example.com"]))
+
+    caplog.set_level("DEBUG", logger="ffbb-mcp")
+    response = client.get("/", headers={"X-Request-ID": "req-disconnect-no-resp"})
+
+    assert response.status_code == 500
+    assert response.headers["X-Request-ID"] == "req-disconnect-no-resp"
+    assert "Client disconnected: No response returned." in caplog.text

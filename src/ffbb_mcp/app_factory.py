@@ -90,7 +90,18 @@ def create_app(mcp: FastMCP, allowed_origins: list[str]) -> Starlette:
                 err_str = str(e).lower()
                 if any(
                     x in err_str
-                    for x in ["broken pipe", "connection closed", "client disconnected"]
+                    for x in [
+                        "broken pipe",
+                        "connection closed",
+                        "connection reset",
+                        "connection aborted",
+                        "client disconnected",
+                        "no response returned",
+                        "context canceled",
+                        "context cancelled",
+                        "endofstream",
+                        "eof",
+                    ]
                 ):
                     logger.debug("Client disconnected: %s", e)
                 else:
