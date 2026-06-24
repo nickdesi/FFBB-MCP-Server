@@ -23,7 +23,7 @@ const IGNORED_FILES = [
   'AGENTS.md', 'task.md', 'implementation_plan.md', 'walkthrough.md'
 ];
 
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 5;
 const BASE_DELAY_MS = 1000;
 
 // HTTPS request helper with retry and exponential backoff
