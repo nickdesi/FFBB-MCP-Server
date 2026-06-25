@@ -10,9 +10,9 @@ from ffbb_mcp.services import (
     _dedup_equipes_by_engagement,
     _fetch_poule_matches,
     _prioritize_phase,
-    _resolve_club_and_org,
     _resolve_team_equipes,
     format_poule_response,
+    resolve_club_and_org,
 )
 from ffbb_mcp.services.club import _match_team_name
 
@@ -48,21 +48,21 @@ def test_dedup_equipes_by_engagement_preserves_missing_ids():
 
 
 # ---------------------------------------------------------------------------
-# _resolve_club_and_org error logging
+# resolve_club_and_org error logging
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_resolve_club_and_org_logs_organisme_load_error(caplog):
+async def testresolve_club_and_org_logs_organisme_load_error(caplog):
     # httpx.HTTPError est dans le tuple (httpx.HTTPError, McpError, ValidationError)
-    # capturé par _resolve_club_and_org après le narrowing de Task D.
+    # capturé par resolve_club_and_org après le narrowing de Task D.
     with patch(
         "ffbb_mcp.services.get_organisme_service",
         new_callable=AsyncMock,
         side_effect=httpx.ConnectError("boom"),
     ):
         caplog.set_level("DEBUG", logger="ffbb-mcp")
-        resolved, org_data = await _resolve_club_and_org(None, 123)
+        resolved, org_data = await resolve_club_and_org(None, 123)
 
     assert resolved == []
     assert org_data is None
@@ -70,7 +70,7 @@ async def test_resolve_club_and_org_logs_organisme_load_error(caplog):
 
 
 @pytest.mark.asyncio
-async def test_resolve_club_and_org_logs_first_org_detail_error(caplog):
+async def testresolve_club_and_org_logs_first_org_detail_error(caplog):
     with (
         patch(
             "ffbb_mcp.services.search_organismes_service",
@@ -84,7 +84,7 @@ async def test_resolve_club_and_org_logs_first_org_detail_error(caplog):
         ),
     ):
         caplog.set_level("DEBUG", logger="ffbb-mcp")
-        resolved, org_data = await _resolve_club_and_org("Club", None)
+        resolved, org_data = await resolve_club_and_org("Club", None)
 
     assert resolved == [
         {
@@ -126,7 +126,7 @@ class TestResolveTeamEquipes:
     @pytest.mark.asyncio
     async def test_returns_not_found_when_club_unknown(self):
         with patch(
-            "ffbb_mcp.services._resolve_club_and_org",
+            "ffbb_mcp.services.resolve_club_and_org",
             new_callable=AsyncMock,
             return_value=([], None),
         ):
@@ -146,7 +146,7 @@ class TestResolveTeamEquipes:
             {"organisme_id": 2, "nom": "Club B"},
         ]
         with patch(
-            "ffbb_mcp.services._resolve_club_and_org",
+            "ffbb_mcp.services.resolve_club_and_org",
             new_callable=AsyncMock,
             return_value=(clubs, None),
         ):
@@ -168,7 +168,7 @@ class TestResolveTeamEquipes:
         ]
         with (
             patch(
-                "ffbb_mcp.services._resolve_club_and_org",
+                "ffbb_mcp.services.resolve_club_and_org",
                 new_callable=AsyncMock,
                 return_value=([club], None),
             ),
@@ -192,7 +192,7 @@ class TestResolveTeamEquipes:
     @pytest.mark.asyncio
     async def test_custom_not_found_status(self):
         with patch(
-            "ffbb_mcp.services._resolve_club_and_org",
+            "ffbb_mcp.services.resolve_club_and_org",
             new_callable=AsyncMock,
             return_value=([], None),
         ):

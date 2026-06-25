@@ -308,7 +308,7 @@ def _resolve_team_number(
     return matched
 
 
-async def _resolve_club_and_org(
+async def resolve_club_and_org(
     club_name: str | None,
     organisme_id: int | str | None,
     categorie: str | None = None,
@@ -685,7 +685,7 @@ async def ffbb_resolve_team_service(
         )
 
     # 1) Résoudre l'organisme avec métadonnées
-    resolved_clubs, _ = await _resolve_club_and_org(
+    resolved_clubs, _ = await resolve_club_and_org(
         club_name=club_name, organisme_id=organisme_id, categorie=categorie
     )
 

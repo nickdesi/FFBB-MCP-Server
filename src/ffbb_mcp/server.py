@@ -26,7 +26,6 @@ from .prompts import ROUTING_PROMPT, register_prompts
 from .resources import register_resources
 from .routes import register_routes
 from .services import (
-    _resolve_club_and_org,
     ffbb_bilan_service,
     ffbb_equipes_club_service,
     ffbb_get_classement_service,
@@ -47,6 +46,7 @@ from .services import (
     get_rencontre_service,
     get_saisons_service,
     handle_api_error,
+    resolve_club_and_org,
     resolve_poule_id_service,
 )
 from .utils import prune_payload
@@ -618,10 +618,31 @@ async def ffbb_club(
     d'une equipe specifique. Utiliser `ffbb_last_result` et `ffbb_next_match` a la place.
     """
     try:
-        # Résolution automatique de l'organisme_id si manquant mais club_name fourni
+        # Action calendrier : le service gère résolution + ambiguïté en interne
+        if action == "calendrier":
+            if not organisme_id and not club_name:
+                return [{"error": "Fournir organisme_id ou club_name"}]
+            effective_refresh = force_refresh
+            kwargs: dict[str, Any] = {
+                "club_name": club_name,
+                "organisme_id": organisme_id,
+                "categorie": filtre,
+                "numero_equipe": numero_equipe,
+                "adversaire": adversaire,
+                "force_refresh": effective_refresh,
+            }
+            if date_debut is not None:
+                kwargs["date_debut"] = date_debut
+            if date_fin is not None:
+                kwargs["date_fin"] = date_fin
+            if limit is not None:
+                kwargs["limit"] = limit
+            return await get_calendrier_club_service(**kwargs)
+
+        # Actions equipes / classement : pré-résolution nécessaire
         target_org_id = organisme_id
         if not target_org_id and club_name:
-            resolved_clubs, _ = await _resolve_club_and_org(
+            resolved_clubs, _ = await resolve_club_and_org(
                 club_name=club_name, organisme_id=None, categorie=filtre, limit=3
             )
 
@@ -655,26 +676,7 @@ async def ffbb_club(
 
             target_org_id = resolved_clubs[0].get("organisme_id")
 
-        if action == "calendrier":
-            if not target_org_id and not club_name:
-                return [{"error": "Fournir organisme_id ou club_name"}]
-            effective_refresh = force_refresh
-            kwargs: dict[str, Any] = {
-                "club_name": club_name,
-                "organisme_id": target_org_id,
-                "categorie": filtre,
-                "numero_equipe": numero_equipe,
-                "adversaire": adversaire,
-                "force_refresh": effective_refresh,
-            }
-            if date_debut is not None:
-                kwargs["date_debut"] = date_debut
-            if date_fin is not None:
-                kwargs["date_fin"] = date_fin
-            if limit is not None:
-                kwargs["limit"] = limit
-            return await get_calendrier_club_service(**kwargs)
-        elif action == "equipes":
+        if action == "equipes":
             if not target_org_id:
                 return [
                     {

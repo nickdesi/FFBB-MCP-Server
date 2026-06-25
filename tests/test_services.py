@@ -541,8 +541,10 @@ class TestCalendrierClubService:
 
         result_2 = await get_calendrier_club_service(club_name="club fantome")
 
-        assert result_1 == []
-        assert result_2 == []
+        # _build_calendar_matches now returns an error dict instead of []
+        assert isinstance(result_1, list) and len(result_1) == 1
+        assert "error" in result_1[0]
+        assert result_1 == result_2
         # The second call should be served from cache — no additional API calls.
         assert mock_client.search_organismes_async.await_count == call_count_after_first
 
@@ -745,7 +747,7 @@ class TestCalendrierClubService:
         # Force une petite limite pour le test
         monkeypatch.setattr("ffbb_mcp.services._MAX_CALENDAR_MATCHES", 3)
 
-        # 0. Mock get_organisme (requis par _resolve_club_and_org)
+        # 0. Mock get_organisme (requis par resolve_club_and_org)
         org_mock = MagicMock()
         org_mock.model_dump = MagicMock(
             return_value={"id": 123, "nom": "Club", "engagements": []}
@@ -1303,18 +1305,18 @@ class TestExtractClubKeyWord:
 
 
 # ---------------------------------------------------------------------------
-# Tests — _resolve_club_and_org entente detection
+# Tests — resolve_club_and_org entente detection
 # ---------------------------------------------------------------------------
 
 
 class TestResolveClubAndOrgEntente:
-    """Vérifie que _resolve_club_and_org inclut les ententes associées."""
+    """Vérifie que resolve_club_and_org inclut les ententes associées."""
 
     @pytest.mark.asyncio
     async def test_entente_included_in_resolved(self, patch_get_client, mock_client):
         """Quand on cherche 'Gerzat Basket', l'entente ENT. GERZAT / JULES VERNE
         doit être incluse dans les clubs résolus."""
-        from ffbb_mcp.services import _resolve_club_and_org
+        from ffbb_mcp.services import resolve_club_and_org
 
         call_count = {"n": 0}
 
@@ -1343,7 +1345,7 @@ class TestResolveClubAndOrgEntente:
         original = svc.search_organismes_service
         svc.search_organismes_service = mock_search
         try:
-            resolved, _ = await _resolve_club_and_org(
+            resolved, _ = await resolve_club_and_org(
                 club_name="Gerzat Basket",
                 organisme_id=None,
                 categorie=None,
@@ -1364,7 +1366,7 @@ class TestResolveClubAndOrgEntente:
     ):
         """Les clubs sans 'ENT.' dans le nom ne doivent pas être ajoutés via la
         recherche secondaire (éviter les faux positifs)."""
-        from ffbb_mcp.services import _resolve_club_and_org
+        from ffbb_mcp.services import resolve_club_and_org
 
         async def mock_search(nom, limit=20):
             nom_up = nom.upper()
@@ -1389,7 +1391,7 @@ class TestResolveClubAndOrgEntente:
         original = svc.search_organismes_service
         svc.search_organismes_service = mock_search
         try:
-            resolved, _ = await _resolve_club_and_org(
+            resolved, _ = await resolve_club_and_org(
                 club_name="Gerzat Basket",
                 organisme_id=None,
                 categorie=None,
@@ -1409,7 +1411,7 @@ class TestResolveClubAndOrgEntente:
     ):
         """Si aucun mot distinctif n'est extrait, la recherche secondaire ne doit
         pas être déclenchée (ex : nom d'un seul mot non générique)."""
-        from ffbb_mcp.services import _resolve_club_and_org
+        from ffbb_mcp.services import resolve_club_and_org
 
         call_count = {"n": 0}
 
@@ -1431,7 +1433,7 @@ class TestResolveClubAndOrgEntente:
         original = svc.search_organismes_service
         svc.search_organismes_service = mock_search
         try:
-            resolved, _ = await _resolve_club_and_org(
+            resolved, _ = await resolve_club_and_org(
                 club_name="Villeurbanne",
                 organisme_id=None,
                 categorie=None,
@@ -1442,13 +1444,13 @@ class TestResolveClubAndOrgEntente:
         assert call_count["n"] == 1, "Only one search should be called when no key word"
 
 
-# Tests for _resolve_club_and_org M/F filtering
+# Tests for resolve_club_and_org M/F filtering
 
 
 @pytest.mark.asyncio
-async def test_resolve_club_and_org_mf_filtering():
-    """Vérifie le filtrage M/F (Règle 10) dans _resolve_club_and_org."""
-    from ffbb_mcp.services import _resolve_club_and_org
+async def testresolve_club_and_org_mf_filtering():
+    """Vérifie le filtrage M/F (Règle 10) dans resolve_club_and_org."""
+    from ffbb_mcp.services import resolve_club_and_org
 
     mock_search = AsyncMock(
         return_value=[
@@ -1469,7 +1471,7 @@ async def test_resolve_club_and_org_mf_filtering():
         patch("ffbb_mcp.services.get_organisme_service", mock_get),
     ):
         # Test 1: Catégorie M should filter out "Féminin"
-        resolved, _ = await _resolve_club_and_org(
+        resolved, _ = await resolve_club_and_org(
             club_name="Stade Clermontois", organisme_id=None, categorie="U11M"
         )
         assert len(resolved) == 1
@@ -1484,7 +1486,7 @@ async def test_resolve_club_and_org_mf_filtering():
             }
         )
         with patch("ffbb_mcp.services.get_organisme_service", mock_get_f):
-            resolved_f, _ = await _resolve_club_and_org(
+            resolved_f, _ = await resolve_club_and_org(
                 club_name="Stade Clermontois", organisme_id=None, categorie="U11F"
             )
             assert len(resolved_f) == 1
@@ -1801,14 +1803,14 @@ class TestSalleEnrichment:
 
 
 class TestResolveClubAndOrgCache:
-    """Vérifie le fonctionnement du cache sur _resolve_club_and_org."""
+    """Vérifie le fonctionnement du cache sur resolve_club_and_org."""
 
     @pytest.mark.asyncio
-    async def test_resolve_club_and_org_uses_cache(self, patch_get_client, mock_client):
+    async def testresolve_club_and_org_uses_cache(self, patch_get_client, mock_client):
         from unittest.mock import AsyncMock, MagicMock
 
         from ffbb_mcp._state import reset_service_state
-        from ffbb_mcp.services import _resolve_club_and_org
+        from ffbb_mcp.services import resolve_club_and_org
 
         reset_service_state()
         call_count = {"n": 0}
@@ -1830,7 +1832,7 @@ class TestResolveClubAndOrgCache:
 
         try:
             # Premier appel -> cache miss, recherche (recherche principale + recherche mot-clé)
-            resolved1, _ = await _resolve_club_and_org(
+            resolved1, _ = await resolve_club_and_org(
                 club_name="Gerzat Basket",
                 organisme_id=None,
                 categorie=None,
@@ -1838,7 +1840,7 @@ class TestResolveClubAndOrgCache:
             assert call_count["n"] == 2
 
             # Deuxième appel -> cache hit, pas de recherche supplémentaire
-            resolved2, _ = await _resolve_club_and_org(
+            resolved2, _ = await resolve_club_and_org(
                 club_name="Gerzat Basket",
                 organisme_id=None,
                 categorie=None,

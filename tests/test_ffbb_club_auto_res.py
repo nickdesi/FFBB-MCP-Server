@@ -6,7 +6,7 @@ from ffbb_mcp.server import ffbb_club
 
 
 def _make_resolve_mock(candidates):
-    """Construit un mock de _resolve_club_and_org retournant (candidates, None)."""
+    """Construit un mock de resolve_club_and_org retournant (candidates, None)."""
     return AsyncMock(return_value=(candidates, None))
 
 
@@ -20,7 +20,7 @@ async def test_ffbb_club_equipes_auto_resolution():
     mock_equipes = AsyncMock(return_value=[{"id": "team1", "nom": "U11M1"}])
 
     with (
-        patch("ffbb_mcp.server._resolve_club_and_org", mock_resolve),
+        patch("ffbb_mcp.server.resolve_club_and_org", mock_resolve),
         patch("ffbb_mcp.server.ffbb_equipes_club_service", mock_equipes),
     ):
         # Appel sans organisme_id mais avec club_name
@@ -41,7 +41,7 @@ async def test_ffbb_club_equipes_auto_resolution():
     )
 
     with (
-        patch("ffbb_mcp.server._resolve_club_and_org", mock_resolve),
+        patch("ffbb_mcp.server.resolve_club_and_org", mock_resolve),
         patch("ffbb_mcp.server.resolve_poule_id_service", mock_resolve_poule),
         patch("ffbb_mcp.server.ffbb_get_classement_service", mock_classement),
     ):
@@ -69,7 +69,7 @@ async def test_ffbb_club_resolution_failure():
 
     mock_resolve = _make_resolve_mock([])
 
-    with patch("ffbb_mcp.server._resolve_club_and_org", mock_resolve):
+    with patch("ffbb_mcp.server.resolve_club_and_org", mock_resolve):
         result = await ffbb_club(action="equipes", club_name="Club Inconnu")
 
         assert "error" in result[0]
@@ -105,7 +105,7 @@ async def test_ffbb_club_calendrier_with_numero_equipe():
 async def test_ffbb_club_calendrier_match_day_does_not_force_refresh():
     with (
         patch("ffbb_mcp.server.get_calendrier_club_service") as mock_cal_service,
-        patch("ffbb_mcp.server._resolve_club_and_org", _make_resolve_mock([])),
+        patch("ffbb_mcp.server.resolve_club_and_org", _make_resolve_mock([])),
     ):
         mock_cal_service.return_value = []
 
@@ -129,26 +129,12 @@ async def test_ffbb_club_calendrier_match_day_does_not_force_refresh():
 
 @pytest.mark.asyncio
 async def test_ffbb_club_calendrier_filters_by_gender():
-    """Le filtre 'U11M' doit sélectionner silencieusement le club AUVERGNE
-    (général/masculin) et non déclencher une ambiguïté avec le FEMININ."""
+    """Le filtre 'U11M' est transmis au service calendrier qui gère
+    la résolution + filtrage M/F en interne (plus de pré-résolution)."""
 
-    auv_candidate = {
-        "organisme_id": "9326",
-        "nom": "STADE CLERMONTOIS BASKET AUVERGNE",
-        "code": "0063127",
-        "ville": "CLERMONT-FERRAND",
-        "code_postal": "63000",
-        "departement": "Puy-de-dôme",
-        "genre": None,
-    }
-    # Le mock de _resolve_club_and_org simule le filtrage M/F déjà appliqué.
-    mock_resolve = _make_resolve_mock([auv_candidate])
     mock_cal = AsyncMock(return_value=[])
 
-    with (
-        patch("ffbb_mcp.server._resolve_club_and_org", mock_resolve),
-        patch("ffbb_mcp.server.get_calendrier_club_service", mock_cal),
-    ):
+    with patch("ffbb_mcp.server.get_calendrier_club_service", mock_cal):
         result = await ffbb_club(
             action="calendrier",
             club_name="Stade Clermontois",
@@ -156,10 +142,10 @@ async def test_ffbb_club_calendrier_filters_by_gender():
             numero_equipe=1,
         )
 
-        # Le service de calendrier doit avoir été appelé avec le bon organisme_id
+        # Le service de calendrier doit avoir été appelé avec les params bruts
         mock_cal.assert_called_once()
         call_kwargs = mock_cal.call_args.kwargs
-        assert call_kwargs["organisme_id"] == "9326"
+        assert call_kwargs["organisme_id"] is None  # pas de pré-résolution
         assert call_kwargs["club_name"] == "Stade Clermontois"
         assert call_kwargs["categorie"] == "U11M"
         assert call_kwargs["numero_equipe"] == 1
@@ -193,7 +179,7 @@ async def test_ffbb_club_ambiguity_includes_ville_genre():
     }
     mock_resolve = _make_resolve_mock([auv_candidate, fem_candidate])
 
-    with patch("ffbb_mcp.server._resolve_club_and_org", mock_resolve):
+    with patch("ffbb_mcp.server.resolve_club_and_org", mock_resolve):
         result = await ffbb_club(action="equipes", club_name="Stade Clermontois")
 
         assert "error" in result[0]

@@ -38,13 +38,13 @@ from .poule import (
 )
 from .search import (
     _extract_club_key_word,
-    _resolve_club_and_org,
     ffbb_resolve_team_service,
     ffbb_search_service,
     get_entraineur_service,
     get_officiel_service,
     get_rencontre_service,
     multi_search_service,
+    resolve_club_and_org,
     resolve_poule_id_service,
     search_organismes_service,
 )
@@ -63,7 +63,6 @@ __all__ = [
     "_inflight_lock",
     "_prioritize_phase",
     "_read_positive_int_env",
-    "_resolve_club_and_org",
     "_resolve_team_equipes",
     "ffbb_bilan_service",
     "ffbb_equipes_club_service",
@@ -88,6 +87,7 @@ __all__ = [
     "get_static_ttl",
     "handle_api_error",
     "multi_search_service",
+    "resolve_club_and_org",
     "resolve_poule_id_service",
     "search_organismes_service",
     "warmup_cache_service",

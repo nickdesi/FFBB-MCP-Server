@@ -336,7 +336,7 @@ async def _resolve_team_equipes(
 
     import ffbb_mcp.services
 
-    resolved_clubs, org_data = await ffbb_mcp.services._resolve_club_and_org(
+    resolved_clubs, org_data = await ffbb_mcp.services.resolve_club_and_org(
         club_name=club_name,
         organisme_id=organisme_id,
         categorie=categorie,
@@ -869,9 +869,9 @@ async def _build_bilan_payload(
     déduplication est entièrement gérée par l'appelant via `_dedupe_inflight`.
     """
     from .poule import get_poule_service
-    from .search import _resolve_club_and_org
+    from .search import resolve_club_and_org
 
-    resolved_clubs, org_data = await _resolve_club_and_org(
+    resolved_clubs, org_data = await resolve_club_and_org(
         club_name=club_name, organisme_id=organisme_id, categorie=categorie
     )
     target_org_ids = [str(c["organisme_id"]) for c in resolved_clubs]
@@ -1144,15 +1144,40 @@ async def _build_calendar_matches(
     cache / déduplication est entièrement gérée par l'appelant via
     `_dedupe_inflight`.
     """
-    from .search import _resolve_club_and_org
+    from .search import resolve_club_and_org
 
-    resolved_clubs, _ = await _resolve_club_and_org(
+    resolved_clubs, _ = await resolve_club_and_org(
         club_name=club_name, organisme_id=organisme_id, categorie=categorie, limit=5
     )
+
+    if not resolved_clubs:
+        return [
+            {
+                "error": f"Aucun club trouvé pour '{club_name or organisme_id}'. "
+                "Vérifie l'orthographe ou utilise ffbb_search.",
+            }
+        ]
+
+    if len(resolved_clubs) > 1 and not organisme_id:
+        candidates = [
+            {
+                "id": c.get("organisme_id"),
+                "nom": c.get("nom"),
+                "ville": c.get("ville"),
+            }
+            for c in resolved_clubs
+            if isinstance(c, dict)
+        ]
+        return [
+            {
+                "error": f"Plusieurs clubs correspondent à '{club_name}'. "
+                "Précise l'organisme_id ou un nom plus exact.",
+                "candidates": candidates,
+            }
+        ]
+
     target_org_ids = [str(c["organisme_id"]) for c in resolved_clubs]
     target_org_ids = list(dict.fromkeys(oid for oid in target_org_ids if oid))
-    if not target_org_ids:
-        return []
 
     # Extraire le nom du club résolu pour le filtrage par adversaire
     club_nom_resolu = resolved_clubs[0].get("nom", "") if resolved_clubs else ""
