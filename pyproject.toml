@@ -31,6 +31,7 @@ dev = [
     "pytest-cov>=4.1.0",
     "ruff>=0.15.12",
     "mypy>=1.15.0",
+    "radon>=6.0.1",
     "types-cachetools>=7.0.0.20260503",
     "types-setuptools",
     "pre-commit>=3.7.0",
@@ -49,10 +50,17 @@ where = ["src"]
 [tool.setuptools.package-data]
 "*" = ["website/*", "website/css/*"]
 
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
+[tool.pytest.ini_options]asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "--cov=ffbb_mcp --cov-fail-under=78"
+filterwarnings = [
+    # Starlette publie des DeprecationWarning sur ses APIs historiques
+    # (TestClient lifespan on_event, etc.) — bruit non bloquant pour pytest.
+    # Restreint au TestClient pour ne pas masquer des avertissements de
+    # starlette.middleware.base (DNS rebinding), qui restent pertinents.
+    "ignore::DeprecationWarning:starlette.testclient",
+]
+
 
 [tool.ruff]
 line-length = 88

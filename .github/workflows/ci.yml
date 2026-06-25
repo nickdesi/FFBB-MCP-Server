@@ -77,6 +77,10 @@ jobs:
 
       - name: Type check with mypy
         run: uv run --frozen mypy src
+      - name: Cyclomatic complexity report (radon)
+        # Rapport informatif — n'échoue pas la CI par défaut.
+        # Pour activer un seuil strict, remplacer par: radon cc src/ffbb_mcp -n C -s
+        run: uv run --frozen radon cc src/ffbb_mcp -s -a || true
 
   test:
     name: Tests (Python ${{ matrix.python-version }})
