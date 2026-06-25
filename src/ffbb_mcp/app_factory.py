@@ -115,6 +115,13 @@ def create_app(mcp: FastMCP, allowed_origins: list[str]) -> Starlette:
                 )
 
             response.headers["X-Request-ID"] = request_id
+
+            # Désactiver le buffering de Nginx/OpenResty pour les flux SSE
+            content_type = response.headers.get("content-type", "").lower()
+            if "text/event-stream" in content_type:
+                response.headers["X-Accel-Buffering"] = "no"
+                response.headers["Cache-Control"] = "no-cache, no-transform"
+
             return response
 
     app.add_middleware(RequestIdMiddleware)

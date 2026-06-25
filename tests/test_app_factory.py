@@ -119,3 +119,24 @@ def test_request_id_middleware_logs_no_response_returned_as_disconnect(caplog):
     assert response.status_code == 500
     assert response.headers["X-Request-ID"] == "req-disconnect-no-resp"
     assert "Client disconnected: No response returned." in caplog.text
+
+
+def test_sse_response_adds_buffering_headers():
+    from starlette.responses import StreamingResponse
+
+    async def sse_app(scope, receive, send):
+        response = StreamingResponse(
+            iter(["data: hello\n\n"]), media_type="text/event-stream"
+        )
+        await response(scope, receive, send)
+
+    mcp = MagicMock()
+    mcp.session_manager.run.return_value.__aenter__ = AsyncMock(return_value=None)
+    mcp.session_manager.run.return_value.__aexit__ = AsyncMock(return_value=None)
+    mcp.streamable_http_app.return_value = sse_app
+    client = TestClient(create_app(mcp, allowed_origins=["https://example.com"]))
+
+    response = client.get("/")
+
+    assert response.headers["X-Accel-Buffering"] == "no"
+    assert "no-cache" in response.headers["Cache-Control"]
