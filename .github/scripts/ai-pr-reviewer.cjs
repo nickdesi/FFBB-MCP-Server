@@ -23,8 +23,8 @@ const IGNORED_FILES = [
   'AGENTS.md', 'task.md', 'implementation_plan.md', 'walkthrough.md'
 ];
 
-const MAX_RETRIES = 5;
-const BASE_DELAY_MS = 2000;
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 1000;
 
 // HTTPS request helper with retry and exponential backoff
 function makeRequest(options, postData = null, retries = MAX_RETRIES) {
@@ -250,7 +250,7 @@ ${JSON.stringify(fileDiffData, null, 2)}`;
 ${reviewResult.summary}
 
 _Revue générée automatiquement._`,
-      event: reviewResult.verdict === 'APPROVE' ? 'COMMENT' : reviewResult.verdict,
+      event: reviewResult.verdict,
       comments: validComments
     };
 
@@ -271,10 +271,6 @@ _Revue générée automatiquement._`,
 
   } catch (error) {
     console.error("AI review failed:", error);
-    if (error.message && (error.message.includes('Status 503') || error.message.includes('Status 429'))) {
-      console.warn("Gracefully exiting due to transient API issues.");
-      process.exit(0);
-    }
     process.exit(1);
   }
 }
