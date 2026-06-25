@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 
 from ffbb_mcp._state import reset_service_state
@@ -16,11 +17,14 @@ def clear_caches():
 
 @pytest.mark.asyncio
 async def test_resolve_logs_debug_when_organisme_id_fetch_fails(caplog):
-    """Branch: organisme_id fourni, get_organisme_service lève une exception → debug log."""
+    """Branch: organisme_id fourni, get_organisme_service lève une exception → debug log.
+
+    httpx.HTTPError est capté par le tuple narrowed de _resolve_club_and_org.
+    """
     with patch(
         "ffbb_mcp.services.get_organisme_service",
         new_callable=AsyncMock,
-        side_effect=RuntimeError("timeout"),
+        side_effect=httpx.ConnectError("timeout"),
     ):
         caplog.set_level("DEBUG", logger="ffbb-mcp")
         resolved, org_data = await _resolve_club_and_org(
@@ -48,7 +52,7 @@ async def test_resolve_logs_debug_when_first_org_detail_fails(caplog):
         patch(
             "ffbb_mcp.services.get_organisme_service",
             new_callable=AsyncMock,
-            side_effect=RuntimeError("503"),
+            side_effect=httpx.ConnectError("503 Service Unavailable"),
         ),
     ):
         caplog.set_level("DEBUG", logger="ffbb-mcp")

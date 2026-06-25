@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+# Note mypy: les annotations `# type: ignore[untyped-decorator]` du fichier
+# (sur `@mcp.custom_route(...)`) proviennent uniquement du décorateur
+# FastMCP `mcp.custom_route` dont les stubs officiels ne sont pas typés.
+# Pas de fond à corriger côté projet — la convention est documentée ici.
 import asyncio
 import datetime
 import logging

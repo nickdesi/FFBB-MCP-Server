@@ -30,6 +30,10 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any
 
+import httpx
+from mcp.shared.exceptions import McpError
+from pydantic import ValidationError
+
 from ffbb_mcp._state import state
 from ffbb_mcp.models import BilanResponse, CalendrierMatch
 
@@ -765,7 +769,7 @@ async def ffbb_saison_bilan_service(
     async def _fetch_poule(pid: str) -> dict[str, Any] | Exception:
         try:
             return await get_poule_service(pid, force_refresh=force_refresh)
-        except Exception as e:
+        except (httpx.HTTPError, McpError, ValidationError) as e:
             return e
 
     poules_raw = await asyncio.gather(
@@ -924,7 +928,7 @@ async def _build_bilan_payload(
     async def _fetch_poule_bilan(pid: str) -> dict[str, Any] | Exception:
         try:
             return await get_poule_service(pid)
-        except Exception as e:
+        except (httpx.HTTPError, McpError, ValidationError) as e:
             return e
 
     poules_raw = await asyncio.gather(
@@ -1285,7 +1289,7 @@ async def _build_calendar_matches(
                         return await _client.list_rencontres_async(
                             limit=500, filter_criteria=fc
                         )
-                    except Exception:
+                    except httpx.HTTPError, ValidationError:
                         return []
 
                 _rencontres_lists = await asyncio.gather(
@@ -1302,8 +1306,8 @@ async def _build_calendar_matches(
                     _sid = _salle_map.get(str(m["id"]))
                     if _sid:
                         m["salle"] = _sid
-            except Exception:
-                pass  # Fallback silencieux
+            except AttributeError, TypeError:
+                pass  # Fallback silencieux (forme inattendue des rencontres)
 
     await _enrich_matches_with_salle_details(all_matches)
 

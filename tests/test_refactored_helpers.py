@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 
 from ffbb_mcp._state import reset_service_state
@@ -53,10 +54,12 @@ def test_dedup_equipes_by_engagement_preserves_missing_ids():
 
 @pytest.mark.asyncio
 async def test_resolve_club_and_org_logs_organisme_load_error(caplog):
+    # httpx.HTTPError est dans le tuple (httpx.HTTPError, McpError, ValidationError)
+    # capturé par _resolve_club_and_org après le narrowing de Task D.
     with patch(
         "ffbb_mcp.services.get_organisme_service",
         new_callable=AsyncMock,
-        side_effect=RuntimeError("boom"),
+        side_effect=httpx.ConnectError("boom"),
     ):
         caplog.set_level("DEBUG", logger="ffbb-mcp")
         resolved, org_data = await _resolve_club_and_org(None, 123)
@@ -77,7 +80,7 @@ async def test_resolve_club_and_org_logs_first_org_detail_error(caplog):
         patch(
             "ffbb_mcp.services.get_organisme_service",
             new_callable=AsyncMock,
-            side_effect=RuntimeError("boom"),
+            side_effect=httpx.ConnectError("boom"),
         ),
     ):
         caplog.set_level("DEBUG", logger="ffbb-mcp")

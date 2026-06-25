@@ -6,8 +6,10 @@ import re
 from functools import lru_cache
 from typing import Any, Protocol, cast
 
+import httpx
 from mcp.shared.exceptions import ErrorData, McpError
 from mcp.types import INTERNAL_ERROR
+from pydantic import ValidationError
 
 from ffbb_mcp._state import state
 
@@ -345,7 +347,7 @@ async def _resolve_club_and_org(
                 )
             else:
                 logger.warning("Organisme retourné vide ou invalide")
-        except Exception:
+        except httpx.HTTPError, McpError, ValidationError:
             logger.debug(
                 "Impossible de charger l'organisme",
                 exc_info=True,
@@ -387,7 +389,7 @@ async def _resolve_club_and_org(
                     org_data = await ffbb_mcp.services.get_organisme_service(
                         first_org_id
                     )
-            except Exception:
+            except httpx.HTTPError, McpError, ValidationError:
                 logger.debug(
                     "Impossible de charger les détails du premier organisme pour %s",
                     club_name,
