@@ -50,7 +50,8 @@ where = ["src"]
 [tool.setuptools.package-data]
 "*" = ["website/*", "website/css/*"]
 
-[tool.pytest.ini_options]asyncio_mode = "auto"
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "--cov=ffbb_mcp --cov-fail-under=78"
 filterwarnings = [
