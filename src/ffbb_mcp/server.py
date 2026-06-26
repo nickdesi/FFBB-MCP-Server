@@ -235,9 +235,10 @@ mcp: FastMCP = FastMCP(
     ),
     dependencies=["mcp", "ffbb-data-client"],
     # Streamable HTTP transport (MCP spec 2025-11-25)
-    # stateless_http=True → pas de session persistante (scalabilité horizontale)
+    # stateless_http=False → session persistante avec mcp-session-id
+    #   (requis par Antigravity et la plupart des clients MCP)
     # json_response=True  → répond en application/json (plus simple que SSE pour POST)
-    stateless_http=True,
+    stateless_http=False,
     json_response=True,
     transport_security=TransportSecuritySettings(
         enable_dns_rebinding_protection=_dns_protection,
