@@ -91,14 +91,22 @@ Configurez un serveur MCP distant :
 
 ### Google Antigravity
 
-Ajoutez la configuration suivante dans votre fichier de configuration MCP :
+> [!WARNING]
+> En raison d'un bug connu dans le client Go d'Antigravity (timeouts d'initialisation trop courts et gestion SSE sur serveur distant), la configuration directe en `type: "http"` peut provoquer des erreurs `context deadline exceeded`.
+> 
+> Utilisez plutôt le proxy local `mcp-remote` (installé à la volée via `npx`) :
 
 ```json
     "ffbb": {
-      "type": "http",
-      "serverUrl": "https://ffbb.desimone.fr/mcp"
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://ffbb.desimone.fr/mcp"
+      ]
     }
 ```
+
 
 ---
 

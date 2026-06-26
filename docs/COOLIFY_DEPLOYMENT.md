@@ -37,6 +37,22 @@ Puisque tu utilises **Nginx Proxy Manager** pour gérer le trafic :
 - **Websockets Support** : facultatif pour l'usage normal. Streamable HTTP fonctionne sur HTTP(S) standard ; active-le seulement si ton proxy l'exige pour d'autres usages.
 - **Block Common Exploits** : Tu peux le laisser, mais si tu as une erreur 403, essaie de le désactiver.
 
+### Configuration Avancée pour le Streaming MCP (SSE)
+
+Dans l'onglet **Custom Nginx Configuration** (Advanced) de ton proxy host dans NPM, ajoute ces directives pour éviter la mise en cache des flux SSE et empêcher les déconnexions intempestives :
+
+```nginx
+# Désactiver le buffering pour le streaming SSE (requis pour MCP)
+proxy_buffering off;
+proxy_cache off;
+
+# Timeouts adaptés au streaming MCP
+proxy_read_timeout 300s;
+proxy_send_timeout 300s;
+proxy_connect_timeout 60s;
+```
+
+
 ## 4. Chemin /mcp
 
 Pas besoin de configurer de path particulier dans NPM ou Coolify. Le code Python du serveur est déjà configuré pour écouter sur `/mcp`.
