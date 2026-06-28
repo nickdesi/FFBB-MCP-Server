@@ -355,6 +355,11 @@ def _normalize_apostrophes(text: str) -> str:
     if text.isascii() and "`" not in text:
         return text
 
+    # Bolt: Fast-path for Unicode strings without typographic apostrophes
+    # Bypasses the overhead of the C-level translate loop when no replacement is needed
+    if not ("\u2019" in text or "\u2018" in text or "\u201b" in text or "`" in text):
+        return text
+
     return text.translate(_APOSTROPHES_MAP)
 
 
