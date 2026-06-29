@@ -187,15 +187,6 @@ def _parse_dt(raw: str | None) -> datetime | None:
     except ValueError:
         pass
 
-    if type(raw) is str and len(raw) == 19 and raw[10] == " ":
-        try:
-            dt = datetime.fromisoformat(raw[:10] + "T" + raw[11:])
-            if dt.tzinfo is None:
-                return dt.replace(tzinfo=tz)
-            return dt.astimezone(tz)
-        except ValueError:
-            pass
-
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
         try:
             dt = datetime.strptime(raw, fmt)
@@ -543,7 +534,7 @@ def _cache_set(cache: Any, key: Any, val: Any, cache_name: str) -> None:
         return
     try:
         cache[key] = val
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         logger.debug(
             "Impossible d'écrire dans le cache %s",
             cache_name,

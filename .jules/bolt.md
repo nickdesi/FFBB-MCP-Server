@@ -7,3 +7,6 @@
 ## 2025-07-02 - [Text Normalization Fast-Path via Translation Tables]
 **Learning:** Python's C-optimized `str.translate()` is significantly faster (~3x) than a list comprehension combining `unicodedata.normalize` and `unicodedata.category` lookups when filtering out specific character categories (like diacritics). The list comprehension requires evaluating every character at the Python level dynamically.
 **Action:** Pre-compute a dictionary (`_DIACRITICS`) mapping the ordinals of characters to drop (e.g., categories "Mn", "So") to `None` at module load, and use `str.translate(_DIACRITICS)` in the hot path.
+## 2024-10-15 - datetime.fromisoformat native space support in Python 3.11+
+**Learning:** Python 3.11+ natively supports space separators in `datetime.fromisoformat()`. Manual replacement of space with 'T' (e.g., via slicing `raw[:10] + 'T' + raw[11:]` or `.replace(' ', 'T')`) is unnecessary and adds overhead.
+**Action:** Remove fallback manual parsing and allow `datetime.fromisoformat()` to handle the raw string directly wrapped in `try..except ValueError` for performance.

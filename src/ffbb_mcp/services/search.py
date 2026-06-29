@@ -347,7 +347,7 @@ async def resolve_club_and_org(
                 )
             else:
                 logger.warning("Organisme retourné vide ou invalide")
-        except httpx.HTTPError, McpError, ValidationError:
+        except (httpx.HTTPError, McpError, ValidationError):
             logger.debug(
                 "Impossible de charger l'organisme",
                 exc_info=True,
@@ -389,7 +389,7 @@ async def resolve_club_and_org(
                     org_data = await ffbb_mcp.services.get_organisme_service(
                         first_org_id
                     )
-            except httpx.HTTPError, McpError, ValidationError:
+            except (httpx.HTTPError, McpError, ValidationError):
                 logger.debug(
                     "Impossible de charger les détails du premier organisme pour %s",
                     club_name,

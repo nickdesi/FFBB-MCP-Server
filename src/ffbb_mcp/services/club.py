@@ -128,7 +128,7 @@ def _compute_bilan_from_rencontres(
 
         try:
             s1, s2 = int(score1), int(score2)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             continue
 
         # Déterminer quel côté est notre équipe
@@ -1314,7 +1314,7 @@ async def _build_calendar_matches(
                         return await _client.list_rencontres_async(
                             limit=500, filter_criteria=fc
                         )
-                    except httpx.HTTPError, ValidationError:
+                    except (httpx.HTTPError, ValidationError):
                         return []
 
                 _rencontres_lists = await asyncio.gather(
@@ -1331,7 +1331,7 @@ async def _build_calendar_matches(
                     _sid = _salle_map.get(str(m["id"]))
                     if _sid:
                         m["salle"] = _sid
-            except AttributeError, TypeError:
+            except (AttributeError, TypeError):
                 pass  # Fallback silencieux (forme inattendue des rencontres)
 
     await _enrich_matches_with_salle_details(all_matches)
