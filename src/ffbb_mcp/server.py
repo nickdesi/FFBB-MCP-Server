@@ -136,7 +136,7 @@ async def _safe_report_progress(
         return
     try:
         await ctx.report_progress(progress, total=total, message=message)
-    except (ValueError, AssertionError):
+    except ValueError, AssertionError:
         # Hors d'un vrai RequestContext FastMCP ou état dégradé → no-op
         # mais on trace en DEBUG pour ne pas perdre la trace d'un bug.
         logger.debug("progress report skipped", exc_info=True)

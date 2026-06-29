@@ -534,7 +534,7 @@ def _cache_set(cache: Any, key: Any, val: Any, cache_name: str) -> None:
         return
     try:
         cache[key] = val
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         logger.debug(
             "Impossible d'écrire dans le cache %s",
             cache_name,
