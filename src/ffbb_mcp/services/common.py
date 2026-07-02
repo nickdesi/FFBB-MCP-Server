@@ -187,15 +187,6 @@ def _parse_dt(raw: str | None) -> datetime | None:
     except ValueError:
         pass
 
-    if type(raw) is str and len(raw) == 19 and raw[10] == " ":
-        try:
-            dt = datetime.fromisoformat(raw[:10] + "T" + raw[11:])
-            if dt.tzinfo is None:
-                return dt.replace(tzinfo=tz)
-            return dt.astimezone(tz)
-        except ValueError:
-            pass
-
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
         try:
             dt = datetime.strptime(raw, fmt)
