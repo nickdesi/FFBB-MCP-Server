@@ -4,3 +4,6 @@
 ## 2025-02-28 - Fast-path Text Translation
 **Learning:** In CPython, when applying text replacement via methods like `str.translate()` with a small translation map, appending a fast-path literal check (e.g., `if not ("char1" in text or "char2" in text): return text`) before the call can yield a ~35x speedup for strings that do not contain the target characters by completely bypassing the overhead of the C-level translate loop.
 **Action:** When normalizing characters via `.translate()` or `.replace()` in performance-critical paths, add an explicit literal fast-path check to early-exit if the target characters are not present.
+## 2025-07-02 - [Text Normalization Fast-Path via Translation Tables]
+**Learning:** Python's C-optimized `str.translate()` is significantly faster (~3x) than a list comprehension combining `unicodedata.normalize` and `unicodedata.category` lookups when filtering out specific character categories (like diacritics). The list comprehension requires evaluating every character at the Python level dynamically.
+**Action:** Pre-compute a dictionary (`_DIACRITICS`) mapping the ordinals of characters to drop (e.g., categories "Mn", "So") to `None` at module load, and use `str.translate(_DIACRITICS)` in the hot path.

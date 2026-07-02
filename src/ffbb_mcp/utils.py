@@ -1,11 +1,19 @@
 import os
 import re
+import sys
+import unicodedata
 from functools import lru_cache
 from typing import Any, NamedTuple
 
 from starlette.responses import JSONResponse
 
 type JSONValue = Any
+
+_DIACRITICS = {
+    i: None
+    for i in range(sys.maxunicode)
+    if unicodedata.category(chr(i)) in ("Mn", "So")
+}
 
 
 def serialize_model(obj: Any) -> JSONValue:
