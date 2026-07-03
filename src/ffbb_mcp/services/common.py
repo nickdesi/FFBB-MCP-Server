@@ -185,18 +185,7 @@ def _parse_dt(raw: str | None) -> datetime | None:
             return dt.replace(tzinfo=tz)
         return dt.astimezone(tz)
     except ValueError:
-        pass
-
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
-        try:
-            dt = datetime.strptime(raw, fmt)
-            if dt.tzinfo is None:
-                return dt.replace(tzinfo=tz)
-            return dt.astimezone(tz)
-        except ValueError:
-            pass
-
-    return None
+        return None
 
 
 def _notify_cache_hit(cache_name: str) -> None:
@@ -238,7 +227,7 @@ def _format_salle_address(salle: dict[str, Any]) -> str | None:
         salle.get("code_postal") or salle.get("codePostal"),
         salle.get("ville") or salle.get("commune"),
     ]
-    address = " ".join(str(part).strip() for part in parts if part)
+    address = " ".join([str(part).strip() for part in parts if part])
     return address or None
 
 
@@ -534,7 +523,7 @@ def _cache_set(cache: Any, key: Any, val: Any, cache_name: str) -> None:
         return
     try:
         cache[key] = val
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         logger.debug(
             "Impossible d'écrire dans le cache %s",
             cache_name,

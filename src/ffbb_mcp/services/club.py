@@ -128,7 +128,7 @@ def _compute_bilan_from_rencontres(
 
         try:
             s1, s2 = int(score1), int(score2)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             continue
 
         # Déterminer quel côté est notre équipe
