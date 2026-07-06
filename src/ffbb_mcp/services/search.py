@@ -177,14 +177,13 @@ def _extract_club_key_word(club_name: str) -> str | None:
     """
     norm = _normalize_name(club_name)
     words = norm.split()
-    key_words = [w for w in words if w not in _GENERIC_CLUB_WORDS and len(w) >= 4]
-    if not key_words:
-        return None
-    candidate = key_words[0]
-    # Inutile de chercher si le mot-clé représente déjà toute la requête normalisée
-    if candidate == norm:
-        return None
-    return candidate
+    for w in words:
+        if len(w) >= 4 and w not in _GENERIC_CLUB_WORDS:
+            # Inutile de chercher si le mot-clé représente déjà toute la requête normalisée
+            if w == norm:
+                return None
+            return w
+    return None
 
 
 def _filter_orgs_by_gender(
