@@ -52,7 +52,13 @@ async def get_poule_ttl(
     # 3. Fenêtre live → interroger le signal lives()
     try:
         lives = await get_lives_fn()  # cache 15s, coût quasi nul
-        live_poule_ids = {m["poule_id"] for m in lives}
+        live_poule_ids: set[int] = set()
+        for m in lives:
+            ext = m.get("external_id") if isinstance(m, dict) else None
+            id_poule = ext.get("id_poule") if isinstance(ext, dict) else None
+            pid = id_poule.get("id") if isinstance(id_poule, dict) else None
+            if pid is not None:
+                live_poule_ids.add(int(pid))
         if poule_id in live_poule_ids:
             return 15  # ⚡ match en cours dans cette poule
         return 300  # fenêtre WE mais cette poule au repos

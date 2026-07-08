@@ -315,11 +315,11 @@ state.cache_bilan = make_persistent_cache(
     ttl_provider=lambda _v: get_static_ttl("bilan"),
 )
 state.cache_poule = make_persistent_cache(
-    TLRUCache(maxsize=128, ttu=_ttu_poule),
+    TLRUCache(maxsize=256, ttu=_ttu_poule),
     "poule",
 )
 state.cache_classement = make_persistent_cache(
-    TLRUCache(maxsize=128, ttu=_ttu_poule),
+    TLRUCache(maxsize=256, ttu=_ttu_poule),
     "classement",
 )
 state.cache_salle = make_persistent_cache(

@@ -1347,7 +1347,13 @@ async def _build_calendar_matches(
                     if isinstance(_res, list):
                         for _r in _res:
                             if _r.id and _r.salle:
-                                _salle_map[str(_r.id)] = str(_r.salle)
+                                raw = _r.salle
+                                sid = (
+                                    str(raw.get("id", raw))
+                                    if isinstance(raw, dict)
+                                    else str(raw)
+                                )
+                                _salle_map[str(_r.id)] = sid
                 for m in _matches_need_salle:
                     _sid = _salle_map.get(str(m["id"]))
                     if _sid:
