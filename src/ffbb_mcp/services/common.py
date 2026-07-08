@@ -18,6 +18,7 @@ from mcp.types import INTERNAL_ERROR
 
 from ffbb_mcp._state import _read_positive_int_env, state
 from ffbb_mcp.cache_strategy import get_static_ttl
+from ffbb_mcp.persistent_cache import make_persistent_cache
 from ffbb_mcp.utils import _DIACRITICS
 
 
@@ -257,42 +258,94 @@ def _ttu_calendrier(k, v, now):
 
 
 # Initialisation des caches sur l'état global
+# Les caches sont enveloppés dans un cache persistant (SQLite) quand
+# FFBB_SERVICE_CACHE_PERSIST=1 : les entrées encore dans leur TTL sont
+# réutilisées d'un redémarrage à l'autre (accélère les démarrages stdio
+# à froid) sans jamais servir de donnée périmée.
 
-state.cache_lives = TTLCache(
-    maxsize=1,
-    ttl=_read_positive_int_env("FFBB_CACHE_TTL_LIVES", get_static_ttl("lives")),
+state.cache_lives = make_persistent_cache(
+    TTLCache(
+        maxsize=1,
+        ttl=_read_positive_int_env("FFBB_CACHE_TTL_LIVES", get_static_ttl("lives")),
+    ),
+    "lives",
 )
-state.cache_search = TTLCache(
-    maxsize=256,
-    ttl=_read_positive_int_env("FFBB_CACHE_TTL_SEARCH", get_static_ttl("search")),
+state.cache_search = make_persistent_cache(
+    TTLCache(
+        maxsize=256,
+        ttl=_read_positive_int_env("FFBB_CACHE_TTL_SEARCH", get_static_ttl("search")),
+    ),
+    "search",
 )
-state.cache_competition = TTLCache(
-    maxsize=128,
-    ttl=_read_positive_int_env("FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")),
+state.cache_competition = make_persistent_cache(
+    TTLCache(
+        maxsize=128,
+        ttl=_read_positive_int_env(
+            "FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")
+        ),
+    ),
+    "competition",
 )
-state.cache_organisme = TTLCache(
-    maxsize=128,
-    ttl=_read_positive_int_env("FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")),
+state.cache_organisme = make_persistent_cache(
+    TTLCache(
+        maxsize=128,
+        ttl=_read_positive_int_env(
+            "FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")
+        ),
+    ),
+    "organisme",
 )
-state.cache_saisons = TTLCache(
-    maxsize=128,
-    ttl=_read_positive_int_env("FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")),
+state.cache_saisons = make_persistent_cache(
+    TTLCache(
+        maxsize=128,
+        ttl=_read_positive_int_env(
+            "FFBB_CACHE_TTL_DETAIL", get_static_ttl("organisme")
+        ),
+    ),
+    "saisons",
 )
-state.cache_calendrier = TLRUCache(maxsize=64, ttu=_ttu_calendrier)
-state.cache_bilan = TLRUCache(maxsize=64, ttu=_ttu_bilan)
-state.cache_poule = TLRUCache(maxsize=128, ttu=_ttu_poule)
-state.cache_classement = TLRUCache(maxsize=128, ttu=_ttu_poule)
-state.cache_salle = TTLCache(
-    maxsize=1024,
-    ttl=_read_positive_int_env("FFBB_CACHE_TTL_SALLE", get_static_ttl("salle")),
+state.cache_calendrier = make_persistent_cache(
+    TLRUCache(maxsize=64, ttu=_ttu_calendrier),
+    "calendrier",
+    ttl_provider=lambda _v: get_static_ttl("calendrier"),
 )
-state.cache_resolve_club = TTLCache(
-    maxsize=256,
-    ttl=_read_positive_int_env("FFBB_CACHE_TTL_RESOLVE_CLUB", 3600),
+state.cache_bilan = make_persistent_cache(
+    TLRUCache(maxsize=64, ttu=_ttu_bilan),
+    "bilan",
+    ttl_provider=lambda _v: get_static_ttl("bilan"),
+)
+state.cache_poule = make_persistent_cache(
+    TLRUCache(maxsize=128, ttu=_ttu_poule),
+    "poule",
+)
+state.cache_classement = make_persistent_cache(
+    TLRUCache(maxsize=128, ttu=_ttu_poule),
+    "classement",
+)
+state.cache_salle = make_persistent_cache(
+    TTLCache(
+        maxsize=1024,
+        ttl=_read_positive_int_env("FFBB_CACHE_TTL_SALLE", get_static_ttl("salle")),
+    ),
+    "salle",
+)
+state.cache_resolve_club = make_persistent_cache(
+    TTLCache(
+        maxsize=256,
+        ttl=_read_positive_int_env("FFBB_CACHE_TTL_RESOLVE_CLUB", 3600),
+    ),
+    "resolve_club",
+)
+state.cache_equipes = make_persistent_cache(
+    TTLCache(
+        maxsize=256,
+        ttl=_read_positive_int_env("FFBB_CACHE_TTL_EQUIPES", 3600),
+    ),
+    "equipes",
 )
 
-_inflight_lock: asyncio.Lock | None = None
-_inflight_lock_guard = threading.Lock()
+_inflight_locks: dict[int, asyncio.Lock] = {}
+_inflight_locks_guard = threading.Lock()
 state.inflight_detail = {}
 state.inflight_search = {}
 state.inflight_calendrier = {}
@@ -300,13 +353,24 @@ state.inflight_bilan = {}
 state.inflight_poule = {}
 
 
-def _get_inflight_lock() -> asyncio.Lock:
-    global _inflight_lock
-    if _inflight_lock is None:
-        with _inflight_lock_guard:
-            if _inflight_lock is None:
-                _inflight_lock = asyncio.Lock()
-    return _inflight_lock
+def _get_inflight_lock(
+    inflight_map: dict[str, asyncio.Task[Any]] | None = None,
+) -> asyncio.Lock:
+    """Retourne un verrou asyncio dédié à une map inflight donnée.
+
+    Au lieu d'un unique verrou global qui sérialise toutes les déduplications
+    (bilan, poule, search, detail, calendrier), on utilise un verrou par map.
+    Cela réduit la contention en mode HTTP/streamable concurent.
+    """
+    key = id(inflight_map) if inflight_map is not None else 0
+    lock = _inflight_locks.get(key)
+    if lock is None:
+        with _inflight_locks_guard:
+            lock = _inflight_locks.get(key)
+            if lock is None:
+                lock = asyncio.Lock()
+                _inflight_locks[key] = lock
+    return lock
 
 
 def get_cache_ttls() -> dict[str, int]:
@@ -544,7 +608,7 @@ async def _dedupe_inflight(
         if cached is not None:
             return cached
 
-    async with _get_inflight_lock():
+    async with _get_inflight_lock(inflight_map):
         if cache is not None:
             cached = _cache_get(cache, cache_key, cache_name, record_miss=False)
             if cached is not None:
@@ -560,7 +624,7 @@ async def _dedupe_inflight(
             _cache_set(cache, cache_key, result, cache_name)
         return result
     finally:
-        async with _get_inflight_lock():
+        async with _get_inflight_lock(inflight_map):
             if inflight_map.get(cache_key) is existing:
                 inflight_map.pop(cache_key, None)
 

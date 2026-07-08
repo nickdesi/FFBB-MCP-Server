@@ -209,6 +209,7 @@ ENV_DESCRIPTIONS = {
     "TRUSTED_PROXY_HOSTS": "Proxies de confiance",
     "FFBB_CACHE_BACKEND": "Choix du backend de cache HTTP (`sqlite` ou `redis`)",
     "FFBB_REDIS_URL": "URL de connexion à l'instance Redis si backend=redis",
+    "FFBB_SERVICE_CACHE_PERSIST": "Activer la persistance des caches service sur disque (SQLite) entre redémarrages",
     "FFBB_CACHE_EXPIRE_AFTER": "TTL en secondes pour le cache HTTP court de session (défaut : 30)",
     "ENABLE_DNS_PROTECTION": "Activer/désactiver explicitement la protection contre le DNS rebinding",
     "XDG_CACHE_HOME": "Dossier racine pour stocker les fichiers de cache persistants (ex: acronymes, benchmark)",

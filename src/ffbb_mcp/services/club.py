@@ -25,6 +25,7 @@ Trois sections logiques cohabitent :
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import logging
 from datetime import datetime, timedelta
@@ -187,6 +188,19 @@ async def ffbb_equipes_club_service(
     if not data:
         return []
 
+    # Cache de réutilisation inter-outils (bilan/calendrier/next/last/resolve
+    # pour un même club+catégorie). Évite de reconstruire les team_info et de
+    # re-interroger l'organisme à chaque appel de la session.
+    _eq_key = (
+        f"equipes:{organisme_id}:{_normalize_name(filtre or '')}"
+        if organisme_id is not None
+        else None
+    )
+    if _eq_key is not None:
+        _cached_equipes = state.cache_equipes.get(_eq_key)
+        if _cached_equipes is not None:
+            return copy.deepcopy(_cached_equipes)
+
     raw = data.get("engagements", []) if isinstance(data, dict) else []
     all_teams: list[dict[str, Any]] = []
     club_nom = data.get("nom", "")
@@ -241,6 +255,8 @@ async def ffbb_equipes_club_service(
         all_teams.append(team_info)
 
     if parsed_filter is None:
+        if _eq_key is not None:
+            state.cache_equipes[_eq_key] = copy.deepcopy(all_teams)
         return all_teams
 
     filtered_teams: list[dict[str, Any]] = []
@@ -281,14 +297,19 @@ async def ffbb_equipes_club_service(
 
     if not filtered_teams:
         suggestions = sorted(list({t["team_label"] for t in all_teams}))
-        return [
+        _error_result = [
             {
                 "error": f"Aucune équipe matchant '{filtre}' trouvée pour '{club_nom}'.",
                 "suggested_teams": suggestions,
                 "hint": "Utilise l'un des labels suggérés pour une précision exacte.",
             }
         ]
+        if _eq_key is not None:
+            state.cache_equipes[_eq_key] = copy.deepcopy(_error_result)
+        return _error_result
 
+    if _eq_key is not None:
+        state.cache_equipes[_eq_key] = copy.deepcopy(filtered_teams)
     return filtered_teams
 
 
@@ -798,7 +819,7 @@ async def ffbb_saison_bilan_service(
         for entry in classements:
             eng = entry.get("id_engagement", {}) or {}
             entry_eng_id = str(eng.get("id", ""))
-            if entry_eng_id not in {str(e["engagement_id"]) for e in equipes}:
+            if entry_eng_id not in eng_ids:
                 continue
 
             stats = _extract_and_accumulate_bilan(entry, totaux)
