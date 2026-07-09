@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import random
 import re
 import threading
@@ -55,6 +56,20 @@ _ELIMINATION_KEYWORDS = re.compile(
 _MAX_CONCURRENT_FFBB = _read_positive_int_env("MAX_CONCURRENT_FFBB", 8)
 _MAX_CALENDAR_MATCHES = _read_positive_int_env("FFBB_MAX_CALENDAR_MATCHES", 300)
 _ffbb_semaphore = asyncio.Semaphore(_MAX_CONCURRENT_FFBB)
+
+# Stale-While-Revalidate : sert la valeur en cache immédiatement même si elle
+# approche de son expiration, et rafraîchit en arrière-plan. L'utilisateur ne
+# subit ainsi jamais la latence (~400ms) d'un cache miss sur les données chaudes.
+_SWR_ENABLED = os.environ.get("FFBB_SWR_ENABLED", "1").lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
+# Fraction du TTL au-delà de laquelle une entrée est considérée "stale" et
+# déclenche un refresh en arrière-plan (0.75 = on rafraîchit dans le dernier
+# quart du TTL).
+_SWR_STALE_FRACTION = float(os.environ.get("FFBB_SWR_STALE_FRACTION", "0.75"))
 
 # Hooks simples pour les metrics de cache.
 _cache_hit_hook: Callable[..., None] | None = record_cache_hit
@@ -587,12 +602,85 @@ def _cache_set(cache: Any, key: Any, val: Any, cache_name: str) -> None:
         return
     try:
         cache[key] = val
+        # Horodatage du dernier fetch réel pour le SWR.
+        state.swr_last_fetch[f"{cache_name}:{key}"] = time.monotonic()
     except TypeError, ValueError:
         logger.debug(
             "Impossible d'écrire dans le cache %s",
             cache_name,
             exc_info=True,
         )
+
+
+# ---------------------------------------------------------------------------
+# Stale-While-Revalidate
+# ---------------------------------------------------------------------------
+def _swr_is_stale(cache_name: str, key: Any, ttl: float) -> bool:
+    """Vrai si l'entrée dépasse la fraction "stale" de son TTL depuis le dernier fetch."""
+    if not _SWR_ENABLED or ttl <= 0:
+        return False
+    sk = f"{cache_name}:{key}"
+    last = state.swr_last_fetch.get(sk)
+    if last is None:
+        return True
+    return (time.monotonic() - last) >= _SWR_STALE_FRACTION * ttl
+
+
+def _swr_schedule(
+    cache_name: str,
+    key: Any,
+    make_coro: Callable[[], Any],
+    cache: Any = None,
+) -> None:
+    """Déclenche (fire-and-forget, dédupliqué) un refresh en arrière-plan.
+
+    Si ``cache`` est fourni, le résultat du refresh est (ré)écrit dans le cache,
+    ce qui permet d'utiliser cette fonction avec des ``make_coro`` qui ne
+    persistent pas eux-mêmes (ex: ``_fetch`` des poules/classements).
+    """
+    name = f"{cache_name}:{key}"
+    existing = state.swr_tasks.get(name)
+    if existing is not None and not existing.done():
+        return
+
+    async def _run() -> None:
+        try:
+            result = await make_coro()
+            if cache is not None and result is not None:
+                _cache_set(cache, key, result, cache_name)
+        except Exception:  # pragma: no cover - robustness
+            logger.debug("SWR refresh '%s' échoué", name, exc_info=True)
+        finally:
+            state.swr_tasks.pop(name, None)
+
+    try:
+        state.swr_tasks[name] = asyncio.ensure_future(_run())
+    except RuntimeError:
+        # Pas de loop en cours (ex: import hors contexte async) → on ignore.
+        logger.debug("SWR: impossible de planifier le refresh '%s' (pas de loop)", name)
+
+
+async def _swr_serve(
+    cache: Any,
+    key: Any,
+    cache_name: str,
+    ttl: float,
+    make_fetch_coro: Callable[[], Any],
+) -> Any:
+    """Sert depuis le cache ; si l'entrée est stale, la renvoie et rafraîchit en arrière-plan.
+
+    ``make_fetch_coro`` est une fabrique de coroutine qui effectue le fetch réseau
+    *complet* (fetch + enrichissement + écriture dans le cache) — exactement le
+    chemin utilisé en cas de miss. En présence d'une entrée valide mais stale,
+    on la renvoie immédiatement sans attendre le réseau, et on planifie son
+    rafraîchissement asynchrone.
+    """
+    cached = _cache_get(cache, key, cache_name, record_miss=False)
+    if cached is not None:
+        if _swr_is_stale(cache_name, key, ttl):
+            _swr_schedule(cache_name, key, make_fetch_coro, cache)
+        return cached
+    return await make_fetch_coro()
 
 
 async def _dedupe_inflight(
@@ -602,10 +690,15 @@ async def _dedupe_inflight(
     inflight_map: dict[str, asyncio.Task[Any]],
     make_coro,
     cache_name: str,
+    swr_ttl: float | None = None,
 ) -> Any:
     if cache is not None:
         cached = _cache_get(cache, cache_key, cache_name)
         if cached is not None:
+            # Stale-While-Revalidate : on sert l'entrée valide mais stale
+            # immédiatement, et on la rafraîchit en arrière-plan.
+            if swr_ttl is not None and _swr_is_stale(cache_name, cache_key, swr_ttl):
+                _swr_schedule(cache_name, cache_key, make_coro, cache)
             return cached
 
     async with _get_inflight_lock(inflight_map):

@@ -9,6 +9,10 @@ This document summarizes recent performance optimizations and explains how to ru
 - **Shared in-memory TTL caches**: `cachetools.TTLCache` instances are shared between tools and resources for popular read paths (lives, saisons, search results, details, calendrier, bilan).
 - **Lazy imports**: heavy Meilisearch-related symbols from `ffbb_data_client` are imported lazily inside hot functions (`_search_generic`, `multi_search_service`) to reduce cold-start overhead.
 - **Regex precompilation**: the filtering logic in `ffbb_equipes_club_service` relies on precompiled regular expressions to avoid re-compiling them on every call.
+- **Parallel fan-out**: workflows agrégés (`ffbb_bilan_service`, `get_calendrier_club_service`, `ffbb_equipes_club_service`) récupèrent les poules/classements en `asyncio.gather` — N appels indépendants coûtent un seul RTT (~412ms) au lieu de N×412ms.
+- **Stale-While-Revalidate (SWR)**: les chemins chauds (`lives`, `saisons`, `poule`, `classement`) renvoient la valeur en cache immédiatement même si elle approche de l'expiration, et la rafraîchissent en arrière-plan (`FFBB_SWR_ENABLED`, `FFBB_SWR_STALE_FRACTION`). Le TTL dynamique des poules/classements (via `get_poule_ttl`) sert de seuil de fraîcheur. L'utilisateur ne subit jamais la latence d'un miss sur ces données.
+- **Cache persistant (SQLite)**: activé par défaut (`FFBB_SERVICE_CACHE_PERSIST=1`), il survit aux redémarrages (critique en mode stdio où chaque session démarre dans un processus neuf) sans jamais servir de donnée périmée.
+- **Warm-up au démarrage**: en mode HTTP, une boucle rafraîchit proactivement les `lives` pendant les fenêtres de match (`FFBB_LIVES_REFRESH_INTERVAL`) et un préchauffage optionnel charge les organismes/clubs configurés (`FFBB_WARMUP_ORGANISMES`).
 
 ## Concurrency and batching
 

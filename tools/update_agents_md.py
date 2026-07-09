@@ -215,6 +215,9 @@ ENV_DESCRIPTIONS = {
     "XDG_CACHE_HOME": "Dossier racine pour stocker les fichiers de cache persistants (ex: acronymes, benchmark)",
     "FFBB_WARMUP_ORGANISMES": "Liste d'organisme_id séparés par des virgules à préchauffer au démarrage",
     "FFBB_WARMUP_CONCURRENCY": "Concurrence maximale lors du préchauffage du cache",
+    "FFBB_SWR_ENABLED": "Activer le Stale-While-Revalidate : servir le cache et rafraîchir en arrière-plan (défaut : 1)",
+    "FFBB_SWR_STALE_FRACTION": "Fraction du TTL au-delà de laquelle une entrée est rafraîchie en arrière-plan (défaut : 0.75)",
+    "FFBB_LIVES_REFRESH_INTERVAL": "Intervalle de rafraîchissement proactif des lives en secondes, mode HTTP (défaut : 10)",
     "FFBB_KNOWN_CLUB_IDS": "Override JSON de la liste d'organisme_id connus pour les prompts MCP (fallback : _DEFAULT_KNOWN_CLUB_IDS)",
 }
 

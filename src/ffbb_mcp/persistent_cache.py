@@ -250,23 +250,28 @@ def make_persistent_cache(
     name: str,
     ttl_provider: Callable[[Any], float] | None = None,
 ) -> Any:
-    """Retourne un ``PersistentCache`` si ``FFBB_SERVICE_CACHE_PERSIST=1``.
+    """Retourne un ``PersistentCache`` (SQLite) sauf opt-out explicite.
 
-    Sinon renvoie ``inner`` tel quel (comportement identique à avant, aucun
-    changement de fraîcheur ni de tests affecté).
+    Activé par défaut : les entrées encore dans leur TTL sont réutilisées
+    d'un redémarrage à l'autre (accélère les démarrages stdio à froid) sans
+    jamais servir de donnée périmée (voir ``PersistentCache``).
+
+    Désactiver avec ``FFBB_SERVICE_CACHE_PERSIST=0`` (ou ``false``/``no``/
+    ``off``) pour revenir à un cache purement mémoire.
     """
-    if os.environ.get("FFBB_SERVICE_CACHE_PERSIST", "").lower() in (
-        "1",
-        "true",
-        "yes",
-        "on",
+    if os.environ.get("FFBB_SERVICE_CACHE_PERSIST", "1").lower() in (
+        "0",
+        "false",
+        "no",
+        "off",
     ):
-        try:
-            cache: PersistentCache = PersistentCache(inner, name)
-            cache._ttl_provider = ttl_provider
-            return cache
-        except Exception as e:  # pragma: no cover - robustness
-            logger.warning(
-                "Cache persistant indisponible (%s), fallback mémoire: %s", name, e
-            )
+        return inner
+    try:
+        cache: PersistentCache = PersistentCache(inner, name)
+        cache._ttl_provider = ttl_provider
+        return cache
+    except Exception as e:  # pragma: no cover - robustness
+        logger.warning(
+            "Cache persistant indisponible (%s), fallback mémoire: %s", name, e
+        )
     return inner
