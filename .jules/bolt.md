@@ -16,3 +16,6 @@
 ## 2025-02-28 - Fast-path Text Extraction
 **Learning:** In CPython, when extracting the first matching element from an iterable that requires processing (like `str.split()`), a manual `for` loop that short-circuits via `return` is significantly faster than using a list comprehension to build a fully filtered list and returning `list[0]`. The list comprehension forces Python to process the entire sequence and allocate intermediate memory for elements that will ultimately be discarded.
 **Action:** When filtering data just to extract a single/first match, replace list comprehensions with manual short-circuiting `for` loops to save CPU cycles and avoid unnecessary allocations.
+## 2026-07-10 - Optimize Collection Truncation via Slicing
+**Learning:** For collection truncation in performance-critical loops (like payload pruning), using native list slicing (`obj[:limit]`) is significantly faster than using a manual loop with `enumerate` and `break` (e.g., `for i, item in enumerate(obj): if i >= limit: break`). Native slicing avoids pure Python execution overhead (such as variable binding and branch evaluation) by delegating boundary checks to C.
+**Action:** Replace manual `enumerate` and `break` loops with native collection slicing in hot paths that perform iteration limits on lists.
