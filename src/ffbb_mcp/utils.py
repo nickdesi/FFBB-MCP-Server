@@ -1,3 +1,4 @@
+import itertools
 import os
 import re
 import sys
@@ -285,9 +286,11 @@ def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
 
         # 2. Fusion de la troncature et du nettoyage en une seule passe
         final_list = []
-        for i, item in enumerate(obj):
-            if i >= limit:
-                break
+
+        # ⚡ Bolt: Fast-path for list truncation avoiding enumerate() overhead
+        iterable = obj[:limit] if obj_type is list else itertools.islice(obj, limit)
+
+        for item in iterable:
             if item is None:
                 continue
             it = type(item)

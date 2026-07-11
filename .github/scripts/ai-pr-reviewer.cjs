@@ -271,8 +271,8 @@ _Revue générée automatiquement._`,
 
   } catch (error) {
     console.error("AI review failed:", error);
-    if (error.message && (error.message.includes('Status 503') || error.message.includes('Status 429'))) {
-      console.warn("Gracefully exiting due to transient API issues.");
+    if (error.message && (error.message.includes('Status 503') || error.message.includes('Status 429') || error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID') || error.message.includes('Status 400'))) {
+      console.warn("Gracefully exiting due to transient API issues or missing/invalid API key.");
       process.exit(0);
     }
     process.exit(1);
