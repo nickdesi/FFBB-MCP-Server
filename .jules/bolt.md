@@ -19,3 +19,10 @@
 ## 2025-02-28 - Optimize List Truncation with Slicing
 **Learning:** In CPython, when iterating over a sequence up to a fixed maximum length (truncation), using native list slicing (`obj[:limit]`) combined with a simple `for item in ...:` loop is significantly faster than using `for i, item in enumerate(obj): if i >= limit: break`. The `enumerate` and manual loop index checking add pure Python execution overhead (variable binding and branch evaluation) that can be entirely avoided by slicing, which delegates the boundary evaluation to C.
 **Action:** In performance-critical data transformation loops where an iterable must be truncated, use `itertools.islice()` or native list slicing (`obj[:limit]`) rather than manually tracking indices and breaking with `enumerate`.
+## 2025-02-28 - Fast-Path Object Serialization and Dict Check Ordering
+**Learning:** When optimizing object serialization, do not indiscriminately use `hasattr(obj, '__dict__')` iteration as a fast-path before checking for Pydantic serialization methods (`model_dump` or `dict`). Doing so can intercept Pydantic models and bypass their native C/Rust serialization handling, causing functional regressions.
+**Action:** Always test object serialization against all object types (Pydantic V1, Pydantic V2, Enum, native primitives) before adopting structural fast paths.
+
+## 2025-02-28 - Inner-Loop Redundant Operations
+**Learning:** In nested loops (such as O(N*M) algorithms like Jaro-Winkler string similarity), hoisting outer loop invariant operations (e.g., string indexing `val = s1[i]`) out of the inner loop avoids redundant subscripting operations and yields measurable performance benefits in CPython.
+**Action:** Identify and extract invariant object lookups or calculations from tight inner loops.

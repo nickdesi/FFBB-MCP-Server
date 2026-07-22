@@ -104,7 +104,7 @@ class PersistentCache:
         for key, value, expires_at in rows:
             try:
                 val = json.loads(value)
-            except json.JSONDecodeError, TypeError:
+            except (json.JSONDecodeError, TypeError):
                 continue
             self._inner[key] = val
             self._expires[key] = expires_at
@@ -127,7 +127,7 @@ class PersistentCache:
             return None
         try:
             val = json.loads(row[0])
-        except json.JSONDecodeError, TypeError:
+        except (json.JSONDecodeError, TypeError):
             return None
         self._inner[key] = val
         self._expires[key] = row[1]
@@ -142,7 +142,7 @@ class PersistentCache:
         if isinstance(value, dict) and "_ttl" in value:
             try:
                 return float(value["_ttl"])
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 pass
         if ttl_provider is not None:
             try:
@@ -155,7 +155,7 @@ class PersistentCache:
         expires_at = time.time() + ttl
         try:
             blob = json.dumps(value, ensure_ascii=False, default=str)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return
         try:
             with _DB_LOCK:

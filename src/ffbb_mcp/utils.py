@@ -126,7 +126,7 @@ def format_team_name(name: str | None, number: int | str | None) -> str:
         num_int = int(number)
         if num_int > 1:
             return f"{name} - {num_int}"
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         pass
 
     return name
@@ -353,8 +353,9 @@ def jaro_winkler_similarity(s1: str, s2: str) -> float:
     for i in range(len1):
         start = max(0, i - match_bound)
         end = min(len2, i + match_bound + 1)
+        s1_i = s1[i]
         for j in range(start, end):
-            if not s2_matches[j] and s1[i] == s2[j]:
+            if not s2_matches[j] and s1_i == s2[j]:
                 s1_matches[i] = True
                 s2_matches[j] = True
                 matches += 1
