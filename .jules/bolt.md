@@ -10,19 +10,19 @@
 ## 2024-10-15 - datetime.fromisoformat native space support in Python 3.11+
 **Learning:** Python 3.11+ natively supports space separators in `datetime.fromisoformat()`. Manual replacement of space with 'T' (e.g., via slicing `raw[:10] + 'T' + raw[11:]` or `.replace(' ', 'T')`) is unnecessary and adds overhead.
 **Action:** Remove fallback manual parsing and allow `datetime.fromisoformat()` to handle the raw string directly wrapped in `try..except ValueError` for performance.
-## 2025-02-28 - Optimize String Join Filtering with List Comprehensions
+## 2026-07-05 - Optimize String Join Filtering with List Comprehensions
 **Learning:** In CPython, when filtering iterables and joining the results to build a string (e.g. `"".join(str(part).strip() for part in parts if part)`), using a list comprehension instead of a generator expression yields a significant performance improvement (nearly 2x faster). The list comprehension executes its filtering entirely in C-level and pre-allocates memory for the list, allowing `.join()` to size the final string efficiently, whereas generators incur Python-level frame evaluation overhead for every yield.
 **Action:** Replace generator expressions with list comprehensions when filtering elements to be consumed by `str.join()` in performance-critical paths.
-## 2025-02-28 - Fast-path Text Extraction
+## 2026-07-06 - Fast-path Text Extraction
 **Learning:** In CPython, when extracting the first matching element from an iterable that requires processing (like `str.split()`), a manual `for` loop that short-circuits via `return` is significantly faster than using a list comprehension to build a fully filtered list and returning `list[0]`. The list comprehension forces Python to process the entire sequence and allocate intermediate memory for elements that will ultimately be discarded.
 **Action:** When filtering data just to extract a single/first match, replace list comprehensions with manual short-circuiting `for` loops to save CPU cycles and avoid unnecessary allocations.
-## 2025-02-28 - Optimize List Truncation with Slicing
+## 2026-07-11 - Optimize List Truncation with Slicing
 **Learning:** In CPython, when iterating over a sequence up to a fixed maximum length (truncation), using native list slicing (`obj[:limit]`) combined with a simple `for item in ...:` loop is significantly faster than using `for i, item in enumerate(obj): if i >= limit: break`. The `enumerate` and manual loop index checking add pure Python execution overhead (variable binding and branch evaluation) that can be entirely avoided by slicing, which delegates the boundary evaluation to C.
 **Action:** In performance-critical data transformation loops where an iterable must be truncated, use `itertools.islice()` or native list slicing (`obj[:limit]`) rather than manually tracking indices and breaking with `enumerate`.
-## 2025-02-28 - Fast-Path Object Serialization and Dict Check Ordering
+## 2026-07-22 - Fast-Path Object Serialization and Dict Check Ordering
 **Learning:** When optimizing object serialization, do not indiscriminately use `hasattr(obj, '__dict__')` iteration as a fast-path before checking for Pydantic serialization methods (`model_dump` or `dict`). Doing so can intercept Pydantic models and bypass their native C/Rust serialization handling, causing functional regressions.
 **Action:** Always test object serialization against all object types (Pydantic V1, Pydantic V2, Enum, native primitives) before adopting structural fast paths.
 
-## 2025-02-28 - Inner-Loop Redundant Operations
+## 2026-07-22 - Inner-Loop Redundant Operations
 **Learning:** In nested loops (such as O(N*M) algorithms like Jaro-Winkler string similarity), hoisting outer loop invariant operations (e.g., string indexing `val = s1[i]`) out of the inner loop avoids redundant subscripting operations and yields measurable performance benefits in CPython.
 **Action:** Identify and extract invariant object lookups or calculations from tight inner loops.
