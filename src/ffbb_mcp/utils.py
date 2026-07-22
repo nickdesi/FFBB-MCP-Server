@@ -126,7 +126,7 @@ def format_team_name(name: str | None, number: int | str | None) -> str:
         num_int = int(number)
         if num_int > 1:
             return f"{name} - {num_int}"
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         pass
 
     return name
@@ -395,9 +395,14 @@ def jaro_winkler_similarity(s1: str, s2: str) -> float:
 
 
 class OrjsonResponse(JSONResponse):
-    """JSONResponse subclass using orjson for high-performance JSON serialization."""
+    """JSONResponse subclass using orjson for high-performance JSON serialization with fallback."""
 
     def render(self, content: Any) -> bytes:
-        import orjson
+        try:
+            import orjson
 
-        return orjson.dumps(content)
+            return orjson.dumps(content)
+        except ImportError:
+            import json
+
+            return json.dumps(content, ensure_ascii=False).encode("utf-8")
