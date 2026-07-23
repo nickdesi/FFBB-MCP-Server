@@ -26,3 +26,6 @@
 ## 2026-07-22 - Inner-Loop Redundant Operations
 **Learning:** In nested loops (such as O(N*M) algorithms like Jaro-Winkler string similarity), hoisting outer loop invariant operations (e.g., string indexing `val = s1[i]`) out of the inner loop avoids redundant subscripting operations and yields measurable performance benefits in CPython.
 **Action:** Identify and extract invariant object lookups or calculations from tight inner loops.
+## 2026-07-22 - Inner Loop Mathematical Built-ins
+**Learning:** In tight algorithmic loops (like string similarity), replacing built-in functions like `min()` and `max()` with explicit `if/else` bounds checking eliminates pure Python function call overhead, yielding a measurable speedup in CPython. Additionally, mathematically analyzing boolean short-circuit conditions (e.g., checking character equality, which is rarely true, before performing a list lookup) allows you to bypass expensive operations on most loop iterations.
+**Action:** When optimizing performance-critical algorithmic code, replace mathematical built-in function calls with explicit branching, and statistically order your boolean operations to maximize short-circuiting.
