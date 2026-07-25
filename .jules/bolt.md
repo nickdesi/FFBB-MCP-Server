@@ -33,3 +33,6 @@
 ## 2025-02-23 - Python Iteration Overhead for Small Fixed Sets
 **Learning:** Iterating over a small, fixed list of tuples to match conditions adds measurable pure Python overhead due to variable binding and loop execution, especially when it re-evaluates expensive property accesses (like `now.weekday()`).
 **Action:** For small, static sets of conditions evaluated repeatedly (e.g., matching known time windows), unrolling the loop into explicit `if/elif` blocks and caching repeated property lookups outside the checks eliminates iteration overhead and substantially accelerates execution.
+## 2026-07-22 - Inner Loop Mathematical Built-ins
+**Learning:** In tight algorithmic loops (like string similarity), replacing built-in functions like `min()` and `max()` with explicit `if/else` bounds checking eliminates pure Python function call overhead, yielding a measurable speedup in CPython. Additionally, mathematically analyzing boolean short-circuit conditions (e.g., checking character equality, which is rarely true, before performing a list lookup) allows you to bypass expensive operations on most loop iterations.
+**Action:** When optimizing performance-critical algorithmic code, replace mathematical built-in function calls with explicit branching, and statistically order your boolean operations to maximize short-circuiting.
