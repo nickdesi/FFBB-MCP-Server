@@ -79,6 +79,7 @@ _STATIC_TTLS = {
     "salle": 604_800,  # 7 jours (immuable)
 }
 
+
 # TTLs statiques pour les autres caches
 def get_static_ttl(cache_name: str) -> int:
     # ⚡ Bolt: Fast-path pour les TTLs statiques sans appel de fonction conditionnel.
