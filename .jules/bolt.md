@@ -26,3 +26,10 @@
 ## 2026-07-22 - Inner-Loop Redundant Operations
 **Learning:** In nested loops (such as O(N*M) algorithms like Jaro-Winkler string similarity), hoisting outer loop invariant operations (e.g., string indexing `val = s1[i]`) out of the inner loop avoids redundant subscripting operations and yields measurable performance benefits in CPython.
 **Action:** Identify and extract invariant object lookups or calculations from tight inner loops.
+## 2025-02-23 - Dictionary Allocation Overhead in Constant Lookups
+**Learning:** Functions designed to return "static" configuration values based on dynamic conditionals often recreate static mappings entirely on every invocation (e.g., building a dict just to call `.get()`). This adds unexpected O(1) allocation overhead on hot paths.
+**Action:** When a function mixes static constant lookups with conditionally-evaluated dynamic values, hoist the static mapping into a module-level dictionary to serve as an O(1) fast-path, and execute the dynamic logic strictly as a fallback.
+
+## 2025-02-23 - Python Iteration Overhead for Small Fixed Sets
+**Learning:** Iterating over a small, fixed list of tuples to match conditions adds measurable pure Python overhead due to variable binding and loop execution, especially when it re-evaluates expensive property accesses (like `now.weekday()`).
+**Action:** For small, static sets of conditions evaluated repeatedly (e.g., matching known time windows), unrolling the loop into explicit `if/elif` blocks and caching repeated property lookups outside the checks eliminates iteration overhead and substantially accelerates execution.

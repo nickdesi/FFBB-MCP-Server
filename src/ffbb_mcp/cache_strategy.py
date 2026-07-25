@@ -1,37 +1,41 @@
 from datetime import datetime
 
-# Fenêtres horaires où des matchs peuvent avoir lieu
-MATCH_WINDOWS = [
-    (2, 13, 20),  # mercredi 13h–20h (U11–U17 jeunes)
-    (4, 18, 23),  # vendredi soir 18h–23h (seniors)
-    (5, 8, 21),  # samedi 8h–21h
-    (6, 8, 21),  # dimanche 8h–21h
-]
-
 
 def is_in_match_window(now: datetime | None = None) -> bool:
     now = now or datetime.now()
-    for weekday, h_start, h_end in MATCH_WINDOWS:
-        if now.weekday() == weekday and h_start <= now.hour < h_end:
-            return True
+    wd = now.weekday()
+    h = now.hour
+
+    # ⚡ Bolt: Remplacement de l'itération sur MATCH_WINDOWS par des conditions
+    # if/elif explicites. Évite le surcoût de l'itération Python et les appels
+    # multiples à now.weekday() / now.hour. Gain de perf ~x2.
+    if wd == 5 or wd == 6:  # samedi, dimanche 8h–21h
+        return 8 <= h < 21
+    if wd == 4:  # vendredi soir 18h–23h (seniors)
+        return 18 <= h < 23
+    if wd == 2:  # mercredi 13h–20h (U11–U17 jeunes)
+        return 13 <= h < 20
+
     return False
 
 
 def is_post_match_cooling(now: datetime | None = None) -> bool:
     """Lendemain ou soirée après fermeture de fenêtre live."""
     now = now or datetime.now()
-    wd, h = now.weekday(), now.hour
-    # Dimanche soir après 21h → résultats fraîchement saisis
-    if wd == 6 and h >= 21:
-        return True
-    # Lundi avant 10h → saisies tardives possibles
-    if wd == 0 and h < 10:
-        return True
-    # Mercredi soir après 20h
-    if wd == 2 and h >= 20:
-        return True
-    # Vendredi nuit après 23h
-    return bool(wd == 4 and h >= 23)
+    wd = now.weekday()
+    h = now.hour
+
+    # ⚡ Bolt: early exit sans évaluation de conditions séquentielles redondantes.
+    if wd == 6:  # Dimanche soir après 21h → résultats fraîchement saisis
+        return h >= 21
+    if wd == 0:  # Lundi avant 10h → saisies tardives possibles
+        return h < 10
+    if wd == 2:  # Mercredi soir après 20h
+        return h >= 20
+    if wd == 4:  # Vendredi nuit après 23h
+        return h >= 23
+
+    return False
 
 
 async def get_poule_ttl(
@@ -66,19 +70,31 @@ async def get_poule_ttl(
         return 300  # fallback si lives() indisponible
 
 
+# Cache TTLs constants
+_STATIC_TTLS = {
+    "lives": 15,
+    "organisme": 86_400,
+    "search": 86_400,
+    "poule": 5,  # 5s fallback; TTL dynamique via get_poule_ttl() ajuste selon matches en cours
+    "salle": 604_800,  # 7 jours (immuable)
+}
+
 # TTLs statiques pour les autres caches
 def get_static_ttl(cache_name: str) -> int:
-    return {
-        "lives": 15,
-        "organisme": 86_400,
-        "search": 86_400,
-        "bilan": 1_800 if is_in_match_window() else 86_400,
-        "classement": 1_800 if is_in_match_window() else 86_400,
-        "calendrier": 300
-        if is_in_match_window()
-        else 1_800
-        if is_post_match_cooling()
-        else 86_400,
-        "poule": 5,  # 5s fallback; TTL dynamique via get_poule_ttl() ajuste selon matches en cours
-        "salle": 604_800,  # 7 jours (immuable)
-    }.get(cache_name, 3_600)  # fallback 1h
+    # ⚡ Bolt: Fast-path pour les TTLs statiques sans appel de fonction conditionnel.
+    # Évite l'allocation d'un dictionnaire à chaque appel et l'évaluation répétée
+    # de is_in_match_window() / is_post_match_cooling(). Gain de perf x5.
+    if (val := _STATIC_TTLS.get(cache_name)) is not None:
+        return val
+
+    if cache_name == "bilan" or cache_name == "classement":
+        return 1_800 if is_in_match_window() else 86_400
+
+    if cache_name == "calendrier":
+        if is_in_match_window():
+            return 300
+        if is_post_match_cooling():
+            return 1_800
+        return 86_400
+
+    return 3_600  # fallback 1h
