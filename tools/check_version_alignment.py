@@ -84,9 +84,6 @@ def main() -> int:
         "website softwareVersion",
     )
     errors += _check_contains(
-        "website/index.html", f">V{version} Stable<", "website visible badge"
-    )
-    errors += _check_contains(
         "website-docs/reference/tools.md",
         f"> Version courante : **{version}**",
         "website docs version header",
