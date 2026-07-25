@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.6.0] - 2026-07-09
+## [1.6.0] - 2026-07-25
 
 ### Added
 - **Stale-While-Revalidate (SWR)** : les chemins chauds (`lives`, `saisons`, `poule`, `classement`) renvoient la valeur en cache immédiatement même si elle approche de l'expiration, et la rafraîchissent en arrière-plan. L'utilisateur ne subit jamais la latence (~400ms) d'un miss sur ces données. Réglable via `FFBB_SWR_ENABLED` et `FFBB_SWR_STALE_FRACTION`.
