@@ -351,11 +351,17 @@ def jaro_winkler_similarity(s1: str, s2: str) -> float:
     matches = 0
     # Recherche des correspondances dans la fenêtre
     for i in range(len1):
-        start = max(0, i - match_bound)
-        end = min(len2, i + match_bound + 1)
+        start = i - match_bound
+        if start < 0:
+            start = 0
+        end = i + match_bound + 1
+        if end > len2:
+            end = len2
+
         s1_i = s1[i]
         for j in range(start, end):
-            if not s2_matches[j] and s1_i == s2[j]:
+            # ⚡ Bolt: Fast-path string character equality check before list index lookup
+            if s1_i == s2[j] and not s2_matches[j]:
                 s1_matches[i] = True
                 s2_matches[j] = True
                 matches += 1
@@ -383,7 +389,11 @@ def jaro_winkler_similarity(s1: str, s2: str) -> float:
     # Similarité de Jaro-Winkler
     # Recherche de la longueur du préfixe commun (jusqu'à 4 caractères)
     prefix_len = 0
-    for i in range(min(4, len1, len2)):
+    limit = len1 if len1 < len2 else len2
+    if limit > 4:
+        limit = 4
+
+    for i in range(limit):
         if s1[i] == s2[i]:
             prefix_len += 1
         else:
