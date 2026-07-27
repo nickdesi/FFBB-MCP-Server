@@ -5,26 +5,40 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="TuCtfpsMfaMi13jU8fbz5LFA1vxzqeLZMHc74ulWRig" />
-    <title>FFBB MCP Server - Données FFBB live pour agents IA</title>
+    <title>FFBB MCP Server — Données officielles du basket français pour vos agents IA</title>
     <meta name="description"
-        content="Connectez GitHub Copilot, Claude, Cursor et autres clients MCP aux données officielles FFBB : calendriers, classements, bilans, derniers résultats, prochains matchs et scores live via Streamable HTTP.">
-    <meta name="keywords" content="FFBB, Basketball, MCP Server, extension VS Code, GitHub Copilot, Claude, Cursor, AI, Basket France, API Basketball">
-    <meta name="robots" content="index, follow">
+        content="Serveur MCP public connecté aux données officielles de la FFBB : calendriers, classements, bilans, derniers résultats, prochains matchs et scores live. Compatible GitHub Copilot, Claude, Cursor et VS Code.">
+    <meta name="keywords"
+        content="FFBB, Basketball, MCP Server, basket français, GitHub Copilot, Claude, Cursor, VS Code, scores live, classement basket, API basketball France">
+    <meta name="author" content="Nicolas De Simone">
+    <meta name="robots" content="index, follow, max-image-preview:large">
     <link rel="canonical" href="https://ffbb.desimone.fr/" />
-    <meta name="theme-color" content="#0a0a0a">
+    <meta name="theme-color" content="#13357e">
+    <meta name="color-scheme" content="light">
 
     <!-- Preconnect for fonts perf -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="css/style.css">
 
     <!-- Open Graph / Social Media -->
-    <meta property="og:title" content="FFBB MCP Server — Données FFBB live pour agents IA">
-    <meta property="og:description"
-        content="Serveur MCP public pour consulter calendriers, classements, bilans, résultats et scores live FFBB depuis GitHub Copilot, Claude ou Cursor.">
     <meta property="og:type" content="website">
+    <meta property="og:site_name" content="FFBB MCP Server">
+    <meta property="og:title" content="FFBB MCP Server — Les données officielles du basket dans votre agent IA">
+    <meta property="og:description"
+        content="Calendriers, classements, bilans, résultats et scores live FFBB accessibles depuis GitHub Copilot, Claude, Cursor ou VS Code via Streamable HTTP.">
     <meta property="og:url" content="https://ffbb.desimone.fr/">
     <meta property="og:image" content="https://ffbb.desimone.fr/logo.webp">
+    <meta property="og:locale" content="fr_FR">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="FFBB MCP Server — Données officielles du basket pour agents IA">
+    <meta name="twitter:description"
+        content="Calendriers, classements, bilans et scores live FFBB dans GitHub Copilot, Claude, Cursor ou VS Code.">
+    <meta name="twitter:image" content="https://ffbb.desimone.fr/logo.webp">
 
     <link rel="icon" type="image/webp" href="logo.webp">
 
@@ -34,28 +48,41 @@
         "@context": "https://schema.org",
         "@graph": [
             {
+                "@type": "WebSite",
+                "@id": "https://ffbb.desimone.fr/#website",
+                "url": "https://ffbb.desimone.fr/",
+                "name": "FFBB MCP Server",
+                "description": "Serveur MCP public connecté aux données officielles de la FFBB.",
+                "inLanguage": "fr-FR",
+                "publisher": { "@id": "https://ffbb.desimone.fr/#person" }
+            },
+            {
                 "@type": "SoftwareApplication",
+                "@id": "https://ffbb.desimone.fr/#software",
                 "name": "FFBB MCP Server",
                 "applicationCategory": "DeveloperApplication",
                 "operatingSystem": "macOS, Windows, Linux",
-                "description": "Serveur MCP pour accéder aux données de la Fédération Française de BasketBall.",
+                "description": "Serveur MCP pour accéder aux données officielles de la Fédération Française de BasketBall depuis un agent IA.",
                 "url": "https://ffbb.desimone.fr",
                 "image": "https://ffbb.desimone.fr/logo.webp",
-                "softwareVersion": "1.5.1",
+                "softwareVersion": "1.6.0",
                 "datePublished": "2025-01-01T00:00:00Z",
-                "dateModified": "2026-06-06T23:20:45Z",
-                "author": {
-                    "@type": "Person",
-                    "name": "Nicolas De Simone",
-                    "url": "https://github.com/nickdesi",
-                    "description": "Développeur Python spécialisé dans l'écosystème open source pour la FFBB."
-                },
+                "dateModified": "2026-07-11T00:00:00Z",
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+                "author": { "@id": "https://ffbb.desimone.fr/#person" },
                 "sameAs": [
                     "https://github.com/nickdesi/FFBB-MCP-Server",
                     "https://smithery.ai/servers/nickdesi/mcpffbb",
                     "https://nickdesi.github.io/ffbb-data-client/",
                     "https://pypi.org/project/ffbb-data-client/"
                 ]
+            },
+            {
+                "@type": "Person",
+                "@id": "https://ffbb.desimone.fr/#person",
+                "name": "Nicolas De Simone",
+                "url": "https://github.com/nickdesi",
+                "description": "Développeur Python spécialisé dans l'écosystème open source pour la FFBB."
             },
             {
                 "@type": "FAQPage",
