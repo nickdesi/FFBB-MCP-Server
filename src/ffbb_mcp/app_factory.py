@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 import os
@@ -19,20 +20,75 @@ from starlette.middleware.gzip import GZipMiddleware
 from starlette.routing import Mount
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
+from ffbb_mcp._state import _read_positive_int_env
+from ffbb_mcp.cache_strategy import is_in_match_window
 from ffbb_mcp.utils import OrjsonResponse
 
 logger = logging.getLogger("ffbb-mcp")
 
 _REQUEST_ID_RE = re.compile(r"^[a-zA-Z0-9\-]{1,64}$")
 
+# Intervalle de rafraîchissement proactif du cache « lives » (secondes).
+_LIVES_REFRESH_INTERVAL = _read_positive_int_env("FFBB_LIVES_REFRESH_INTERVAL", 10)
+
+
+async def _background_lives_refresh_loop() -> None:
+    """Rafraîchit proactivement les matchs en cours pendant les fenêtres de match.
+
+    Ne tourne qu'en mode HTTP (serveur longue durée) : les données live sont
+    ainsi toujours à jour en cache, l'utilisateur ne subit jamais la latence
+    (~400ms) d'un miss sur le chemin le plus chaud.
+    """
+    while True:
+        try:
+            await asyncio.sleep(_LIVES_REFRESH_INTERVAL)
+            if not is_in_match_window():
+                continue
+            from ffbb_mcp.services.poule import _fetch_lives
+
+            await _fetch_lives()
+        except asyncio.CancelledError:
+            break
+        except Exception:  # pragma: no cover - robustness
+            logger.debug("Refresh lives en arrière-plan échoué", exc_info=True)
+
+
+async def _bootstrap_cache() -> None:
+    """Préchauffe les données chaudes au démarrage (saisons, lives, organismes)."""
+    try:
+        from ffbb_mcp.services.poule import get_lives_service, get_saisons_service
+
+        await get_saisons_service(active_only=True)
+        await get_lives_service()
+    except Exception:  # pragma: no cover - robustness
+        logger.debug("Bootstrap cache (saisons/lives) échoué", exc_info=True)
+    try:
+        from ffbb_mcp.services.warmup import warmup_cache_service
+
+        await warmup_cache_service()
+    except Exception:  # pragma: no cover - robustness
+        logger.debug("Warm-up organismes échoué", exc_info=True)
+
 
 def create_app(mcp: FastMCP, allowed_origins: list[str]) -> Starlette:
     @contextlib.asynccontextmanager
     async def lifespan(app: Starlette) -> AsyncGenerator[None]:
+        # Tâches de fond réservées au mode HTTP (1 client = 1 requête en stdio).
+        background_tasks: list[asyncio.Task[None]] = []
+        if os.environ.get("MCP_MODE", "stdio").lower() not in ("stdio", ""):
+            background_tasks.append(
+                asyncio.ensure_future(_background_lives_refresh_loop())
+            )
+            background_tasks.append(asyncio.ensure_future(_bootstrap_cache()))
         async with mcp.session_manager.run():
             try:
                 yield
             finally:
+                for task in background_tasks:
+                    task.cancel()
+                for task in background_tasks:
+                    with contextlib.suppress(asyncio.CancelledError, Exception):
+                        await task
                 try:
                     from ffbb_mcp.client import FFBBClientFactory
 
@@ -115,6 +171,13 @@ def create_app(mcp: FastMCP, allowed_origins: list[str]) -> Starlette:
                 )
 
             response.headers["X-Request-ID"] = request_id
+
+            # Désactiver le buffering de Nginx/OpenResty pour les flux SSE
+            content_type = response.headers.get("content-type", "").lower()
+            if "text/event-stream" in content_type:
+                response.headers["X-Accel-Buffering"] = "no"
+                response.headers["Cache-Control"] = "no-cache, no-transform"
+
             return response
 
     app.add_middleware(RequestIdMiddleware)

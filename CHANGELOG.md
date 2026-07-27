@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-07-25
+
+### Added
+- **Stale-While-Revalidate (SWR)** : les chemins chauds (`lives`, `saisons`, `poule`, `classement`) renvoient la valeur en cache immédiatement même si elle approche de l'expiration, et la rafraîchissent en arrière-plan. L'utilisateur ne subit jamais la latence (~400ms) d'un miss sur ces données. Réglable via `FFBB_SWR_ENABLED` et `FFBB_SWR_STALE_FRACTION`.
+- **Cache persistant (SQLite) activé par défaut** : les caches service survivent aux redémarrages (critique en mode stdio où chaque session démarre dans un processus neuf) sans jamais servir de donnée périmée. Désactivable via `FFBB_SERVICE_CACHE_PERSIST=0`.
+- **Warm-up au démarrage (mode HTTP)** : une boucle rafraîchit proactivement les `lives` pendant les fenêtres de match (`FFBB_LIVES_REFRESH_INTERVAL`), et un préchauffage optionnel charge les organismes/clubs configurés (`FFBB_WARMUP_ORGANISMES`).
+- **Parallélisation du fan-out** : les workflows agrégés (`ffbb_bilan`, `get_calendrier_club_service`, `ffbb_equipes_club_service`) récupèrent les poules/classements en `asyncio.gather` — N appels indépendants coûtent un seul RTT au lieu de N×412ms.
+
+### Changed
+- `ffbb_get_classement_service` utilise désormais `_dedupe_inflight` (avec une map d'inflight dédiée `inflight_classement`) + SWR, conservant la même signature.
+- `get_poule_service` calcule le TTL dynamique (`get_poule_ttl`) une seule fois et le sert de seuil de fraîcheur SWR.
+
+### Fixed
+- `reset_service_state` vide aussi le backing disque des caches persistants, garantissant l'isolation entre tests.
+
 ## [1.5.1] - 2026-06-07
 
 ### Fixed

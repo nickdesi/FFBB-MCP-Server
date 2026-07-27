@@ -1,11 +1,20 @@
+import itertools
 import os
 import re
+import sys
+import unicodedata
 from functools import lru_cache
 from typing import Any, NamedTuple
 
 from starlette.responses import JSONResponse
 
 type JSONValue = Any
+
+_DIACRITICS = {
+    i: None
+    for i in range(sys.maxunicode)
+    if unicodedata.category(chr(i)) in ("Mn", "So")
+}
 
 
 def serialize_model(obj: Any) -> JSONValue:
@@ -277,9 +286,11 @@ def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
 
         # 2. Fusion de la troncature et du nettoyage en une seule passe
         final_list = []
-        for i, item in enumerate(obj):
-            if i >= limit:
-                break
+
+        # ⚡ Bolt: Fast-path for list truncation avoiding enumerate() overhead
+        iterable = obj[:limit] if obj_type is list else itertools.islice(obj, limit)
+
+        for item in iterable:
             if item is None:
                 continue
             it = type(item)
@@ -340,10 +351,17 @@ def jaro_winkler_similarity(s1: str, s2: str) -> float:
     matches = 0
     # Recherche des correspondances dans la fenêtre
     for i in range(len1):
-        start = max(0, i - match_bound)
-        end = min(len2, i + match_bound + 1)
+        start = i - match_bound
+        if start < 0:
+            start = 0
+        end = i + match_bound + 1
+        if end > len2:
+            end = len2
+
+        s1_i = s1[i]
         for j in range(start, end):
-            if not s2_matches[j] and s1[i] == s2[j]:
+            # ⚡ Bolt: Fast-path string character equality check before list index lookup
+            if s1_i == s2[j] and not s2_matches[j]:
                 s1_matches[i] = True
                 s2_matches[j] = True
                 matches += 1
@@ -371,7 +389,11 @@ def jaro_winkler_similarity(s1: str, s2: str) -> float:
     # Similarité de Jaro-Winkler
     # Recherche de la longueur du préfixe commun (jusqu'à 4 caractères)
     prefix_len = 0
-    for i in range(min(4, len1, len2)):
+    limit = len1 if len1 < len2 else len2
+    if limit > 4:
+        limit = 4
+
+    for i in range(limit):
         if s1[i] == s2[i]:
             prefix_len += 1
         else:
@@ -383,9 +405,14 @@ def jaro_winkler_similarity(s1: str, s2: str) -> float:
 
 
 class OrjsonResponse(JSONResponse):
-    """JSONResponse subclass using orjson for high-performance JSON serialization."""
+    """JSONResponse subclass using orjson for high-performance JSON serialization with fallback."""
 
     def render(self, content: Any) -> bytes:
-        import orjson
+        try:
+            import orjson
 
-        return orjson.dumps(content)
+            return orjson.dumps(content)
+        except ImportError:
+            import json
+
+            return json.dumps(content, ensure_ascii=False).encode("utf-8")

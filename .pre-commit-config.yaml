@@ -3,7 +3,7 @@ fail_fast: false
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.18
+    rev: v0.15.20
     hooks:
       - id: ruff
         args: [--fix]
@@ -33,3 +33,9 @@ repos:
         language: system
         pass_filenames: false
         files: ^(src/ffbb_mcp/.*\.py|tools/update_agents_md\.py)$
+      - id: check-version-alignment
+        name: Vérifie l'alignement de version (README + site + pyproject)
+        entry: uv run python tools/check_version_alignment.py
+        language: system
+        pass_filenames: false
+        files: ^(README\.md|website/.*|website-docs/.*|pyproject\.toml)$

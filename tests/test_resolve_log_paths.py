@@ -1,11 +1,12 @@
-"""Tests des branches de log dans _resolve_club_and_org."""
+"""Tests des branches de log dans resolve_club_and_org."""
 
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 
 from ffbb_mcp._state import reset_service_state
-from ffbb_mcp.services import _resolve_club_and_org
+from ffbb_mcp.services import resolve_club_and_org
 
 
 @pytest.fixture(autouse=True)
@@ -16,14 +17,17 @@ def clear_caches():
 
 @pytest.mark.asyncio
 async def test_resolve_logs_debug_when_organisme_id_fetch_fails(caplog):
-    """Branch: organisme_id fourni, get_organisme_service lève une exception → debug log."""
+    """Branch: organisme_id fourni, get_organisme_service lève une exception → debug log.
+
+    httpx.HTTPError est capté par le tuple narrowed de resolve_club_and_org.
+    """
     with patch(
         "ffbb_mcp.services.get_organisme_service",
         new_callable=AsyncMock,
-        side_effect=RuntimeError("timeout"),
+        side_effect=httpx.ConnectError("timeout"),
     ):
         caplog.set_level("DEBUG", logger="ffbb-mcp")
-        resolved, org_data = await _resolve_club_and_org(
+        resolved, org_data = await resolve_club_and_org(
             club_name=None,
             organisme_id=9999,
         )
@@ -48,11 +52,11 @@ async def test_resolve_logs_debug_when_first_org_detail_fails(caplog):
         patch(
             "ffbb_mcp.services.get_organisme_service",
             new_callable=AsyncMock,
-            side_effect=RuntimeError("503"),
+            side_effect=httpx.ConnectError("503 Service Unavailable"),
         ),
     ):
         caplog.set_level("DEBUG", logger="ffbb-mcp")
-        resolved, org_data = await _resolve_club_and_org(
+        resolved, org_data = await resolve_club_and_org(
             club_name="Club Test",
             organisme_id=None,
         )
@@ -67,7 +71,7 @@ async def test_resolve_logs_debug_when_first_org_detail_fails(caplog):
 @pytest.mark.asyncio
 async def test_resolve_returns_empty_when_no_club_and_no_id():
     """Cas dégénéré : rien fourni → liste vide."""
-    resolved, org_data = await _resolve_club_and_org(
+    resolved, org_data = await resolve_club_and_org(
         club_name=None,
         organisme_id=None,
     )

@@ -83,3 +83,57 @@ Le serveur **FFBB MCP** est compatible avec tout client respectant le protocole 
 - **Google Antigravity** : Intégration native via Streamable HTTP.
 - **Claude Desktop / Claude Code** : Support via Stdio (local) ou Streamable HTTP (distant).
 - **Cursor / IDEs** : Compatibilité via le plugin MCP.
+
+## ⚡ Stratégie de Performance
+
+Le serveur FFBB MCP est conçu pour minimiser les appels à l'API FFBB
+quotaisée tout en gardant une fraîcheur acceptable pour les usages les
+plus fréquents. Trois mécanismes complémentaires se combinent :
+
+### 1. Cache TTL différencié (`services/common.py` + `cache_strategy.py`)
+
+Chaque type de donnée a une fenêtre de fraîcheur adaptée à sa
+fréquence d'évolution :
+
+| Type | TTL par défaut | Override |
+| :--- | :---: | :--- |
+| `lives` | 30 s | `FFBB_CACHE_TTL_LIVES` |
+| `search` | 300 s | `FFBB_CACHE_TTL_SEARCH` |
+| `calendrier` | 1800 s | `FFBB_CACHE_TTL_CALENDRIER` |
+| `poule` / `bilan` | 1800 s | `FFBB_CACHE_TTL_POULE` |
+| `salle` | 86400 s | `FFBB_CACHE_TTL_SALLE` |
+| `organisme` / `competition` | 86400 s | `FFBB_CACHE_TTL_DETAIL` |
+| `resolve_club` | 3600 s | `FFBB_CACHE_TTL_RESOLVE_CLUB` |
+
+Les outils exposés proposent tous un paramètre `force_refresh=True`
+qui contourne le cache (utile les jours de match, ou pour vérifier
+un score frais via `ffbb_lives`).
+
+### 2. Sémaphore global de concurrence (`_MAX_CONCURRENT_FFBB`)
+
+Un `asyncio.Semaphore(8)` plafonne les appels parallèles à l'API FFBB
+pour éviter d'être rate-limité. Réglable via `MAX_CONCURRENT_FFBB=N`
+(valeur sûre d'après tests : 4–12).
+
+### 3. Inflight deduplication (`_dedupe_inflight*`)
+
+Quand plusieurs requêtes arrivent simultanément avec la même clé
+(par exemple deux agents qui résolvent le même club en parallèle), le
+premier crée une `asyncio.Task` partagée et tous les appelants
+attendent la même promesse. Le résultat est mis en cache à la fin. Cela
+évite N requêtes pour une même donnée chaude.
+
+### 4. Token refresh proactif (`client.py`)
+
+Le token FFBB expire à ~30 min. Il est rafraîchi en tâche de fond
+à 25 min (marge de sécurité), ce qui évite une latence visible au
+moment de la rotation de token.
+
+### Notes
+
+- La complexité cyclomatique est surveillée via `radon cc src/` (job
+  CI). Le rapport est informatif par défaut — un seuil strict peut
+  être activé avec `-n C`.
+- Les endpoints `POST /cache/warmup` et `GET /cache/ttl` permettent
+  respectivamente de préchauffer le cache et d'inspecter les TTL en
+  runtime.

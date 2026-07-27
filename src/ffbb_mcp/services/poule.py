@@ -6,8 +6,8 @@ from typing import Any
 from mcp.shared.exceptions import ErrorData, McpError
 from mcp.types import INTERNAL_ERROR
 
-from ffbb_mcp._state import state
-from ffbb_mcp.cache_strategy import get_poule_ttl
+from ffbb_mcp._state import _read_positive_int_env, state
+from ffbb_mcp.cache_strategy import get_poule_ttl, get_static_ttl
 
 
 async def get_client_async(*args, **kwargs):
@@ -19,7 +19,6 @@ async def get_client_async(*args, **kwargs):
 from ffbb_mcp.utils import format_team_name, serialize_model
 
 from .common import (
-    _cache_get,
     _cache_set,
     _coerce_numeric_id,
     _dedupe_inflight,
@@ -28,18 +27,14 @@ from .common import (
     _freshness_meta,
     _safe_call,
     _safe_call_with_inflight,
+    _swr_serve,
     _with_ffbb_semaphore,
 )
 
 logger = logging.getLogger("ffbb-mcp")
 
 
-async def get_lives_service() -> list[dict]:
-    cached = _cache_get(state.cache_lives, "lives", "lives")
-    if cached is not None:
-        logger.debug("Cache hit: lives")
-        return cached
-
+async def _fetch_lives() -> list[dict]:
     client = await get_client_async()
     lives = await _with_ffbb_semaphore(
         _safe_call_with_inflight(
@@ -55,12 +50,12 @@ async def get_lives_service() -> list[dict]:
     return result
 
 
-async def get_saisons_service(active_only: bool = False) -> list[dict]:
-    cache_key = f"saisons:{active_only}"
-    cached = _cache_get(state.cache_saisons, cache_key, "saisons")
-    if cached is not None:
-        return cached
+async def get_lives_service() -> list[dict]:
+    ttl = _read_positive_int_env("FFBB_CACHE_TTL_LIVES", get_static_ttl("lives"))
+    return await _swr_serve(state.cache_lives, "lives", "lives", ttl, _fetch_lives)
 
+
+async def _fetch_saisons(active_only: bool) -> list[dict]:
     client = await get_client_async()
     filter_criteria = '{"actif": {"$eq": true}}' if active_only else None
     saisons = await _with_ffbb_semaphore(
@@ -70,8 +65,20 @@ async def get_saisons_service(active_only: bool = False) -> list[dict]:
     )
     saisons_list = saisons if isinstance(saisons, list) else []
     result = [serialize_model(s) for s in saisons_list]
-    _cache_set(state.cache_saisons, cache_key, result, "saisons")
+    _cache_set(state.cache_saisons, f"saisons:{active_only}", result, "saisons")
     return result
+
+
+async def get_saisons_service(active_only: bool = False) -> list[dict]:
+    cache_key = f"saisons:{active_only}"
+    ttl = _read_positive_int_env("FFBB_CACHE_TTL_DETAIL", get_static_ttl("saisons"))
+    return await _swr_serve(
+        state.cache_saisons,
+        cache_key,
+        "saisons",
+        ttl,
+        lambda: _fetch_saisons(active_only),
+    )
 
 
 async def get_competition_service(competition_id: int | str) -> dict:
@@ -105,6 +112,8 @@ async def get_poule_service(
     if force_refresh and state.cache_poule is not None:
         state.cache_poule.pop(cache_key, None)
 
+    ttl = await get_poule_ttl(poule_id_int, get_lives_service)
+
     async def _fetch() -> dict:
         client = await get_client_async()
         poule = await _with_ffbb_semaphore(
@@ -137,7 +146,6 @@ async def get_poule_service(
         comp_name = data.get("nom") or data.get("libelle") or ""
         data["phase_type"] = _detect_phase_type(comp_name)
 
-        ttl = await get_poule_ttl(poule_id_int, get_lives_service)
         return {"_ttl": ttl, "data": data}
 
     result = await _dedupe_inflight(
@@ -146,6 +154,7 @@ async def get_poule_service(
         inflight_map=state.inflight_poule,
         make_coro=_fetch,
         cache_name="poule",
+        swr_ttl=ttl,
     )
 
     if isinstance(result, dict) and "data" in result:
@@ -272,78 +281,84 @@ async def ffbb_get_classement_service(
     if force_refresh and state.cache_classement is not None:
         state.cache_classement.pop(cache_key, None)
 
-    cached = _cache_get(state.cache_classement, cache_key, "classement")
-    if cached is not None:
-        return (
-            cached["data"] if isinstance(cached, dict) and "data" in cached else cached
-        )
-
-    client = await get_client_async()
-    poule = await _with_ffbb_semaphore(
-        _safe_call(
-            f"Classement poule {poule_id_int}",
-            lambda: client.get_poule_async(poule_id=poule_id_int),
-        )
-    )
-    if not poule:
-        return []
-    data = serialize_model(poule)
-    raw = data.get("classements", data.get("classement", [])) or []
-    if not isinstance(raw, list):
-        raw = []
-
-    flat: list[dict[str, Any]] = []
-    target_org_str = str(target_organisme_id) if target_organisme_id else None
-    target_num_str = str(target_num) if target_num else None
-
-    for c in raw:
-        if not isinstance(c, dict):
-            continue
-        eng = c.get("id_engagement", {}) or {}
-        nom_equipe = eng.get("nom", "")
-        num_equipe = eng.get("numero_equipe")
-        org_id = str(c.get("organisme_id") or eng.get("organisme_id") or "")
-
-        is_target = False
-        if target_org_str and org_id == target_org_str:
-            if target_num_str:
-                curr_num = str(num_equipe or "")
-                if curr_num == target_num_str or not curr_num:
-                    is_target = True
-            else:
-                is_target = True
-
-        logo_id = c.get("organisme_logo_id") or (eng.get("logo") or {}).get("id")
-        logo_url = (
-            f"https://api.ffbb.com/assets/{logo_id}?height=220&fit=contain&format=avif"
-            if logo_id
-            else None
-        )
-
-        flat.append(
-            {
-                "position": c.get("position"),
-                "equipe": format_team_name(nom_equipe, num_equipe),
-                "points": c.get("points"),
-                "match_joues": c.get("match_joues"),
-                "gagnes": c.get("gagnes"),
-                "perdus": c.get("perdus"),
-                "difference": c.get("difference"),
-                "is_target": is_target,
-                "paniers_marques": c.get("paniers_marques") or 0,
-                "paniers_encaisses": c.get("paniers_encaisses") or 0,
-                "logo_url": logo_url,
-                "point_initiaux": c.get("point_initiaux"),
-                "penalites_arbitrage": c.get("penalites_arbitrage"),
-                "penalites_entraineur": c.get("penalites_entraineur"),
-                "penalites_diverses": c.get("penalites_diverses"),
-                "nombre_forfaits": c.get("nombre_forfaits"),
-                "nombre_defauts": c.get("nombre_defauts"),
-                "quotient": c.get("quotient"),
-                "hors_classement": c.get("hors_classement"),
-            }
-        )
     ttl = await get_poule_ttl(poule_id_int, get_lives_service)
-    wrapped_flat = {"_ttl": ttl, "data": flat}
-    _cache_set(state.cache_classement, cache_key, wrapped_flat, "classement")
-    return flat
+
+    async def _fetch() -> dict[str, Any]:
+        client = await get_client_async()
+        poule = await _with_ffbb_semaphore(
+            _safe_call(
+                f"Classement poule {poule_id_int}",
+                lambda: client.get_poule_async(poule_id=poule_id_int),
+            )
+        )
+        if not poule:
+            return {"_ttl": ttl, "data": []}
+        data = serialize_model(poule)
+        raw = data.get("classements", data.get("classement", [])) or []
+        if not isinstance(raw, list):
+            raw = []
+
+        flat: list[dict[str, Any]] = []
+        target_org_str = str(target_organisme_id) if target_organisme_id else None
+        target_num_str = str(target_num) if target_num else None
+
+        for c in raw:
+            if not isinstance(c, dict):
+                continue
+            eng = c.get("id_engagement", {}) or {}
+            nom_equipe = eng.get("nom", "")
+            num_equipe = eng.get("numero_equipe")
+            org_id = str(c.get("organisme_id") or eng.get("organisme_id") or "")
+
+            is_target = False
+            if target_org_str and org_id == target_org_str:
+                if target_num_str:
+                    curr_num = str(num_equipe or "")
+                    if curr_num == target_num_str or not curr_num:
+                        is_target = True
+                else:
+                    is_target = True
+
+            logo_id = c.get("organisme_logo_id") or (eng.get("logo") or {}).get("id")
+            logo_url = (
+                f"https://api.ffbb.com/assets/{logo_id}?height=220&fit=contain&format=avif"
+                if logo_id
+                else None
+            )
+
+            flat.append(
+                {
+                    "position": c.get("position"),
+                    "equipe": format_team_name(nom_equipe, num_equipe),
+                    "points": c.get("points"),
+                    "match_joues": c.get("match_joues"),
+                    "gagnes": c.get("gagnes"),
+                    "perdus": c.get("perdus"),
+                    "difference": c.get("difference"),
+                    "is_target": is_target,
+                    "paniers_marques": c.get("paniers_marques") or 0,
+                    "paniers_encaisses": c.get("paniers_encaisses") or 0,
+                    "logo_url": logo_url,
+                    "point_initiaux": c.get("point_initiaux"),
+                    "penalites_arbitrage": c.get("penalites_arbitrage"),
+                    "penalites_entraineur": c.get("penalites_entraineur"),
+                    "penalites_diverses": c.get("penalites_diverses"),
+                    "nombre_forfaits": c.get("nombre_forfaits"),
+                    "nombre_defauts": c.get("nombre_defauts"),
+                    "quotient": c.get("quotient"),
+                    "hors_classement": c.get("hors_classement"),
+                }
+            )
+        return {"_ttl": ttl, "data": flat}
+
+    wrapped = await _dedupe_inflight(
+        cache=state.cache_classement,
+        cache_key=cache_key,
+        inflight_map=state.inflight_classement,
+        make_coro=_fetch,
+        cache_name="classement",
+        swr_ttl=ttl,
+    )
+    return (
+        wrapped["data"] if isinstance(wrapped, dict) and "data" in wrapped else wrapped
+    )

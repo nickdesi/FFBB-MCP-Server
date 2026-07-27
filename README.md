@@ -1,128 +1,171 @@
+<div align="center">
+
 # 🏀 FFBB MCP Server
 
-<p align="center">
-  <img src="./assets/logo.webp" width="180" alt="Logo FFBB MCP" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);" />
-</p>
+**Le basket français officiel, directement dans vos assistants IA.**
 
-<h3 align="center">Serveur MCP pour consulter les données officielles du basket français.</h3>
+Serveur [MCP](https://modelcontextprotocol.io) pour consulter calendriers, classements, bilans, résultats et scores live de la FFBB.
 
-<p align="center">
-  Calendriers, classements, bilans, résultats et scores live FFBB pour assistants IA compatibles MCP.
-  <br /><br />
-  🌐 <b><a href="https://ffbb.desimone.fr">Site</a></b>
-  · 🧩 <b><a href="https://github.com/nickdesi/FFBB-MCP-Server/releases/latest">Extension VS Code</a></b>
-  · 📚 <b><a href="https://ffbb.desimone.fr/docs/">Documentation</a></b>
-</p>
+[🌐 Site](https://ffbb.desimone.fr) ·
+[🧩 Extension VS Code](https://github.com/nickdesi/FFBB-MCP-Server/releases/latest) ·
+[📚 Documentation](https://ffbb.desimone.fr/docs/) ·
+[💬 Support](SUPPORT.md)
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.14%2B-blue?style=for-the-badge&logo=python" alt="Version Python" />
-  <img src="https://img.shields.io/badge/version-1.5.1-green?style=for-the-badge" alt="Version" />
-  <a href="https://smithery.ai/servers/nickdesi/mcpffbb"><img src="https://smithery.ai/badge/nickdesi/mcpffbb" alt="Badge Smithery" /></a>
-  <img src="https://img.shields.io/github/actions/workflow/status/nickdesi/FFBB-MCP-Server/ci.yml?label=CI&style=for-the-badge" alt="Statut CI" />
-  <img src="https://img.shields.io/badge/License-Apache--2.0-blue?style=for-the-badge" alt="Licence" />
-</p>
+<br />
+
+[![Python](https://img.shields.io/badge/Python-3.14%2B-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org)
+[![Version](https://img.shields.io/badge/version-1.6.0-green?style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/releases/latest)
+[![Release](https://img.shields.io/github/v/release/nickdesi/FFBB-MCP-Server?style=for-the-badge&color=green)](https://github.com/nickdesi/FFBB-MCP-Server/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/nickdesi/FFBB-MCP-Server/ci.yml?label=CI&style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=for-the-badge)](LICENSE)
+[![MCP](https://img.shields.io/badge/MCP-Ready-00ADD8?style=for-the-badge&logo=modelcontextprotocol&logoColor=white)](https://modelcontextprotocol.io)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](Dockerfile)
+[![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
+[![Stars](https://img.shields.io/github/stars/nickdesi/FFBB-MCP-Server?style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/stargazers)
+[![Last Commit](https://img.shields.io/github/last-commit/nickdesi/FFBB-MCP-Server?style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/commits/main)
+[![Issues](https://img.shields.io/github/issues/nickdesi/FFBB-MCP-Server?style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/issues)
+[![PRs](https://img.shields.io/github/issues-pr/nickdesi/FFBB-MCP-Server?style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/pulls)
+[![Smithery](https://smithery.ai/badge/nickdesi/mcpffbb)](https://smithery.ai/servers/nickdesi/mcpffbb)
+
+</div>
 
 ---
 
-## Utiliser l'instance publique
+## ⚡ Démarrage express (< 2 min)
 
-Endpoint MCP public :
+> [!TIP]
+> **Aucune installation requise** : le serveur est hébergé publiquement. Ajoutez simplement l'endpoint MCP à votre client :
 
 ```text
 https://ffbb.desimone.fr/mcp
 ```
 
-Transport : **Streamable HTTP**.
+Puis posez vos questions en langage naturel :
 
-Endpoints utiles :
+> _« Quel est le prochain match des U15 de mon club ? »_
+> _« Donne-moi le classement de la poule et le dernier résultat. »_
+> _« Y a-t-il des matchs en direct ce soir ? »_
 
-- Dashboard : `https://ffbb.desimone.fr/dashboard`
-- Métriques : `https://ffbb.desimone.fr/metrics.json`
-- Santé : `https://ffbb.desimone.fr/health`
+👉 Voir la section [Installation](#-installation) pour brancher l'endpoint sur VS Code, Claude, Cursor, etc.
 
 ---
 
-## Installation rapide
+## ✨ Fonctionnalités
+
+- 🗓️ **Calendriers & résultats** — matchs passés et à venir, par club ou par équipe.
+- 🏆 **Classements** — poules complètes avec points, différentiel et forme.
+- 📊 **Bilans agrégés** — toutes phases confondues en un seul appel.
+- 🔴 **Scores live** — matchs en cours, mis à jour toutes les 30 s.
+- 🔎 **Recherche universelle** — clubs, compétitions, salles, engagements.
+- 🚀 **Optimisé pour les LLM** — réponses agrégées et cache TTL pour réduire le contexte et le nombre d'appels.
+
+---
+
+## 🚀 Installation
 
 ### VS Code / GitHub Copilot
 
-Option recommandée : installer l’extension **FFBB Basketball MCP** depuis les [releases](https://github.com/nickdesi/FFBB-MCP-Server/releases/latest), puis ouvrir Copilot Chat en mode agent.
+**Option recommandée** — installer l'extension **FFBB Basketball MCP** depuis les [releases](https://github.com/nickdesi/FFBB-MCP-Server/releases/latest), puis ouvrir Copilot Chat en mode agent.
 
-Alternative sans extension : [Installer FFBB MCP](vscode:mcp/install?%7B%22name%22%3A%22ffbb-mcp%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fffbb.desimone.fr%2Fmcp%22%7D)
+**Alternative sans extension** — [➕ Installer FFBB MCP en un clic](vscode:mcp/install?%7B%22name%22%3A%22ffbb-mcp%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fffbb.desimone.fr%2Fmcp%22%7D)
 
 ### Claude Desktop
 
-Il existe deux manières d'ajouter le serveur MCP FFBB à Claude :
+<details>
+<summary><b>Option A — Via l'interface de Claude</b> (recommandé, sans prérequis)</summary>
 
-#### Option A : Via l'interface de Claude (Recommandé)
-Les versions récentes de Claude permettent d'ajouter des connecteurs directement depuis l'interface graphique :
-1. Allez dans les **Paramètres** de Claude puis dans **Connecteurs** (ou **Plugins**).
+<br />
+
+1. Ouvrez les **Paramètres** de Claude, puis **Connecteurs** (ou **Plugins**).
 2. Cliquez sur **Ajouter un connecteur personnalisé**.
-3. Renseignez l'URL publique : `https://ffbb.desimone.fr/mcp` et validez.
+3. Renseignez l'URL publique `https://ffbb.desimone.fr/mcp` et validez.
 
-#### Option B : Via `claude_desktop_config.json`
-Pour une intégration via le fichier de configuration de Claude Desktop, vous devez utiliser le bridge SSE officiel (via `npx`) pour assurer la compatibilité et éviter les erreurs de validation (Claude Desktop n'acceptant que le transport `stdio` local).
+</details>
 
-> ⚠️ **Prérequis** : **Node.js** (qui inclut `npm` et `npx`) doit être installé sur votre machine. Si vous ne souhaitez pas installer Node.js, privilégiez l'**Option A** (sans prérequis).
+<details>
+<summary><b>Option B — Via <code>claude_desktop_config.json</code></b> (nécessite Node.js)</summary>
+
+<br />
+
+Claude Desktop n'accepte que le transport `stdio` local : on utilise donc le bridge SSE officiel via `npx`.
+
+> [!WARNING]
+> **Prérequis : Node.js** (inclut `npm` et `npx`). Sans Node.js, privilégiez l'**Option A**.
 
 ```json
 {
   "mcpServers": {
     "ffbb": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/client-sse",
-        "https://ffbb.desimone.fr/mcp"
-      ]
+      "args": ["-y", "@modelcontextprotocol/client-sse", "https://ffbb.desimone.fr/mcp"]
     }
   }
 }
 ```
 
-
+</details>
 
 ### Cursor / autres clients MCP
 
 Configurez un serveur MCP distant :
 
-- Type : `Streamable HTTP`
-- URL : `https://ffbb.desimone.fr/mcp`
+| Champ | Valeur |
+| --- | --- |
+| Type | `Streamable HTTP` |
+| URL | `https://ffbb.desimone.fr/mcp` |
 
 ### Google Antigravity
 
-Ajoutez la configuration suivante dans votre fichier de configuration MCP :
+> [!WARNING]
+> Un bug connu du client Go d'Antigravity (timeouts d'initialisation trop courts, gestion SSE sur serveur distant) peut provoquer des erreurs `context deadline exceeded` en `type: "http"`. Utilisez plutôt le proxy local `mcp-remote` (installé à la volée via `npx`) :
 
 ```json
-    "ffbb": {
-      "type": "http",
-      "serverUrl": "https://ffbb.desimone.fr/mcp"
-    }
+"ffbb": {
+  "command": "npx",
+  "args": ["-y", "mcp-remote", "https://ffbb.desimone.fr/mcp"]
+}
 ```
 
 ---
 
-## Outils principaux
+## 🧰 Outils principaux
 
 | Outil | Usage |
 | --- | --- |
-| `ffbb_bilan` | Bilan complet d’une équipe, toutes phases confondues. |
+| `ffbb_bilan` | Bilan complet d'une équipe, toutes phases confondues. |
 | `ffbb_team_summary` | Résumé agent : bilan, classement courant, dernier résultat, prochain match. |
-| `ffbb_bilan_saison` | Bilan détaillé d’une équipe précise avec `numero_equipe`. |
+| `ffbb_bilan_saison` | Bilan détaillé d'une équipe précise avec `numero_equipe`. |
 | `ffbb_last_result` | Dernier match joué. |
 | `ffbb_next_match` | Prochain match. |
-| `ffbb_club` | Calendrier complet, équipes ou classement d’un club. |
+| `ffbb_club` | Calendrier complet, équipes ou classement d'un club. |
 | `ffbb_search` | Recherche clubs, compétitions, salles, matchs, engagements. |
 | `ffbb_get` | Accès technique à une ressource FFBB par identifiant. |
 | `ffbb_lives` | Matchs en direct. |
 | `ffbb_saisons` | Saisons disponibles. |
 | `ffbb_version` | Version et diagnostic runtime. |
 
-La référence complète est dans [`docs/TOOLS_REFERENCE.md`](docs/TOOLS_REFERENCE.md).
+> [!NOTE]
+> Référence complète des paramètres : [`docs/TOOLS_REFERENCE.md`](docs/TOOLS_REFERENCE.md).
 
 ---
 
-## Architecture en bref
+## 🌐 Instance publique
+
+Endpoint MCP (transport **Streamable HTTP**) :
+
+```text
+https://ffbb.desimone.fr/mcp
+```
+
+| Endpoint | URL |
+| --- | --- |
+| 📊 Dashboard | `https://ffbb.desimone.fr/dashboard` |
+| 📈 Métriques | `https://ffbb.desimone.fr/metrics.json` |
+| ❤️ Santé | `https://ffbb.desimone.fr/health` |
+
+---
+
+## 🏗️ Architecture
 
 ```mermaid
 flowchart LR
@@ -143,21 +186,32 @@ Détails : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) et [`docs/PERFORMANCE.
 
 ---
 
-## Développement local
+## 💻 Développement local
 
 ```bash
-uv sync --extra dev
-uv run ruff format .
-uv run ruff check --fix .
-uv run mypy src
-uv run pytest
+uv sync --extra dev       # installer les dépendances
+uv run ruff format .      # formater
+uv run ruff check --fix . # linter
+uv run mypy src           # vérifier les types
+uv run pytest             # lancer les tests
 ```
 
 Voir [`CONTRIBUTING.md`](CONTRIBUTING.md) pour les règles de contribution.
 
 ---
 
-## Documentation
+## 🧪 Tests
+
+```bash
+uv run pytest             # tests unitaires + couverture
+uv run pytest tests/      # ciblé
+```
+
+Le pipeline CI (`.github/workflows/ci.yml`) exécute ruff, mypy, pytest et le contrôle de couverture à chaque push/PR.
+
+---
+
+## 📚 Documentation
 
 - [Exemples d’usage](docs/EXAMPLES.md)
 - [Référence des outils](docs/TOOLS_REFERENCE.md)
@@ -165,12 +219,36 @@ Voir [`CONTRIBUTING.md`](CONTRIBUTING.md) pour les règles de contribution.
 - [Performance et cache](docs/PERFORMANCE.md)
 - [Déploiement Coolify](docs/COOLIFY_DEPLOYMENT.md)
 
-## Communauté
+---
+
+## 🤝 Communauté
 
 - [Contribuer](CONTRIBUTING.md)
 - [Code de conduite](CODE_OF_CONDUCT.md)
 - [Support](SUPPORT.md)
 - [Sécurité](SECURITY.md)
+
+---
+
+## ❓ Dépannage
+
+| Symptôme | Cause probable | Solution |
+| --- | --- | --- |
+| `context deadline exceeded` (Antigravity) | Bug client Go sur SSE distant | Utiliser `mcp-remote` via `npx` (voir [Google Antigravity](#google-antigravity)) |
+| Claude Desktop refuse l'URL `http` | Claude Desktop impose `stdio` | Utiliser le bridge `@modelcontextprotocol/client-sse` via `npx` (voir [Claude Desktop](#claude-desktop)) |
+| Données live obsolètes | Cache TTL | Attendre le rafraîchissement (≤ 30 s) ou interroger l'endpoint `/health` |
+
+---
+
+## 📌 Recommandations GitHub
+
+**Description suggérée :**
+
+> 🏀 MCP server exposing official French basketball (FFBB) data — schedules, standings, live scores & more — for AI assistants.
+
+**Topics suggérés (≤ 20) :**
+
+`mcp` · `model-context-protocol` · `python` · `ffbb` · `basketball` · `open-data` · `ai` · `llm` · `claude` · `vscode` · `vscode-extension` · `mcp-server` · `sports` · `dns` · `api` · `starlette` · `uvicorn` · `docker` · `assistant` · `france`
 
 ---
 

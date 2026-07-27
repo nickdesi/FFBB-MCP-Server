@@ -1,3 +1,7 @@
+# Note mypy: les `# type: ignore[untyped-decorator]` sur `@mcp.tool(...)`
+# dans ce fichier proviennent du décorateur FastMCP dont les stubs
+# officiels ne sont pas typés. Convention documentée au niveau du projet.
+
 import asyncio
 import logging
 import os
@@ -22,7 +26,6 @@ from .prompts import ROUTING_PROMPT, register_prompts
 from .resources import register_resources
 from .routes import register_routes
 from .services import (
-    _resolve_club_and_org,
     ffbb_bilan_service,
     ffbb_equipes_club_service,
     ffbb_get_classement_service,
@@ -43,6 +46,7 @@ from .services import (
     get_rencontre_service,
     get_saisons_service,
     handle_api_error,
+    resolve_club_and_org,
     resolve_poule_id_service,
 )
 from .utils import prune_payload
@@ -112,6 +116,30 @@ def _resolve_uvicorn_log_level(level: int) -> str:
     if level <= logging.ERROR:
         return "error"
     return "critical"
+
+
+async def _safe_report_progress(
+    ctx: Context[Any, Any, Any] | None,
+    progress: float,
+    total: float | None = None,
+    message: str | None = None,
+) -> None:
+    """Rapporte la progression à FastMCP sans casser en l'absence de request.
+
+    FastMCP expose ``Context.request_context`` comme une ``@property`` qui
+    lève ``ValueError`` hors d'un vrai request (ex: appels via
+    ``mcp.call_tool`` en test unitaire). On capture donc un petit ensemble
+    défensif d'exceptions et on no-op silencieusement — l'objectif est que
+    le rapport de progression ne bloque JAMAIS l'exécution d'un outil.
+    """
+    if ctx is None:
+        return
+    try:
+        await ctx.report_progress(progress, total=total, message=message)
+    except ValueError, AssertionError:
+        # Hors d'un vrai RequestContext FastMCP ou état dégradé → no-op
+        # mais on trace en DEBUG pour ne pas perdre la trace d'un bug.
+        logger.debug("progress report skipped", exc_info=True)
 
 
 # ---------------------------------------------------------------------------
@@ -207,9 +235,10 @@ mcp: FastMCP = FastMCP(
     ),
     dependencies=["mcp", "ffbb-data-client"],
     # Streamable HTTP transport (MCP spec 2025-11-25)
-    # stateless_http=True → pas de session persistante (scalabilité horizontale)
+    # stateless_http=False → session persistante avec mcp-session-id
+    #   (requis par Antigravity et la plupart des clients MCP)
     # json_response=True  → répond en application/json (plus simple que SSE pour POST)
-    stateless_http=True,
+    stateless_http=False,
     json_response=True,
     transport_security=TransportSecuritySettings(
         enable_dns_rebinding_protection=_dns_protection,
@@ -365,8 +394,7 @@ async def ffbb_bilan(
     - phases : détail par compétition/phase (position, V/D/N, paniers)
     """
     try:
-        if ctx:
-            await ctx.report_progress(0, total=3, message="Résolution du club…")
+        await _safe_report_progress(ctx, 0, total=3, message="Résolution du club…")
         effective_refresh = force_refresh
         result = await ffbb_bilan_service(
             club_name=club_name,
@@ -374,8 +402,7 @@ async def ffbb_bilan(
             categorie=categorie,
             force_refresh=effective_refresh,
         )
-        if ctx:
-            await ctx.report_progress(3, total=3, message="Bilan prêt.")
+        await _safe_report_progress(ctx, 3, total=3, message="Bilan prêt.")
         return result
     except Exception as e:
         raise handle_api_error(e) from e
@@ -592,10 +619,31 @@ async def ffbb_club(
     d'une equipe specifique. Utiliser `ffbb_last_result` et `ffbb_next_match` a la place.
     """
     try:
-        # Résolution automatique de l'organisme_id si manquant mais club_name fourni
+        # Action calendrier : le service gère résolution + ambiguïté en interne
+        if action == "calendrier":
+            if not organisme_id and not club_name:
+                return [{"error": "Fournir organisme_id ou club_name"}]
+            effective_refresh = force_refresh
+            kwargs: dict[str, Any] = {
+                "club_name": club_name,
+                "organisme_id": organisme_id,
+                "categorie": filtre,
+                "numero_equipe": numero_equipe,
+                "adversaire": adversaire,
+                "force_refresh": effective_refresh,
+            }
+            if date_debut is not None:
+                kwargs["date_debut"] = date_debut
+            if date_fin is not None:
+                kwargs["date_fin"] = date_fin
+            if limit is not None:
+                kwargs["limit"] = limit
+            return await get_calendrier_club_service(**kwargs)
+
+        # Actions equipes / classement : pré-résolution nécessaire
         target_org_id = organisme_id
         if not target_org_id and club_name:
-            resolved_clubs, _ = await _resolve_club_and_org(
+            resolved_clubs, _ = await resolve_club_and_org(
                 club_name=club_name, organisme_id=None, categorie=filtre, limit=3
             )
 
@@ -629,26 +677,7 @@ async def ffbb_club(
 
             target_org_id = resolved_clubs[0].get("organisme_id")
 
-        if action == "calendrier":
-            if not target_org_id and not club_name:
-                return [{"error": "Fournir organisme_id ou club_name"}]
-            effective_refresh = force_refresh
-            kwargs: dict[str, Any] = {
-                "club_name": club_name,
-                "organisme_id": target_org_id,
-                "categorie": filtre,
-                "numero_equipe": numero_equipe,
-                "adversaire": adversaire,
-                "force_refresh": effective_refresh,
-            }
-            if date_debut is not None:
-                kwargs["date_debut"] = date_debut
-            if date_fin is not None:
-                kwargs["date_fin"] = date_fin
-            if limit is not None:
-                kwargs["limit"] = limit
-            return await get_calendrier_club_service(**kwargs)
-        elif action == "equipes":
+        if action == "equipes":
             if not target_org_id:
                 return [
                     {
@@ -843,8 +872,7 @@ async def ffbb_team_summary(
     Pour une liste de matchs restants, utiliser plutôt `ffbb_club(action="calendrier")`.
     """
     try:
-        if ctx:
-            await ctx.report_progress(0, total=3, message="Résolution de l'équipe…")
+        await _safe_report_progress(ctx, 0, total=3, message="Résolution de l'équipe…")
         # Résoudre l'équipe d'abord pour obtenir organisme_id et catégorie
         resolve_result = await ffbb_resolve_team_service(
             club_name=club_name,
@@ -870,10 +898,9 @@ async def ffbb_team_summary(
         if not effective_org_id:
             return {"error": "Impossible de résoudre le club"}
 
-        if ctx:
-            await ctx.report_progress(
-                1, total=3, message="Récupération bilan et matchs en parallèle…"
-            )
+        await _safe_report_progress(
+            ctx, 1, total=3, message="Récupération bilan et matchs en parallèle…"
+        )
 
         # Lancer bilan + last_result + next_match en parallèle
         # On passe effective_org_id au lieu de club_name pour éviter une double résolution
@@ -909,8 +936,7 @@ async def ffbb_team_summary(
             last_match = None
             next_match = None
 
-        if ctx:
-            await ctx.report_progress(3, total=3, message="Résumé prêt.")
+        await _safe_report_progress(ctx, 3, total=3, message="Résumé prêt.")
         return {
             "team": resolved_team or bilan.get("team"),
             "phase_courante": bilan.get("phase_courante"),
@@ -1119,8 +1145,7 @@ async def ffbb_bilan_saison(
     Et fournit également un champ `bilan_total` qui cumule toutes les phases.
     """
     try:
-        if ctx:
-            await ctx.report_progress(0, total=1, message="Calcul du bilan saison…")
+        await _safe_report_progress(ctx, 0, total=1, message="Calcul du bilan saison…")
         effective_refresh = force_refresh
         result = await ffbb_saison_bilan_service(
             organisme_id=organisme_id,
@@ -1128,8 +1153,7 @@ async def ffbb_bilan_saison(
             numero_equipe=numero_equipe,
             force_refresh=effective_refresh,
         )
-        if ctx:
-            await ctx.report_progress(1, total=1, message="Bilan saison prêt.")
+        await _safe_report_progress(ctx, 1, total=1, message="Bilan saison prêt.")
         return result
     except Exception as e:
         raise handle_api_error(e) from e

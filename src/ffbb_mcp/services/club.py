@@ -25,10 +25,15 @@ Trois sections logiques cohabitent :
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import logging
 from datetime import datetime, timedelta
 from typing import Any
+
+import httpx
+from mcp.shared.exceptions import McpError
+from pydantic import ValidationError
 
 from ffbb_mcp._state import state
 from ffbb_mcp.models import BilanResponse, CalendrierMatch
@@ -183,6 +188,19 @@ async def ffbb_equipes_club_service(
     if not data:
         return []
 
+    # Cache de réutilisation inter-outils (bilan/calendrier/next/last/resolve
+    # pour un même club+catégorie). Évite de reconstruire les team_info et de
+    # re-interroger l'organisme à chaque appel de la session.
+    _eq_key = (
+        f"equipes:{organisme_id}:{_normalize_name(filtre or '')}"
+        if organisme_id is not None
+        else None
+    )
+    if _eq_key is not None:
+        _cached_equipes = state.cache_equipes.get(_eq_key)
+        if _cached_equipes is not None:
+            return copy.deepcopy(_cached_equipes)
+
     raw = data.get("engagements", []) if isinstance(data, dict) else []
     all_teams: list[dict[str, Any]] = []
     club_nom = data.get("nom", "")
@@ -237,6 +255,8 @@ async def ffbb_equipes_club_service(
         all_teams.append(team_info)
 
     if parsed_filter is None:
+        if _eq_key is not None:
+            state.cache_equipes[_eq_key] = copy.deepcopy(all_teams)
         return all_teams
 
     filtered_teams: list[dict[str, Any]] = []
@@ -277,14 +297,19 @@ async def ffbb_equipes_club_service(
 
     if not filtered_teams:
         suggestions = sorted(list({t["team_label"] for t in all_teams}))
-        return [
+        _error_result = [
             {
                 "error": f"Aucune équipe matchant '{filtre}' trouvée pour '{club_nom}'.",
                 "suggested_teams": suggestions,
                 "hint": "Utilise l'un des labels suggérés pour une précision exacte.",
             }
         ]
+        if _eq_key is not None:
+            state.cache_equipes[_eq_key] = copy.deepcopy(_error_result)
+        return _error_result
 
+    if _eq_key is not None:
+        state.cache_equipes[_eq_key] = copy.deepcopy(filtered_teams)
     return filtered_teams
 
 
@@ -332,7 +357,7 @@ async def _resolve_team_equipes(
 
     import ffbb_mcp.services
 
-    resolved_clubs, org_data = await ffbb_mcp.services._resolve_club_and_org(
+    resolved_clubs, org_data = await ffbb_mcp.services.resolve_club_and_org(
         club_name=club_name,
         organisme_id=organisme_id,
         categorie=categorie,
@@ -765,7 +790,7 @@ async def ffbb_saison_bilan_service(
     async def _fetch_poule(pid: str) -> dict[str, Any] | Exception:
         try:
             return await get_poule_service(pid, force_refresh=force_refresh)
-        except Exception as e:
+        except (httpx.HTTPError, McpError, ValidationError) as e:
             return e
 
     poules_raw = await asyncio.gather(
@@ -794,7 +819,7 @@ async def ffbb_saison_bilan_service(
         for entry in classements:
             eng = entry.get("id_engagement", {}) or {}
             entry_eng_id = str(eng.get("id", ""))
-            if entry_eng_id not in {str(e["engagement_id"]) for e in equipes}:
+            if entry_eng_id not in eng_ids:
                 continue
 
             stats = _extract_and_accumulate_bilan(entry, totaux)
@@ -865,9 +890,9 @@ async def _build_bilan_payload(
     déduplication est entièrement gérée par l'appelant via `_dedupe_inflight`.
     """
     from .poule import get_poule_service
-    from .search import _resolve_club_and_org
+    from .search import resolve_club_and_org
 
-    resolved_clubs, org_data = await _resolve_club_and_org(
+    resolved_clubs, org_data = await resolve_club_and_org(
         club_name=club_name, organisme_id=organisme_id, categorie=categorie
     )
     target_org_ids = [str(c["organisme_id"]) for c in resolved_clubs]
@@ -924,7 +949,7 @@ async def _build_bilan_payload(
     async def _fetch_poule_bilan(pid: str) -> dict[str, Any] | Exception:
         try:
             return await get_poule_service(pid)
-        except Exception as e:
+        except (httpx.HTTPError, McpError, ValidationError) as e:
             return e
 
     poules_raw = await asyncio.gather(
@@ -1140,15 +1165,40 @@ async def _build_calendar_matches(
     cache / déduplication est entièrement gérée par l'appelant via
     `_dedupe_inflight`.
     """
-    from .search import _resolve_club_and_org
+    from .search import resolve_club_and_org
 
-    resolved_clubs, _ = await _resolve_club_and_org(
+    resolved_clubs, _ = await resolve_club_and_org(
         club_name=club_name, organisme_id=organisme_id, categorie=categorie, limit=5
     )
+
+    if not resolved_clubs:
+        return [
+            {
+                "error": f"Aucun club trouvé pour '{club_name or organisme_id}'. "
+                "Vérifie l'orthographe ou utilise ffbb_search.",
+            }
+        ]
+
+    if len(resolved_clubs) > 1 and not organisme_id:
+        candidates = [
+            {
+                "id": c.get("organisme_id"),
+                "nom": c.get("nom"),
+                "ville": c.get("ville"),
+            }
+            for c in resolved_clubs
+            if isinstance(c, dict)
+        ]
+        return [
+            {
+                "error": f"Plusieurs clubs correspondent à '{club_name}'. "
+                "Précise l'organisme_id ou un nom plus exact.",
+                "candidates": candidates,
+            }
+        ]
+
     target_org_ids = [str(c["organisme_id"]) for c in resolved_clubs]
     target_org_ids = list(dict.fromkeys(oid for oid in target_org_ids if oid))
-    if not target_org_ids:
-        return []
 
     # Extraire le nom du club résolu pour le filtrage par adversaire
     club_nom_resolu = resolved_clubs[0].get("nom", "") if resolved_clubs else ""
@@ -1285,7 +1335,7 @@ async def _build_calendar_matches(
                         return await _client.list_rencontres_async(
                             limit=500, filter_criteria=fc
                         )
-                    except Exception:
+                    except httpx.HTTPError, ValidationError:
                         return []
 
                 _rencontres_lists = await asyncio.gather(
@@ -1297,13 +1347,19 @@ async def _build_calendar_matches(
                     if isinstance(_res, list):
                         for _r in _res:
                             if _r.id and _r.salle:
-                                _salle_map[str(_r.id)] = str(_r.salle)
+                                raw = _r.salle
+                                sid = (
+                                    str(raw.get("id", raw))
+                                    if isinstance(raw, dict)
+                                    else str(raw)
+                                )
+                                _salle_map[str(_r.id)] = sid
                 for m in _matches_need_salle:
                     _sid = _salle_map.get(str(m["id"]))
                     if _sid:
                         m["salle"] = _sid
-            except Exception:
-                pass  # Fallback silencieux
+            except AttributeError, TypeError:
+                pass  # Fallback silencieux (forme inattendue des rencontres)
 
     await _enrich_matches_with_salle_details(all_matches)
 

@@ -70,7 +70,7 @@ async def test_phase_prioritization_next_match():
             "ffbb_mcp.services.get_poule_service", AsyncMock(side_effect=side_effect)
         ),
         patch(
-            "ffbb_mcp.services._resolve_club_and_org",
+            "ffbb_mcp.services.resolve_club_and_org",
             AsyncMock(return_value=([{"nom": "Club", "organisme_id": "123"}], {})),
         ),
     ):
@@ -143,7 +143,7 @@ async def test_phase_prioritization_last_result():
             "ffbb_mcp.services.get_poule_service", AsyncMock(side_effect=side_effect)
         ),
         patch(
-            "ffbb_mcp.services._resolve_club_and_org",
+            "ffbb_mcp.services.resolve_club_and_org",
             AsyncMock(return_value=([{"nom": "Club", "organisme_id": "123"}], {})),
         ),
     ):
@@ -275,7 +275,7 @@ async def test_next_match_enriches_salle_from_rencontre():
             AsyncMock(side_effect=poule_side_effect),
         ),
         patch(
-            "ffbb_mcp.services._resolve_club_and_org",
+            "ffbb_mcp.services.resolve_club_and_org",
             AsyncMock(
                 return_value=([{"nom": "Stade Clermontois", "organisme_id": "123"}], {})
             ),
@@ -341,7 +341,7 @@ async def test_last_result_enriches_salle_from_rencontre():
             AsyncMock(side_effect=poule_side_effect),
         ),
         patch(
-            "ffbb_mcp.services._resolve_club_and_org",
+            "ffbb_mcp.services.resolve_club_and_org",
             AsyncMock(
                 return_value=([{"nom": "Stade Clermontois", "organisme_id": "123"}], {})
             ),

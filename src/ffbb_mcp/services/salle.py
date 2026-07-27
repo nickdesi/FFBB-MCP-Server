@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+import httpx
+
 
 async def get_client_async(*args, **kwargs):
     import ffbb_mcp.client
@@ -45,7 +47,9 @@ async def _enrich_salle_data_with_meilisearch(
                         if getattr(hit, "commune", None):
                             salle_data["ville"] = hit.commune.libelle
                             salle_data["code_postal"] = hit.commune.code_postal
-            except Exception:
+            except httpx.HTTPError, ValueError, TypeError:
+                # Soft-fail: l'enrichissement Meilisearch ne doit jamais casser
+                # le flux principal (get salle + formatage).
                 pass
 
 

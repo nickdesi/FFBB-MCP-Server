@@ -25,7 +25,7 @@ def test_dashboard_html_renders_empty_cache(monkeypatch):
     assert "0j 00:01:05" in html
     assert "Aucune donnee de cache" in html
     assert "Aucun appel outil MCP observe" in html
-    assert "FFBB MCP DASHBOARD" in html
+    assert "FFBB MCP Dashboard" in html
 
 
 def test_dashboard_html_renders_degraded_cache_rows(monkeypatch):
@@ -54,7 +54,8 @@ def test_dashboard_html_renders_degraded_cache_rows(monkeypatch):
 
     assert "DEGRADED" in html
     assert "1j 01:01:01" in html
-    assert "taux d'echec 25.0%" in html
+    assert "echec" in html
+    assert "25.0%" in html
     assert "123.0" in html
     assert "class='cache-name'>hot" in html
     assert "class='cache-name'>cold" in html

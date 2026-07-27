@@ -151,3 +151,160 @@ def test_resolve_uvicorn_log_level_mapping():
     assert _resolve_uvicorn_log_level(logging.WARNING) == "warning"
     assert _resolve_uvicorn_log_level(logging.ERROR) == "error"
     assert _resolve_uvicorn_log_level(logging.CRITICAL) == "critical"
+
+
+# -------------------------------------------------------------------
+# Tests des outils MCP via le client FastMCP (couvre le corps server.py)
+# (Ajoutés pour augmenter la couverture — alignés sur l'API réelle FastMCP 1.x)
+# -------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_ffbb_lives_via_call_tool():
+    """Couvre ffbb_lives (server.py ``ffbb_get_lives``) via ``mcp.call_tool``.
+
+    En mode ``json_response=True``, FastMCP renvoie un tuple
+    ``(content_list, structured_dict)`` (et non un ``CallToolResult``).
+    """
+    import json
+    from unittest.mock import AsyncMock, patch
+
+    fake_matches = [
+        {"id": "rx1", "score_domicile": 42, "score_exterieur": 39},
+    ]
+    with patch(
+        "ffbb_mcp.server.get_lives_service",
+        new_callable=AsyncMock,
+        return_value=fake_matches,
+    ) as mock_svc:
+        result = await mcp.call_tool("ffbb_lives", {})
+        mock_svc.assert_called_once_with()
+        # result = (content_list, structured_dict) en mode JSON.
+        content_list, _structured = result
+        assert content_list, "FastMCP doit renvoyer au moins un TextContent"
+        payload = json.loads(content_list[0].text)
+        # ``_freshness_meta`` peut envelopper la liste → on supporte dict ou list.
+        items = payload if isinstance(payload, list) else [payload]
+        first = items[0]
+        assert first["id"] == "rx1"
+        assert first["score_domicile"] == 42
+
+
+@pytest.mark.asyncio
+async def test_ffbb_get_competition_via_call_tool():
+    """Couvre la branche ``type='competition'`` du switch dans ``ffbb_get``."""
+    import json
+    from unittest.mock import AsyncMock, patch
+
+    fake_comp = {"id": 42, "nom": "Coupe du Puy-de-Dôme"}
+    with patch(
+        "ffbb_mcp.server.get_competition_service",
+        new_callable=AsyncMock,
+        return_value=fake_comp,
+    ) as mock_svc:
+        result = await mcp.call_tool("ffbb_get", {"id": 42, "type": "competition"})
+        mock_svc.assert_called_once_with(competition_id=42)
+        content_list, _structured = result
+        assert content_list, "FastMCP doit renvoyer au moins un TextContent"
+        payload = json.loads(content_list[0].text)
+        # Le payload peut être soit l'objet direct, soit enveloppé sous "result".
+        obj = payload.get("result", payload) if isinstance(payload, dict) else payload
+        assert obj["nom"] == "Coupe du Puy-de-Dôme"
+
+
+@pytest.mark.asyncio
+async def test_ffbb_bilan_service_error_raises_tool_error():
+    """Couvre la branche ``try/except`` de ``ffbb_bilan`` quand le service jette.
+
+    Toute erreur du service est rattrapée par ``handle_api_error`` et
+    remappée en ``ToolError`` ; côté serveur, ``_safe_report_progress``
+    neutralise déjà l'appel hors requête réelle.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    from mcp.server.fastmcp.exceptions import ToolError
+
+    expected_markers = (
+        "Erreur API FFBB",
+        "RuntimeError",
+        "boom",
+        "Action conseillée",
+    )
+
+    with patch(
+        "ffbb_mcp.server.ffbb_bilan_service",
+        new_callable=AsyncMock,
+        side_effect=RuntimeError("boom"),
+    ):
+        try:
+            await mcp.call_tool("ffbb_bilan", {"club_name": "ASVEL"})
+        except ToolError as exc:
+            # Format émis par handle_api_error() :
+            # f"Erreur API FFBB ({error_type}): {error_msg}. Action conseillée: …"
+            msg = str(exc)
+            for marker in expected_markers:
+                assert marker in msg, (
+                    f"Marqueur manquant dans le message mappé : {marker!r}"
+                )
+        else:
+            pytest.fail(
+                "ToolError attendu : le service a jetté, mais aucune erreur n'a été levée"
+            )
+
+
+@pytest.mark.asyncio
+async def test_ffbb_search_validation_error():
+    """Couvre la branche ``except ValueError`` de ``ffbb_search`` (filter_by invalide).
+
+    On ancre sur le substring littéral émis par ``_validate_filter_by()``.
+    """
+    from mcp.server.fastmcp.exceptions import ToolError
+
+    with pytest.raises(ToolError) as exc_info:
+        await mcp.call_tool(
+            "ffbb_search",
+            {"query": "test", "filter_by": "bad\x00input"},
+        )
+    msg = str(exc_info.value)
+    assert "caractères de contrôle invalides" in msg
+
+
+@pytest.mark.asyncio
+async def test_safe_report_progress_swallows_value_error():
+    """Verrouille le contrat de capture (ValueError, AssertionError) du helper.
+
+    Quand FastMCP expose un ``Context`` hors d'un vrai RequestContext (cas des
+    tests unitaires ``mcp.call_tool``), ``ctx.report_progress`` lève
+    ``ValueError("Context is not available outside of a request")``. Le helper
+    doit swallow + logger en DEBUG sans propager.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+
+    from ffbb_mcp.server import _safe_report_progress
+
+    ctx = MagicMock()
+    ctx.report_progress = AsyncMock(
+        side_effect=ValueError("Context is not available outside of a request"),
+    )
+
+    result = await _safe_report_progress(ctx, 0.0, total=3, message="start")
+    assert result is None
+    ctx.report_progress.assert_awaited_once_with(0.0, total=3, message="start")
+
+
+@pytest.mark.asyncio
+async def test_safe_report_progress_passes_through_runtime_error():
+    """Verrouille la promesse inverse : seule ``(ValueError, AssertionError)`` est swallowée.
+
+    Toute autre exception applicative (ici ``RuntimeError``) doit remonter pour
+    ne pas masquer un bug réel dans le code appelant.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+
+    from ffbb_mcp.server import _safe_report_progress
+
+    ctx = MagicMock()
+    ctx.report_progress = AsyncMock(side_effect=RuntimeError("oops"))
+
+    with pytest.raises(RuntimeError, match="oops"):
+        await _safe_report_progress(ctx, 1.0, total=2, message="middle")

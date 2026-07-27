@@ -44,7 +44,7 @@ jobs:
           python-version: "3.14"
 
       - name: Cache Mypy
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .mypy_cache
           key: mypy-${{ runner.os }}-${{ hashFiles('uv.lock') }}
@@ -52,7 +52,7 @@ jobs:
             mypy-${{ runner.os }}-
 
       - name: Cache Ruff
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .ruff_cache
           key: ruff-${{ runner.os }}-${{ hashFiles('uv.lock') }}
@@ -77,6 +77,10 @@ jobs:
 
       - name: Type check with mypy
         run: uv run --frozen mypy src
+      - name: Cyclomatic complexity report (radon)
+        # Rapport informatif — n'échoue pas la CI par défaut.
+        # Pour activer un seuil strict, remplacer par: radon cc src/ffbb_mcp -n C -s
+        run: uv run --frozen radon cc src/ffbb_mcp -s -a || true
 
   test:
     name: Tests (Python ${{ matrix.python-version }})
@@ -127,7 +131,7 @@ jobs:
           output: 'trivy-results.sarif'
 
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v3.26.12
+        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v3.26.12
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'

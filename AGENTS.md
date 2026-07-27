@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB MCP server | server.py: 1209 lignes | services.py: 3835 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 1233 lignes | services.py: 4048 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -119,8 +119,8 @@ src/ffbb_mcp/
 ├── prompts.py             # Prompts MCP réutilisables
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
-├── server.py              # Tools MCP + main() (≈1209 lignes)
-├── services/              # Logique métier modularisée (≈3835 lignes)
+├── server.py              # Tools MCP + main() (≈1233 lignes)
+├── services/              # Logique métier modularisée (≈4048 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── club.py            # Service de gestion des clubs
 │   ├── common.py          # Helpers et base services partagés
@@ -137,7 +137,7 @@ src/ffbb_mcp/
 - Pas de suffixe `_compact_` ou `_impl_` exposé
 - Modifier une fonction à la fois, seulement si test/usage échoue
 - Nouvelle fonction → test manuel validé avant exposition MCP
-- **Modularisation** : Le package `services/` (total ≈3835 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
+- **Modularisation** : Le package `services/` (total ≈4048 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
 
 ## Commandes
 - Démarrer le serveur MCP (stdio) : `rtk uv run python -m ffbb_mcp` (recommandé pour Claude Desktop)
@@ -188,9 +188,11 @@ Avant push/tag/release :
 | Variable | Défaut | Usage |
 |----------|--------|-------|
 | `XDG_CACHE_HOME` | `` | Dossier racine pour stocker les fichiers de cache persistants (ex: acronymes, benchmark) |
-| `TRUSTED_PROXY_HOSTS` | `127.0.0.1` | Proxies de confiance |
 | `MCP_MODE` | `stdio` | Mode de transport (`stdio` / `streamable-http`) |
+| `TRUSTED_PROXY_HOSTS` | `127.0.0.1` | Proxies de confiance |
+| `FFBB_LIVES_REFRESH_INTERVAL` | `10` | Intervalle de rafraîchissement proactif des lives en secondes, mode HTTP (défaut : 10) |
 | `FFBB_CACHE_BACKEND` | `sqlite` | Choix du backend de cache HTTP (`sqlite` ou `redis`) |
+| `FFBB_SERVICE_CACHE_PERSIST` | `1` | Activer la persistance des caches service sur disque (SQLite) entre redémarrages |
 | `FFBB_KNOWN_CLUB_IDS` | `` | Override JSON de la liste d'organisme_id connus pour les prompts MCP (fallback : _DEFAULT_KNOWN_CLUB_IDS) |
 | `FFBB_ENABLE_BENCHMARK` | `` | Activer endpoint `/benchmark/run` (sécurité) |
 | `ALLOWED_HOSTS` | `*` | Hosts autorisés (DNS rebinding protection) |
@@ -200,6 +202,8 @@ Avant push/tag/release :
 | `FFBB_LOG_LEVEL` | `INFO` | Niveau de log |
 | `HOST` | `0.0.0.0` | Interface d'écoute |
 | `PORT` | `9123` | Port d'écoute HTTP |
+| `FFBB_SWR_ENABLED` | `1` | Activer le Stale-While-Revalidate : servir le cache et rafraîchir en arrière-plan (défaut : 1) |
+| `FFBB_SWR_STALE_FRACTION` | `0.75` | Fraction du TTL au-delà de laquelle une entrée est rafraîchie en arrière-plan (défaut : 0.75) |
 | `MAX_CONCURRENT_FFBB` | `8` | Concurrence max appels API FFBB |
 | `FFBB_MAX_CALENDAR_MATCHES` | `300` | Max rencontres retournées |
 | `FFBB_WARMUP_ORGANISMES` | `` | Liste d'organisme_id séparés par des virgules à préchauffer au démarrage |

@@ -6,8 +6,10 @@ import re
 from functools import lru_cache
 from typing import Any, Protocol, cast
 
+import httpx
 from mcp.shared.exceptions import ErrorData, McpError
 from mcp.types import INTERNAL_ERROR
+from pydantic import ValidationError
 
 from ffbb_mcp._state import state
 
@@ -175,14 +177,13 @@ def _extract_club_key_word(club_name: str) -> str | None:
     """
     norm = _normalize_name(club_name)
     words = norm.split()
-    key_words = [w for w in words if w not in _GENERIC_CLUB_WORDS and len(w) >= 4]
-    if not key_words:
-        return None
-    candidate = key_words[0]
-    # Inutile de chercher si le mot-clé représente déjà toute la requête normalisée
-    if candidate == norm:
-        return None
-    return candidate
+    for w in words:
+        if len(w) >= 4 and w not in _GENERIC_CLUB_WORDS:
+            # Inutile de chercher si le mot-clé représente déjà toute la requête normalisée
+            if w == norm:
+                return None
+            return w
+    return None
 
 
 def _filter_orgs_by_gender(
@@ -306,7 +307,7 @@ def _resolve_team_number(
     return matched
 
 
-async def _resolve_club_and_org(
+async def resolve_club_and_org(
     club_name: str | None,
     organisme_id: int | str | None,
     categorie: str | None = None,
@@ -345,7 +346,7 @@ async def _resolve_club_and_org(
                 )
             else:
                 logger.warning("Organisme retourné vide ou invalide")
-        except Exception:
+        except httpx.HTTPError, McpError, ValidationError:
             logger.debug(
                 "Impossible de charger l'organisme",
                 exc_info=True,
@@ -387,7 +388,7 @@ async def _resolve_club_and_org(
                     org_data = await ffbb_mcp.services.get_organisme_service(
                         first_org_id
                     )
-            except Exception:
+            except httpx.HTTPError, McpError, ValidationError:
                 logger.debug(
                     "Impossible de charger les détails du premier organisme pour %s",
                     club_name,
@@ -683,7 +684,7 @@ async def ffbb_resolve_team_service(
         )
 
     # 1) Résoudre l'organisme avec métadonnées
-    resolved_clubs, _ = await _resolve_club_and_org(
+    resolved_clubs, _ = await resolve_club_and_org(
         club_name=club_name, organisme_id=organisme_id, categorie=categorie
     )
 
