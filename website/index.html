@@ -13,14 +13,14 @@
     <meta name="author" content="Nicolas De Simone">
     <meta name="robots" content="index, follow, max-image-preview:large">
     <link rel="canonical" href="https://ffbb.desimone.fr/" />
-    <meta name="theme-color" content="#13357e">
-    <meta name="color-scheme" content="light">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="color-scheme" content="dark">
 
     <!-- Preconnect for fonts perf -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Outfit:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="css/style.css">
 
     <!-- Open Graph / Social Media -->
@@ -67,7 +67,7 @@
                 "image": "https://ffbb.desimone.fr/logo.webp",
                 "softwareVersion": "1.6.0",
                 "datePublished": "2025-01-01T00:00:00Z",
-                "dateModified": "2026-07-11T00:00:00Z",
+                "dateModified": "2026-07-29T00:00:00Z",
                 "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
                 "author": { "@id": "https://ffbb.desimone.fr/#person" },
                 "sameAs": [
@@ -129,10 +129,32 @@
 <body>
     <a class="skip-link" href="#main-content">Aller au contenu principal</a>
 
+    <!-- Background glowing orbs -->
     <div class="bg-glow" aria-hidden="true">
         <div class="glow-orb glow-1"></div>
         <div class="glow-orb glow-2"></div>
     </div>
+
+    <!-- Header Navigation -->
+    <header class="site-header">
+        <div class="container header-inner">
+            <a class="brand" href="/" aria-label="Accueil FFBB MCP Server">
+                <img src="logo.webp" alt="Logo FFBB MCP" class="brand-logo" width="36" height="36">
+                <span class="brand-name">FFBB <strong>MCP</strong></span>
+            </a>
+            <nav class="main-nav" aria-label="Navigation principale">
+                <a href="#fonctionnalites">Fonctionnalités</a>
+                <a href="#comment-ca-marche">Intégration</a>
+                <a href="#faq">FAQ</a>
+            </nav>
+            <div class="header-actions">
+                <a href="/docs/" class="link-quiet">Documentation</a>
+                <a href="https://github.com/nickdesi/FFBB-MCP-Server/releases/latest" class="btn btn-primary btn-sm">
+                    Extension VS Code
+                </a>
+            </div>
+        </div>
+    </header>
 
     <div class="container" id="main-content">
         <!-- Hero Section -->
@@ -143,23 +165,23 @@
                 <div class="badge">12 outils MCP en lecture seule</div>
                 <div class="badge">Streamable HTTP</div>
             </div>
-            <h1 class="hero-title">Les données FFBB live dans votre <span class="accent-text">agent IA</span></h1>
+            <h1 class="hero-title">Les données officielles du <span class="accent-text">basket français</span> dans votre agent IA</h1>
             <p class="hero-subtitle">
                 Interrogez calendriers, classements, bilans, derniers résultats, prochains matchs et scores live depuis
                 GitHub Copilot, Claude, Cursor ou tout client MCP compatible.
             </p>
             <div class="cta-group">
+                <a href="https://github.com/nickdesi/FFBB-MCP-Server/releases/latest" class="btn btn-docs" aria-label="Installer l’extension VS Code FFBB Basketball MCP">
+                    <span aria-hidden="true">🧩</span>
+                    Installer l’extension VS Code
+                </a>
                 <a href="https://github.com/nickdesi/FFBB-MCP-Server" class="btn btn-primary">
                     <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"
                         focusable="false">
                         <path
                             d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
                     </svg>
-                    Code source
-                </a>
-                <a href="https://github.com/nickdesi/FFBB-MCP-Server/releases/latest" class="btn btn-docs" aria-label="Installer l’extension VS Code FFBB Basketball MCP">
-                    <span aria-hidden="true">🧩</span>
-                    Installer l’extension VS Code
+                    Code source GitHub
                 </a>
                 <a href="/docs/" class="btn btn-secondary" aria-label="Ouvrir la documentation FFBB MCP">
                     <span aria-hidden="true">📚</span>
@@ -192,7 +214,7 @@
         </div>
 
         <!-- Features Section -->
-        <section class="features">
+        <section id="fonctionnalites" class="features">
             <div class="section-label">
                 <div class="badge">Fonctionnalités</div>
                 <h2 class="section-title">Ce que vos agents peuvent demander</h2>
@@ -232,7 +254,7 @@
         </section>
 
         <!-- Integration Section -->
-        <section id="integration" class="integration">
+        <section id="comment-ca-marche" class="integration">
             <div class="section-label">
                 <div class="badge">Configuration</div>
                 <h2 class="section-title">Intégration en 30&nbsp;secondes</h2>
@@ -244,8 +266,7 @@
                 <button class="tab-btn tab-active" role="tab" aria-selected="true" aria-controls="tab-vscode"
                     id="btn-vscode" onclick="switchTab(event, 'tab-vscode')" data-tab="tab-vscode">Extension VS Code</button>
                 <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-claude"
-                    id="btn-claude" onclick="switchTab(event, 'tab-claude')" data-tab="tab-claude">Claude
-                    Desktop</button>
+                    id="btn-claude" onclick="switchTab(event, 'tab-claude')" data-tab="tab-claude">Claude Desktop</button>
                 <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-smithery" id="btn-smithery"
                     onclick="switchTab(event, 'tab-smithery')" data-tab="tab-smithery">Smithery CLI</button>
                 <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-cursor" id="btn-cursor"
@@ -262,7 +283,7 @@
                     </div>
                     <div class="install-actions">
                         <a class="btn btn-docs" href="https://github.com/nickdesi/FFBB-MCP-Server/releases/latest">Télécharger l’extension</a>
-                        <a class="btn btn-secondary" href="vscode:mcp/install?%7B%22name%22%3A%22ffbb-mcp%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fffbb.desimone.fr%2Fmcp%22%7D">Installer sans extension</a>
+                        <a class="btn btn-secondary" href="vscode:mcp/install?%7B%22name%22%3A%22ffbb-mcp%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fffbb.desimone.fr%2Fmcp%22%7D">Installer directement</a>
                     </div>
                 </div>
             </div>
@@ -271,7 +292,7 @@
             <div class="tab-panel tab-panel-hidden" id="tab-claude" role="tabpanel" aria-labelledby="btn-claude">
                 <p style="margin-bottom: 1.5rem; color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6; text-align: left;">
                     <strong>Option A (Recommandé) :</strong> Dans Claude, allez dans <em>Paramètres &rarr; Connecteurs</em> &rarr; <em>Ajouter un connecteur personnalisé</em> et saisissez l'URL <code>https://ffbb.desimone.fr/mcp</code>.<br>
-                    <strong>Option B :</strong> Si vous préférez le fichier de configuration de Claude Desktop, utilisez le bridge SSE officiel (nécessite <strong>Node.js</strong> pour exécuter <code>npx</code>) :
+                    <strong>Option B :</strong> Fichier <code>claude_desktop_config.json</code> avec le transport SSE :
                 </p>
                 <div class="code-terminal">
                     <div class="terminal-header" aria-hidden="true">
@@ -340,23 +361,20 @@ npx -y @smithery/cli@latest install @nickdesi/mcpffbb \
             </div>
         </section>
 
-        <!-- FAQ Section (GEO Optimized) -->
+        <!-- FAQ Section -->
         <section id="faq" class="features" style="margin-top: 4rem;">
             <div class="section-label">
                 <div class="badge">Questions fréquentes</div>
                 <h2 class="section-title">FAQ : API FFBB, extension VS Code & Intégration IA</h2>
                 <p class="section-subtitle">Les réponses aux questions les plus courantes sur le serveur et la data.</p>
             </div>
-            <div class="features-grid"
-                style="grid-template-columns: 1fr; max-width: 800px; margin: 0 auto; gap: 1.5rem;">
+            <div class="features-grid" style="grid-template-columns: 1fr; max-width: 800px; margin: 0 auto; gap: 1.5rem;">
                 <article class="feature-card" style="text-align: left; padding: 1.5rem;">
-                    <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Comment interroger l'API FFBB avec l'IA ?
-                    </h3>
-                    <p>Avec VS Code, installez l’extension <strong>FFBB Basketball MCP</strong> depuis la dernière release GitHub : elle enregistre <code>https://ffbb.desimone.fr/mcp</code> pour GitHub Copilot en mode agent. Pour Claude, Cursor ou un autre client MCP, utilisez le transport Streamable HTTP avec la même URL.</p>
+                    <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Comment interroger l'API FFBB avec l'IA ?</h3>
+                    <p>Avec VS Code, installez l’extension <strong>FFBB Basketball MCP</strong> depuis la dernière release GitHub : elle enregistre <code>https://ffbb.desimone.fr/mcp</code> pour GitHub Copilot en mode agent. Pour Claude, Cursor ou un autre client MCP, utilisez le transport Streamable HTTP avec cette même URL.</p>
                 </article>
                 <article class="feature-card" style="text-align: left; padding: 1.5rem;">
-                    <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Mon club de basket est introuvable, que faire
-                        ?</h3>
+                    <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Mon club de basket est introuvable, que faire ?</h3>
                     <p>Essayez un libellé plus précis via <code>ffbb_search</code> : ville, nom officiel ou fragments distinctifs du club. Une fois l’ID FFBB trouvé, réutilisez-le pour les requêtes suivantes afin d’éviter les ambiguïtés.</p>
                 </article>
                 <article class="feature-card" style="text-align: left; padding: 1.5rem;">
@@ -364,8 +382,7 @@ npx -y @smithery/cli@latest install @nickdesi/mcpffbb \
                     <p>L’ID FFBB est plus fiable que le nom du club. Pour une catégorie ambiguë comme <code>U13M</code>, utilisez <code>ffbb_resolve_team</code> ou précisez le numéro d’équipe.</p>
                 </article>
                 <article class="feature-card" style="text-align: left; padding: 1.5rem;">
-                    <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Les données et scores sont-ils en temps réel
-                        ?</h3>
+                    <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Les données et scores sont-ils en temps réel ?</h3>
                     <p>Les scores live utilisent un cache très court pendant les matchs. Les calendriers, classements et ressources FFBB utilisent une stratégie de cache adaptée au type de donnée afin de rester exploitables sans surcharger les services officiels.</p>
                 </article>
             </div>
@@ -374,10 +391,9 @@ npx -y @smithery/cli@latest install @nickdesi/mcpffbb \
         <!-- Footer -->
         <footer class="site-footer">
             <p>&copy; 2026 Nicolas De Simone — Développeur écosystème de données FFBB</p>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;">
-                Dernière mise à jour du contenu : 6 Juin 2026 <span aria-hidden="true">•</span>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">
                 Propulsé par la logique métier de <a href="https://pypi.org/project/ffbb-data-client/" target="_blank"
-                    rel="noopener" style="color: inherit; text-decoration: underline;">ffbb-data-client sur PyPI</a>
+                    rel="noopener" style="color: var(--accent-orange); text-decoration: underline;">ffbb-data-client sur PyPI</a>
             </p>
             <nav class="footer-nav" aria-label="Liens du pied de page" style="margin-top: 1.5rem;">
                 <a href="https://github.com/nickdesi/FFBB-MCP-Server" class="footer-link">GitHub FFBB MCP</a>
@@ -393,14 +409,12 @@ npx -y @smithery/cli@latest install @nickdesi/mcpffbb \
         // Tab switching
         function switchTab(event, tabId) {
             const container = event.target.closest('.tab-container').parentElement;
-            // Update tab buttons
             container.querySelectorAll('.tab-btn').forEach(function (btn) {
                 btn.classList.remove('tab-active');
                 btn.setAttribute('aria-selected', 'false');
             });
             event.target.classList.add('tab-active');
             event.target.setAttribute('aria-selected', 'true');
-            // Update panels
             container.querySelectorAll('.tab-panel').forEach(function (panel) {
                 panel.classList.add('tab-panel-hidden');
             });
