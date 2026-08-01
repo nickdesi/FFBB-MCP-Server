@@ -135,5 +135,7 @@ moment de la rotation de token.
   CI). Le rapport est informatif par défaut — un seuil strict peut
   être activé avec `-n C`.
 - Les endpoints `POST /cache/warmup` et `GET /cache/ttl` permettent
-  respectivamente de préchauffer le cache et d'inspecter les TTL en
-  runtime.
+  respectivement de préchauffer le cache et d'inspecter les TTL en
+  runtime. Le préchauffage est borné (`FFBB_WARMUP_MAX_ORGANISMES`,
+  body ≤ 64 Ko) et peut être authentifié (`FFBB_WARMUP_API_KEY`,
+  Bearer) pour limiter l'exposition en mode HTTP.

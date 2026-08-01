@@ -130,3 +130,5 @@ location /cache/warmup {
 | `ALLOWED_ORIGINS` | Restreint les origines CORS. En production : `https://ffbb.desimone.fr` |
 | `TRUSTED_PROXY_HOSTS` | IP des proxies de confiance (ex: NPM). Défaut : `127.0.0.1` |
 | `FFBB_ENABLE_BENCHMARK` | Active l'endpoint `/benchmark/run`. Laisser vide en production. |
+| `FFBB_WARMUP_API_KEY` | Si définie, `POST /cache/warmup` exige `Authorization: Bearer <clé>` (rejet `401` sinon). Recommandée en production même derrière NPM. |
+| `FFBB_WARMUP_MAX_ORGANISMES` | Borne max d'organismes par préchauffage (défaut 50, rejet `413` au-delà). |

@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-08-01
+
+### Security
+- **`POST /cache/warmup` borné et authentifiable** : l'endpoint accepte désormais au plus `FFBB_WARMUP_MAX_ORGANISMES` organismes (défaut 50) et un body ≤ 64 Ko, avec validation stricte de `organisme_ids` (liste de chaînes non vides) — rejets `400`/`413`. Une clé optionnelle `FFBB_WARMUP_API_KEY` rend l'endpoint obligatoirement authentifié (`Authorization: Bearer <clé>`, rejet `401` sinon). Le service `warmup_cache_service` tronque également toute liste dépassant la borne en défense en profondeur. Adresse la DoS « Unauthenticated Unbounded Cache Warmup Resource Exhaustion » (CWE-400, GHSA-c5rm-rrrx-4mqq).
+
 ## [1.6.0] - 2026-07-25
 
 ### Added

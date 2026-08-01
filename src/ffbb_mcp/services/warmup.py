@@ -13,6 +13,8 @@ logger = logging.getLogger("ffbb-mcp")
 
 # Limiter la concurrence de planification pour le préchauffage proactive (charge Event Loop)
 _WARMUP_CONCURRENCY = _read_positive_int_env("FFBB_WARMUP_CONCURRENCY", 5)
+# Nombre maximal d'organismes traités par préchauffage (défense anti-DoS, CWE-400)
+_WARMUP_MAX_ORGANISMES = _read_positive_int_env("FFBB_WARMUP_MAX_ORGANISMES", 50)
 
 
 async def warmup_cache_service(
@@ -27,6 +29,16 @@ async def warmup_cache_service(
             ]
         else:
             organisme_ids = []
+
+    # Borne le volume total de travail (le sémaphore limite la concurrence,
+    # pas la quantité de coroutines créées).
+    if len(organisme_ids) > _WARMUP_MAX_ORGANISMES:
+        logger.warning(
+            "Préchauffage tronqué de %d à %d organismes (FFBB_WARMUP_MAX_ORGANISMES)",
+            len(organisme_ids),
+            _WARMUP_MAX_ORGANISMES,
+        )
+        organisme_ids = organisme_ids[:_WARMUP_MAX_ORGANISMES]
 
     if not organisme_ids:
         return {

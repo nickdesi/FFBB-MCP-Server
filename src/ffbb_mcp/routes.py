@@ -25,6 +25,7 @@ from starlette.responses import (
 )
 
 from . import __version__ as _PACKAGE_VERSION
+from ._state import _read_positive_int_env
 from .benchmark import get_benchmark_trends, run_benchmark
 from .dashboard import _build_dashboard_html
 from .metrics import generate_prometheus_metrics, get_snapshot, summarize_health
@@ -36,6 +37,10 @@ _REMOTE_LOGO_URL = (
 )
 logger = logging.getLogger("ffbb-mcp")
 _background_tasks: set[asyncio.Task] = set()
+
+# Bornes de sécurité de l'endpoint /cache/warmup (CWE-400 : DoS par ressources).
+_WARMUP_MAX_ORGANISMES = _read_positive_int_env("FFBB_WARMUP_MAX_ORGANISMES", 50)
+_WARMUP_MAX_BODY_BYTES = 64 * 1024
 
 
 def _find_website_dir() -> Path:
@@ -277,6 +282,33 @@ def register_routes(mcp: FastMCP) -> None:
     @mcp.custom_route("/cache/warmup", methods=["POST"])  # type: ignore[untyped-decorator]
     async def cache_warmup_post(request: Request) -> Response:
         """Déclenche le préchauffage du cache."""
+        # Authentification optionnelle : si FFBB_WARMUP_API_KEY est définie,
+        # elle est obligatoire (Authorization: Bearer <clé>).
+        api_key = os.environ.get("FFBB_WARMUP_API_KEY", "")
+        if api_key:
+            auth = request.headers.get("Authorization", "")
+            if auth != f"Bearer {api_key}":
+                return OrjsonResponse(
+                    {"error": "Unauthorized", "error_type": "InvalidApiKey"},
+                    status_code=401,
+                )
+
+        # Borne la taille du body pour éviter les DoS mémoire (CWE-400).
+        content_length = request.headers.get("Content-Length")
+        try:
+            too_large = int(content_length) > _WARMUP_MAX_BODY_BYTES
+        except TypeError, ValueError:
+            too_large = False
+        if too_large:
+            return OrjsonResponse(
+                {
+                    "error": "Payload Too Large",
+                    "error_type": "BodyTooLarge",
+                    "max_bytes": _WARMUP_MAX_BODY_BYTES,
+                },
+                status_code=413,
+            )
+
         try:
             body = await request.json()
         except Exception:
@@ -284,6 +316,29 @@ def register_routes(mcp: FastMCP) -> None:
 
         organisme_ids = body.get("organisme_ids") if isinstance(body, dict) else None
         sync_mode = body.get("sync", False) if isinstance(body, dict) else False
+
+        # Validation stricte de la liste : type + taille bornée (CWE-400).
+        if organisme_ids is not None:
+            if not isinstance(organisme_ids, list) or not all(
+                isinstance(oid, str) and oid.strip() for oid in organisme_ids
+            ):
+                return OrjsonResponse(
+                    {
+                        "error": "Bad Request",
+                        "error_type": "InvalidOrganismeIds",
+                        "message": "'organisme_ids' doit être une liste de chaînes non vides.",
+                    },
+                    status_code=400,
+                )
+            if len(organisme_ids) > _WARMUP_MAX_ORGANISMES:
+                return OrjsonResponse(
+                    {
+                        "error": "Payload Too Large",
+                        "error_type": "TooManyOrganismeIds",
+                        "max_organismes": _WARMUP_MAX_ORGANISMES,
+                    },
+                    status_code=413,
+                )
 
         if sync_mode:
             from .services.warmup import warmup_cache_service
@@ -316,6 +371,15 @@ def register_routes(mcp: FastMCP) -> None:
                 "description": "Préchauffe proactivement le cache FFBB pour les clubs favoris.",
                 "usage_post": "POST {'organisme_ids': ['123', '456'], 'sync': false}",
                 "env_var_config": "FFBB_WARMUP_ORGANISMES",
+                "limits": {
+                    "max_organisme_ids": _WARMUP_MAX_ORGANISMES,
+                    "max_body_bytes": _WARMUP_MAX_BODY_BYTES,
+                },
+                "auth": (
+                    "Requires Authorization: Bearer <FFBB_WARMUP_API_KEY>"
+                    if os.environ.get("FFBB_WARMUP_API_KEY")
+                    else "Open (no FFBB_WARMUP_API_KEY configured); set it to require a bearer token"
+                ),
             }
         )
 

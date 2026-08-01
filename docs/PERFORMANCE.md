@@ -13,6 +13,7 @@ This document summarizes recent performance optimizations and explains how to ru
 - **Stale-While-Revalidate (SWR)**: les chemins chauds (`lives`, `saisons`, `poule`, `classement`) renvoient la valeur en cache immédiatement même si elle approche de l'expiration, et la rafraîchissent en arrière-plan (`FFBB_SWR_ENABLED`, `FFBB_SWR_STALE_FRACTION`). Le TTL dynamique des poules/classements (via `get_poule_ttl`) sert de seuil de fraîcheur. L'utilisateur ne subit jamais la latence d'un miss sur ces données.
 - **Cache persistant (SQLite)**: activé par défaut (`FFBB_SERVICE_CACHE_PERSIST=1`), il survit aux redémarrages (critique en mode stdio où chaque session démarre dans un processus neuf) sans jamais servir de donnée périmée.
 - **Warm-up au démarrage**: en mode HTTP, une boucle rafraîchit proactivement les `lives` pendant les fenêtres de match (`FFBB_LIVES_REFRESH_INTERVAL`) et un préchauffage optionnel charge les organismes/clubs configurés (`FFBB_WARMUP_ORGANISMES`).
+- **Endpoints de préchauffage bornés**: `POST /cache/warmup` refuse les listes de plus de `FFBB_WARMUP_MAX_ORGANISMES` organismes (défaut 50) et les bodies > 64 Ko (`413`), valide strictement `organisme_ids` (`400`), et exige `Authorization: Bearer <clé>` dès que `FFBB_WARMUP_API_KEY` est configurée (`401` sinon). Le service tronque également toute liste excessive en défense en profondeur — le sémaphore limite la concurrence, ces bornes limitent le volume total (CWE-400).
 
 ## Concurrency and batching
 
