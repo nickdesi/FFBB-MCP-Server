@@ -634,7 +634,7 @@ def _cache_set(cache: Any, key: Any, val: Any, cache_name: str) -> None:
         cache[key] = val
         # Horodatage du dernier fetch réel pour le SWR.
         state.swr_last_fetch[f"{cache_name}:{key}"] = time.monotonic()
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         logger.debug(
             "Impossible d'écrire dans le cache %s",
             cache_name,

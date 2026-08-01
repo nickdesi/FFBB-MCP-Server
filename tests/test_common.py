@@ -69,12 +69,18 @@ def test_is_retriable_http_status():
     request = Request("GET", "https://example.invalid")
     retriable = Response(429, request=request)
     non_retriable = Response(500, request=request)
-    assert common._is_retriable_error(
-        HTTPStatusError("rate limited", request=request, response=retriable)
-    ) is True
-    assert common._is_retriable_error(
-        HTTPStatusError("server error", request=request, response=non_retriable)
-    ) is False
+    assert (
+        common._is_retriable_error(
+            HTTPStatusError("rate limited", request=request, response=retriable)
+        )
+        is True
+    )
+    assert (
+        common._is_retriable_error(
+            HTTPStatusError("server error", request=request, response=non_retriable)
+        )
+        is False
+    )
 
 
 def test_is_retriable_misc():
