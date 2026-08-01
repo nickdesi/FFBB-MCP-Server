@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 license = { text = "Apache-2.0" }
 dependencies = [
-    "mcp[cli]>=1.27.0",
+    "mcp[cli]>=1.28.1,<2.0.0",
     "ffbb-data-client>=2.1.0,<3.0.0",
     "httpx>=0.28.0",
     "uvicorn>=0.30.0,<1.0.0",
