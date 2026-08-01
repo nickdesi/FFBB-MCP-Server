@@ -47,13 +47,13 @@ def _evict_runtime_caches_for_benchmark() -> None:
         from ffbb_mcp.utils import parse_categorie
 
         parse_categorie.cache_clear()
-    except ImportError, AttributeError:
+    except (ImportError, AttributeError):
         pass
     try:
         from ffbb_mcp.services.common import _normalize_name
 
         _normalize_name.cache_clear()
-    except ImportError, AttributeError:
+    except (ImportError, AttributeError):
         pass
 
 

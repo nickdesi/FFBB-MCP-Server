@@ -297,7 +297,7 @@ def register_routes(mcp: FastMCP) -> None:
         content_length = request.headers.get("Content-Length")
         try:
             too_large = int(content_length or "0") > _WARMUP_MAX_BODY_BYTES
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             too_large = False
         if too_large:
             return OrjsonResponse(

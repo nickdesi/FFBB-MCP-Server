@@ -70,6 +70,9 @@ _SWR_ENABLED = os.environ.get("FFBB_SWR_ENABLED", "1").lower() in (
 # déclenche un refresh en arrière-plan (0.75 = on rafraîchit dans le dernier
 # quart du TTL).
 _SWR_STALE_FRACTION = float(os.environ.get("FFBB_SWR_STALE_FRACTION", "0.75"))
+# Timeout applicatif par tentative d'appel FFBB (sec). Indépendant des
+# timeouts httpx : un appel qui pend ne bloque jamais la réponse MCP.
+_API_TIMEOUT_SECONDS = float(os.environ.get("FFBB_API_TIMEOUT_SECONDS", "30"))
 
 # Hooks simples pour les metrics de cache.
 _cache_hit_hook: Callable[..., None] | None = record_cache_hit
@@ -530,7 +533,8 @@ async def _safe_call(
         t0 = time.perf_counter()
         try:
             current_coro = make_coro()
-            result = await current_coro
+            async with asyncio.timeout(_API_TIMEOUT_SECONDS):
+                result = await current_coro
             record_call(time.perf_counter() - t0, is_error=False)
             logger.debug("Succès: %s (attempt %d)", operation_name, attempt)
             return result
@@ -565,6 +569,11 @@ async def _safe_call(
 
 
 def _is_retriable_error(e: Exception) -> bool:
+    # TimeoutError est transitoire et couvre aussi asyncio.TimeoutError
+    # et socket.timeout (dont il est la classe de base).
+    if isinstance(e, TimeoutError):
+        return True
+
     if isinstance(e, HTTPStatusError):
         status = getattr(e.response, "status_code", None)
         if status == 429:
@@ -625,7 +634,7 @@ def _cache_set(cache: Any, key: Any, val: Any, cache_name: str) -> None:
         cache[key] = val
         # Horodatage du dernier fetch réel pour le SWR.
         state.swr_last_fetch[f"{cache_name}:{key}"] = time.monotonic()
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         logger.debug(
             "Impossible d'écrire dans le cache %s",
             cache_name,
