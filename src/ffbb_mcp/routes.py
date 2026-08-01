@@ -296,7 +296,7 @@ def register_routes(mcp: FastMCP) -> None:
         # Borne la taille du body pour éviter les DoS mémoire (CWE-400).
         content_length = request.headers.get("Content-Length")
         try:
-            too_large = int(content_length) > _WARMUP_MAX_BODY_BYTES
+            too_large = int(content_length or "0") > _WARMUP_MAX_BODY_BYTES
         except TypeError, ValueError:
             too_large = False
         if too_large:
