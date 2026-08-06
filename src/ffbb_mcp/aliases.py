@@ -409,9 +409,11 @@ def _try_fallback_query(query: str) -> str | None:
 
     Ex: 'CS PONT DU CHATEAU' → 'PONT DU CHATEAU' (meilleur matching Meilisearch).
     """
-    words = query.strip().split()
+    # ⚡ Bolt: Fast-path string splitting with maxsplit=1 avoids unnecessary
+    # list allocations for long club names and bypasses the overhead of " ".join()
+    words = query.strip().split(None, 1)
     if len(words) >= 2 and words[0].upper() in _GENERIC_PREFIXES:
-        return " ".join(words[1:])
+        return words[1]
     return None
 
 
@@ -423,7 +425,9 @@ def _build_fallback_queries(query: str) -> list[str]:
     2. Pour les requêtes multi-mots sans préfixe générique, essayer des
        variantes plus courtes (ex: 'Pont du Château' → ['Pont du Château'])
     """
-    words = query.strip().split()
+    # ⚡ Bolt: Fast-path string splitting with maxsplit=1 avoids unnecessary
+    # list allocations for long club names and bypasses the overhead of " ".join()
+    words = query.strip().split(None, 1)
     fallbacks: list[str] = []
 
     if len(words) < 2:
@@ -431,6 +435,6 @@ def _build_fallback_queries(query: str) -> list[str]:
 
     # 1. Retrait préfixe générique
     if words[0].upper() in _GENERIC_PREFIXES:
-        fallbacks.append(" ".join(words[1:]))
+        fallbacks.append(words[1])
 
     return fallbacks
