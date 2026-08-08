@@ -42,3 +42,6 @@
 ## 2025-03-01 - Optimize String Splitting and Joining
 **Learning:** In CPython, when parsing text by splitting it on whitespace just to isolate the first word and join the rest (e.g., removing a known prefix), doing a full `.split()` and then `" ".join(words[1:])` is inefficient. By using `str.split(None, 1)`, we can limit the split to a single operation. This avoids allocating a list of all words for long strings and completely eliminates the need for `" ".join()`, resulting in a ~40% speedup for matches.
 **Action:** When stripping a known prefix word from a string, use `maxsplit=1` with `split()` instead of doing a full split and join.
+## 2025-07-28 - Fast-path explicit bounds checking
+**Learning:** In tight loops like string similarity functions, replacing `max()` or explicit manual condition checking (e.g., `val = i - x; if val < 0: val = 0`) with a single-line explicit ternary operator bounds check (`val = i - x if i > x else 0`) reduces Python frame overhead and avoids unnecessary variable assignment for branch operations, yielding minor performance improvements on large data sets.
+**Action:** Replace `max()`, `min()` and multi-line conditional bounds assignments with explicit single-line ternary expressions inside algorithmic inner loops where possible.

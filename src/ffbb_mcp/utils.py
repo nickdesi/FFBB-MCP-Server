@@ -341,7 +341,8 @@ def jaro_winkler_similarity(s1: str, s2: str) -> float:
 
     len1, len2 = len(s1), len(s2)
     # Fenêtre de correspondance maximale
-    match_bound = max(len1, len2) // 2 - 1
+    # ⚡ Bolt: Fast-path via explicit bounds checking eliminates max() pure Python overhead
+    match_bound = (len1 if len1 > len2 else len2) // 2 - 1
     if match_bound < 0:
         match_bound = 0
 
@@ -351,9 +352,8 @@ def jaro_winkler_similarity(s1: str, s2: str) -> float:
     matches = 0
     # Recherche des correspondances dans la fenêtre
     for i in range(len1):
-        start = i - match_bound
-        if start < 0:
-            start = 0
+        # ⚡ Bolt: Direct ternary assignment avoids unnecessary variable creation and branch reassignment
+        start = i - match_bound if i > match_bound else 0
         end = i + match_bound + 1
         if end > len2:
             end = len2
