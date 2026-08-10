@@ -623,7 +623,8 @@ def _cache_get(
         _notify_cache_hit(cache_name)
         return val
     if record_miss:
-        _notify_cache_miss(cache_name)
+        reason = getattr(cache, "_last_miss_reason", None) or "cold"
+        _notify_cache_miss(cache_name, reason)
     return None
 
 
@@ -746,6 +747,16 @@ async def _dedupe_inflight(
         if cache is not None:
             _cache_set(cache, cache_key, result, cache_name)
         return result
+    except Exception as e:
+        # Signal distinct : le miss "cold" du get a déjà été compté, celui-ci
+        # explique pourquoi l'entrée ne sera jamais remplie.
+        if (
+            cache is not None
+            and isinstance(e, HTTPStatusError)
+            and e.response.status_code == 404
+        ):
+            _notify_cache_miss(cache_name, "api_404")
+        raise
     finally:
         async with _get_inflight_lock(inflight_map):
             if inflight_map.get(cache_key) is existing:

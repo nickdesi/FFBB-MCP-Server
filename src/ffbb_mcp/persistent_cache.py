@@ -80,6 +80,10 @@ class PersistentCache:
         self._name = name
         self._ttl_provider: Callable[[Any], float] | None = None
         self._expires: dict[Any, float] = {}
+        # Cause du dernier miss (None si hit) : "expired" (TTL dépassé)
+        # ou "cold" (clé jamais vue). Consommé par _cache_get pour
+        # alimenter ffbb_cache_misses_by_reason_total.
+        self._last_miss_reason: str | None = None
         self._load()
 
     # ------------------------------------------------------------------
@@ -187,15 +191,19 @@ class PersistentCache:
         now = time.time()
         exp = self._expires.get(key)
         if exp is not None and now >= exp:
+            self._last_miss_reason = "expired"
             self._inner.pop(key, None)
             self._expires.pop(key, None)
             self._delete_db(key)
-            exp = None
+            return default
         if exp is None:
             val = self._load_one(key, now)
             if val is None:
+                self._last_miss_reason = "cold"
                 return default
+            self._last_miss_reason = None
             return val
+        self._last_miss_reason = None
         return self._inner.get(key, default)
 
     def __setitem__(self, key: Any, value: Any) -> None:
