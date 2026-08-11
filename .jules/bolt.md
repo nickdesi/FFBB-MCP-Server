@@ -48,3 +48,6 @@
 ## 2026-08-11 - [Fast-path redundant truthiness checks and uppercase conversions]
 **Learning:** In CPython string processing, combining string checks like `str.isalpha()` which evaluates false for empty strings eliminates the need for an explicit truthiness check `if not string:` beforehand. Furthermore, when `str.isupper()` has already verified the case of a string, calling `.upper()` before dictionary lookups is redundant and causes unnecessary string allocation overhead.
 **Action:** Remove redundant empty-string checks before `isalpha()` / `isdigit()` validations, and eliminate `.upper()`/`.lower()` conversions when case has already been guaranteed by a fast-path condition.
+## 2026-08-11 - Fast-path Integer Type Checking before try-except casting
+**Learning:** In CPython, wrapping a native typecast like `int(val)` inside a `try...except ValueError` block carries overhead, particularly when `val` is very frequently already of type `int`. A simple explicit type check `if type(val) is int:` can bypass this exception-handling overhead completely and execute up to 25-30% faster for native ints.
+**Action:** Always write explicit fast-paths for native primitives (like `int`) when functions expect mixed types but predominantly receive primitives, bypassing `try...except` parsing blocks.

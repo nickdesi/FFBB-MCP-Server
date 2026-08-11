@@ -122,6 +122,12 @@ def format_team_name(name: str | None, number: int | str | None) -> str:
     if not number:
         return name
 
+    # ⚡ Bolt: Fast-path for integers avoids try/except and int() overhead
+    if type(number) is int:
+        if number > 1:
+            return f"{name} - {number}"
+        return name
+
     try:
         num_int = int(number)
         if num_int > 1:
