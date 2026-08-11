@@ -220,3 +220,8 @@ Avant push/tag/release :
 - **NE PAS utiliser** `gh pr review --comment` — Jules ne le détecte pas
 - **Utiliser** `gh pr comment <number> --body "..."` ou commenter via l'UI GitHub
 - Jules écoute les `issue_comment` events, pas les `pull_request_review` events
+
+### Journal Bolt (`.jules/bolt.md`)
+- **OBLIGATION** : chaque nouvelle entrée ajoutée à `.jules/bolt.md` DOIT être datée de la **date du jour** (format `## YYYY-MM-DD - Titre`)
+- **INTERDIT** : copier une date existante (d'une entrée précédente, d'une autre branche, d'un commit ou d'une issue) — les dates antérieures au jour d'écriture signalent une entrée non datée
+- **Vérifier** la date courante avant d'écrire, ex : `date +%F`
