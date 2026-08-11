@@ -45,3 +45,6 @@
 ## 2025-07-28 - Fast-path explicit bounds checking
 **Learning:** In tight loops like string similarity functions, replacing `max()` or explicit manual condition checking (e.g., `val = i - x; if val < 0: val = 0`) with a single-line explicit ternary operator bounds check (`val = i - x if i > x else 0`) reduces Python frame overhead and avoids unnecessary variable assignment for branch operations, yielding minor performance improvements on large data sets.
 **Action:** Replace `max()`, `min()` and multi-line conditional bounds assignments with explicit single-line ternary expressions inside algorithmic inner loops where possible.
+## 2025-10-18 - [Fast-path redundant truthiness checks and uppercase conversions]
+**Learning:** In CPython string processing, combining string checks like `str.isalpha()` which evaluates false for empty strings eliminates the need for an explicit truthiness check `if not string:` beforehand. Furthermore, when `str.isupper()` has already verified the case of a string, calling `.upper()` before dictionary lookups is redundant and causes unnecessary string allocation overhead.
+**Action:** Remove redundant empty-string checks before `isalpha()` / `isdigit()` validations, and eliminate `.upper()`/`.lower()` conversions when case has already been guaranteed by a fast-path condition.
