@@ -245,7 +245,7 @@ def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
     ):
         return obj
 
-    if obj_type is dict or isinstance(obj, dict):
+    if obj_type is dict:
         # Fusion du nettoyage récursif et de l'élagage en une seule passe
         cleaned: dict[str, Any] = {}
         for k, v in obj.items():
@@ -286,7 +286,7 @@ def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
             return kept
         return cleaned
 
-    elif obj_type is list or isinstance(obj, list):
+    elif obj_type is list:
         # 1. Limitation de taille (ZipAI Surgical)
         limit = _PRUNE_LIMIT
 
