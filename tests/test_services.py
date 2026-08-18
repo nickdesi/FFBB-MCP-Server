@@ -58,7 +58,9 @@ class TestGetSaisonsService:
 
     @pytest.mark.asyncio
     async def test_active_filter(self, patch_get_client, mock_client):
-        def mock_get_saisons(filter_criteria=None):
+        from ffbb_mcp.services.poule import _SAISONS_FIELDS
+
+        def mock_get_saisons(fields=None, filter_criteria=None):
             data = [
                 {"id": 1, "nom": "2023-2024", "actif": False},
                 {"id": 2, "nom": "2024-2025", "actif": True},
@@ -73,7 +75,8 @@ class TestGetSaisonsService:
         assert len(result_active) == 1
         assert result_active[0]["nom"] == "2024-2025"
         mock_client.get_saisons_async.assert_awaited_once_with(
-            filter_criteria='{"actif": {"_eq": true}}'
+            fields=_SAISONS_FIELDS,
+            filter_criteria='{"actif": {"_eq": true}}',
         )
 
 

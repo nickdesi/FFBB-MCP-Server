@@ -55,12 +55,18 @@ async def get_lives_service() -> list[dict]:
     return await _swr_serve(state.cache_lives, "lives", "lives", ttl, _fetch_lives)
 
 
+_SAISONS_FIELDS = ["id", "libelle", "code", "actif", "debut", "fin", "enCours"]
+
+
 async def _fetch_saisons(active_only: bool) -> list[dict]:
     client = await get_client_async()
     filter_criteria = '{"actif": {"_eq": true}}' if active_only else None
     saisons = await _with_ffbb_semaphore(
         _safe_call_with_inflight(
-            "Saisons", lambda: client.get_saisons_async(filter_criteria=filter_criteria)
+            "Saisons",
+            lambda: client.get_saisons_async(
+                fields=_SAISONS_FIELDS, filter_criteria=filter_criteria
+            ),
         )
     )
     saisons_list = saisons if isinstance(saisons, list) else []
