@@ -144,8 +144,8 @@ def _build_dashboard_html() -> str:
             "<tr><td colspan='3' class='empty'>Aucun appel outil MCP observe.</td></tr>"
         )
 
-    status_badge_cls = "healthy" if errors == 0 else "degraded"
-    status_label = "HEALTHY" if errors == 0 else "DEGRADED"
+    status_badge_cls = "healthy" if error_rate <= 0.05 else "degraded"
+    status_label = "HEALTHY" if error_rate <= 0.05 else "DEGRADED"
 
     benchmark_html = _build_benchmark_html()
 
@@ -426,7 +426,7 @@ def _build_dashboard_html() -> str:
         "        setText('k-hitratio', (hr*100).toFixed(1) + '%');\n"
         "        setText('k-hitratio-sub', cv.hits + ' / ' + cv.total);\n"
         "        const fg = $('ring-fg'); if(fg) fg.setAttribute('stroke-dashoffset', RING_C * (1 - hr));\n"
-        "        const badge = $('status-badge'); const ok = errors === 0;\n"
+        "        const badge = $('status-badge'); const ok = (d.api_error_rate || 0) <= 0.05;\n"
         "        if(badge){ badge.className = 'badge ' + (ok?'healthy':'degraded'); setText('k-status-label', ok?'HEALTHY':'DEGRADED'); }\n"
         "        upBase = d.uptime_seconds||0; upT = Date.now();\n"
         "        setText('last-updated', new Date().toLocaleTimeString('fr-FR'));\n"

@@ -307,7 +307,7 @@ def summarize_health(snapshot: Mapping[str, Any] | None = None) -> dict[str, Any
     api_errors_total = snap["api_calls_error"]
     inflight = snap["api_inflight_requests"]
 
-    if api_errors_total:
+    if snap.get("api_error_rate", 0.0) > 0.05:
         status = "degraded"
     elif inflight:
         status = "busy"
