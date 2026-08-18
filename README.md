@@ -243,18 +243,6 @@ Le pipeline CI (`.github/workflows/ci.yml`) exécute ruff, mypy, pytest et le co
 
 ---
 
-## 📌 Recommandations GitHub
-
-**Description suggérée :**
-
-> 🏀 MCP server exposing official French basketball (FFBB) data — schedules, standings, live scores & more — for AI assistants.
-
-**Topics suggérés (≤ 20) :**
-
-`mcp` · `model-context-protocol` · `python` · `ffbb` · `basketball` · `open-data` · `ai` · `llm` · `claude` · `vscode` · `vscode-extension` · `mcp-server` · `sports` · `dns` · `api` · `starlette` · `uvicorn` · `docker` · `assistant` · `france`
-
----
-
 <p align="center">
   <i>Projet non officiel, non affilié à la Fédération Française de BasketBall.</i>
 </p>
