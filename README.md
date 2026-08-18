@@ -134,17 +134,18 @@ Configurez directement l'URL distante dans `mcp_config.json` via la directive na
 
 | Outil | Usage |
 | --- | --- |
-| `ffbb_bilan` | Bilan complet d'une équipe, toutes phases confondues. |
-| `ffbb_team_summary` | Résumé agent : bilan, classement courant, dernier résultat, prochain match. |
-| `ffbb_bilan_saison` | Bilan détaillé d'une équipe précise avec `numero_equipe`. |
-| `ffbb_last_result` | Dernier match joué. |
-| `ffbb_next_match` | Prochain match. |
-| `ffbb_club` | Calendrier complet, équipes ou classement d'un club. |
-| `ffbb_search` | Recherche clubs, compétitions, salles, matchs, engagements. |
-| `ffbb_get` | Accès technique à une ressource FFBB par identifiant. |
-| `ffbb_lives` | Matchs en direct. |
-| `ffbb_saisons` | Saisons disponibles. |
-| `ffbb_version` | Version et diagnostic runtime. |
+| `ffbb_version` | Informations de version et configuration runtime du serveur FFBB MCP. |
+| `ffbb_search` | Recherche FFBB — clubs, compétitions, matchs, salles, tournois, etc. |
+| `ffbb_bilan` | Bilan complet d'une équipe toutes phases confondues en UN seul appel. |
+| `ffbb_get` | Recupere une ressource FFBB par identifiant. |
+| `ffbb_club` | Outils agreges autour d'un club (calendrier, equipes, classement). |
+| `ffbb_lives` | Matchs en cours (scores live, cache 30s). Retourne [] si aucun match. |
+| `ffbb_saisons` | Liste des saisons FFBB. active_only=True pour la saison en cours uniquement. |
+| `ffbb_resolve_team` | Identifie une equipe unique (Pivot central). |
+| `ffbb_team_summary` | Résumé complet et agent-friendly pour une équipe. |
+| `ffbb_last_result` | Dernier résultat d'une équipe précise. |
+| `ffbb_next_match` | Prochain match à jouer pour une équipe précise. |
+| `ffbb_bilan_saison` | Bilan détaillé de la saison pour une équipe précise (toutes phases). |
 
 > [!NOTE]
 > Référence complète des paramètres : [`docs/TOOLS_REFERENCE.md`](docs/TOOLS_REFERENCE.md).

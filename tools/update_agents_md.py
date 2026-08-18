@@ -453,6 +453,32 @@ Avant push/tag/release :
     return content
 
 
+def update_readme_tools_table(tools: list[dict]) -> bool:
+    readme = ROOT / "README.md"
+    if not readme.exists():
+        return False
+    content = readme.read_text(encoding="utf-8")
+
+    lines = ["| Outil | Usage |", "| --- | --- |"]
+    for t in tools:
+        desc = t["summary"]
+        if desc and not desc.endswith("."):
+            desc += "."
+        lines.append(f"| `{t['name']}` | {desc} |")
+    new_table = "\n".join(lines)
+
+    pattern = re.compile(
+        r"(## 🧰 Outils principaux\n\n)\|.*?(?=\n\n> \[\!NOTE\]|\n\n---)", re.DOTALL
+    )
+    if pattern.search(content):
+        updated = pattern.sub(f"## 🧰 Outils principaux\n\n{new_table}", content)
+        if updated != content:
+            readme.write_text(updated, encoding="utf-8")
+            print("README.md — table des outils mise à jour avec succès.")
+            return True
+    return False
+
+
 def main():
     """Génère AGENTS.md et retourne 0 si le fichier a changé, 1 sinon."""
     # Détecter les variables d'environnement manquantes dans la description
@@ -469,6 +495,8 @@ def main():
             file=sys.stderr,
         )
 
+    tools = extract_tools()
+    update_readme_tools_table(tools)
     new_content = generate_agents_md()
     existing = AGENTS_MD.read_text() if AGENTS_MD.exists() else ""
 
