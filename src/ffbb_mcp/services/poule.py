@@ -57,7 +57,7 @@ async def get_lives_service() -> list[dict]:
 
 async def _fetch_saisons(active_only: bool) -> list[dict]:
     client = await get_client_async()
-    filter_criteria = '{"actif": {"$eq": true}}' if active_only else None
+    filter_criteria = '{"actif": {"_eq": true}}' if active_only else None
     saisons = await _with_ffbb_semaphore(
         _safe_call_with_inflight(
             "Saisons", lambda: client.get_saisons_async(filter_criteria=filter_criteria)

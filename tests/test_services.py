@@ -73,7 +73,7 @@ class TestGetSaisonsService:
         assert len(result_active) == 1
         assert result_active[0]["nom"] == "2024-2025"
         mock_client.get_saisons_async.assert_awaited_once_with(
-            filter_criteria='{"actif": {"$eq": true}}'
+            filter_criteria='{"actif": {"_eq": true}}'
         )
 
 
