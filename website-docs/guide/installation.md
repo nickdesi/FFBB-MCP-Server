@@ -44,20 +44,16 @@ Dans l'interface de gestion MCP de votre éditeur :
 
 ## 🪐 Google Antigravity
 
-> [!WARNING]
-> En raison d'un bug connu dans le client Go d'Antigravity (timeouts d'initialisation trop courts et gestion SSE sur serveur distant), la configuration directe en `type: "http"` peut provoquer des erreurs `context deadline exceeded`.
-> 
-> Utilisez plutôt le proxy local `mcp-remote` (installé à la volée via `npx`) :
+Dans votre fichier `mcp_config.json` (`~/.gemini/config/mcp_config.json` ou `~/.gemini/antigravity-ide/mcp_config.json`), configurez directement l'URL distante avec la directive native `serverUrl` :
 
 ```json
-    "ffbb": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "mcp-remote",
-        "https://ffbb.desimone.fr/mcp"
-      ]
+{
+  "mcpServers": {
+    "ffbb_mcp": {
+      "serverUrl": "https://ffbb.desimone.fr/mcp"
     }
+  }
+}
 ```
 
 

@@ -116,13 +116,15 @@ Configurez un serveur MCP distant :
 
 ### Google Antigravity
 
-> [!WARNING]
-> Un bug connu du client Go d'Antigravity (timeouts d'initialisation trop courts, gestion SSE sur serveur distant) peut provoquer des erreurs `context deadline exceeded` en `type: "http"`. Utilisez plutôt le proxy local `mcp-remote` (installé à la volée via `npx`) :
+Configurez directement l'URL distante dans `mcp_config.json` via la directive native `serverUrl` :
 
 ```json
-"ffbb": {
-  "command": "npx",
-  "args": ["-y", "mcp-remote", "https://ffbb.desimone.fr/mcp"]
+{
+  "mcpServers": {
+    "ffbb_mcp": {
+      "serverUrl": "https://ffbb.desimone.fr/mcp"
+    }
+  }
 }
 ```
 
@@ -234,7 +236,7 @@ Le pipeline CI (`.github/workflows/ci.yml`) exécute ruff, mypy, pytest et le co
 
 | Symptôme | Cause probable | Solution |
 | --- | --- | --- |
-| `context deadline exceeded` (Antigravity) | Bug client Go sur SSE distant | Utiliser `mcp-remote` via `npx` (voir [Google Antigravity](#google-antigravity)) |
+| `Missing session ID` / `deadline exceeded` | Wrapper `mcp-remote` ou mauvais transport | Utiliser `serverUrl` natif dans `mcp_config.json` (voir [Google Antigravity](#google-antigravity)) |
 | Claude Desktop refuse l'URL `http` | Claude Desktop impose `stdio` | Utiliser le bridge `@modelcontextprotocol/client-sse` via `npx` (voir [Claude Desktop](#claude-desktop)) |
 | Données live obsolètes | Cache TTL | Attendre le rafraîchissement (≤ 30 s) ou interroger l'endpoint `/health` |
 
