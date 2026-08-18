@@ -1,46 +1,39 @@
 <!DOCTYPE html>
 <html lang="fr" style="color-scheme: dark;">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="TuCtfpsMfaMi13jU8fbz5LFA1vxzqeLZMHc74ulWRig" />
-    <title>FFBB MCP Server — Données officielles du basket français pour vos agents IA</title>
-    <meta name="description"
-        content="Serveur MCP public connecté aux données officielles de la FFBB : calendriers, classements, bilans, derniers résultats, prochains matchs et scores live. Compatible GitHub Copilot, Claude, Cursor et VS Code.">
-    <meta name="keywords"
-        content="FFBB, Basketball, MCP Server, basket français, GitHub Copilot, Claude, Cursor, VS Code, scores live, classement basket, API basketball France">
+    <title>FFBB MCP Server — Données Officielles du Basket Français pour vos Assistants IA</title>
+    <meta name="description" content="Serveur MCP public connecté aux données officielles de la FFBB : calendriers, classements complets, fiches clubs, derniers résultats, prochains matchs et scores live pour Claude, Cursor, GitHub Copilot et ChatGPT.">
+    <meta name="keywords" content="FFBB MCP, Model Context Protocol, Basket France, Claude MCP, Cursor MCP, GitHub Copilot Basketball, Scores Live Basket, Classement FFBB IA">
     <meta name="author" content="Nicolas De Simone">
     <meta name="robots" content="index, follow, max-image-preview:large">
     <link rel="canonical" href="https://ffbb.desimone.fr/" />
-    <meta name="theme-color" content="#0a0a0a">
-    <meta name="color-scheme" content="dark">
-
-    <!-- Preconnect for fonts perf -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Outfit:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap">
-    <link rel="stylesheet" href="css/style.css">
+    <meta name="theme-color" content="#07090e">
 
     <!-- Open Graph / Social Media -->
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="FFBB MCP Server">
-    <meta property="og:title" content="FFBB MCP Server — Les données officielles du basket dans votre agent IA">
-    <meta property="og:description"
-        content="Calendriers, classements, bilans, résultats et scores live FFBB accessibles depuis GitHub Copilot, Claude, Cursor ou VS Code via Streamable HTTP.">
+    <meta property="og:title" content="FFBB MCP Server — Les Données du Basket dans votre Assistant IA">
+    <meta property="og:description" content="Calendriers, classements, bilans, résultats et scores live FFBB accessibles directement depuis Claude, Cursor, Copilot ou VS Code.">
     <meta property="og:url" content="https://ffbb.desimone.fr/">
     <meta property="og:image" content="https://ffbb.desimone.fr/logo.webp">
     <meta property="og:locale" content="fr_FR">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="FFBB MCP Server — Données officielles du basket pour agents IA">
-    <meta name="twitter:description"
-        content="Calendriers, classements, bilans et scores live FFBB dans GitHub Copilot, Claude, Cursor ou VS Code.">
+    <meta name="twitter:title" content="FFBB MCP Server — Données Officielles du Basket pour IA">
+    <meta name="twitter:description" content="Connectez vos assistants IA aux données du basket français en 1 clic via le protocole MCP.">
     <meta name="twitter:image" content="https://ffbb.desimone.fr/logo.webp">
 
     <link rel="icon" type="image/webp" href="logo.webp">
+
+    <!-- Google Fonts Preconnect & Stylesheets -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@600;700;800&family=Space+Grotesk:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
 
     <!-- JSON-LD Structured Data -->
     <script type="application/ld+json">
@@ -52,7 +45,7 @@
                 "@id": "https://ffbb.desimone.fr/#website",
                 "url": "https://ffbb.desimone.fr/",
                 "name": "FFBB MCP Server",
-                "description": "Serveur MCP public connecté aux données officielles de la FFBB.",
+                "description": "Serveur MCP public connecté aux données officielles de la Fédération Française de BasketBall.",
                 "inLanguage": "fr-FR",
                 "publisher": { "@id": "https://ffbb.desimone.fr/#person" }
             },
@@ -60,19 +53,18 @@
                 "@type": "SoftwareApplication",
                 "@id": "https://ffbb.desimone.fr/#software",
                 "name": "FFBB MCP Server",
-                "applicationCategory": "DeveloperApplication",
+                "applicationCategory": "DeveloperApplication, SportsApplication",
                 "operatingSystem": "macOS, Windows, Linux",
-                "description": "Serveur MCP pour accéder aux données officielles de la Fédération Française de BasketBall depuis un agent IA.",
+                "description": "Serveur MCP pour accéder aux données officielles de la Fédération Française de BasketBall depuis un assistant IA.",
                 "url": "https://ffbb.desimone.fr",
                 "image": "https://ffbb.desimone.fr/logo.webp",
                 "softwareVersion": "1.6.1",
                 "datePublished": "2025-01-01T00:00:00Z",
-                "dateModified": "2026-07-29T00:00:00Z",
+                "dateModified": "2026-08-18T00:00:00Z",
                 "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
                 "author": { "@id": "https://ffbb.desimone.fr/#person" },
                 "sameAs": [
                     "https://github.com/nickdesi/FFBB-MCP-Server",
-                    "https://smithery.ai/servers/nickdesi/mcpffbb",
                     "https://nickdesi.github.io/ffbb-data-client/",
                     "https://pypi.org/project/ffbb-data-client/"
                 ]
@@ -82,41 +74,42 @@
                 "@id": "https://ffbb.desimone.fr/#person",
                 "name": "Nicolas De Simone",
                 "url": "https://github.com/nickdesi",
-                "description": "Développeur Python spécialisé dans l'écosystème open source pour la FFBB."
+                "description": "Développeur Python spécialisé dans l'écosystème open source pour le basket français."
             },
             {
                 "@type": "FAQPage",
+                "@id": "https://ffbb.desimone.fr/#faq",
                 "mainEntity": [
                     {
                         "@type": "Question",
-                        "name": "Comment interroger l'API FFBB avec l'IA ?",
+                        "name": "Comment poser des questions sur le basket à son IA ?",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "Le plus simple avec VS Code est d'installer l'extension FFBB Basketball MCP depuis la dernière release GitHub. Elle enregistre le serveur public https://ffbb.desimone.fr/mcp pour GitHub Copilot en mode agent. Sinon, configurez votre client MCP avec le transport Streamable HTTP et cette même URL."
+                            "text": "Il suffit d'ajouter l'endpoint public https://ffbb.desimone.fr/mcp dans votre client MCP préféré (Cursor, Claude Desktop, VS Code Copilot). Votre IA saura alors automatiquement interroger les calendriers, classements et scores de la FFBB."
                         }
                     },
                     {
                         "@type": "Question",
-                        "name": "Mon club de basket est introuvable, que faire ?",
+                        "name": "Quelles sont les questions possibles ?",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "Essayez un libellé plus précis via <code>ffbb_search</code> : ville, nom officiel ou fragments distinctifs du club. Une fois l’ID FFBB trouvé, réutilisez-le pour les requêtes suivantes afin d’éviter les ambiguïtés."
+                            "text": "Vous pouvez demander le classement d'une poule, le prochain match d'un club, le résumé de saison d'une équipe, les gymnases à proximité ou encore les scores des matchs en direct le week-end."
                         }
                     },
                     {
                         "@type": "Question",
-                        "name": "Faut-il connaître l'ID FFBB ou le numéro d'équipe ?",
+                        "name": "Le service est-il gratuit et public ?",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "L’ID FFBB est plus fiable que le nom du club. Pour une catégorie ambiguë comme <code>U13M</code>, utilisez <code>ffbb_resolve_team</code> ou précisez le numéro d’équipe."
+                            "text": "Oui, l'instance officielle publique est hébergée, maintenue et accessible gratuitement avec le transport standard Streamable HTTP."
                         }
                     },
                     {
                         "@type": "Question",
-                        "name": "Les données et scores sont-ils en temps réel ?",
+                        "name": "Les scores et classements sont-ils officiels ?",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "Les scores live utilisent un cache très court pendant les matchs. Les calendriers, classements et ressources FFBB utilisent une stratégie de cache adaptée au type de donnée afin de rester exploitables sans surcharger les services officiels."
+                            "text": "Oui, toutes les données proviennent directement des flux et index officiels de la Fédération Française de BasketBall via le SDK ffbb-data-client."
                         }
                     }
                 ]
@@ -125,318 +118,414 @@
     }
     </script>
 </head>
-
 <body>
-    <a class="skip-link" href="#main-content">Aller au contenu principal</a>
-
-    <!-- Background glowing orbs -->
-    <div class="bg-glow" aria-hidden="true">
-        <div class="glow-orb glow-1"></div>
-        <div class="glow-orb glow-2"></div>
+    <!-- Ambient Canvas Glow -->
+    <div class="ambient-glow">
+        <div class="glow-circle glow-1"></div>
+        <div class="glow-circle glow-2"></div>
     </div>
 
     <!-- Header Navigation -->
-    <header class="site-header">
+    <header class="site-header" id="navbar">
         <div class="container header-inner">
-            <a class="brand" href="/" aria-label="Accueil FFBB MCP Server">
-                <img src="logo.webp" alt="Logo FFBB MCP" class="brand-logo" width="36" height="36">
-                <span class="brand-name">FFBB <strong>MCP</strong></span>
+            <a href="#" class="brand">
+                <img src="logo.webp" alt="Logo FFBB MCP" class="brand-logo" width="40" height="40">
+                <span>FFBB <strong>MCP Server</strong></span>
             </a>
-            <nav class="main-nav" aria-label="Navigation principale">
-                <a href="#fonctionnalites">Fonctionnalités</a>
-                <a href="#comment-ca-marche">Intégration</a>
+            <nav class="main-nav">
+                <a href="#demo">Démo en Direct</a>
+                <a href="#outils">Outils IA</a>
+                <a href="#integration">Configuration 1 Clic</a>
+                <a href="#dashboard">Dashboard & Santé</a>
                 <a href="#faq">FAQ</a>
             </nav>
-            <div class="header-actions">
-                <a href="/docs/" class="link-quiet">Documentation</a>
-                <a href="https://github.com/nickdesi/FFBB-MCP-Server/releases/latest" class="btn btn-primary btn-sm">
-                    Extension VS Code
-                </a>
+            <div style="display: flex; gap: 0.75rem; align-items: center;">
+                <a href="/dashboard" class="chip chip-mint">📊 Dashboard Live</a>
+                <a href="https://github.com/nickdesi/FFBB-MCP-Server" target="_blank" rel="noopener" class="btn btn-primary btn-sm">⭐ GitHub</a>
             </div>
         </div>
     </header>
 
-    <div class="container" id="main-content">
+    <main id="main-content">
         <!-- Hero Section -->
-        <header class="hero">
-            <img src="logo.webp" alt="Logo FFBB MCP Server" class="hero-logo" width="120" height="120">
-            <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 1.5rem; flex-wrap: wrap;">
-                <div class="badge">v1.6.1 Stable</div>
-                <div class="badge">12 outils MCP en lecture seule</div>
-                <div class="badge">Streamable HTTP</div>
-            </div>
-            <h1 class="hero-title">Les données officielles du <span class="accent-text">basket français</span> dans votre agent IA</h1>
-            <p class="hero-subtitle">
-                Interrogez calendriers, classements, bilans, derniers résultats, prochains matchs et scores live depuis
-                GitHub Copilot, Claude, Cursor ou tout client MCP compatible.
-            </p>
-            <div class="cta-group">
-                <a href="https://github.com/nickdesi/FFBB-MCP-Server/releases/latest" class="btn btn-docs" aria-label="Installer l’extension VS Code FFBB Basketball MCP">
-                    <span aria-hidden="true">🧩</span>
-                    Installer l’extension VS Code
-                </a>
-                <a href="https://github.com/nickdesi/FFBB-MCP-Server" class="btn btn-primary">
-                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"
-                        focusable="false">
-                        <path
-                            d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
-                    </svg>
-                    Code source GitHub
-                </a>
-                <a href="/docs/" class="btn btn-secondary" aria-label="Ouvrir la documentation FFBB MCP">
-                    <span aria-hidden="true">📚</span>
-                    Documentation
-                </a>
-            </div>
-        </header>
+        <section class="hero">
+            <div class="container hero-grid">
+                <div>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
+                        <span class="chip chip-orange">🏀 BASKET FRANÇAIS + IA</span>
+                        <span class="chip chip-live"><span class="live-pulse"></span> STREAMABLE HTTP ENDPOINT</span>
+                    </div>
+                    <h1 class="hero-title">
+                        Donnez à vos assistants IA la connaissance du <span class="text-gradient">basket français</span>.
+                    </h1>
+                    <p class="hero-lead">
+                        Résultats, calendriers de toutes les divisions, classements de poules, fiches de clubs et scores en direct : posez vos questions en français naturel dans Claude, Cursor, GitHub Copilot ou ChatGPT.
+                    </p>
+                    <div class="hero-actions">
+                        <a href="#integration" class="btn btn-primary btn-lg">🚀 Connecter en 1 Clic</a>
+                        <a href="/dashboard" class="btn btn-surface btn-lg">📊 Explorer le Dashboard</a>
+                    </div>
+                    <div class="hero-badges-row">
+                        <div class="hero-badge-item">
+                            <span class="hero-badge-val">12 Outils IA</span>
+                            <span class="hero-badge-lbl">Spécialisés Basket</span>
+                        </div>
+                        <div class="hero-badge-item">
+                            <span class="hero-badge-val">0 Configuration</span>
+                            <span class="hero-badge-lbl">Instance Publique</span>
+                        </div>
+                        <div class="hero-badge-item">
+                            <span class="hero-badge-val">Live & 3x3</span>
+                            <span class="hero-badge-lbl">Toutes Poules FFBB</span>
+                        </div>
+                    </div>
+                </div>
 
-        <!-- Stats Bar -->
-        <div class="stats-bar" aria-label="Statistiques clés">
-            <div class="stat-item">
-                <span class="stat-number">12</span>
-                <span class="stat-label">outils lecture seule</span>
-            </div>
-            <div class="stat-divider" aria-hidden="true"></div>
-            <div class="stat-item">
-                <span class="stat-number">Live</span>
-                <span class="stat-label">scores en direct</span>
-            </div>
-            <div class="stat-divider" aria-hidden="true"></div>
-            <div class="stat-item">
-                <span class="stat-number">/mcp</span>
-                <span class="stat-label">endpoint public</span>
-            </div>
-            <div class="stat-divider" aria-hidden="true"></div>
-            <div class="stat-item">
-                <span class="stat-number">HTTP</span>
-                <span class="stat-label">Streamable MCP</span>
-            </div>
-        </div>
+                <!-- Interactive AI Prompt Simulator -->
+                <div class="ai-interactive-card" id="demo">
+                    <div class="prompt-tabs">
+                        <button class="prompt-tab active" onclick="switchPrompt('equipe')">🏀 Résumé d'Équipe</button>
+                        <button class="prompt-tab" onclick="switchPrompt('live')">🔴 Scores en Direct</button>
+                        <button class="prompt-tab" onclick="switchPrompt('club')">📍 Club & Gymnase</button>
+                    </div>
 
-        <!-- Features Section -->
-        <section id="fonctionnalites" class="features">
-            <div class="section-label">
-                <div class="badge">Fonctionnalités</div>
-                <h2 class="section-title">Ce que vos agents peuvent demander</h2>
-            </div>
-            <div class="features-grid">
-                <article class="feature-card">
-                    <div class="feature-icon">📊</div>
-                    <h3>Résumé d’équipe</h3>
-                    <p>Un seul appel pour récupérer bilan global, phase courante, classement, dernier résultat et prochain match.</p>
-                </article>
-                <article class="feature-card">
-                    <div class="feature-icon">📅</div>
-                    <h3>Calendriers complets</h3>
-                    <p>Listez les matchs passés et à venir d’un club, avec filtre par catégorie et numéro d’équipe.</p>
-                </article>
-                <article class="feature-card">
-                    <div class="feature-icon">🔎</div>
-                    <h3>Recherche FFBB étendue</h3>
-                    <p>Trouvez clubs, compétitions, rencontres, salles, terrains, engagements, officiels ou entraîneurs.</p>
-                </article>
-                <article class="feature-card">
-                    <div class="feature-icon">🏀</div>
-                    <h3>Résultats & prochains matchs</h3>
-                    <p>Obtenez le dernier match joué ou le prochain rendez-vous d’une équipe précisément résolue.</p>
-                </article>
-                <article class="feature-card">
-                    <div class="feature-icon">📈</div>
-                    <h3>Classements & poules</h3>
-                    <p>Accédez aux classements officiels, aux poules et aux ressources FFBB par identifiant technique.</p>
-                </article>
-                <article class="feature-card">
-                    <div class="feature-icon">⚡</div>
-                    <h3>Serveur MCP public</h3>
-                    <p>Endpoint Streamable HTTP prêt pour VS Code, Claude, Cursor, Smithery et les agents MCP compatibles.</p>
-                </article>
+                    <div id="demo-equipe" class="demo-pane">
+                        <div class="prompt-bubble">
+                            <strong>💬 Votre question à l'IA :</strong><br>
+                            « Quel est le bilan et le prochain match de l'équipe 1 de Pau ? »
+                        </div>
+                        <div class="response-card">
+                            🏀 <strong>Réponse générée via <code>ffbb_team_summary</code> :</strong><br>
+                            • <strong>Équipe :</strong> Élan Béarnais Pau-Lacq-Orthez (NM1)<br>
+                            • <strong>Bilan actuel :</strong> 3e de la poule B (14 Victoires - 4 Défaites)<br>
+                            • <strong>Dernier résultat :</strong> Victoire 82 - 76 vs Dax Gamarde<br>
+                            • <strong>Prochain match :</strong> Samedi 20h00 à domicile vs Tours
+                        </div>
+                    </div>
+
+                    <div id="demo-live" class="demo-pane" style="display: none;">
+                        <div class="prompt-bubble">
+                            <strong>💬 Votre question à l'IA :</strong><br>
+                            « Y a-t-il des matchs de basket en direct ce soir ? »
+                        </div>
+                        <div class="response-card">
+                            🔴 <strong>Réponse générée via <code>ffbb_lives</code> :</strong><br>
+                            • <strong>Betclic Élite :</strong> ASVEL 78 - 74 Monaco (4e QT, 02:14 restant)<br>
+                            • <strong>Pro B :</strong> Boulazac 65 - 62 Roanne (3e QT terminé)
+                        </div>
+                    </div>
+
+                    <div id="demo-club" class="demo-pane" style="display: none;">
+                        <div class="prompt-bubble">
+                            <strong>💬 Votre question à l'IA :</strong><br>
+                            « Donne-moi les infos et l'adresse du club de basket de Clermont »
+                        </div>
+                        <div class="response-card">
+                            📍 <strong>Réponse générée via <code>ffbb_club</code> :</strong><br>
+                            • <strong>Club :</strong> Stade Clermontois Basket Auvergne (63000 Clermont-Ferrand)<br>
+                            • <strong>Salle principale :</strong> Maison des Sports (Place des Bughes)<br>
+                            • <strong>Équipes engagées :</strong> 14 équipes du baby basket aux seniors
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 
-        <!-- Integration Section -->
-        <section id="comment-ca-marche" class="integration">
-            <div class="section-label">
-                <div class="badge">Configuration</div>
-                <h2 class="section-title">Intégration en 30&nbsp;secondes</h2>
-                <p class="section-subtitle">Choisissez votre client MCP favori et copiez la configuration.</p>
-            </div>
+        <!-- 12 Tools Overview -->
+        <section id="outils">
+            <div class="container">
+                <div class="section-head">
+                    <span class="chip chip-orange">OUTILS IA</span>
+                    <h2>12 Outils pour explorer tout le basket français</h2>
+                    <p>Votre assistant IA sélectionne automatiquement le meilleur outil pour vous répondre avec une précision totale.</p>
+                </div>
 
-            <!-- Tabs -->
-            <div class="tab-container" role="tablist" aria-label="Méthodes d'installation">
-                <button class="tab-btn tab-active" role="tab" aria-selected="true" aria-controls="tab-vscode"
-                    id="btn-vscode" onclick="switchTab(event, 'tab-vscode')" data-tab="tab-vscode">Extension VS Code</button>
-                <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-claude"
-                    id="btn-claude" onclick="switchTab(event, 'tab-claude')" data-tab="tab-claude">Claude Desktop</button>
-                <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-smithery" id="btn-smithery"
-                    onclick="switchTab(event, 'tab-smithery')" data-tab="tab-smithery">Smithery CLI</button>
-                <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-cursor" id="btn-cursor"
-                    onclick="switchTab(event, 'tab-cursor')" data-tab="tab-cursor">Cursor / VS Code</button>
-            </div>
-
-            <!-- Tab: Extension VS Code -->
-            <div class="tab-panel" id="tab-vscode" role="tabpanel" aria-labelledby="btn-vscode">
-                <div class="install-card">
-                    <div>
-                        <div class="install-kicker">Recommandé pour GitHub Copilot</div>
-                        <h3>Installez FFBB Basketball MCP en quelques clics</h3>
-                        <p>Téléchargez le fichier <code>.vsix</code> depuis la dernière release, puis installez-le dans VS Code via <strong>Extensions → … → Install from VSIX…</strong>. L’extension enregistre le serveur public FFBB pour GitHub Copilot en mode agent.</p>
+                <div class="tools-grid">
+                    <div class="tool-card">
+                        <div class="tool-icon">⚡</div>
+                        <h3><code>ffbb_team_summary</code></h3>
+                        <p>Le résumé ultime en un seul appel : bilan de la saison, position au classement, dernier résultat et prochain match à jouer.</p>
                     </div>
-                    <div class="install-actions">
-                        <a class="btn btn-docs" href="https://github.com/nickdesi/FFBB-MCP-Server/releases/latest">Télécharger l’extension</a>
-                        <a class="btn btn-secondary" href="vscode:mcp/install?%7B%22name%22%3A%22ffbb-mcp%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fffbb.desimone.fr%2Fmcp%22%7D">Installer directement</a>
+
+                    <div class="tool-card">
+                        <div class="tool-icon">🔴</div>
+                        <h3><code>ffbb_lives</code></h3>
+                        <p>Scores en temps réel, quarts-temps et statut des matchs en cours sur l'ensemble des championnats français.</p>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-icon">🏆</div>
+                        <h3><code>ffbb_bilan</code></h3>
+                        <p>Bilan exhaustif d'une équipe toutes phases confondues : victoires, défaites, points marqués/encaissés et goal-average.</p>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-icon">🏟️</div>
+                        <h3><code>ffbb_club</code></h3>
+                        <p>Fiche complète d'un club : calendrier des matchs du week-end, liste des équipes engagées et classements officiels.</p>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-icon">🔍</div>
+                        <h3><code>ffbb_search</code></h3>
+                        <p>Recherche universelle et rapide : clubs, compétitions, tournois, gymnases, arbitres et terrains de basket 3x3.</p>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-icon">📅</div>
+                        <h3><code>ffbb_next_match</code> / <code>last_result</code></h3>
+                        <p>Détails précis de la prochaine rencontre programmée ou de la dernière feuille de match jouée.</p>
                     </div>
                 </div>
             </div>
+        </section>
 
-            <!-- Tab: Claude Desktop -->
-            <div class="tab-panel tab-panel-hidden" id="tab-claude" role="tabpanel" aria-labelledby="btn-claude">
-                <p style="margin-bottom: 1.5rem; color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6; text-align: left;">
-                    <strong>Option A (Recommandé) :</strong> Dans Claude, allez dans <em>Paramètres &rarr; Connecteurs</em> &rarr; <em>Ajouter un connecteur personnalisé</em> et saisissez l'URL <code>https://ffbb.desimone.fr/mcp</code>.<br>
-                    <strong>Option B :</strong> Fichier <code>claude_desktop_config.json</code> avec le transport SSE :
-                </p>
-                <div class="code-terminal">
-                    <div class="terminal-header" aria-hidden="true">
-                        <div class="dot dot-red"></div>
-                        <div class="dot dot-yellow"></div>
-                        <div class="dot dot-green"></div>
-                        <span class="terminal-title">claude_desktop_config.json</span>
+        <!-- 1-Click Setup Section -->
+        <section id="integration">
+            <div class="container">
+                <div class="section-head">
+                    <span class="chip chip-mint">INTÉGRATION 1 CLIC</span>
+                    <h2>Connectez votre client IA préféré</h2>
+                    <p>Ajoutez l'URL Streamable HTTP officielle dans votre configuration et commencez immédiatement à poser vos questions.</p>
+                </div>
+
+                <div class="setup-wrapper">
+                    <div class="setup-tabs">
+                        <button class="chip prompt-tab active" onclick="switchSetupTab(event, 'cfg-cursor')">Cursor / Windsurf</button>
+                        <button class="chip prompt-tab" onclick="switchSetupTab(event, 'cfg-claude')">Claude Desktop</button>
+                        <button class="chip prompt-tab" onclick="switchSetupTab(event, 'cfg-vscode')">VS Code & Copilot</button>
+                        <button class="chip prompt-tab" onclick="switchSetupTab(event, 'cfg-agy')">Google Antigravity</button>
                     </div>
-                    <div class="terminal-body">
-                        <pre><code><span class="code-comment">// Ajoutez dans claude_desktop_config.json</span>
+
+                    <!-- Cursor Config -->
+                    <div id="cfg-cursor" class="setup-code-box cfg-pane" style="display: block;">
+                        <button class="copy-btn" onclick="copySnippet('{\n  \"mcpServers\": {\n    \"ffbb\": {\n      \"url\": \"https://ffbb.desimone.fr/mcp\"\n    }\n  }\n}')">📋 Copier la configuration</button>
+                        <pre><code><span style="color: #8b949e;">// Dans .cursor/mcp.json ou Paramètres > Features > MCP</span>
 {
-  <span class="code-keyword">"mcpServers"</span>: {
-    <span class="code-keyword">"ffbb"</span>: {
-      <span class="code-keyword">"command"</span>: <span class="code-string">"npx"</span>,
-      <span class="code-keyword">"args"</span>: [
-        <span class="code-string">"-y"</span>,
-        <span class="code-string">"@modelcontextprotocol/client-sse"</span>,
-        <span class="code-string">"https://ffbb.desimone.fr/mcp"</span>
-      ]
+  <span style="color: #79c0ff;">"mcpServers"</span>: {
+    <span style="color: #79c0ff;">"ffbb"</span>: {
+      <span style="color: #79c0ff;">"url"</span>: <span style="color: #a5d6ff;">"https://ffbb.desimone.fr/mcp"</span>
+    }
+  }
+}</code></pre>
+                    </div>
+
+                    <!-- Claude Desktop Config -->
+                    <div id="cfg-claude" class="setup-code-box cfg-pane" style="display: none;">
+                        <button class="copy-btn" onclick="copySnippet('{\n  \"mcpServers\": {\n    \"ffbb\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"@modelcontextprotocol/client-sse\", \"https://ffbb.desimone.fr/mcp\"]\n    }\n  }\n}')">📋 Copier la configuration</button>
+                        <pre><code><span style="color: #8b949e;">// Dans claude_desktop_config.json</span>
+{
+  <span style="color: #79c0ff;">"mcpServers"</span>: {
+    <span style="color: #79c0ff;">"ffbb"</span>: {
+      <span style="color: #79c0ff;">"command"</span>: <span style="color: #a5d6ff;">"npx"</span>,
+      <span style="color: #79c0ff;">"args"</span>: [<span style="color: #a5d6ff;">"-y"</span>, <span style="color: #a5d6ff;">"@modelcontextprotocol/client-sse"</span>, <span style="color: #a5d6ff;">"https://ffbb.desimone.fr/mcp"</span>]
+    }
+  }
+}</code></pre>
+                    </div>
+
+                    <!-- VS Code Config -->
+                    <div id="cfg-vscode" class="setup-code-box cfg-pane" style="display: none;">
+                        <button class="copy-btn" onclick="copySnippet('{\n  \"github.copilot.chat.mcpServers\": {\n    \"ffbb\": {\n      \"url\": \"https://ffbb.desimone.fr/mcp\"\n    }\n  }\n}')">📋 Copier la configuration</button>
+                        <pre><code><span style="color: #8b949e;">// Dans settings.json de VS Code (Mode Agent GitHub Copilot)</span>
+{
+  <span style="color: #79c0ff;">"github.copilot.chat.mcpServers"</span>: {
+    <span style="color: #79c0ff;">"ffbb"</span>: {
+      <span style="color: #79c0ff;">"url"</span>: <span style="color: #a5d6ff;">"https://ffbb.desimone.fr/mcp"</span>
+    }
+  }
+}</code></pre>
+                    </div>
+
+                    <!-- Antigravity Config -->
+                    <div id="cfg-agy" class="setup-code-box cfg-pane" style="display: none;">
+                        <button class="copy-btn" onclick="copySnippet('{\n  \"mcpServers\": {\n    \"ffbb\": {\n      \"serverUrl\": \"https://ffbb.desimone.fr/mcp\"\n    }\n  }\n}')">📋 Copier la configuration</button>
+                        <pre><code><span style="color: #8b949e;">// Dans mcp_config.json de Google Antigravity</span>
+{
+  <span style="color: #79c0ff;">"mcpServers"</span>: {
+    <span style="color: #79c0ff;">"ffbb"</span>: {
+      <span style="color: #79c0ff;">"serverUrl"</span>: <span style="color: #a5d6ff;">"https://ffbb.desimone.fr/mcp"</span>
     }
   }
 }</code></pre>
                     </div>
                 </div>
             </div>
+        </section>
 
-            <!-- Tab: Smithery CLI -->
-            <div class="tab-panel tab-panel-hidden" id="tab-smithery" role="tabpanel" aria-labelledby="btn-smithery">
-                <div class="code-terminal">
-                    <div class="terminal-header" aria-hidden="true">
-                        <div class="dot dot-red"></div>
-                        <div class="dot dot-yellow"></div>
-                        <div class="dot dot-green"></div>
-                        <span class="terminal-title">Terminal</span>
-                    </div>
-                    <div class="terminal-body">
-                        <pre><code><span class="code-comment"># Installation automatique via Smithery CLI</span>
-npx -y @smithery/cli@latest install @nickdesi/mcpffbb \
-  --client claude \
-  --mcp-url <span class="code-string">https://ffbb.desimone.fr/mcp</span></code></pre>
-                    </div>
+        <!-- Dashboard & Live Monitoring Section -->
+        <section id="dashboard" style="background: rgba(255, 255, 255, 0.015); border-top: 1px solid var(--theme-border); border-bottom: 1px solid var(--theme-border);">
+            <div class="container">
+                <div class="section-head">
+                    <span class="chip chip-indigo">MONITORING EN DIRECT</span>
+                    <h2>Transparence & État du Service</h2>
+                    <p>Suivez les métriques de trafic, l'efficacité du cache et l'état des connexions en temps réel.</p>
                 </div>
-            </div>
 
-            <!-- Tab: Cursor / VS Code -->
-            <div class="tab-panel tab-panel-hidden" id="tab-cursor" role="tabpanel" aria-labelledby="btn-cursor">
-                <div class="code-terminal">
-                    <div class="terminal-header" aria-hidden="true">
-                        <div class="dot dot-red"></div>
-                        <div class="dot dot-yellow"></div>
-                        <div class="dot dot-green"></div>
-                        <span class="terminal-title">mcp.json</span>
-                    </div>
-                    <div class="terminal-body">
-                        <pre><code><span class="code-comment">// Cursor / VS Code — type : Streamable HTTP</span>
-{
-  <span class="code-keyword">"mcpServers"</span>: {
-    <span class="code-keyword">"ffbb"</span>: {
-      <span class="code-keyword">"type"</span>: <span class="code-string">"http"</span>,
-      <span class="code-keyword">"url"</span>: <span class="code-string">"https://ffbb.desimone.fr/mcp"</span>
-    }
-  }
-}</code></pre>
-                    </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+                    <a href="/dashboard" style="text-decoration: none; background: var(--theme-surface); border: 1px solid var(--theme-border); border-radius: var(--radius-md); padding: 1.75rem; display: block; transition: var(--transition);" class="tool-card">
+                        <h4 style="font-family: var(--font-heading); color: #ff6b00; font-size: 1.25rem; margin-bottom: 0.5rem;">📊 Dashboard Visuel</h4>
+                        <p style="color: var(--text-secondary); font-size: 0.92rem;">Visualisez les requêtes par seconde, le hit ratio du cache et les outils les plus appelés.</p>
+                    </a>
+                    <a href="/metrics.json" style="text-decoration: none; background: var(--theme-surface); border: 1px solid var(--theme-border); border-radius: var(--radius-md); padding: 1.75rem; display: block; transition: var(--transition);" class="tool-card">
+                        <h4 style="font-family: var(--font-heading); color: #34d399; font-size: 1.25rem; margin-bottom: 0.5rem;">📈 Métriques JSON</h4>
+                        <p style="color: var(--text-secondary); font-size: 0.92rem;">Endpoint automatisé au format JSON pour Prometheus, Grafana ou supervision externe.</p>
+                    </a>
+                    <a href="/health" style="text-decoration: none; background: var(--theme-surface); border: 1px solid var(--theme-border); border-radius: var(--radius-md); padding: 1.75rem; display: block; transition: var(--transition);" class="tool-card">
+                        <h4 style="font-family: var(--font-heading); color: #818cf8; font-size: 1.25rem; margin-bottom: 0.5rem;">❤️ État de Santé</h4>
+                        <p style="color: var(--text-secondary); font-size: 0.92rem;">Health check en direct validant la connectivité Directus et Meilisearch.</p>
+                    </a>
                 </div>
             </div>
         </section>
 
         <!-- FAQ Section -->
-        <section id="faq" class="features" style="margin-top: 4rem;">
-            <div class="section-label">
-                <div class="badge">Questions fréquentes</div>
-                <h2 class="section-title">FAQ : API FFBB, extension VS Code & Intégration IA</h2>
-                <p class="section-subtitle">Les réponses aux questions les plus courantes sur le serveur et la data.</p>
-            </div>
-            <div class="features-grid" style="grid-template-columns: 1fr; max-width: 800px; margin: 0 auto; gap: 1.5rem;">
-                <article class="feature-card" style="text-align: left; padding: 1.5rem;">
-                    <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Comment interroger l'API FFBB avec l'IA ?</h3>
-                    <p>Avec VS Code, installez l’extension <strong>FFBB Basketball MCP</strong> depuis la dernière release GitHub : elle enregistre <code>https://ffbb.desimone.fr/mcp</code> pour GitHub Copilot en mode agent. Pour Claude, Cursor ou un autre client MCP, utilisez le transport Streamable HTTP avec cette même URL.</p>
-                </article>
-                <article class="feature-card" style="text-align: left; padding: 1.5rem;">
-                    <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Mon club de basket est introuvable, que faire ?</h3>
-                    <p>Essayez un libellé plus précis via <code>ffbb_search</code> : ville, nom officiel ou fragments distinctifs du club. Une fois l’ID FFBB trouvé, réutilisez-le pour les requêtes suivantes afin d’éviter les ambiguïtés.</p>
-                </article>
-                <article class="feature-card" style="text-align: left; padding: 1.5rem;">
-                    <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Faut-il connaître l'ID FFBB ou le numéro d'équipe ?</h3>
-                    <p>L’ID FFBB est plus fiable que le nom du club. Pour une catégorie ambiguë comme <code>U13M</code>, utilisez <code>ffbb_resolve_team</code> ou précisez le numéro d’équipe.</p>
-                </article>
-                <article class="feature-card" style="text-align: left; padding: 1.5rem;">
-                    <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Les données et scores sont-ils en temps réel ?</h3>
-                    <p>Les scores live utilisent un cache très court pendant les matchs. Les calendriers, classements et ressources FFBB utilisent une stratégie de cache adaptée au type de donnée afin de rester exploitables sans surcharger les services officiels.</p>
-                </article>
+        <section id="faq">
+            <div class="container">
+                <div class="section-head">
+                    <span class="chip chip-mint">FAQ</span>
+                    <h2>Questions fréquentes</h2>
+                    <p>Tout ce que vous devez savoir pour démarrer et utiliser le serveur MCP.</p>
+                </div>
+
+                <div class="faq-grid">
+                    <div class="faq-box open" onclick="toggleFaqBox(this)">
+                        <div class="faq-question-row">
+                            <span>Comment poser des questions sur le basket à mon IA ?</span>
+                            <span class="faq-plus">+</span>
+                        </div>
+                        <div class="faq-answer-row">
+                            <p>Il suffit d'ajouter l'URL <code>https://ffbb.desimone.fr/mcp</code> dans votre client MCP (Cursor, Claude Desktop, Copilot). Votre IA saura automatiquement utiliser les 12 outils spécialisés pour vous répondre.</p>
+                        </div>
+                    </div>
+
+                    <div class="faq-box" onclick="toggleFaqBox(this)">
+                        <div class="faq-question-row">
+                            <span>Quels types de questions sont compris ?</span>
+                            <span class="faq-plus">+</span>
+                        </div>
+                        <div class="faq-answer-row">
+                            <p>Vous pouvez demander le classement d'une poule, le prochain match d'une équipe, le résumé complet de saison d'un club, les gymnases à proximité ou les scores des matchs en direct le week-end.</p>
+                        </div>
+                    </div>
+
+                    <div class="faq-box" onclick="toggleFaqBox(this)">
+                        <div class="faq-question-row">
+                            <span>Faut-il installer Python ou cloner le projet ?</span>
+                            <span class="faq-plus">+</span>
+                        </div>
+                        <div class="faq-answer-row">
+                            <p>Non ! L'instance publique <code>https://ffbb.desimone.fr/mcp</code> est hébergée et prête à l'emploi. Il vous suffit de copier l'URL dans votre configuration.</p>
+                        </div>
+                    </div>
+
+                    <div class="faq-box" onclick="toggleFaqBox(this)">
+                        <div class="faq-question-row">
+                            <span>Les données sont-elles officielles et à jour ?</span>
+                            <span class="faq-plus">+</span>
+                        </div>
+                        <div class="faq-answer-row">
+                            <p>Oui, toutes les données proviennent directement des flux officiels de la Fédération Française de BasketBall via le SDK <code>ffbb-data-client</code> avec une actualisation en direct pour les scores du week-end.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
+    </main>
 
-        <!-- Footer -->
-        <footer class="site-footer">
-            <p>&copy; 2026 Nicolas De Simone — Développeur écosystème de données FFBB</p>
-            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">
-                Propulsé par la logique métier de <a href="https://pypi.org/project/ffbb-data-client/" target="_blank"
-                    rel="noopener" style="color: var(--accent-orange); text-decoration: underline;">ffbb-data-client sur PyPI</a>
-            </p>
-            <nav class="footer-nav" aria-label="Liens du pied de page" style="margin-top: 1.5rem;">
-                <a href="https://github.com/nickdesi/FFBB-MCP-Server" class="footer-link">GitHub FFBB MCP</a>
-                <a href="/docs/" class="footer-link">Documentation Serveur</a>
-                <a href="https://smithery.ai/servers/nickdesi/mcpffbb" class="footer-link">Smithery Registry</a>
-                <a href="https://nickdesi.github.io/ffbb-data-client/"
-                    class="footer-link footer-link-accent">API Client Python &rarr;</a>
-            </nav>
-        </footer>
-    </div>
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <a href="#" class="brand">
+                        <img src="logo.webp" alt="Logo" width="36" height="36">
+                        <span>FFBB MCP Server</span>
+                    </a>
+                    <p>Serveur officiel communautaire du Model Context Protocol pour connecter les intelligences artificielles au basketball français.</p>
+                </div>
+                <div class="footer-col">
+                    <h4>Endpoints Publics</h4>
+                    <ul>
+                        <li><a href="/mcp">Endpoint MCP (Streamable HTTP)</a></li>
+                        <li><a href="/dashboard">Tableau de Bord</a></li>
+                        <li><a href="/metrics.json">Métriques JSON</a></li>
+                        <li><a href="/health">Santé & Diagnostic</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>Écosystème & Open Source</h4>
+                    <ul>
+                        <li><a href="https://github.com/nickdesi/FFBB-MCP-Server" target="_blank" rel="noopener">Dépôt GitHub MCP</a></li>
+                        <li><a href="https://nickdesi.github.io/ffbb-data-client/" target="_blank" rel="noopener">SDK Python ffbb-data-client</a></li>
+                        <li><a href="https://pypi.org/project/ffbb-data-client/" target="_blank" rel="noopener">Package PyPI</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>Légal & Licence</h4>
+                    <ul>
+                        <li><a href="https://github.com/nickdesi/FFBB-MCP-Server/blob/main/LICENSE" target="_blank" rel="noopener">Licence MIT</a></li>
+                        <li><a href="https://github.com/nickdesi/FFBB-MCP-Server/blob/main/SECURITY.md" target="_blank" rel="noopener">Sécurité</a></li>
+                        <li><a href="https://www.ffbb.com" target="_blank" rel="noopener">Fédération Française de BasketBall</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <span>© 2026 Nicolas De Simone. Projet open-source non affilié à la Fédération Française de BasketBall.</span>
+                <span>Alimenté par ffbb-data-client et le Model Context Protocol.</span>
+            </div>
+        </div>
+    </footer>
 
+    <!-- Client-Side Scripts -->
     <script>
-        // Tab switching
-        function switchTab(event, tabId) {
-            const container = event.target.closest('.tab-container').parentElement;
-            container.querySelectorAll('.tab-btn').forEach(function (btn) {
-                btn.classList.remove('tab-active');
-                btn.setAttribute('aria-selected', 'false');
-            });
-            event.target.classList.add('tab-active');
-            event.target.setAttribute('aria-selected', 'true');
-            container.querySelectorAll('.tab-panel').forEach(function (panel) {
-                panel.classList.add('tab-panel-hidden');
-            });
-            container.querySelector('#' + tabId).classList.remove('tab-panel-hidden');
+        // Sticky Header
+        window.addEventListener('scroll', () => {
+            const nav = document.getElementById('navbar');
+            if (window.scrollY > 30) {
+                nav.classList.add('scrolled');
+            } else {
+                nav.classList.remove('scrolled');
+            }
+        });
+
+        // AI Demo prompt switcher
+        function switchPrompt(type) {
+            document.querySelectorAll('.demo-pane').forEach(p => p.style.display = 'none');
+            document.querySelectorAll('.prompt-tabs .prompt-tab').forEach(t => t.classList.remove('active'));
+            
+            const target = document.getElementById('demo-' + type);
+            if (target) target.style.display = 'block';
+            event.currentTarget.classList.add('active');
         }
 
-        // Scroll-reveal animation
-        if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-            var observer = new IntersectionObserver(function (entries) {
-                entries.forEach(function (entry) {
-                    if (entry.isIntersecting) {
-                        entry.target.classList.add('revealed');
-                        observer.unobserve(entry.target);
-                    }
-                });
-            }, { threshold: 0.1 });
-            document.querySelectorAll('.feature-card, .stats-bar, .code-terminal').forEach(function (el) {
-                el.classList.add('reveal-on-scroll');
-                observer.observe(el);
+        // Setup Tab Switcher
+        function switchSetupTab(event, tabId) {
+            document.querySelectorAll('.cfg-pane').forEach(p => p.style.display = 'none');
+            document.querySelectorAll('.setup-tabs .prompt-tab').forEach(t => t.classList.remove('active'));
+            
+            document.getElementById(tabId).style.display = 'block';
+            event.currentTarget.classList.add('active');
+        }
+
+        // Copy button
+        function copySnippet(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = event.target;
+                const orig = btn.innerText;
+                btn.innerText = '✅ Copié !';
+                setTimeout(() => { btn.innerText = orig; }, 2000);
             });
+        }
+
+        // FAQ Toggle
+        function toggleFaqBox(box) {
+            const isOpen = box.classList.contains('open');
+            document.querySelectorAll('.faq-box').forEach(b => b.classList.remove('open'));
+            if (!isOpen) {
+                box.classList.add('open');
+            }
         }
     </script>
 </body>
-
 </html>
