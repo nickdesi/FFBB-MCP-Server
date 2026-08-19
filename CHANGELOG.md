@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-08-19
+
+### Added
+- **Endpoints GEO IA (`/llms.txt`, `/llms-full.txt`)** : Documentation standardisée des 12 outils FastMCP accessible directement par les moteurs de recherche IA (Perplexity, ChatGPT Search, Cursor, Copilot).
+- **Index de documentation (`docs/README.md`)** : Sommaire interactif regroupant les références d'outils, guides d'architecture, benchmarks et règles métier.
+- **Granularité des métriques de cache** : Catégorisation des causes de cache miss (`cold` / `expired` / `api_404`) dans `/metrics.json`.
+
+### Changed & Performance
+- **Optimisation des résolutions textuelles** : Fast-paths sur les acronymes de clubs (`resolve_acronym`), normalisation optimisée des numéros d'équipes (`format_team_name`) et accélération du calcul de distance de chaîne.
+- **Landing page responsive** : Refonte de l'interface web `ffbb.desimone.fr` avec menu tiroir mobile, typographie fluide et élimination du CSS grid blowout.
+- **Dépendances** : Mise à niveau vers `ffbb-data-client 2.3.4`.
+
+### Fixed & Security
+- **Sécurité (CVE-2026-69247)** : Mise à niveau de `cryptography` vers **50.0.0**.
+- **Opérateur Directus** : Utilisation de l'opérateur `_eq` pour le filtre des saisons actives et retrait du champ `nom` dans `SaisonFields` pour prévenir les erreurs 403.
+- **Monitoring (`/health`)** : Évaluation de la santé de l'instance basée sur le taux d'erreur en temps réel (`<= 5%`) plutôt que sur un compteur cumulatif d'erreurs historiques.
+
 ## [1.6.1] - 2026-08-01
 
 ### Security

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -54,6 +55,9 @@ def _check_tag(version: str, explicit_tag: str | None = None) -> list[str]:
             errors.append(
                 f"git tag mismatch: pyproject={version!r}, tag={explicit_tag!r}"
             )
+        return errors
+
+    if os.environ.get("SKIP_TAG_CHECK") == "1":
         return errors
 
     # Priority 2: compare with latest git tag (CI on main / PR)

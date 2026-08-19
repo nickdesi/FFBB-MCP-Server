@@ -341,7 +341,7 @@ wheels = [
 
 [[package]]
 name = "ffbb-data-client"
-version = "2.3.3"
+version = "2.3.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "hishel", extra = ["async"] },
@@ -350,14 +350,14 @@ dependencies = [
     { name = "python-dateutil" },
     { name = "python-dotenv" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2c/03/4f319e9c1ca5386c79224e4b29a39f0e2b2fc691016ac39cdc6ebacbffb9/ffbb_data_client-2.3.3.tar.gz", hash = "sha256:12644cab888c0cd1c64e166694fae1e255e69418262e031a1c22bc33c4556ddf", size = 484226, upload-time = "2026-08-10T20:23:52.58Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/20/87/f9f0fa80a557127a4a58a3daf240509c43062cc50d8f5e3296e055798f8e/ffbb_data_client-2.3.4.tar.gz", hash = "sha256:c158b5c0d9ee26239d0c8d19976ed50b40f47450c7acdb30af24b90210214e39", size = 494649, upload-time = "2026-08-19T10:41:49.129Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ba/3a/ac71b5d63498addbc827b0b05eec4214f2f065ea3f6213b425302d135ff9/ffbb_data_client-2.3.3-py3-none-any.whl", hash = "sha256:799102fed9e99283427e759ecf2022d5db6c5c7a46c1172ff553ef4947b20428", size = 231680, upload-time = "2026-08-10T20:23:51.323Z" },
+    { url = "https://files.pythonhosted.org/packages/6b/8c/c961b4d024ae144e7a8580e919b40f8e7b0037810f472fe63eeca6bc5d20/ffbb_data_client-2.3.4-py3-none-any.whl", hash = "sha256:4eaf8741bb9266bf4b0c75b198b2e518751e20e8dbc8dba9355b0b783e801e79", size = 231340, upload-time = "2026-08-19T10:41:47.546Z" },
 ]
 
 [[package]]
 name = "ffbb-mcp-server"
-version = "1.6.1"
+version = "1.7.0"
 source = { editable = "." }
 dependencies = [
     { name = "cachetools" },
@@ -390,7 +390,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "cachetools", specifier = ">=5.3.0" },
-    { name = "ffbb-data-client", specifier = ">=2.1.0,<3.0.0" },
+    { name = "ffbb-data-client", specifier = ">=2.3.4,<3.0.0" },
     { name = "httpx", specifier = ">=0.28.0" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.28.1,<2.0.0" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6.0" },

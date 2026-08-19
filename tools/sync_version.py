@@ -36,7 +36,7 @@ def update_readme(root_dir, version, client_version):
 
     # 1. Update badge
     content = re.sub(
-        r'(<img src="https://img.shields.io/badge/version-)[^ ]+(-green\?style=for-the-badge" alt="Version" />)',
+        r"(https://img.shields.io/badge/version-)[^ -]+(-green\?style=for-the-badge)",
         f"\\g<1>{version}\\g<2>",
         content,
     )
