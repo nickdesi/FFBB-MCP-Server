@@ -129,19 +129,38 @@
     <header class="site-header" id="navbar">
         <div class="container header-inner">
             <a href="#" class="brand">
-                <img src="logo.webp" alt="Logo FFBB MCP" class="brand-logo" width="40" height="40">
+                <img src="logo.webp" alt="Logo FFBB MCP" class="brand-logo" width="36" height="36">
                 <span>FFBB <strong>MCP Server</strong></span>
             </a>
             <nav class="main-nav">
-                <a href="#demo">Démo en Direct</a>
-                <a href="#outils">Outils IA</a>
-                <a href="#integration">Configuration 1 Clic</a>
-                <a href="#dashboard">Dashboard & Santé</a>
+                <a href="#demo">Démo</a>
+                <a href="#outils">Outils</a>
+                <a href="#integration">Intégration</a>
+                <a href="#dashboard">Dashboard</a>
                 <a href="#faq">FAQ</a>
             </nav>
-            <div style="display: flex; gap: 0.75rem; align-items: center;">
-                <a href="/dashboard" class="chip chip-mint">📊 Dashboard Live</a>
-                <a href="https://github.com/nickdesi/FFBB-MCP-Server" target="_blank" rel="noopener" class="btn btn-primary btn-sm">⭐ GitHub</a>
+            <div class="header-actions">
+                <a href="/dashboard" class="chip chip-mint header-dash-chip">📊 Dashboard</a>
+                <a href="https://github.com/nickdesi/FFBB-MCP-Server" target="_blank" rel="noopener" class="btn btn-primary btn-sm header-gh-btn">⭐ GitHub</a>
+                <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu" aria-expanded="false" onclick="toggleMobileMenu()">
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                </button>
+            </div>
+        </div>
+        <!-- Mobile Drawer -->
+        <div class="mobile-nav-drawer" id="mobileDrawer">
+            <ul class="mobile-nav-links">
+                <li><a href="#demo" onclick="closeMobileMenu()">🎯 Démo en direct</a></li>
+                <li><a href="#outils" onclick="closeMobileMenu()">⚡ 12 Outils IA Spécialisés</a></li>
+                <li><a href="#integration" onclick="closeMobileMenu()">🚀 Intégration 1 Clic (Cursor, Claude, Copilot)</a></li>
+                <li><a href="#dashboard" onclick="closeMobileMenu()">📊 Dashboard & Santé du Service</a></li>
+                <li><a href="#faq" onclick="closeMobileMenu()">❓ Questions fréquentes</a></li>
+            </ul>
+            <div class="mobile-drawer-actions">
+                <a href="/dashboard" class="chip chip-mint" style="justify-content: center; width: 100%; padding: 0.75rem;">📊 Accéder au Dashboard Live</a>
+                <a href="https://github.com/nickdesi/FFBB-MCP-Server" target="_blank" rel="noopener" class="btn btn-primary" style="width: 100%;">⭐ GitHub Repository</a>
             </div>
         </div>
     </header>
@@ -482,10 +501,45 @@
         // Sticky Header
         window.addEventListener('scroll', () => {
             const nav = document.getElementById('navbar');
-            if (window.scrollY > 30) {
+            if (window.scrollY > 20) {
                 nav.classList.add('scrolled');
             } else {
                 nav.classList.remove('scrolled');
+            }
+        });
+
+        // Mobile Menu Drawer Toggle
+        function toggleMobileMenu() {
+            const btn = document.getElementById('mobileMenuBtn');
+            const drawer = document.getElementById('mobileDrawer');
+            const isOpen = drawer.classList.contains('open');
+            if (isOpen) {
+                closeMobileMenu();
+            } else {
+                drawer.classList.add('open');
+                btn.classList.add('active');
+                btn.setAttribute('aria-expanded', 'true');
+                document.body.style.overflow = 'hidden';
+            }
+        }
+
+        function closeMobileMenu() {
+            const btn = document.getElementById('mobileMenuBtn');
+            const drawer = document.getElementById('mobileDrawer');
+            if (drawer) drawer.classList.remove('open');
+            if (btn) {
+                btn.classList.remove('active');
+                btn.setAttribute('aria-expanded', 'false');
+            }
+            document.body.style.overflow = '';
+        }
+
+        // Close drawer on outside click
+        document.addEventListener('click', (e) => {
+            const drawer = document.getElementById('mobileDrawer');
+            const btn = document.getElementById('mobileMenuBtn');
+            if (drawer && drawer.classList.contains('open') && !drawer.contains(e.target) && !btn.contains(e.target)) {
+                closeMobileMenu();
             }
         });
 
@@ -496,25 +550,34 @@
             
             const target = document.getElementById('demo-' + type);
             if (target) target.style.display = 'block';
-            event.currentTarget.classList.add('active');
+            if (window.event && window.event.currentTarget) {
+                window.event.currentTarget.classList.add('active');
+            }
         }
 
         // Setup Tab Switcher
-        function switchSetupTab(event, tabId) {
+        function switchSetupTab(evt, tabId) {
             document.querySelectorAll('.cfg-pane').forEach(p => p.style.display = 'none');
             document.querySelectorAll('.setup-tabs .prompt-tab').forEach(t => t.classList.remove('active'));
             
-            document.getElementById(tabId).style.display = 'block';
-            event.currentTarget.classList.add('active');
+            const target = document.getElementById(tabId);
+            if (target) target.style.display = 'block';
+            if (evt && evt.currentTarget) {
+                evt.currentTarget.classList.add('active');
+            } else if (window.event && window.event.currentTarget) {
+                window.event.currentTarget.classList.add('active');
+            }
         }
 
         // Copy button
         function copySnippet(text) {
             navigator.clipboard.writeText(text).then(() => {
-                const btn = event.target;
-                const orig = btn.innerText;
-                btn.innerText = '✅ Copié !';
-                setTimeout(() => { btn.innerText = orig; }, 2000);
+                const btn = window.event ? window.event.target : null;
+                if (btn) {
+                    const orig = btn.innerText;
+                    btn.innerText = '✅ Copié !';
+                    setTimeout(() => { btn.innerText = orig; }, 2000);
+                }
             });
         }
 
