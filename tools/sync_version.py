@@ -36,7 +36,7 @@ def update_readme(root_dir, version, client_version):
 
     # 1. Update badge
     content = re.sub(
-        r"(https://img.shields.io/badge/version-)[^ -]+(-green\?style=for-the-badge)",
+        r"(https://img\.shields\.io/badge/version-)[^ -]+(-green\?style=for-the-badge)",
         f"\\g<1>{version}\\g<2>",
         content,
     )
@@ -68,7 +68,7 @@ def update_readme(root_dir, version, client_version):
     # 3. Update client version if found
     if client_version:
         content = re.sub(
-            r"(Propulsé par <a href=\"https://pypi.org/project/ffbb-data-client/\">ffbb-data-client v)[^\s<]+(</a>)",
+            r"(Propulsé par <a href=\"https://pypi\.org/project/ffbb-data-client/\">ffbb-data-client v)[^\s<]+(</a>)",
             f"\\g<1>{client_version}\\g<2>",
             content,
         )
