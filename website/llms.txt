@@ -1,0 +1,35 @@
+# FFBB MCP Server — Serveur MCP Public pour le Basket Français
+> Serveur FastMCP public et open-source exposant 12 outils spécialisés pour interroger les données officielles de la Fédération Française de BasketBall (FFBB) depuis n'importe quel client MCP (Claude, Cursor, Copilot, ChatGPT).
+
+## Endpoint MCP Public (Streamable HTTP)
+- URL MCP : https://ffbb.desimone.fr/mcp
+- Dashboard Web : https://ffbb.desimone.fr/
+- Documentation GitHub : https://github.com/nickdesi/FFBB-MCP-Server
+- Client Python sous-jacent : https://nickdesi.github.io/ffbb-data-client/
+
+## Outils IA Disponibles (12 Tools)
+1. `ffbb_search` : Recherche plein texte Meilisearch dans les clubs, compétitions, gymnases, tournois 3x3 et arbitres.
+2. `ffbb_bilan` : Résumé complet des victoires/défaites et forme d'un club sur la saison.
+3. `ffbb_last_result` : Dernier score et feuille de match d'une équipe.
+4. `ffbb_next_match` : Prochain match programmé (date, heure, adversaire, gymnase).
+5. `ffbb_lives` : Scores en direct et temps forts des rencontres du week-end.
+6. `ffbb_club` : Fiche détaillée d'un club (coordonnées, équipes engagées, gymnases).
+7. `ffbb_get` : Récupération brute d'une entité FFBB par identifiant.
+8. `ffbb_saisons` : Liste des saisons sportives disponibles.
+9. `ffbb_resolve_team` : Résolution intelligente du nom d'une équipe.
+10. `ffbb_team_summary` : Synthèse globale d'une équipe.
+11. `ffbb_bilan_saison` : Bilan approfondi d'une saison.
+12. `ffbb_version` : Version et statut de l'instance.
+
+## Configuration Rapide pour Claude Desktop / Cursor
+```json
+{
+  "mcpServers": {
+    "ffbb": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-everything"],
+      "url": "https://ffbb.desimone.fr/mcp"
+    }
+  }
+}
+```

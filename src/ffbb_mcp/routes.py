@@ -271,6 +271,20 @@ def register_routes(mcp: FastMCP) -> None:
             return FileResponse(css_path, media_type="text/css")
         return Response("/* CSS non trouvé */", status_code=404)
 
+    @mcp.custom_route("/llms.txt", methods=["GET"])  # type: ignore[untyped-decorator]
+    async def llms_txt(request: Request) -> Response:
+        llms_path = _WEBSITE_DIR / "llms.txt"
+        if llms_path.exists():
+            return PlainTextResponse(llms_path.read_text(encoding="utf-8"))
+        return Response("Not Found", status_code=404)
+
+    @mcp.custom_route("/llms-full.txt", methods=["GET"])  # type: ignore[untyped-decorator]
+    async def llms_full_txt(request: Request) -> Response:
+        llms_path = _WEBSITE_DIR / "llms-full.txt"
+        if llms_path.exists():
+            return PlainTextResponse(llms_path.read_text(encoding="utf-8"))
+        return Response("Not Found", status_code=404)
+
     @mcp.custom_route("/robots.txt", methods=["GET"])  # type: ignore[untyped-decorator]
     async def robots_txt(request: Request) -> Response:
         return PlainTextResponse(_build_robots_txt())

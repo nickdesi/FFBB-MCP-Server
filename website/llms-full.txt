@@ -1,0 +1,16 @@
+# FFBB MCP Server - Documentation Complète des Outils MCP
+
+## Présentation
+Le serveur FFBB MCP est une passerelle officielle et haute performance connectant les modèles de langage (LLMs) aux bases de données de la FFBB via le SDK `ffbb-data-client`.
+
+- Endpoint Streamable HTTP : `https://ffbb.desimone.fr/mcp`
+- Health check : `https://ffbb.desimone.fr/health`
+- Métriques Prometheus : `https://ffbb.desimone.fr/metrics`
+- Dashboard web : `https://ffbb.desimone.fr/dashboard`
+
+## Outils Détaillés
+- `ffbb_search(query: str, limit: int = 10)` : Recherche multi-index dans la base FFBB.
+- `ffbb_lives()` : Liste des rencontres en direct avec scores par quart-temps.
+- `ffbb_last_result(organisme_id: str, equipe_id: str = None)` : Dernier résultat officiel.
+- `ffbb_next_match(organisme_id: str, equipe_id: str = None)` : Prochaine rencontre et adresse du gymnase.
+- `ffbb_bilan(organisme_id: str)` : Bilan victoires / défaites de la saison.
