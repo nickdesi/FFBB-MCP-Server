@@ -196,7 +196,7 @@ Avant push/tag/release :
 | `FFBB_KNOWN_CLUB_IDS` | `` | Override JSON de la liste d'organisme_id connus pour les prompts MCP (fallback : _DEFAULT_KNOWN_CLUB_IDS) |
 | `FFBB_ENABLE_BENCHMARK` | `` | Activer endpoint `/benchmark/run` (sécurité) |
 | `ALLOWED_HOSTS` | `*` | Hosts autorisés (DNS rebinding protection) |
-| `ALLOWED_ORIGINS` | `*` | Origins CORS |
+| `ALLOWED_ORIGINS` | `https://ffbb.desimone.fr` | Origins CORS |
 | `PUBLIC_URL` | `https://ffbb.desimone.fr` | URL publique pour liens/sitemap |
 | `ENABLE_DNS_PROTECTION` | `` | Activer/désactiver explicitement la protection contre le DNS rebinding |
 | `FFBB_LOG_LEVEL` | `INFO` | Niveau de log |

@@ -189,11 +189,6 @@ def _sdk_version(package: str) -> str:
 # Initialisation FastMCP
 # ---------------------------------------------------------------------------
 
-_allowed_hosts_raw = os.environ.get("ALLOWED_HOSTS", "*")
-_allowed_origins_raw = os.environ.get("ALLOWED_ORIGINS", "*")
-_allowed_hosts = [h.strip() for h in _allowed_hosts_raw.split(",") if h.strip()]
-_allowed_origins = [o.strip() for o in _allowed_origins_raw.split(",") if o.strip()]
-
 _public_url = os.environ.get("PUBLIC_URL", "https://ffbb.desimone.fr").strip()
 try:
     _parsed_url = urllib.parse.urlparse(_public_url)
@@ -201,9 +196,17 @@ try:
 except Exception:
     _public_host = "ffbb.desimone.fr"
 
-# Ajout automatique de l'hôte public par défaut
+_allowed_hosts_raw = os.environ.get("ALLOWED_HOSTS", "*")
+_allowed_origins_raw = os.environ.get("ALLOWED_ORIGINS", _public_url)
+_allowed_hosts = [h.strip() for h in _allowed_hosts_raw.split(",") if h.strip()]
+_allowed_origins = [o.strip() for o in _allowed_origins_raw.split(",") if o.strip()]
+
+# Ajout automatique de l'hôte public et de l'origine publique par défaut
 if _public_host and _public_host not in _allowed_hosts and "*" not in _allowed_hosts:
     _allowed_hosts.append(_public_host)
+
+if _public_url and _public_url not in _allowed_origins and "*" not in _allowed_origins:
+    _allowed_origins.append(_public_url)
 
 # On ajoute localhost par défaut si pas de wildcard
 if "*" not in _allowed_hosts and "localhost" not in _allowed_hosts:

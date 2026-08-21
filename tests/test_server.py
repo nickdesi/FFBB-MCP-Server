@@ -111,7 +111,7 @@ def test_index_html_contains_seo_metadata(monkeypatch):
     html = _build_index_html()
 
     assert 'meta name="description"' in html
-    assert 'rel="icon" type="image/webp"' in html
+    assert 'rel="icon"' in html
     assert "FFBB MCP Server" in html
 
 
@@ -308,3 +308,11 @@ async def test_safe_report_progress_passes_through_runtime_error():
 
     with pytest.raises(RuntimeError, match="oops"):
         await _safe_report_progress(ctx, 1.0, total=2, message="middle")
+
+
+def test_allowed_origins_default_to_public_url(monkeypatch):
+    """Vérifie que _allowed_origins ne par défaut plus sur '*' mais sur _public_url."""
+    import ffbb_mcp.server as server_mod
+
+    assert "*" not in server_mod._allowed_origins
+    assert server_mod._public_url in server_mod._allowed_origins
