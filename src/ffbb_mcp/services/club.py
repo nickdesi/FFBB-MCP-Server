@@ -65,6 +65,7 @@ from .common import (
 from .salle import _enrich_matches_with_salle_details
 
 logger = logging.getLogger("ffbb-mcp")
+_EMPTY_SET: set[str] = set()
 
 
 def _get_max_calendar_matches() -> int:
@@ -971,7 +972,9 @@ async def _build_bilan_payload(
         eid = str(e.get("engagement_id", ""))
         num = str(e.get("numero_equipe") or "")
         if pid and eid:
-            poule_to_eng.setdefault(pid, set()).add(eid)
+            if pid not in poule_to_eng:
+                poule_to_eng[pid] = set()
+            poule_to_eng[pid].add(eid)
             if num:
                 eng_to_num[eid] = num
         if pid and e.get("competition"):
@@ -983,7 +986,7 @@ async def _build_bilan_payload(
     for pid, poule_data in poules_map.items():
         if not isinstance(poule_data, dict):
             continue
-        eng_ids_here = poule_to_eng.get(pid, set())
+        eng_ids_here = poule_to_eng.get(pid, _EMPTY_SET)
         classements = poule_data.get("classements", []) or []
         for entry in classements:
             if not isinstance(entry, dict):

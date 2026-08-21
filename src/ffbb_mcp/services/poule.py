@@ -138,7 +138,9 @@ async def get_poule_service(
             for side in ("nomEquipe1", "nomEquipe2"):
                 nom = r.get(side, "")
                 if nom:
-                    restantes_par_equipe.setdefault(nom, []).append(
+                    if nom not in restantes_par_equipe:
+                        restantes_par_equipe[nom] = []
+                    restantes_par_equipe[nom].append(
                         {
                             "id": r.get("id"),
                             "date": r.get("date_rencontre"),
