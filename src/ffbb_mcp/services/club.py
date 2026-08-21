@@ -65,7 +65,7 @@ from .common import (
 from .salle import _enrich_matches_with_salle_details
 
 logger = logging.getLogger("ffbb-mcp")
-_EMPTY_SET = frozenset()
+_EMPTY_SET: set[str] = set()
 
 
 def _get_max_calendar_matches() -> int:
