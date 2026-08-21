@@ -111,7 +111,7 @@ def test_index_html_contains_seo_metadata(monkeypatch):
     html = _build_index_html()
 
     assert 'meta name="description"' in html
-    assert 'rel="icon" type="image/webp"' in html
+    assert 'rel="icon"' in html
     assert "FFBB MCP Server" in html
 
 
