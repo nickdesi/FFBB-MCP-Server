@@ -51,3 +51,7 @@
 ## 2026-08-11 - Fast-path Integer Type Checking before try-except casting
 **Learning:** In CPython, wrapping a native typecast like `int(val)` inside a `try...except ValueError` block carries overhead, particularly when `val` is very frequently already of type `int`. A simple explicit type check `if type(val) is int:` can bypass this exception-handling overhead completely and execute up to 25-30% faster for native ints.
 **Action:** Always write explicit fast-paths for native primitives (like `int`) when functions expect mixed types but predominantly receive primitives, bypassing `try...except` parsing blocks.
+
+## 2026-08-21 - Avoid Unnecessary Container Allocations in Loop Defaults
+**Learning:** Calling `dict.setdefault(key, set())` or `dict.get(key, set())` inside loops evaluates `set()` on every single loop iteration, allocating throwaway set instances even when the key already exists or misses. Replacing `setdefault` with an explicit `if key not in dict: dict[key] = set()` check and replacing `.get(key, set())` with a module-level constant (e.g., `_EMPTY_SET = frozenset()`) avoids throwaway memory allocations and improves loop performance.
+**Action:** Replace `dict.setdefault(key, container())` and `dict.get(key, container())` inside loops with explicit `not in` assignments or static module-level fallback constants.
