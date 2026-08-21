@@ -123,7 +123,7 @@ def register_routes(mcp: FastMCP) -> None:
     """Registers all custom HTTP routes on the FastMCP instance."""
 
     @mcp.custom_route("/health", methods=["GET"])  # type: ignore[untyped-decorator]
-    async def health(request: Request) -> Response:
+    async def health(_request: Request) -> Response:
         """Endpoint de santé enrichi — lisible par machine et humain."""
         snap = get_snapshot()
         summary = summarize_health(snap)
@@ -162,11 +162,11 @@ def register_routes(mcp: FastMCP) -> None:
         )
 
     @mcp.custom_route("/metrics", methods=["GET"])  # type: ignore[untyped-decorator]
-    async def metrics(request: Request) -> Response:
+    async def metrics(_request: Request) -> Response:
         return PlainTextResponse(generate_prometheus_metrics())
 
     @mcp.custom_route("/metrics.json", methods=["GET"])  # type: ignore[untyped-decorator]
-    async def metrics_json(request: Request) -> Response:
+    async def metrics_json(_request: Request) -> Response:
         """Snapshot des métriques au format JSON (pour le dashboard front-end)."""
         snap = get_snapshot()
         if "cache_miss_reasons" in snap:
@@ -187,12 +187,12 @@ def register_routes(mcp: FastMCP) -> None:
         )
 
     @mcp.custom_route("/dashboard", methods=["GET"])  # type: ignore[untyped-decorator]
-    async def dashboard(request: Request) -> Response:
+    async def dashboard(_request: Request) -> Response:
         """Dashboard de supervision HTML — lisible humain, demo-friendly."""
         return HTMLResponse(content=_build_dashboard_html(), status_code=200)
 
     @mcp.custom_route("/benchmark", methods=["GET"])  # type: ignore[untyped-decorator]
-    async def benchmark_get(request: Request) -> Response:
+    async def benchmark_get(_request: Request) -> Response:
         """Retourne les tendances historiques du benchmark."""
         trends = get_benchmark_trends()
         if os.environ.get("FFBB_ENABLE_BENCHMARK", "").lower() != "true":
@@ -203,7 +203,7 @@ def register_routes(mcp: FastMCP) -> None:
         return OrjsonResponse(trends)
 
     @mcp.custom_route("/benchmark/run", methods=["POST"])  # type: ignore[untyped-decorator]
-    async def benchmark_post(request: Request) -> Response:
+    async def benchmark_post(_request: Request) -> Response:
         """Exécute un benchmark de performance."""
         if os.environ.get("FFBB_ENABLE_BENCHMARK", "").lower() != "true":
             return OrjsonResponse(
@@ -222,11 +222,11 @@ def register_routes(mcp: FastMCP) -> None:
             )
 
     @mcp.custom_route("/docs", methods=["GET"])  # type: ignore[untyped-decorator]
-    async def docs(request: Request) -> Response:
+    async def docs(_request: Request) -> Response:
         return RedirectResponse("/docs/")
 
     @mcp.custom_route("/docs/", methods=["GET"])  # type: ignore[untyped-decorator]
-    async def docs_slash(request: Request) -> Response:
+    async def docs_slash(_request: Request) -> Response:
         local_doc = _WEBSITE_DIR / "docs" / "index.html"
         if local_doc.exists():
             return HTMLResponse(
@@ -257,40 +257,40 @@ def register_routes(mcp: FastMCP) -> None:
         )
 
     @mcp.custom_route("/logo.webp", methods=["GET"])  # type: ignore[untyped-decorator]
-    async def logo(request: Request) -> Response:
+    async def logo(_request: Request) -> Response:
         return _logo_response()
 
     @mcp.custom_route("/favicon.ico", methods=["GET"])  # type: ignore[untyped-decorator]
-    async def favicon(request: Request) -> Response:
+    async def favicon(_request: Request) -> Response:
         return _logo_response()
 
     @mcp.custom_route("/css/style.css", methods=["GET"])  # type: ignore[untyped-decorator]
-    async def style_css(request: Request) -> Response:
+    async def style_css(_request: Request) -> Response:
         css_path = _WEBSITE_DIR / "css" / "style.css"
         if css_path.exists():
             return FileResponse(css_path, media_type="text/css")
         return Response("/* CSS non trouvé */", status_code=404)
 
     @mcp.custom_route("/llms.txt", methods=["GET"])  # type: ignore[untyped-decorator]
-    async def llms_txt(request: Request) -> Response:
+    async def llms_txt(_request: Request) -> Response:
         llms_path = _WEBSITE_DIR / "llms.txt"
         if llms_path.exists():
             return PlainTextResponse(llms_path.read_text(encoding="utf-8"))
         return Response("Not Found", status_code=404)
 
     @mcp.custom_route("/llms-full.txt", methods=["GET"])  # type: ignore[untyped-decorator]
-    async def llms_full_txt(request: Request) -> Response:
+    async def llms_full_txt(_request: Request) -> Response:
         llms_path = _WEBSITE_DIR / "llms-full.txt"
         if llms_path.exists():
             return PlainTextResponse(llms_path.read_text(encoding="utf-8"))
         return Response("Not Found", status_code=404)
 
     @mcp.custom_route("/robots.txt", methods=["GET"])  # type: ignore[untyped-decorator]
-    async def robots_txt(request: Request) -> Response:
+    async def robots_txt(_request: Request) -> Response:
         return PlainTextResponse(_build_robots_txt())
 
     @mcp.custom_route("/sitemap.xml", methods=["GET"])  # type: ignore[untyped-decorator]
-    async def sitemap_xml(request: Request) -> Response:
+    async def sitemap_xml(_request: Request) -> Response:
         return Response(_build_sitemap_xml(), media_type="application/xml")
 
     @mcp.custom_route("/cache/warmup", methods=["POST"])  # type: ignore[untyped-decorator]
@@ -376,7 +376,7 @@ def register_routes(mcp: FastMCP) -> None:
             )
 
     @mcp.custom_route("/cache/warmup", methods=["GET"])  # type: ignore[untyped-decorator]
-    async def cache_warmup_get(request: Request) -> Response:
+    async def cache_warmup_get(_request: Request) -> Response:
         """Informations sur l'endpoint de préchauffage du cache."""
         return OrjsonResponse(
             {
@@ -398,5 +398,5 @@ def register_routes(mcp: FastMCP) -> None:
         )
 
     @mcp.custom_route("/", methods=["GET"])  # type: ignore[untyped-decorator]
-    async def index(request: Request) -> Response:
+    async def index(_request: Request) -> Response:
         return HTMLResponse(content=_build_index_html(), status_code=200)
