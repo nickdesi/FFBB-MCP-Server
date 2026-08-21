@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB MCP server | server.py: 1233 lignes | services.py: 4107 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 1236 lignes | services.py: 4112 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -119,8 +119,8 @@ src/ffbb_mcp/
 ├── prompts.py             # Prompts MCP réutilisables
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
-├── server.py              # Tools MCP + main() (≈1233 lignes)
-├── services/              # Logique métier modularisée (≈4107 lignes)
+├── server.py              # Tools MCP + main() (≈1236 lignes)
+├── services/              # Logique métier modularisée (≈4112 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── club.py            # Service de gestion des clubs
 │   ├── common.py          # Helpers et base services partagés
@@ -137,7 +137,7 @@ src/ffbb_mcp/
 - Pas de suffixe `_compact_` ou `_impl_` exposé
 - Modifier une fonction à la fois, seulement si test/usage échoue
 - Nouvelle fonction → test manuel validé avant exposition MCP
-- **Modularisation** : Le package `services/` (total ≈4107 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
+- **Modularisation** : Le package `services/` (total ≈4112 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
 
 ## Commandes
 - Démarrer le serveur MCP (stdio) : `rtk uv run python -m ffbb_mcp` (recommandé pour Claude Desktop)
@@ -195,9 +195,8 @@ Avant push/tag/release :
 | `FFBB_SERVICE_CACHE_PERSIST` | `1` | Activer la persistance des caches service sur disque (SQLite) entre redémarrages |
 | `FFBB_KNOWN_CLUB_IDS` | `` | Override JSON de la liste d'organisme_id connus pour les prompts MCP (fallback : _DEFAULT_KNOWN_CLUB_IDS) |
 | `FFBB_ENABLE_BENCHMARK` | `` | Activer endpoint `/benchmark/run` (sécurité) |
-| `ALLOWED_HOSTS` | `*` | Hosts autorisés (DNS rebinding protection) |
-| `ALLOWED_ORIGINS` | `https://ffbb.desimone.fr` | Origins CORS |
 | `PUBLIC_URL` | `https://ffbb.desimone.fr` | URL publique pour liens/sitemap |
+| `ALLOWED_HOSTS` | `*` | Hosts autorisés (DNS rebinding protection) |
 | `ENABLE_DNS_PROTECTION` | `` | Activer/désactiver explicitement la protection contre le DNS rebinding |
 | `FFBB_LOG_LEVEL` | `INFO` | Niveau de log |
 | `HOST` | `0.0.0.0` | Interface d'écoute |
@@ -209,6 +208,7 @@ Avant push/tag/release :
 | `FFBB_WARMUP_ORGANISMES` | `` | Liste d'organisme_id séparés par des virgules à préchauffer au démarrage |
 | `FFBB_WARMUP_CONCURRENCY` | `5` | Concurrence maximale lors du préchauffage du cache |
 | `FFBB_MCP_PRUNE_LIMIT` | `50` | Limite troncature payload |
+| `ALLOWED_ORIGINS` | — | Origins CORS |
 | `FFBB_POULE_FETCH_CONCURRENCY` | — | Concurrence max fetch poules |
 | `FFBB_CACHE_TTL_*` | — | TTL par type de cache (voir cache_strategy.py) |
 | `FFBB_REDIS_URL` | — | URL de connexion à l'instance Redis si backend=redis |
