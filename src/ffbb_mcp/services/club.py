@@ -200,7 +200,7 @@ async def ffbb_equipes_club_service(
     if _eq_key is not None:
         _cached_equipes = state.cache_equipes.get(_eq_key)
         if _cached_equipes is not None:
-            return copy.deepcopy(_cached_equipes)
+            return [t.copy() for t in _cached_equipes]
 
     raw = data.get("engagements", []) if isinstance(data, dict) else []
     all_teams: list[dict[str, Any]] = []
@@ -257,7 +257,7 @@ async def ffbb_equipes_club_service(
 
     if parsed_filter is None:
         if _eq_key is not None:
-            state.cache_equipes[_eq_key] = copy.deepcopy(all_teams)
+            state.cache_equipes[_eq_key] = [t.copy() for t in all_teams]
         return all_teams
 
     filtered_teams: list[dict[str, Any]] = []

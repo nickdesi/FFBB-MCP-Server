@@ -325,6 +325,7 @@ def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
     return obj
 
 
+@lru_cache(maxsize=1024)
 def jaro_winkler_similarity(s1: str, s2: str) -> float:
     """Calcule la similarité de Jaro-Winkler entre deux chaînes.
 

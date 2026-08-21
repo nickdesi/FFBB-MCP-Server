@@ -58,6 +58,10 @@ def _get_conn() -> sqlite3.Connection:
     if _DB_CONN is None:
         _cache_dir().mkdir(parents=True, exist_ok=True)
         _DB_CONN = sqlite3.connect(str(_db_path()), check_same_thread=False)
+        _DB_CONN.execute("PRAGMA journal_mode = WAL;")
+        _DB_CONN.execute("PRAGMA synchronous = NORMAL;")
+        _DB_CONN.execute("PRAGMA temp_store = MEMORY;")
+        _DB_CONN.execute("PRAGMA cache_size = -64000;")
         _DB_CONN.execute(
             "CREATE TABLE IF NOT EXISTS service_cache ("
             "name TEXT, key TEXT, value TEXT, expires_at REAL, "
