@@ -132,6 +132,7 @@ Le serveur a été refondu pour proposer des outils polyvalents qui réduisent l
   { "action": "calendrier", "club_name": "JAV", "filtre": "U13M" }
   ```
 
+
 - **Exemple : Récupérer uniquement les confrontations directes entre deux équipes** :
 
   ```json
@@ -145,7 +146,6 @@ Le serveur a été refondu pour proposer des outils polyvalents qui réduisent l
   ```
 
   Cet appel retourne **uniquement** les matchs où Pont-du-Château U11M-1 affronte Royat Orcines (toutes phases confondues). Le filtre est insensible à la casse et aux accents, et supporte les noms partiels (ex: `"Royat"` trouve `"ROYAT ORCINES CLUB BASKET BALL - 1"`).
-
 
 ### action="calendrier" — calendrier d’un club
 
@@ -248,6 +248,67 @@ la logique de désambiguïsation (U11M1, U13F-2, etc.).
 
 ---
 
+## 🏆 Résultats, Bilans & Matchs
+
+### `ffbb_bilan`
+
+**Description** : Bilan complet d'une équipe toutes phases confondues en **UN seul appel**. ⚡ C'est l'outil à utiliser en priorité pour toute question de type *"quel est le bilan de X cette saison ?"* ou *"résultats de U11M1"*.
+
+- **Arguments** :
+  - `club_name` (string, optionnel) : Nom du club (ex: `"Stade Clermontois"`, `"ASVEL"`).
+  - `organisme_id` (integer|string, optionnel) : ID FFBB du club (alternative plus rapide).
+  - `categorie` (string, optionnel mais recommandé) : Catégorie + genre + numéro d'équipe (ex: `"U11M1"`, `"U13F2"`, `"Senior"`).
+  - `force_refresh` (boolean, défaut: `false`) : Contourne le cache si `true`.
+
+- **Retour** :
+  ```jsonc
+  {
+    "bilan_total": {
+      "match_joues": 14,
+      "gagnes": 10,
+      "perdus": 4,
+      "nuls": 0,
+      "paniers_marques": 720,
+      "paniers_encaisses": 540,
+      "difference": 180
+    },
+    "phases": [
+      {
+        "competition": "U11 Masculin D1",
+        "phase": "Phase 1",
+        "position": 1,
+        "match_joues": 6,
+        "gagnes": 5,
+        "perdus": 1
+      }
+    ]
+  }
+  ```
+
+### `ffbb_last_result`
+
+**Description** : Retourne le **dernier match joué** d'une seule équipe précise avec le score final et le lieu de la rencontre.
+
+- **Arguments** :
+  - `categorie` (string, requis) : Catégorie de l'équipe (ex: `"U11M1"`, `"U13F"`, `"SeniorM"`).
+  - `club_name` (string, optionnel) : Nom du club.
+  - `organisme_id` (integer|string, optionnel) : ID FFBB du club.
+  - `numero_equipe` (integer, défaut: `1`) : Numéro de l'équipe.
+  - `force_refresh` (boolean, défaut: `false`) : Contourne le cache si `true`.
+
+### `ffbb_next_match`
+
+**Description** : Retourne le **prochain match programmé** d'une équipe précise avec la date, l'horaire et le gymnase hôte.
+
+- **Arguments** :
+  - `categorie` (string, requis) : Catégorie de l'équipe (ex: `"U11M1"`, `"U13F"`).
+  - `club_name` (string, optionnel) : Nom du club.
+  - `organisme_id` (integer|string, optionnel) : ID FFBB du club.
+  - `numero_equipe` (integer, défaut: `1`) : Numéro de l'équipe.
+  - `force_refresh` (boolean, défaut: `false`) : Contourne le cache si `true`.
+
+---
+
 ## 🧩 Outil de Résumé d'Équipe
 
 ### `ffbb_team_summary`
@@ -336,7 +397,7 @@ la logique de désambiguïsation (U11M1, U13F-2, etc.).
 
 - **Variables d'env** : Les TTL de cache sont configurables via `FFBB_CACHE_TTL_LIVES`, `FFBB_CACHE_TTL_SEARCH`, `FFBB_CACHE_TTL_DETAIL`, `FFBB_CACHE_TTL_CALENDRIER`, `FFBB_CACHE_TTL_BILAN`, `FFBB_CACHE_TTL_POULE`.
 
-- **TTL dynamiques** : Les caches `poule`, `bilan`, `classement` et `calendrier` utilisent une stratégie adaptative basée sur les fenêtres horaires de match. Hors fenêtre → 24h. En fenêtre → 5min à 30min selon l'activité live. Voir `cache_strategy.py`.
+- **TTL dynamiques** : Les caches `poule`, `bilan`, `classement` et `calendrier` utilisent une stratégie adaptative basée sur les fenêtres horaires de match (mercredi 13h-20h, vendredi 18h-23h, samedi 8h-21h, dimanche 8h-21h). Hors fenêtre → 24h. En fenêtre → 5min à 30min selon l'activité live. Voir `cache_strategy.py` pour le détail.
 
 ---
 
@@ -369,9 +430,9 @@ Le serveur ne se contente pas de données brutes, il guide l'IA via des prompts 
 
 4. **Données live et cache**
    - Les données FFBB sont **toujours live** côté API officielle.
-   - Ne suppose jamais l’existence d’un cache côté LLM ou côté utilisateur :
+   - Ne suppose jamais l'existence d'un cache côté LLM ou côté utilisateur :
      - pour connaître un résultat, un classement ou un calendrier à jour, tu dois **appeler les outils**.
-   - Le serveur MCP gère déjà un cache interne optimisé ; le LLM n’a pas à se préoccuper de la couche cache.
+   - Le serveur MCP gère déjà un cache interne optimisé ; le LLM n'a pas à se préoccuper de la couche cache.
 
 5. **Désambiguïsation des catégories**
    - Si l’utilisateur donne une catégorie ambiguë (ex. `"U13"` sans préciser Masculin/Féminin ni le numéro d’équipe), demande toujours des précisions :
