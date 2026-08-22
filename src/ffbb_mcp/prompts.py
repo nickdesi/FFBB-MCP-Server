@@ -268,9 +268,11 @@ _RULES_METIER = """\
 ## 🧩 RÈGLES MÉTIER
 
 - **Live d'abord** : Pour tout score "en cours" ou "maintenant", appeler `ffbb_lives` EN PREMIER.
+- **Barème FFBB & Classement** : Victoire = 2 pts, Défaite = 1 pt, Forfait = 0 pt (0-20). \
+En cas d'égalité, le départage se fait par Goal-Average particulier puis général. Toujours utiliser le classement et les points officiels retournés par l'API sans les recalculer.
 - **Bilan** : Utiliser `bilan_total` retourné par `ffbb_team_summary` ou `ffbb_bilan`. \
 Ne jamais recalculer V/D à la main si ce champ est présent.
-- **Saison courante** : Toutes les données correspondent à la saison active. \
+- **Saison courante** : Toutes les données correspondent à la saison active (`2026-2027`). \
 Ne mentionner une saison passée qu'après vérification explicite.
 - **Fraîcheur** : Si `_meta.generated_at`, `_meta.timezone` ou `_meta.cache` est présent, \
 les utiliser pour qualifier la fraîcheur des données sans les afficher systématiquement. \
@@ -376,10 +378,9 @@ _RULES_PHASES = """\
 > exclusions, égalités). Cette section est volontairement concise pour éviter
 > la dérive entre les deux sources.
 
-- **Exclusions** : Ignorer "Amical", "Brassage", "Tournoi", "Coupe" (sauf demande explicite).
+- **Exclusions** : Ignorer "Amical", "Tournoi", "Coupe" (sauf demande explicite). Ne pas exclure "Brassage" ou "Qualification" en début de saison s'ils représentent la seule phase active.
 - **Égalité** : Prendre l'`engagement_id` le plus élevé (le plus récent).
 - ⚠️ Ne jamais inventer un `poule_id` : toujours l'extraire de `raw.phases[]`.\
-
 """
 
 _SEQUENCE = """\
