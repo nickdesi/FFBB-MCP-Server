@@ -1,16 +1,112 @@
-# FFBB MCP Server - Documentation Complète des Outils MCP
+# FFBB MCP Server & API Basket — Documentation Complète pour IA & Développeurs
 
-## Présentation
-Le serveur FFBB MCP est une passerelle officielle et haute performance connectant les modèles de langage (LLMs) aux bases de données de la FFBB via le SDK `ffbb-data-client`.
+## 1. Vue d'ensemble & Architecture
+Le serveur **FFBB MCP Server** est une passerelle officielle et haute performance connectant les modèles de langage (Claude, Cursor, GitHub Copilot, ChatGPT, Antigravity) et les applications aux bases de données officielles de la Fédération Française de BasketBall (FFBB).
 
-- Endpoint Streamable HTTP : `https://ffbb.desimone.fr/mcp`
-- Health check : `https://ffbb.desimone.fr/health`
-- Métriques Prometheus : `https://ffbb.desimone.fr/metrics`
-- Dashboard web : `https://ffbb.desimone.fr/dashboard`
+Il repose sur une architecture à deux niveaux :
+1. **Couche Métier MCP (FastMCP / Starlette / Uvicorn)** : Expose 12 outils haut niveau optimisés pour les LLMs (agrégation "one-shot", cache TTL adaptatif, gestion proactive du token).
+2. **Couche Moteur Python (`ffbb-data-client`)** : SDK Python asynchrone (Pydantic v2, HTTPX, Hishel SQLite cache, Directus REST API + Meilisearch).
 
-## Outils Détaillés
-- `ffbb_search(query: str, limit: int = 10)` : Recherche multi-index dans la base FFBB.
-- `ffbb_lives()` : Liste des rencontres en direct avec scores par quart-temps.
-- `ffbb_last_result(organisme_id: str, equipe_id: str = None)` : Dernier résultat officiel.
-- `ffbb_next_match(organisme_id: str, equipe_id: str = None)` : Prochaine rencontre et adresse du gymnase.
-- `ffbb_bilan(organisme_id: str)` : Bilan victoires / défaites de la saison.
+### Endpoints Publics
+- Endpoint MCP (Streamable HTTP) : `https://ffbb.desimone.fr/mcp`
+- Dashboard interactif : `https://ffbb.desimone.fr/dashboard`
+- Métriques JSON : `https://ffbb.desimone.fr/metrics.json`
+- Healthcheck : `https://ffbb.desimone.fr/health`
+
+---
+
+## 2. Spécification Détaillée des 12 Outils MCP
+
+### `ffbb_team_summary`
+- **Description** : Résumé tout-en-un d'une équipe (position au classement, victoires/défaites, dernier match et prochain match).
+- **Paramètres** :
+  - `organisme_id` (str) : Identifiant de l'organisme/club FFBB.
+  - `equipe_id` (str, optionnel) : Identifiant spécifique de l'équipe (par défaut équipe 1).
+  - `saison_id` (str, optionnel) : Identifiant de la saison sportive.
+
+### `ffbb_lives`
+- **Description** : Liste en temps réel de toutes les rencontres en cours avec scores par quart-temps et temps forts (cache 30s).
+- **Paramètres** : Aucun.
+
+### `ffbb_bilan`
+- **Description** : Bilan victoires, défaites, points marqués, points encaissés et goal-average toutes phases confondues.
+- **Paramètres** :
+  - `organisme_id` (str) : Identifiant du club/organisme.
+  - `saison_id` (str, optionnel).
+
+### `ffbb_club`
+- **Description** : Informations complètes sur un club (coordonnées, liste des équipes, gymnases rattachés, calendrier).
+- **Paramètres** :
+  - `organisme_id` (str) : Identifiant du club.
+
+### `ffbb_search`
+- **Description** : Recherche plein texte Meilisearch multi-index.
+- **Paramètres** :
+  - `query` (str) : Terme de recherche (nom de club, ville, nom de compétition, gymnase).
+  - `limit` (int, défaut 10) : Nombre maximum de résultats.
+
+### `ffbb_next_match`
+- **Description** : Détails précis du prochain match programmé pour une équipe.
+- **Paramètres** :
+  - `organisme_id` (str) : Identifiant du club.
+  - `equipe_id` (str, optionnel).
+
+### `ffbb_last_result`
+- **Description** : Feuille de match et score du dernier match disputé.
+- **Paramètres** :
+  - `organisme_id` (str) : Identifiant du club.
+  - `equipe_id` (str, optionnel).
+
+### `ffbb_bilan_saison`
+- **Description** : Synthèse de parcours complète sur une saison pour une équipe.
+- **Paramètres** :
+  - `organisme_id` (str).
+  - `saison_id` (str, optionnel).
+
+### `ffbb_resolve_team`
+- **Description** : Identifie de manière univoque une équipe (utile pour désambiguïser U13, U15, Seniors, etc.).
+- **Paramètres** :
+  - `query` (str) : Nom d'équipe ou désignation.
+
+### `ffbb_get`
+- **Description** : Récupère une ressource brute Directus par ID.
+- **Paramètres** :
+  - `resource_type` (str) : Type de ressource (organisme, competition, poule, rencontre, salle).
+  - `resource_id` (str) : Identifiant.
+
+### `ffbb_saisons`
+- **Description** : Liste les saisons sportives.
+- **Paramètres** :
+  - `active_only` (bool, défaut False) : Restreint à la saison courante.
+
+### `ffbb_version`
+- **Description** : Affiche les informations de version et de runtime.
+- **Paramètres** : Aucun.
+
+---
+
+## 3. Utilisation du SDK Python `ffbb-data-client`
+
+Pour les applications Python (FastAPI, Django, scripts, bots) :
+```bash
+pip install ffbb-data-client
+```
+
+```python
+import asyncio
+from ffbb_data_client import FFBBDataClient
+
+async def main():
+    client = FFBBDataClient.create()
+    
+    # 1. Recherche géographique (clubs dans un rayon de 25 km)
+    clubs = await client.search_organismes_by_geo_async(lat=45.7772, lng=3.0870, radius_km=25)
+    print(f"Trouvé {len(clubs.hits)} clubs")
+
+    # 2. Scores live du week-end
+    lives = await client.get_lives_async()
+    for live in lives or []:
+        print(f"{live.equipe_domicile} vs {live.equipe_exterieur} : {live.score_domicile}-{live.score_exterieur}")
+
+asyncio.run(main())
+```

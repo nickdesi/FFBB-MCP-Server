@@ -26,6 +26,7 @@ Serveur [MCP](https://modelcontextprotocol.io) pour consulter calendriers, class
 [![Issues](https://img.shields.io/github/issues/nickdesi/FFBB-MCP-Server?style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/issues)
 [![PRs](https://img.shields.io/github/issues-pr/nickdesi/FFBB-MCP-Server?style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/pulls)
 [![Smithery](https://smithery.ai/badge/nickdesi/mcpffbb)](https://smithery.ai/servers/nickdesi/mcpffbb)
+[![Glama](https://glama.ai/mcp/servers/nickdesi/FFBB-MCP-Server/badges/score.svg)](https://glama.ai/mcp/servers/nickdesi/FFBB-MCP-Server)
 
 </div>
 

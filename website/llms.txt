@@ -1,35 +1,91 @@
-# FFBB MCP Server — Serveur MCP Public pour le Basket Français
-> Serveur FastMCP public et open-source exposant 12 outils spécialisés pour interroger les données officielles de la Fédération Française de BasketBall (FFBB) depuis n'importe quel client MCP (Claude, Cursor, Copilot, ChatGPT).
+# FFBB MCP Server — Serveur MCP Public & API Basket Français
+> Serveur FastMCP public et open-source exposant 12 outils d'agrégation spécialisés pour interroger les données officielles de la Fédération Française de BasketBall (FFBB) depuis n'importe quel client MCP (Claude Desktop, Cursor, VS Code Copilot, ChatGPT, Antigravity, OpenCode).
+> Propulsé par le SDK Python officiel `ffbb-data-client` (pip install ffbb-data-client).
 
-## Endpoint MCP Public (Streamable HTTP)
-- URL MCP : https://ffbb.desimone.fr/mcp
-- Dashboard Web : https://ffbb.desimone.fr/
-- Documentation GitHub : https://github.com/nickdesi/FFBB-MCP-Server
-- Client Python sous-jacent : https://nickdesi.github.io/ffbb-data-client/
+## Endpoints Publics & Ressources
+- Endpoint MCP (Streamable HTTP) : https://ffbb.desimone.fr/mcp
+- Dashboard Web & Métriques : https://ffbb.desimone.fr/dashboard
+- Métriques JSON : https://ffbb.desimone.fr/metrics.json
+- Healthcheck : https://ffbb.desimone.fr/health
+- Dépôt GitHub MCP : https://github.com/nickdesi/FFBB-MCP-Server
+- SDK Python (ffbb-data-client) : https://nickdesi.github.io/ffbb-data-client/
+- Package PyPI : https://pypi.org/project/ffbb-data-client/
 
-## Outils IA Disponibles (12 Tools)
-1. `ffbb_search` : Recherche plein texte Meilisearch dans les clubs, compétitions, gymnases, tournois 3x3 et arbitres.
-2. `ffbb_bilan` : Résumé complet des victoires/défaites et forme d'un club sur la saison.
-3. `ffbb_last_result` : Dernier score et feuille de match d'une équipe.
-4. `ffbb_next_match` : Prochain match programmé (date, heure, adversaire, gymnase).
-5. `ffbb_lives` : Scores en direct et temps forts des rencontres du week-end.
-6. `ffbb_club` : Fiche détaillée d'un club (coordonnées, équipes engagées, gymnases).
-7. `ffbb_get` : Récupération brute d'une entité FFBB par identifiant.
-8. `ffbb_saisons` : Liste des saisons sportives disponibles.
-9. `ffbb_resolve_team` : Résolution intelligente du nom d'une équipe.
-10. `ffbb_team_summary` : Synthèse globale d'une équipe.
-11. `ffbb_bilan_saison` : Bilan approfondi d'une saison.
-12. `ffbb_version` : Version et statut de l'instance.
+## 12 Outils MCP Disponibles
+1. `ffbb_team_summary` : Synthèse complète en un seul appel (bilan, position au classement, dernier match joué, prochain match).
+2. `ffbb_lives` : Scores en direct, statut et temps forts des rencontres du week-end sur toutes les divisions françaises.
+3. `ffbb_bilan` : Bilan victoires / défaites exhaustif, points marqués/encaissés et goal-average d'une équipe.
+4. `ffbb_club` : Fiche détaillée d'un club (gymnases, équipes engagées, calendriers des matchs, coordonnées).
+5. `ffbb_search` : Recherche universelle multi-index Meilisearch (clubs, compétitions, tournois 3x3, gymnases, arbitres).
+6. `ffbb_next_match` : Prochaine rencontre programmée (date, heure, adversaire, adresse du gymnase).
+7. `ffbb_last_result` : Dernier résultat et score officiel enregistré pour une équipe.
+8. `ffbb_bilan_saison` : Bilan approfondi d'une équipe sur l'ensemble des phases d'une saison sportive.
+9. `ffbb_resolve_team` : Pivot central de désambiguïsation pour identifier une équipe unique à partir d'un nom ou d'un club.
+10. `ffbb_get` : Récupération brute d'une ressource FFBB par son identifiant unique.
+11. `ffbb_saisons` : Liste des saisons sportives disponibles (historique et saison en cours).
+12. `ffbb_version` : Informations de version, configuration runtime et santé du serveur.
 
-## Configuration Rapide pour Claude Desktop / Cursor
+## Configuration pour Clients IA
+
+### Cursor / Windsurf (.cursor/mcp.json)
+```json
+{
+  "mcpServers": {
+    "ffbb": {
+      "url": "https://ffbb.desimone.fr/mcp"
+    }
+  }
+}
+```
+
+### VS Code (settings.json - Mode Agent GitHub Copilot)
+```json
+{
+  "github.copilot.chat.mcpServers": {
+    "ffbb": {
+      "url": "https://ffbb.desimone.fr/mcp"
+    }
+  }
+}
+```
+
+### Claude Desktop (claude_desktop_config.json)
 ```json
 {
   "mcpServers": {
     "ffbb": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-everything"],
-      "url": "https://ffbb.desimone.fr/mcp"
+      "args": ["-y", "@modelcontextprotocol/client-sse", "https://ffbb.desimone.fr/mcp"]
     }
   }
 }
+```
+
+### Google Antigravity (mcp_config.json)
+```json
+{
+  "mcpServers": {
+    "ffbb_mcp": {
+      "serverUrl": "https://ffbb.desimone.fr/mcp"
+    }
+  }
+}
+```
+
+## Pour les Développeurs Python (SDK ffbb-data-client)
+```bash
+pip install ffbb-data-client
+```
+
+```python
+from ffbb_data_client import FFBBDataClient
+
+# Initialisation avec auto-résolution des tokens
+client = FFBBDataClient.create()
+
+# Recherche multi-index
+results = client.multi_search("Stade Clermontois")
+
+# Scores live du week-end
+lives = client.get_lives()
 ```
