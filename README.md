@@ -8,24 +8,16 @@ Serveur [MCP](https://modelcontextprotocol.io) pour consulter calendriers, class
 
 [🌐 Site](https://ffbb.desimone.fr) ·
 [🧩 Extension VS Code](https://github.com/nickdesi/FFBB-MCP-Server/releases/latest) ·
-[📚 Documentation](https://ffbb.desimone.fr/docs/) ·
+[📚 Documentation](https://ffbb.desimone.fr/#tools) ·
 [💬 Support](SUPPORT.md)
 
 <br />
 
-[![Python](https://img.shields.io/badge/Python-3.14%2B-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org)
 [![Version](https://img.shields.io/badge/version-1.7.0-green?style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/releases/latest)
-[![Release](https://img.shields.io/github/v/release/nickdesi/FFBB-MCP-Server?style=for-the-badge&color=green)](https://github.com/nickdesi/FFBB-MCP-Server/releases/latest)
+[![Python](https://img.shields.io/badge/Python-3.14%2B-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org)
 [![CI](https://img.shields.io/github/actions/workflow/status/nickdesi/FFBB-MCP-Server/ci.yml?label=CI&style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=for-the-badge)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-Ready-00ADD8?style=for-the-badge&logo=modelcontextprotocol&logoColor=white)](https://modelcontextprotocol.io)
-[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](Dockerfile)
-[![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
-[![Stars](https://img.shields.io/github/stars/nickdesi/FFBB-MCP-Server?style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/stargazers)
-[![Last Commit](https://img.shields.io/github/last-commit/nickdesi/FFBB-MCP-Server?style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/commits/main)
-[![Issues](https://img.shields.io/github/issues/nickdesi/FFBB-MCP-Server?style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/issues)
-[![PRs](https://img.shields.io/github/issues-pr/nickdesi/FFBB-MCP-Server?style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/pulls)
-[![Smithery](https://smithery.ai/badge/nickdesi/mcpffbb)](https://smithery.ai/servers/nickdesi/mcpffbb)
+[![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=for-the-badge)](LICENSE)
 [![Glama](https://glama.ai/mcp/servers/nickdesi/FFBB-MCP-Server/badges/score.svg)](https://glama.ai/mcp/servers/nickdesi/FFBB-MCP-Server)
 
 </div>
