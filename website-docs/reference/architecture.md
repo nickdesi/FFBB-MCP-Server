@@ -15,14 +15,19 @@ Le serveur supporte deux modes d'exposition :
 - **Stdio** : Utilisé pour l'exécution locale (via `uvx`). Communication via stdin/stdout.
 - **Streamable HTTP** : Utilisé pour le déploiement cloud (Coolify). Endpoint unique `/mcp` acceptant `POST` (JSON-RPC) et `GET` (stream serveur→client optionnel). Transport configuré via `MCP_MODE=http` ou `MCP_MODE=streamable-http`.
 
-### 3. Service Layer (`services.py`)
+### 3. Service Layer (Package `services/`)
 
-Cette couche fait le pont entre les outils MCP et le client API FFBB. Elle implémente les patterns suivants :
+Cette couche modulaire fait le pont entre les outils MCP et le client API FFBB (`ffbb-data-client`). Elle implémente les patterns suivants :
 
-- **Accès FFBB** : Délègue les appels réseau au package `ffbb-data-client` (`>=2.0.0,<3.0.0`) au lieu de réimplémenter les endpoints FFBB.
-- **Unification des entrées** : Centralise les requêtes disparates vers des points d'entrée uniques pour simplifier l'utilisation par les LLMs.
-- **Normalisation des données** : Transforme les modèles Pydantic complexes de l'API FFBB en structures JSON légères et exploitables.
-- **Gestion du Cache** : Utilise des mécanismes de mise en cache pour réduire la latence sur les requêtes fréquentes (recherche, classements).
+- **Accès FFBB & Factory Singleton** : Délègue les appels réseau au package `ffbb-data-client` (`>=2.0.0,<3.0.0`) via un singleton `FFBBClientFactory` avec rafraîchissement proactif du jeton d'accès en tâche de fond.
+- **Découpage modulaire par domaine métier** :
+  - `services/club.py` : Navigation club, équipes, composition et outil composite `ffbb_team_summary`.
+  - `services/poule.py` : Classements, bilans `ffbb_bilan`, calculs de goal-average et rencontres.
+  - `services/salle.py` : Recherche et géolocalisation des salles et terrains.
+  - `services/search.py` : Recherche multi-index unifiée Directus / Meilisearch.
+  - `services/warmup.py` : Préchauffage proactif au démarrage et réchauffement asynchrone.
+  - `services/common.py` : Cache SWR (Stale-While-Revalidate) et helpers partagés.
+- **Normalisation & Token Optimization** : Transforme les payloads bruts en JSON ultra-compacts pour réduire l'empreinte de contexte des LLMs.
 
 ## 🏗️ Surface MCP actuelle
 

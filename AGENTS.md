@@ -195,6 +195,8 @@ Avant push/tag/release :
 | `FFBB_SERVICE_CACHE_PERSIST` | `1` | Activer la persistance des caches service sur disque (SQLite) entre redémarrages |
 | `FFBB_KNOWN_CLUB_IDS` | `` | Override JSON de la liste d'organisme_id connus pour les prompts MCP (fallback : _DEFAULT_KNOWN_CLUB_IDS) |
 | `FFBB_ENABLE_BENCHMARK` | `` | Activer endpoint `/benchmark/run` (sécurité) |
+| `FFBB_WARMUP_API_KEY` | `` | Clé d'API secrète requise pour déclencher le warmup via l'endpoint HTTP `/warmup` |
+| `FFBB_WARMUP_MAX_ORGANISMES` | `50` | Nombre maximum d'organismes à charger lors d'un cycle de warmup |
 | `PUBLIC_URL` | `https://ffbb.desimone.fr` | URL publique pour liens/sitemap |
 | `ALLOWED_HOSTS` | `*` | Hosts autorisés (DNS rebinding protection) |
 | `ENABLE_DNS_PROTECTION` | `` | Activer/désactiver explicitement la protection contre le DNS rebinding |
@@ -203,6 +205,7 @@ Avant push/tag/release :
 | `PORT` | `9123` | Port d'écoute HTTP |
 | `FFBB_SWR_ENABLED` | `1` | Activer le Stale-While-Revalidate : servir le cache et rafraîchir en arrière-plan (défaut : 1) |
 | `FFBB_SWR_STALE_FRACTION` | `0.75` | Fraction du TTL au-delà de laquelle une entrée est rafraîchie en arrière-plan (défaut : 0.75) |
+| `FFBB_API_TIMEOUT_SECONDS` | `30` | Timeout en secondes pour les requêtes vers l'API FFBB / Meilisearch |
 | `MAX_CONCURRENT_FFBB` | `8` | Concurrence max appels API FFBB |
 | `FFBB_MAX_CALENDAR_MATCHES` | `300` | Max rencontres retournées |
 | `FFBB_WARMUP_ORGANISMES` | `` | Liste d'organisme_id séparés par des virgules à préchauffer au démarrage |
