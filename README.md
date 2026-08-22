@@ -165,18 +165,19 @@ https://ffbb.desimone.fr/mcp
 
 ```mermaid
 flowchart LR
-    A[Client MCP] -->|Streamable HTTP| B[FFBB MCP Server]
-    B --> C[Services métier + cache]
-    C --> D[ffbb-data-client]
-    D --> E[API officielle FFBB]
+    A[Client MCP<br/>Claude · Cursor · Antigravity] -->|Streamable HTTP / Stdio| B[FFBB MCP Server<br/>FastMCP]
+    B --> C[Services métier<br/>Cache SWR & Agrégation]
+    C --> D[ffbb-data-client<br/>SDK Python]
+    D --> E[(API Directus &<br/>Meilisearch FFBB)]
 ```
 
 Points clés :
 
-- serveur Python 3.14+ basé sur `mcp[cli]`, `starlette` et `uvicorn` ;
-- agrégation métier pour limiter le nombre d'appels et réduire le contexte LLM ;
-- cache TTL adapté aux données live, calendriers et classements ;
-- dashboard, métriques JSON et healthcheck intégrés.
+- **Double transport** : Streamable HTTP distant (spec `2025-11-25`) ou Stdio local (`uvx`) ;
+- **SDK Python découplé** : Requêtes réseau et parsing Pydantic v2 délégués à `ffbb-data-client` ;
+- **Agrégation composite** : 12 outils optimisés pour réduire les allers-retours et le contexte LLM ;
+- **Cache intelligent & SWR** : *Stale-While-Revalidate* avec TTL par type de donnée (30 s lives, 1 h bilans, 24 h clubs) ;
+- **Observabilité complète** : Dashboard HTML, métriques Prometheus, snapshot JSON et healthcheck intégrés.
 
 Détails : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) et [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
 
