@@ -131,7 +131,7 @@ def test_sitemap_xml_uses_canonical_root(monkeypatch):
     sitemap = _build_sitemap_xml()
 
     assert "<loc>https://ffbb.desimone.fr/</loc>" in sitemap
-    assert "<changefreq>weekly</changefreq>" in sitemap
+    assert "<changefreq>daily</changefreq>" in sitemap
 
 
 def test_resolve_log_level_defaults_to_info():

@@ -89,7 +89,7 @@ def _build_index_html() -> str:
 
 def _build_robots_txt() -> str:
     base_url = _get_public_base_url()
-    return f"User-agent: *\nAllow: /\nAllow: /docs/\nSitemap: {base_url}/sitemap.xml\n"
+    return f"User-agent: *\nAllow: /\nSitemap: {base_url}/sitemap.xml\n"
 
 
 def _build_sitemap_xml() -> str:
@@ -100,14 +100,8 @@ def _build_sitemap_xml() -> str:
   <url>
     <loc>{canonical_url}</loc>
     <lastmod>{lastmod}</lastmod>
-    <changefreq>weekly</changefreq>
+    <changefreq>daily</changefreq>
     <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>{canonical_url}docs/</loc>
-    <lastmod>{lastmod}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
   </url>
 </urlset>
 """
