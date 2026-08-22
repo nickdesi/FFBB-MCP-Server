@@ -1,9 +1,9 @@
 # 🏀 Règles métier FFBB MCP
 
-> Validé contre MCP FFBB v1.2.0 et champs exposés par `ffbb-data-client`
+> Validé contre MCP FFBB v1.7.0 et champs exposés par `ffbb-data-client` (>=2.0.0, Pydantic v2)
 >
 > **Source canonique de maintenance** : ce document est la **référence**
-> pour toute règle métier FFBB (scoring, désambiguïsation, exclusions).
+> pour toute règle métier FFBB (scoring, désambiguïsation, exclusions, goal-average).
 >
 > Le code injecté dans le prompt runtime vit dans
 > `src/ffbb_mcp/prompts.py` (constantes `_RULES_*`, fonction `expert_basket()`).
@@ -14,19 +14,22 @@
 
 ---
 
-### Outils MCP disponibles et leur rôle réel
+### Outils MCP disponibles et leur rôle réel (12 outils)
 
 | Outil                        | Rôle                                       | Fiabilité multi-équipes        |
 |------------------------------|--------------------------------------------|--------------------------------|
-| `ffbb_search`                | Résolution club → organisme_id             | ✅                             |
-| `ffbb_resolve_team`          | Résolution club + catégorie + numéro si possible | ⚠️ Peut rester ambigu si plusieurs équipes/phases |
-| `ffbb_club(action="equipes")`| Liste tous les engagements du club         | ✅ Source de vérité            |
-| `ffbb_get(type="poule")`     | Détail complet d'une poule           | ✅ Source de vérité            |
-| `ffbb_next_match`            | Prochain match                       | ⚠️ 1 seul engagement retourné  |
-| `ffbb_last_result`           | Dernier résultat                     | ⚠️ 1 seul engagement retourné  |
-| `ffbb_team_summary`          | Résumé complet équipe                | ⚠️ Même risque                 |
-| `ffbb_bilan`                 | Bilan agrégé toutes phases           | ✅ Fiable                      |
-| `ffbb_lives`                 | Scores live                          | ✅ Cache 15s                   |
+| `ffbb_search`                | Recherche multi-index unifiée (clubs, salles, compétitions) | ✅ |
+| `ffbb_get`                   | Détail complet par entité (`poule`, `organisme`, `competition`, `salle`) | ✅ Source de vérité |
+| `ffbb_club`                  | Actions club (`equipes`, `calendrier`, `salles`, `details`) | ✅ Source de vérité |
+| `ffbb_resolve_team`          | Résolution club + catégorie + numéro d'équipe | ⚠️ Résout 1 engagement |
+| `ffbb_team_summary`          | Résumé complet équipe (bilan, classement, dernier & prochain match) | ⚠️ Résout 1 engagement |
+| `ffbb_bilan`                 | Bilan agrégé toutes phases confondues en 1 appel | ✅ Fiable (toutes phases) |
+| `ffbb_last_result`           | Dernier résultat d'une équipe précise      | ⚠️ 1 seul match retourné |
+| `ffbb_next_match`            | Prochain match programmé d'une équipe      | ⚠️ 1 seul match retourné |
+| `ffbb_bilan_saison`          | Bilan complet saison par phase et goal-average | ✅ Fiable |
+| `ffbb_lives`                 | Scores live et statut par quart-temps       | ✅ Temps réel (cache 15s) |
+| `ffbb_saisons`               | Liste des saisons sportives disponibles     | ✅ Historique FFBB |
+| `ffbb_version`               | Diagnostics, SDK, transport et TTLs runtime | ✅ Diagnostics |
 
 ### Cache TTL — impact opérationnel
 
@@ -331,3 +334,57 @@ Lors de la résolution d'un club par son nom (ex: "Stade Clermontois"), le syst�
 5. **Exception** : Si l'utilisateur fournit le nom complet (ex: "Stade Clermontois Basket Féminin"), ce choix est respecté sans application de la logique M/F.
 6. **Persistance** : Une fois l'organisme résolu, son `organisme_id` est réutilisé pour tous les appels suivants tant que le genre reste cohérent.
 7. **Transparence en cas d'échec** : Si aucun engagement n'est trouvé après fallback, le système doit lister tous les organismes considérés (en précisant ceux marqués "Féminin") pour validation manuelle.
+
+---
+
+### Règle 11 — Barème de Points & Règles Officielles de Départage (Goal-Average FFBB)
+
+#### A. Barème de points officiel FFBB
+* **Match gagné** : **2 points**
+* **Match perdu** : **1 point**
+* **Match perdu par forfait** : **0 point** (avec score administratif conventionnel `0 - 20`)
+* **Match perdu par pénalité** : **1 point** (ou 0 point selon décision fédérale)
+* **Match nul** : **1 point** (uniquement dans les catégories jeunes où le règlement particulier n'autorise pas de prolongation)
+
+#### B. Règles de départage en cas d'égalité au classement (Règlements Fédéraux Livre I)
+En cas d'égalité de points au classement entre plusieurs équipes au sein d'une poule :
+
+1. **Égalité entre 2 équipes (Goal-Average Particulier en priorité)** :
+   * 1° Nombre de points au classement obtenus sur les **confrontations directes** entre les 2 équipes.
+   * 2° **Différence de points particuliers** (points marqués − points encaissés) sur les matchs disputés entre ces 2 équipes.
+   * 3° **Quotient particulier** (points marqués ÷ points encaissés) sur ces mêmes rencontres.
+   * 4° **Goal-average général** (différence de points sur l'ensemble des matchs de la poule) si les confrontations directes ne permettent pas de trancher ou n'ont pas encore été intégralement jouées (phase aller uniquement).
+   * 5° **Meilleure attaque générale** (total des points marqués sur la poule).
+
+2. **Égalité entre 3 équipes ou plus (Mini-championnat)** :
+   * Établissement d'un classement particulier calculé **exclusivement sur les rencontres ayant opposé les équipes à égalité**.
+   * Application du même ordre de critères (points particuliers, différence particulière, quotient particulier, puis général si nécessaire).
+
+---
+
+### Règle 12 — Gestion de la Transition de Saison (2025-2026 ➔ 2026-2027)
+
+#### A. Bascule fédérale estivale
+* La FFBB effectue la bascule de saison officielle chaque été (juillet / août).
+* L'outil `ffbb_saisons(active_only=true)` retourne l'identifiant unique de la saison sportive active courante (`2026-2027`).
+* Lors de la phase de transition (août / septembre) :
+  * Les calendriers de la nouvelle saison `2026-2027` sont initialisés avec des matchs non encore joués (`joue=0` ou `joue=null`).
+  * Les bilans de la saison précédente (`2025-2026`) restent consultables via l'historique des compétitions.
+
+#### B. Détection des phases de rentrée
+* En début de saison (septembre à novembre), les comités et ligues organisent fréquemment des **tournois de qualification et poules de brassage** (`Phase 1 - Brassage` ou `Qualification`).
+* Ces phases préliminaires sont des compétitions officielles FFBB comptant pour le reclassement : **ne jamais les exclure** en début de saison.
+
+---
+
+### Règle 13 — Spécificités par Catégories (Jeunes & Seniors)
+
+| Catégorie | Tranche d'âge | Panier | Ballon | Spécificités Réglementaires & Découpage |
+| :--- | :---: | :---: | :---: | :--- |
+| **U9 / U11** (Poussins) | 7 à 10 ans | 2m60 | Taille 5 | Défense de zone interdite (individuelle obligatoire), pas de tir à 3 pts comptabilisé (compté 2 pts). Souvent 3 phases par saison (Brassage ➔ Reclassement ➔ Titre). |
+| **U13** (Benjamins) | 11 à 12 ans | 3m05 | T6 (F) / T6-T7 (M) | Ligne à 3 points officielle active (6m75). Règles complètes de jeu (temps de possession). |
+| **U15** (Minimes) | 13 à 14 ans | 3m05 | T6 (F) / T7 (M) | 4 × 10 min (ou 4 × 8 min en dép.). Championnats régionaux et nationaux avec phases éliminatoires. |
+| **U18 / U20** (Cadets) | 15 à 19 ans | 3m05 | T6 (F) / T7 (M) | Règles FIBA intégrales. |
+| **Seniors** | 18+ ans | 3m05 | T6 (F) / T7 (M) | Départementale (DM/DF), Régionale (RM/RF), Nationale (NM/NF) et Coupes territoriales. |
+| **CTC / Ententes** | Toutes | - | - | Regroupements de clubs (ex: *CTC Grand Clermont*, *Entente Gerzat/Stade*). Toujours prioriser la correspondance par `engagement_id` / `organisme_id` avant le libellé textuel. |
+
