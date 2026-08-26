@@ -17,10 +17,16 @@ Serveur [MCP](https://modelcontextprotocol.io) pour consulter calendriers, class
 [![Python](https://img.shields.io/badge/Python-3.14%2B-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org)
 [![CI](https://img.shields.io/github/actions/workflow/status/nickdesi/FFBB-MCP-Server/ci.yml?label=CI&style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/actions/workflows/ci.yml)
 [![MCP](https://img.shields.io/badge/MCP-Ready-00ADD8?style=for-the-badge&logo=modelcontextprotocol&logoColor=white)](https://modelcontextprotocol.io)
-[![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=for-the-badge)](LICENSE)
 [![Glama](https://glama.ai/mcp/servers/nickdesi/FFBB-MCP-Server/badges/score.svg)](https://glama.ai/mcp/servers/nickdesi/FFBB-MCP-Server)
+[![GitHub stars](https://img.shields.io/github/stars/nickdesi/FFBB-MCP-Server?style=social)](https://github.com/nickdesi/FFBB-MCP-Server/stargazers)
 
 </div>
+
+---
+
+<p align="center">
+  ⭐ <b>Si ce serveur MCP FFBB vous est utile pour vos assistants IA, n'hésitez pas à laisser une étoile sur GitHub !</b> ⭐
+</p>
 
 ---
 
@@ -234,6 +240,16 @@ Le pipeline CI (`.github/workflows/ci.yml`) exécute ruff, mypy, pytest et le co
 | `Missing session ID` / `deadline exceeded` | Wrapper `mcp-remote` ou mauvais transport | Utiliser `serverUrl` natif dans `mcp_config.json` (voir [Google Antigravity](#google-antigravity)) |
 | Claude Desktop refuse l'URL `http` | Claude Desktop impose `stdio` | Utiliser le bridge `@modelcontextprotocol/client-sse` via `npx` (voir [Claude Desktop](#claude-desktop)) |
 | Données live obsolètes | Cache TTL | Attendre le rafraîchissement (≤ 30 s) ou interroger l'endpoint `/health` |
+
+---
+
+## 🌟 Stargazers & Communauté
+
+<div align="center">
+
+[![Star History Chart](https://api.star-history.com/svg?repos=nickdesi/FFBB-MCP-Server&type=Date)](https://star-history.com/#nickdesi/FFBB-MCP-Server&Date)
+
+</div>
 
 ---
 
