@@ -2097,3 +2097,66 @@ class TestBilanEliminatoireTeamAssignment:
         assert len(eq2_phases) == 1
         assert eq2_phases[0]["poule_id"] == "1002"
         assert eq2_phases[0]["competition"] == "U15 Féminines Finale"
+
+
+class TestServicesRobustness:
+    """Vérifie la robustesse des signatures (arguments positionnels, kwargs supplémentaires, imports)."""
+
+    def test_import_resolve_team_from_club(self):
+        from ffbb_mcp.services.club import ffbb_resolve_team_service
+
+        assert callable(ffbb_resolve_team_service)
+
+    @pytest.mark.asyncio
+    async def test_positional_and_kwargs_support(self, patch_get_client, mock_client):
+        from ffbb_mcp.services import (
+            ffbb_bilan_service,
+            ffbb_last_result_service,
+            ffbb_next_match_service,
+            ffbb_resolve_team_service,
+            ffbb_saison_bilan_service,
+            get_calendrier_club_service,
+        )
+
+        # Mock pour get_organisme_async
+        org_mock = MagicMock()
+        org_mock.model_dump = MagicMock(
+            return_value={"nom": "TEST CLUB", "engagements": []}
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        # 1. ffbb_resolve_team_service positionnel + kwargs
+        res = await ffbb_resolve_team_service(
+            "TEST CLUB", 123, "RM1", extra_param="ignored"
+        )
+        assert isinstance(res, dict)
+
+        # 2. ffbb_bilan_service positionnel + kwargs
+        res = await ffbb_bilan_service(
+            "TEST CLUB", 123, "RM1", False, extra_param="ignored"
+        )
+        assert isinstance(res, dict)
+
+        # 3. ffbb_next_match_service positionnel + kwargs
+        res = await ffbb_next_match_service(
+            "TEST CLUB", 123, "RM1", 1, False, extra_param="ignored"
+        )
+        assert isinstance(res, dict)
+
+        # 4. ffbb_last_result_service positionnel + kwargs
+        res = await ffbb_last_result_service(
+            "TEST CLUB", 123, "RM1", 1, False, extra_param="ignored"
+        )
+        assert isinstance(res, dict)
+
+        # 5. ffbb_saison_bilan_service positionnel + kwargs
+        res = await ffbb_saison_bilan_service(
+            "TEST CLUB", 123, "RM1", 1, False, extra_param="ignored"
+        )
+        assert isinstance(res, dict)
+
+        # 6. get_calendrier_club_service positionnel + kwargs
+        res = await get_calendrier_club_service(
+            "TEST CLUB", 123, "RM1", 1, extra_param="ignored"
+        )
+        assert isinstance(res, list)

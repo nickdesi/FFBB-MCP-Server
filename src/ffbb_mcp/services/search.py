@@ -652,10 +652,10 @@ async def ffbb_search_service(
 
 
 async def ffbb_resolve_team_service(
-    *,
     club_name: str | None = None,
     organisme_id: int | str | None = None,
     categorie: str | None = None,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     """Résout une équipe unique d'un club pour une catégorie donnée.
 

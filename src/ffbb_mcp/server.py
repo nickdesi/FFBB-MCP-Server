@@ -924,18 +924,20 @@ async def ffbb_team_summary(
                 categorie=categorie,
                 numero_equipe=resolved_num,
             )
-            bilan, last_match, next_match = await asyncio.gather(
+            raw_bilan, raw_last, raw_next = await asyncio.gather(
                 bilan_coro, last_coro, next_coro, return_exceptions=True
             )
-            # Normaliser les exceptions en dicts d'erreur
-            if isinstance(bilan, Exception):
-                bilan = {"error": str(bilan)}
-            if isinstance(last_match, Exception):
-                last_match = None
-            if isinstance(next_match, Exception):
-                next_match = None
+            # Normaliser les exceptions et types en dicts d'erreur / None
+            bilan = (
+                raw_bilan if isinstance(raw_bilan, dict) else {"error": str(raw_bilan)}
+            )
+            last_match = raw_last if isinstance(raw_last, dict) else None
+            next_match = raw_next if isinstance(raw_next, dict) else None
         else:
-            bilan = await bilan_coro
+            raw_bilan = await bilan_coro
+            bilan = (
+                raw_bilan if isinstance(raw_bilan, dict) else {"error": str(raw_bilan)}
+            )
             last_match = None
             next_match = None
 

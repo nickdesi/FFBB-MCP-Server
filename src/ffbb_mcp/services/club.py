@@ -63,6 +63,7 @@ from .common import (
     _parse_dt,
 )
 from .salle import _enrich_matches_with_salle_details
+from .search import ffbb_resolve_team_service  # noqa: F401
 
 logger = logging.getLogger("ffbb-mcp")
 _EMPTY_SET: set[str] = set()
@@ -344,7 +345,7 @@ async def _resolve_team_equipes(
     *,
     club_name: str | None,
     organisme_id: int | str | None,
-    categorie: str,
+    categorie: str | None = None,
     numero_equipe: int | None,
     not_found_status: str = "not_found",
 ) -> tuple[dict | None, list[dict], dict | None]:
@@ -531,12 +532,12 @@ def _prioritize_phase(
 
 
 async def ffbb_next_match_service(
-    *,
     club_name: str | None = None,
     organisme_id: int | str | None = None,
-    categorie: str,
+    categorie: str | None = None,
     numero_equipe: int | None = None,
     force_refresh: bool = False,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     from .common import _extract_phase_num
 
@@ -735,13 +736,32 @@ async def ffbb_next_match_service(
 
 
 async def ffbb_saison_bilan_service(
-    *,
-    organisme_id: int | str,
-    categorie: str,
-    numero_equipe: int,
+    club_name: str | None = None,
+    organisme_id: int | str | None = None,
+    categorie: str | None = None,
+    numero_equipe: int = 1,
     force_refresh: bool = False,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     from .poule import get_poule_service
+
+    if not organisme_id and club_name:
+        from .search import resolve_club_and_org
+
+        resolved_clubs, _ = await resolve_club_and_org(
+            club_name,
+            organisme_id,
+            categorie=categorie,
+            limit=1,
+        )
+        if resolved_clubs and resolved_clubs[0].get("organisme_id"):
+            organisme_id = resolved_clubs[0]["organisme_id"]
+
+    if not organisme_id:
+        return {
+            "status": "not_found",
+            "message": f"Organisme introuvable pour '{club_name or organisme_id}'.",
+        }
 
     org_id_int = _coerce_numeric_id(organisme_id, "organisme_id")
     equipes = await ffbb_equipes_club_service(
@@ -1135,6 +1155,7 @@ async def ffbb_bilan_service(
     organisme_id: int | str | None = None,
     categorie: str | None = None,
     force_refresh: bool = False,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     cache_key = f"bilan:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}"
 
@@ -1511,6 +1532,7 @@ async def get_calendrier_club_service(
     date_fin: str | None = None,
     limit: int | None = None,
     force_refresh: bool = False,
+    **kwargs: Any,
 ) -> list[dict]:
     cache_key = f"calendrier:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}:{numero_equipe or ''}:{_normalize_name(adversaire or '')}:{date_debut or ''}:{date_fin or ''}:{limit or ''}"
 
@@ -1536,12 +1558,12 @@ async def get_calendrier_club_service(
 
 
 async def ffbb_last_result_service(
-    *,
     club_name: str | None = None,
     organisme_id: int | str | None = None,
-    categorie: str,
+    categorie: str | None = None,
     numero_equipe: int = 1,
     force_refresh: bool = False,
+    **kwargs: Any,
 ) -> dict:
     error, equipes, club_resolu = await _resolve_team_equipes(
         club_name=club_name,
