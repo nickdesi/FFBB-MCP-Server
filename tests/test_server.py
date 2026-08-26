@@ -310,9 +310,8 @@ async def test_safe_report_progress_passes_through_runtime_error():
         await _safe_report_progress(ctx, 1.0, total=2, message="middle")
 
 
-def test_allowed_origins_default_to_public_url(monkeypatch):
-    """Vérifie que _allowed_origins ne par défaut plus sur '*' mais sur _public_url."""
+def test_allowed_origins_default_to_wildcard(monkeypatch):
+    """Vérifie que _allowed_origins est par défaut sur '*' pour autoriser les clients IA distants (Perplexity, ChatGPT, etc.)."""
     import ffbb_mcp.server as server_mod
 
-    assert "*" not in server_mod._allowed_origins
-    assert server_mod._public_url in server_mod._allowed_origins
+    assert "*" in server_mod._allowed_origins

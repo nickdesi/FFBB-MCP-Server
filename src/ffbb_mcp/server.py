@@ -197,7 +197,7 @@ except Exception:
     _public_host = "ffbb.desimone.fr"
 
 _allowed_hosts_raw = os.environ.get("ALLOWED_HOSTS", "*")
-_allowed_origins_raw = os.environ.get("ALLOWED_ORIGINS", _public_url)
+_allowed_origins_raw = os.environ.get("ALLOWED_ORIGINS", "*")
 _allowed_hosts = [h.strip() for h in _allowed_hosts_raw.split(",") if h.strip()]
 _allowed_origins = [o.strip() for o in _allowed_origins_raw.split(",") if o.strip()]
 
