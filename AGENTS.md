@@ -199,6 +199,7 @@ Avant push/tag/release :
 | `FFBB_WARMUP_MAX_ORGANISMES` | `50` | Nombre maximum d'organismes à charger lors d'un cycle de warmup |
 | `PUBLIC_URL` | `https://ffbb.desimone.fr` | URL publique pour liens/sitemap |
 | `ALLOWED_HOSTS` | `*` | Hosts autorisés (DNS rebinding protection) |
+| `ALLOWED_ORIGINS` | `*` | Origins CORS |
 | `ENABLE_DNS_PROTECTION` | `` | Activer/désactiver explicitement la protection contre le DNS rebinding |
 | `FFBB_LOG_LEVEL` | `INFO` | Niveau de log |
 | `HOST` | `0.0.0.0` | Interface d'écoute |
@@ -211,7 +212,6 @@ Avant push/tag/release :
 | `FFBB_WARMUP_ORGANISMES` | `` | Liste d'organisme_id séparés par des virgules à préchauffer au démarrage |
 | `FFBB_WARMUP_CONCURRENCY` | `5` | Concurrence maximale lors du préchauffage du cache |
 | `FFBB_MCP_PRUNE_LIMIT` | `50` | Limite troncature payload |
-| `ALLOWED_ORIGINS` | — | Origins CORS |
 | `FFBB_POULE_FETCH_CONCURRENCY` | — | Concurrence max fetch poules |
 | `FFBB_CACHE_TTL_*` | — | TTL par type de cache (voir cache_strategy.py) |
 | `FFBB_REDIS_URL` | — | URL de connexion à l'instance Redis si backend=redis |
