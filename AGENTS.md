@@ -97,6 +97,12 @@ Règle de temps verbal :
 - ⚠️ Si `salle` ou `ville` vides → écrire "Salle non encore renseignée"
 - 📍 Format d'adresse standardisé : `[Nom de la Salle] - [Adresse Postale], [Ville]` (gérer proprement les valeurs manquantes sans séparateurs orphelins)
 
+## Alignement Strict FFBB Data Client & MCP
+- **Parité des index Meilisearch** : Le serveur MCP interroge exclusivement les 6 index Meilisearch réels et actifs (`organismes`, `competitions`, `rencontres`, `salles`, `terrains`, `tournois`).
+- **Élévation de niveau / Fallback** : Si Directus renvoie `classements: []` (avant 1ère journée), le MCP reconstruit la liste des équipes engagées depuis les `rencontres` (`status: non_commence`).
+- **Allègement des payloads** : Préférer `get_organisme_for_search_async()` pour la résolution de club afin de minimiser le transfert réseau.
+- **Polymorphisme des paramètres** : Toujours supporter `numero_equipe` et `force_refresh` sur les outils d'équipe (`ffbb_bilan`, `ffbb_team_summary`, `ffbb_next_match`, `ffbb_last_result`).
+
 ## Développement MCP (FastMCP)
 - Cycle de vie : `mcp.run()` ou `mcp.run_streamable_http_async()` — pas de montage manuel via `app.mount()`
 - Chemin personnalisé : configurer `mcp.settings.streamable_http_path` avant `mcp.run()`
