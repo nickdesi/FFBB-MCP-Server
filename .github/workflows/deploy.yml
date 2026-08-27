@@ -1,4 +1,4 @@
-name: Deploy to Coolify
+name: Deploy to Dokploy
 
 on:
   workflow_dispatch:
@@ -21,32 +21,39 @@ env:
 
 jobs:
   deploy:
-    name: Trigger Coolify deployment
+    name: Trigger Dokploy deployment
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     # Ne se lance que sur action manuelle OU si le workflow de CI sur main a réussi
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     steps:
-      - name: Trigger deploy webhook
+      - name: Trigger Dokploy Deployment
         env:
-          COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_DEPLOY_HOOK }}
-        if: env.COOLIFY_WEBHOOK != ''
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL || 'https://dokploy.desimone.fr' }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          APPLICATION_ID: ${{ secrets.DOKPLOY_APP_ID || '5XoCmCzBkds_9lInJFGpt' }}
         run: |
-          echo "Déclenchement du déploiement Coolify..."
-          result=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X POST "$COOLIFY_WEBHOOK")
-          if [ "$result" = "200" ] || [ "$result" = "202" ]; then
-            echo "✅ Déploiement déclenché (HTTP $result)"
-          else
-            echo "::warning::Échec déclenchement Coolify (HTTP $result)"
+          echo "🚀 Déclenchement du déploiement Dokploy pour l'application $APPLICATION_ID sur $DOKPLOY_URL..."
+          
+          if [ -z "$DOKPLOY_API_KEY" ]; then
+            echo "❌ Erreur : Le secret DOKPLOY_API_KEY n'est pas configuré dans les secrets GitHub."
+            exit 1
           fi
 
-      - name: No webhook configured
-        if: env.COOLIFY_WEBHOOK == ''
-        env:
-          COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_DEPLOY_HOOK }}
-        run: |
-          echo "ℹ️  Aucun webhook Coolify configuré."
-          echo "Pour l'activer :"
-          echo "1. Coolify → ton projet → Webhooks → copier l'URL"
-          echo "2. GitHub → Settings → Secrets → COOLIFY_DEPLOY_HOOK"
+          response=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
+            -H "x-api-key: $DOKPLOY_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"0\": {\"json\": {\"applicationId\": \"$APPLICATION_ID\"}}}" \
+            "$DOKPLOY_URL/api/trpc/application.deploy?batch=1")
+
+          http_status=$(echo "$response" | grep "HTTP_STATUS:" | cut -d':' -f2)
+          body=$(echo "$response" | sed '/HTTP_STATUS:/d')
+
+          if [ "$http_status" = "200" ]; then
+            echo "✅ Déploiement Dokploy déclenché avec succès ! (HTTP $http_status)"
+            echo "Payload: $body"
+          else
+            echo "❌ Échec du déploiement Dokploy (HTTP $http_status)"
+            echo "Réponse: $body"
+            exit 1
+          fi
