@@ -867,6 +867,36 @@ class TestMultiSearchService:
         assert result_2 == []
         mock_client.multi_search_async.assert_awaited_once()
 
+    @pytest.mark.asyncio
+    async def test_multi_search_self_healing_on_failure(
+        self, patch_get_client, mock_client
+    ):
+        from ffbb_mcp._state import state
+
+        state.active_search_indexes = ["index_corrompu", "ffbbserver_organismes"]
+        mock_res = MagicMock(spec=MultiSearchResults)
+        mock_res.results = [
+            MagicMock(
+                index_uid="ffbbserver_organismes", hits=[], estimated_total_hits=0
+            )
+        ]
+
+        # Premier appel échoue (ValueError zip), le second (healed) réussit
+        mock_client.multi_search_async = AsyncMock(
+            side_effect=[ValueError("zip() mismatch"), mock_res]
+        )
+
+        # Mock pour le diagnostic probe
+        probe_res_ok = MagicMock(results=[MagicMock()])
+        mock_client._meilisearch.multi_search_async = AsyncMock(
+            side_effect=[Exception("failed"), probe_res_ok]
+        )
+
+        result = await multi_search_service("test self healing", limit=10)
+        assert isinstance(result, list)
+        assert state.active_search_indexes == ["ffbbserver_organismes"]
+        assert mock_client.multi_search_async.await_count == 2
+
 
 class TestSearchCaching:
     @pytest.mark.asyncio

@@ -48,6 +48,9 @@ class _ServiceState:
     cache_resolve_club: Any = None
     cache_equipes: Any = None
 
+    # Registre dynamique et auto-guérissable des index Meilisearch
+    active_search_indexes: list[str] | None = None
+
 
 state = _ServiceState()
 
@@ -86,6 +89,7 @@ def reset_service_state() -> None:
     _reset_cache(state.cache_salle)
     _reset_cache(state.cache_resolve_club)
     _reset_cache(state.cache_equipes)
+    state.active_search_indexes = None
     _clear_lru_caches()
 
 

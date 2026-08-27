@@ -517,61 +517,140 @@ async def search_organismes_service(
     )
 
 
+from ffbb_data_client.config import (
+    MEILISEARCH_INDEX_COMPETITIONS,
+    MEILISEARCH_INDEX_ORGANISMES,
+    MEILISEARCH_INDEX_RENCONTRES,
+    MEILISEARCH_INDEX_SALLES,
+    MEILISEARCH_INDEX_TERRAINS,
+    MEILISEARCH_INDEX_TOURNOIS,
+)
+
+_PRIMARY_SEARCH_INDEXES = {
+    MEILISEARCH_INDEX_ORGANISMES,
+    MEILISEARCH_INDEX_COMPETITIONS,
+    MEILISEARCH_INDEX_RENCONTRES,
+}
+
+_ALL_CANDIDATE_SEARCH_INDEXES = [
+    MEILISEARCH_INDEX_ORGANISMES,
+    MEILISEARCH_INDEX_COMPETITIONS,
+    MEILISEARCH_INDEX_RENCONTRES,
+    MEILISEARCH_INDEX_SALLES,
+    MEILISEARCH_INDEX_TERRAINS,
+    MEILISEARCH_INDEX_TOURNOIS,
+]
+
+
+def _build_multi_search_queries(
+    active_indexes: list[str],
+    normalized_query: str,
+    limit: int,
+) -> list[Any]:
+    from ffbb_data_client.models import MultiSearchQuery
+
+    primary_limit = min(limit, max(2, (limit + 2) // 3))
+    secondary_limit = min(limit, max(1, (limit + 9) // 10))
+
+    return [
+        MultiSearchQuery(
+            index_uid=idx,
+            q=normalized_query,
+            limit=primary_limit if idx in _PRIMARY_SEARCH_INDEXES else secondary_limit,
+        )
+        for idx in active_indexes
+    ]
+
+
+async def _execute_multi_search_with_self_healing(
+    client: Any,
+    nom: str,
+    normalized_query: str,
+    limit: int,
+) -> Any:
+    """Exécute un multi-search Meilisearch avec auto-découverte et boucle de self-healing."""
+    from ffbb_data_client.models import MultiSearchQuery
+
+    if state.active_search_indexes is None:
+        # Résolution dynamique initiale via discovery
+        try:
+            from ffbb_data_client.data import load_discovery_artefact
+
+            disc = load_discovery_artefact("indexes.json")
+            available = set(disc.get("available_indexes", []))
+            if available:
+                state.active_search_indexes = [
+                    idx for idx in _ALL_CANDIDATE_SEARCH_INDEXES if idx in available
+                ]
+        except Exception:
+            pass
+
+        if not state.active_search_indexes:
+            state.active_search_indexes = list(_ALL_CANDIDATE_SEARCH_INDEXES)
+
+    active_indexes = list(state.active_search_indexes)
+    queries = _build_multi_search_queries(active_indexes, normalized_query, limit)
+
+    try:
+        return await _with_ffbb_semaphore(
+            _safe_call_with_inflight(
+                f"Multi-search: {nom}", lambda: client.multi_search_async(queries)
+            )
+        )
+    except Exception as e:
+        logger.warning(
+            "Échec multi-search initial (%s) — Déclenchement de l'auto-guérison (Self-Healing)...",
+            e,
+        )
+        # Diagnostic / Sonde rapide pour identifier les index opérationnels
+        healthy_indexes: list[str] = []
+        for idx in active_indexes:
+            try:
+                single_q = [
+                    MultiSearchQuery(index_uid=idx, q=normalized_query, limit=1)
+                ]
+                probe = await client._meilisearch.multi_search_async(single_q)
+                if (
+                    probe
+                    and getattr(probe, "results", None)
+                    and len(probe.results) == 1
+                ):
+                    healthy_indexes.append(idx)
+                else:
+                    logger.info("Self-Healing : index inactif ou vide exclu : %s", idx)
+            except Exception:
+                logger.info("Self-Healing : index en erreur exclu : %s", idx)
+
+        if not healthy_indexes:
+            healthy_indexes = [
+                MEILISEARCH_INDEX_ORGANISMES,
+                MEILISEARCH_INDEX_COMPETITIONS,
+            ]
+
+        # Cristallisation des index sains en mémoire
+        state.active_search_indexes = healthy_indexes
+        recovered_queries = _build_multi_search_queries(
+            healthy_indexes, normalized_query, limit
+        )
+        return await _with_ffbb_semaphore(
+            _safe_call_with_inflight(
+                f"Multi-search (auto-healed): {nom}",
+                lambda: client.multi_search_async(recovered_queries),
+            )
+        )
+
+
 async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]]:
     normalized_query = normalize_query(nom)
     cache_key = f"multi_search:{normalized_query}:{limit}"
 
     async def _fetch() -> list[dict[str, Any]]:
-        from ffbb_data_client.config import (
-            MEILISEARCH_INDEX_COMPETITIONS,
-            MEILISEARCH_INDEX_ORGANISMES,
-            MEILISEARCH_INDEX_RENCONTRES,
-            MEILISEARCH_INDEX_SALLES,
-            MEILISEARCH_INDEX_TERRAINS,
-            MEILISEARCH_INDEX_TOURNOIS,
-        )
-        from ffbb_data_client.models import MultiSearchQuery
-
         client = await get_client_async()
-        primary_limit = min(limit, max(2, (limit + 2) // 3))
-        secondary_limit = min(limit, max(1, (limit + 9) // 10))
-        queries = [
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_ORGANISMES,
-                q=normalized_query,
-                limit=primary_limit,
-            ),
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_COMPETITIONS,
-                q=normalized_query,
-                limit=primary_limit,
-            ),
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_RENCONTRES,
-                q=normalized_query,
-                limit=primary_limit,
-            ),
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_SALLES,
-                q=normalized_query,
-                limit=secondary_limit,
-            ),
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_TERRAINS,
-                q=normalized_query,
-                limit=secondary_limit,
-            ),
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_TOURNOIS,
-                q=normalized_query,
-                limit=secondary_limit,
-            ),
-        ]
-
-        raw = await _with_ffbb_semaphore(
-            _safe_call_with_inflight(
-                f"Multi-search: {nom}", lambda: client.multi_search_async(queries)
-            )
+        raw = await _execute_multi_search_with_self_healing(
+            client=client,
+            nom=nom,
+            normalized_query=normalized_query,
+            limit=limit,
         )
 
         if not getattr(raw, "results", None):
