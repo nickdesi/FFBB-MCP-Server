@@ -263,14 +263,17 @@ async def ffbb_equipes_club_service(
 
     filtered_teams: list[dict[str, Any]] = []
     for t in all_teams:
-        if (
-            parsed_filter.categorie
-            and t["categorie"].upper() != parsed_filter.categorie.upper()
-        ):
+        t_cat = (t.get("categorie") or "").upper().strip()
+        if parsed_filter.categorie:
+            f_cat = parsed_filter.categorie.upper().strip()
+            is_match = (t_cat == f_cat) or (
+                {t_cat, f_cat} <= {"SE", "SENIOR", "SENIORS"}
+            )
+            if not is_match:
+                continue
+        if parsed_filter.sexe == "F" and (t.get("sexe") or "").upper() == "M":
             continue
-        if parsed_filter.sexe == "F" and (t["sexe"] or "").upper() == "M":
-            continue
-        if parsed_filter.sexe == "M" and (t["sexe"] or "").upper() == "F":
+        if parsed_filter.sexe == "M" and (t.get("sexe") or "").upper() == "F":
             continue
         filtered_teams.append(t)
 

@@ -188,6 +188,62 @@ class TestParseCategorie:
         assert res2.sexe == "M"
         assert res2.numero_equipe == 2
 
+    def test_parse_regional_departemental_national_divisions(self):
+        # RM1, RF2, DM1, DF3, NM2, NF1
+        r_m1 = parse_categorie("RM1")
+        assert r_m1 == ("SENIOR", "M", 1)
+
+        r_f2 = parse_categorie("RF2")
+        assert r_f2 == ("SENIOR", "F", 2)
+
+        d_m1 = parse_categorie("DM1")
+        assert d_m1 == ("SENIOR", "M", 1)
+
+        d_f3 = parse_categorie("DF3")
+        assert d_f3 == ("SENIOR", "F", 3)
+
+        n_m2 = parse_categorie("NM2")
+        assert n_m2 == ("SENIOR", "M", 2)
+
+        n_f1 = parse_categorie("NF1")
+        assert n_f1 == ("SENIOR", "F", 1)
+
+        # Formats inversés : R1M, D2F, N3M
+        assert parse_categorie("R1M") == ("SENIOR", "M", 1)
+        assert parse_categorie("D2F") == ("SENIOR", "F", 2)
+        assert parse_categorie("N3M") == ("SENIOR", "M", 3)
+
+    def test_parse_prenationale_preregionale(self):
+        # PNM, PNF, PRM, PRF
+        assert parse_categorie("PNM") == ("SENIOR", "M", None)
+        assert parse_categorie("PNM1") == ("SENIOR", "M", 1)
+        assert parse_categorie("PNF2") == ("SENIOR", "F", 2)
+        assert parse_categorie("PRM") == ("SENIOR", "M", None)
+        assert parse_categorie("PRF 1") == ("SENIOR", "F", 1)
+        assert parse_categorie("PRÉ-NATIONALE MASCULINE 2") == ("SENIOR", "M", 2)
+
+    def test_parse_senior_shorthands(self):
+        # SEM1, SEF2, SM1, SF2
+        assert parse_categorie("SEM1") == ("SENIOR", "M", 1)
+        assert parse_categorie("SEF2") == ("SENIOR", "F", 2)
+        assert parse_categorie("SM1") == ("SENIOR", "M", 1)
+        assert parse_categorie("SF2") == ("SENIOR", "F", 2)
+
+    def test_parse_traditional_youth_names(self):
+        # Poussins, Benjamines, Minimes, Cadettes, Espoirs
+        assert parse_categorie("Poussins 1") == ("U11", "M", 1)
+        assert parse_categorie("Poussines 2") == ("U11", "F", 2)
+        assert parse_categorie("Benjamins M") == ("U13", "M", None)
+        assert parse_categorie("Benjamines 2") == ("U13", "F", 2)
+        assert parse_categorie("Minimes Filles") == ("U15", "F", None)
+        assert parse_categorie("Cadettes 1") == ("U17", "F", 1)
+        assert parse_categorie("Cadets 2") == ("U17", "M", 2)
+        assert parse_categorie("Espoirs") == ("U21", None, None)
+
+    def test_parse_veterans(self):
+        assert parse_categorie("Vétérans M 1") == ("VETERAN", "M", 1)
+        assert parse_categorie("V35 F") == ("VETERAN", "F", None)
+
     def test_parse_edge_cases(self):
         assert parse_categorie("") == (None, None, None)
         assert parse_categorie(None) == (None, None, None)

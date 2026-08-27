@@ -1096,6 +1096,59 @@ class TestResolveTeamService:
         assert not result.get("candidates")
         assert "message" in result or "ambiguity" in result
 
+    @pytest.mark.asyncio
+    async def test_resolve_team_gender_filtering_rm1_auto_resolves_club(
+        self, patch_get_client, mock_client
+    ):
+        """Une recherche club_name avec RM1 élimine le club féminin et résout l'équipe."""
+        club_fem = MagicMock()
+        club_fem.model_dump = MagicMock(
+            return_value={"id": 9269, "nom": "STADE CLERMONTOIS BASKET FEMININ"}
+        )
+        club_masc = MagicMock()
+        club_masc.model_dump = MagicMock(
+            return_value={"id": 9326, "nom": "STADE CLERMONTOIS BASKET AUVERGNE"}
+        )
+        search_res = MagicMock()
+        search_res.hits = [club_fem, club_masc]
+        search_res.estimated_total_hits = 2
+
+        mock_client.search_organismes_async = AsyncMock(return_value=search_res)
+
+        org_masc_data = {
+            "id": 9326,
+            "nom": "STADE CLERMONTOIS BASKET AUVERGNE",
+            "engagements": [
+                {
+                    "id": "eng_rm1",
+                    "numeroEquipe": "1",
+                    "idCompetition": {
+                        "id": "comp_1",
+                        "nom": "Pré nationale masculine",
+                        "sexe": "M",
+                        "categorie": {"code": "SE"},
+                    },
+                    "idPoule": {"id": "poule_1"},
+                }
+            ],
+        }
+        mock_client.get_organisme_async = AsyncMock(
+            return_value=MagicMock(model_dump=MagicMock(return_value=org_masc_data))
+        )
+
+        result = await ffbb_resolve_team_service(
+            club_name="Stade Clermontois",
+            categorie="RM1",
+        )
+
+        assert result.get("status") == "resolved"
+        assert result.get("team") is not None
+        assert (
+            result.get("team", {}).get("nom_equipe")
+            == "STADE CLERMONTOIS BASKET AUVERGNE"
+        )
+        assert result.get("club_resolu", {}).get("organisme_id") == 9326
+
 
 # ---------------------------------------------------------------------------
 # Tests — Bug 2 : fallback équipe sans numéro explicite

@@ -10,7 +10,7 @@ import logging
 import os
 import platform
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -368,6 +368,220 @@ def register_routes(mcp: FastMCP) -> None:
                 },
                 status_code=202,
             )
+
+    @mcp.custom_route("/api/scba/matches", methods=["GET"])  # type: ignore[untyped-decorator]
+    @mcp.custom_route("/api/v1/club/{organisme_id}/matches", methods=["GET"])  # type: ignore[untyped-decorator]
+    async def club_matches_api(request: Request) -> Response:
+        """Retourne l'ensemble des rencontres d'un club pour les applications web (ex: SCBA-Benevolat)."""
+        organisme_id_raw = request.path_params.get("organisme_id", "9326")
+        try:
+            organisme_id = int(organisme_id_raw)
+        except ValueError, TypeError:
+            organisme_id = 9326
+
+        team_filter = request.query_params.get("team")
+
+        from .client import get_client_async
+
+        client = await get_client_async()
+
+        try:
+            org = await client.get_organisme_async(organisme_id=organisme_id)
+            if not org:
+                return OrjsonResponse(
+                    {"error": "Club introuvable", "matches": [], "count": 0},
+                    status_code=404,
+                    headers={"Access-Control-Allow-Origin": "*"},
+                )
+        except Exception as e:
+            return OrjsonResponse(
+                {"error": str(e), "matches": [], "count": 0},
+                status_code=500,
+                headers={"Access-Control-Allow-Origin": "*"},
+            )
+
+        club_name = getattr(org, "nom", "") or "Club"
+        club_logo_url: str | None = None
+        if getattr(org, "logo", None):
+            logo_id = getattr(org.logo, "id", None) or org.logo
+            if logo_id:
+                club_logo_url = f"https://api.ffbb.com/assets/{logo_id}"
+
+        engagements = getattr(org, "engagements", []) or []
+        matches_list: list[dict[str, Any]] = []
+        seen_match_ids: set[str] = set()
+
+        WEEKDAYS_FR = [
+            "Lundi",
+            "Mardi",
+            "Mercredi",
+            "Jeudi",
+            "Vendredi",
+            "Samedi",
+            "Dimanche",
+        ]
+        MONTHS_FR = [
+            "Janvier",
+            "Février",
+            "Mars",
+            "Avril",
+            "Mai",
+            "Juin",
+            "Juillet",
+            "Août",
+            "Septembre",
+            "Octobre",
+            "Novembre",
+            "Décembre",
+        ]
+
+        def _fmt_date(iso_str: str) -> str:
+            if not iso_str:
+                return ""
+            try:
+                parts = iso_str.split("-")
+                if len(parts) != 3:
+                    return iso_str
+                dt = datetime.date(int(parts[0]), int(parts[1]), int(parts[2]))
+                return f"{WEEKDAYS_FR[dt.weekday()]} {dt.day} {MONTHS_FR[dt.month - 1]} {dt.year}"
+            except Exception:
+                return iso_str
+
+        def _clean_opp(raw: str) -> str:
+            if not raw:
+                return "Adversaire Inconnu"
+            import re
+
+            return re.sub(
+                r"^(IE\s*[-]?\s*|CTC\s*[-]?\s*)", "", raw.strip(), flags=re.IGNORECASE
+            ).strip()
+
+        def _norm_team(team_raw: str, comp_name: str = "") -> str:
+            import re
+
+            raw = (team_raw or "").upper().strip()
+            comp = (comp_name or "").upper().strip()
+            m_cat = re.search(r"U\s*(\d+)", raw) or re.search(r"U\s*(\d+)", comp)
+            if m_cat:
+                cat = m_cat.group(1)
+                m_num = re.search(r"[- ](\d+)$", raw)
+                num = m_num.group(1) if m_num else "1"
+                return f"U{cat} M{num}"
+            m_num = re.search(r"[- ](\d+)$", raw)
+            num = m_num.group(1) if m_num else None
+            if not num:
+                if "RM2" in comp or "DIVISION 2" in comp:
+                    num = "2"
+                elif "RM3" in comp or "DIVISION 3" in comp:
+                    num = "3"
+                elif (
+                    "PNM" in comp or "PRE NATIONALE" in comp or "PRÉ NATIONALE" in comp
+                ):
+                    num = "1"
+                else:
+                    num = "1"
+            return f"SENIOR M{num}"
+
+        for eng in engagements:
+            poule_obj = getattr(eng, "idPoule", None)
+            comp_obj = getattr(eng, "idCompetition", None)
+            poule_id = getattr(poule_obj, "id", None) or (
+                str(poule_obj) if poule_obj else None
+            )
+            comp_nom = getattr(comp_obj, "nom", "") or ""
+
+            if not poule_id:
+                continue
+
+            try:
+                poule = await client.get_poule_async(poule_id=int(poule_id))
+                rencontres = getattr(poule, "rencontres", []) or []
+            except Exception:
+                continue
+
+            for m in rencontres:
+                m_id = str(getattr(m, "id", "") or "")
+                if not m_id or m_id in seen_match_ids:
+                    continue
+
+                nom_eq1 = getattr(m, "nomEquipe1", "") or ""
+                nom_eq2 = getattr(m, "nomEquipe2", "") or ""
+                id_org1 = str(getattr(m, "idOrganismeEquipe1", "") or "")
+                id_org2 = str(getattr(m, "idOrganismeEquipe2", "") or "")
+
+                is_club1 = (
+                    id_org1 == str(organisme_id) or club_name.upper() in nom_eq1.upper()
+                )
+                is_club2 = (
+                    id_org2 == str(organisme_id) or club_name.upper() in nom_eq2.upper()
+                )
+
+                if not is_club1 and not is_club2:
+                    continue
+
+                seen_match_ids.add(m_id)
+                is_home = is_club1
+                local_team_raw = nom_eq1 if is_home else nom_eq2
+                opp_team_raw = nom_eq2 if is_home else nom_eq1
+
+                team_name = _norm_team(local_team_raw, comp_nom)
+                opponent = _clean_opp(opp_team_raw)
+
+                if (
+                    team_filter
+                    and team_filter != "ALL"
+                    and team_filter.upper() not in team_name.upper()
+                ):
+                    continue
+
+                date_raw = str(
+                    getattr(m, "date_rencontre", "") or getattr(m, "date", "") or ""
+                )
+                date_iso = date_raw[:10] if date_raw.startswith("20") else ""
+
+                import re
+
+                time_str = "15:00"
+                horaire = str(getattr(m, "horaire", "") or "")
+                if horaire:
+                    h_clean = re.sub(r"[hH:]", "", horaire).strip()
+                    if len(h_clean) == 4:
+                        time_str = f"{h_clean[:2]}:{h_clean[2:]}"
+                    elif len(h_clean) == 2:
+                        time_str = f"{h_clean}:00"
+                elif " " in date_raw:
+                    time_part = date_raw.split(" ")[1][:5]
+                    if ":" in time_part:
+                        time_str = time_part
+
+                location = (
+                    f"Domicile ({club_name})" if is_home else f"Extérieur ({opponent})"
+                )
+                match_data = {
+                    "ffbbMatchId": m_id,
+                    "team": team_name,
+                    "opponent": opponent,
+                    "date": _fmt_date(date_iso),
+                    "dateISO": date_iso,
+                    "time": time_str,
+                    "location": location,
+                    "isHome": is_home,
+                    "competition": comp_nom,
+                    "teamLogo": club_logo_url,
+                }
+                matches_list.append(match_data)
+
+        matches_list.sort(key=lambda x: (x.get("dateISO", ""), x.get("time", "")))
+
+        return OrjsonResponse(
+            {
+                "organisme_id": organisme_id,
+                "club": club_name,
+                "matches": matches_list,
+                "count": len(matches_list),
+            },
+            headers={"Access-Control-Allow-Origin": "*"},
+        )
 
     @mcp.custom_route("/cache/warmup", methods=["GET"])  # type: ignore[untyped-decorator]
     async def cache_warmup_get(_request: Request) -> Response:

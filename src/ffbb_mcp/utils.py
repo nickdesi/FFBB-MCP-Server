@@ -59,9 +59,31 @@ class ParsedCategorie(NamedTuple):
     numero_equipe: int | None
 
 
-_CAT_PATTERN = re.compile(r"U(\d{1,2})")
-_M_PATTERN = re.compile(r"\bM\b|U\d{1,2}M|MASC")
-_F_PATTERN = re.compile(r"\bF\b|U\d{1,2}F|FÉM|FEM")
+_CAT_PATTERN = re.compile(r"\bU-?(\d{1,2})\b|U(\d{1,2})", re.IGNORECASE)
+_JEUNES_NAMED_MAP = [
+    (re.compile(r"\bMINI[\s_-]?POUSSIN(?:ES?|S)?\b", re.IGNORECASE), "U9"),
+    (re.compile(r"\bPOUSSIN(?:ES?|S)?\b", re.IGNORECASE), "U11"),
+    (re.compile(r"\bBENJAMIN(?:ES?|S)?\b", re.IGNORECASE), "U13"),
+    (re.compile(r"\bMINIMES?\b", re.IGNORECASE), "U15"),
+    (re.compile(r"\bCADET(?:TES?|S)?\b", re.IGNORECASE), "U17"),
+    (re.compile(r"\bESPOIRS?\b", re.IGNORECASE), "U21"),
+]
+_VETERAN_PATTERN = re.compile(
+    r"\b(VETERANS?|VÉTÉRANS?|VET|V35|V40|V45|V50)\b",
+    re.IGNORECASE,
+)
+_SENIOR_PATTERN = re.compile(
+    r"\b(SENIORS?|SEN|SE|SEM\d?|SEF\d?|SM\d?|SF\d?|[RDN][MF]\d?|PN[MF]\d?|PR[MF]\d?|[RDN]\d[MF]|PRE[\s-]?NAT(IONALE?)?|PRÉ[\s-]?NAT(IONALE?)?|PRE[\s-]?REG(IONALE?)?|PRÉ[\s-]?RÉG(IONALE?)?|REGION(AL|ALE|ALES|AUX)?|RÉGION(AL|ALE|ALES|AUX)?|DEPARTEMENT(AL|ALE|ALES|AUX)?|DÉPARTEMENT(AL|ALE|ALES|AUX)?|NATION(AL|ALE|ALES|AUX)?|ELITE|ÉLITE)\b",
+    re.IGNORECASE,
+)
+_M_PATTERN = re.compile(
+    r"\bM\b|U\d{1,2}M|\b[RDN]M\d?\b|\bPNM\d?\b|\bPRM\d?\b|\bR\dM\b|\bD\dM\b|\bN\dM\b|\bSEM\d?\b|\bSM\d?\b|\bM\d\b|\b(MASC|MASCULIN|MASCULINS|MASCULINE|HOMMES?|GARS|GARCONS?|GARÇONS?|MESSIEURS|CADETS?|BENJAMINS?|POUSSINS?)\b",
+    re.IGNORECASE,
+)
+_F_PATTERN = re.compile(
+    r"\bF\b|U\d{1,2}F|\b[RDN]F\d?\b|\bPNF\d?\b|\bPRF\d?\b|\bR\dF\b|\bD\dF\b|\bN\dF\b|\bSEF\d?\b|\bSF\d?\b|\bF\d\b|\b(FÉM|FEM|FEMININ|FÉMININ|FEMININE|FÉMININE|FEMININES|FÉMININES|FILLES?|FEMMES?|DAMES?|CADETTES?|BENJAMINES?|POUSSINES?)\b",
+    re.IGNORECASE,
+)
 _NUM_PATTERN = re.compile(r"(\d+)")
 
 
@@ -70,43 +92,53 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
     """Parse une chaîne de catégorie libre en composantes structurées.
 
     La logique est volontairement tolérante (espaces, casse, tirets) pour
-    accepter des entrées utilisateur comme "u11m1", "U11 M 1", "u11-f-2".
+    accepter des entrées utilisateur comme "u11m1", "U11 M 1", "u11-f-2",
+    "RM1", "RF2", "DM1", "PNM", "Senior F", "Benjamines 2", etc.
     """
 
     if not raw:
         return ParsedCategorie(categorie=None, sexe=None, numero_equipe=None)
 
-    s = raw.strip().upper()
+    s = raw.strip()
     if not s:
         return ParsedCategorie(categorie=None, sexe=None, numero_equipe=None)
 
-    # 1) Catégorie type Uxx
-    cat_match = _CAT_PATTERN.search(s) if "U" in s else None
+    # 1) Catégorie type Uxx, jeunes nommés, vétérans ou SENIOR
+    cat_match = _CAT_PATTERN.search(s) if "U" in s.upper() else None
     categorie: str | None = None
     if cat_match:
-        categorie = f"U{cat_match.group(1)}"
-    elif "SENIOR" in s:
-        categorie = "SENIOR"
+        val = cat_match.group(1) or cat_match.group(2)
+        categorie = f"U{val}"
+    else:
+        for pat, cat_val in _JEUNES_NAMED_MAP:
+            if pat.search(s):
+                categorie = cat_val
+                break
+        if not categorie:
+            if _VETERAN_PATTERN.search(s):
+                categorie = "VETERAN"
+            elif _SENIOR_PATTERN.search(s):
+                categorie = "SENIOR"
 
-    # 2) Sexe (M/F) — on évite de matcher le M de "U11M" si déjà capturé
-    # Fast path: verify substrings before invoking slow regex engine
+    # 2) Sexe (M/F)
     sexe: str | None = None
-    if "M" in s and _M_PATTERN.search(s):
+    is_m = bool(_M_PATTERN.search(s))
+    is_f = bool(_F_PATTERN.search(s))
+    if is_m and not is_f:
         sexe = "M"
-    elif "F" in s and _F_PATTERN.search(s):
+    elif is_f and not is_m:
         sexe = "F"
 
-    # 3) Numéro d'équipe (chiffre final non lié à Uxx)
-    # On cherche un chiffre en fin de chaîne qui n'est PAS un digit du code Uxx.
-    # Exemples : U11M1 → 1, U11M → None, U13F2 → 2, U11 → None
+    # 3) Numéro d'équipe (chiffre final non lié à Uxx / Vxx)
     numero_equipe: int | None = None
-    # Retirer le pattern Uxx du début, puis chercher un chiffre isolé restant
-    remainder = s[cat_match.end() :] if cat_match else s
+    remainder = s
+    if cat_match:
+        remainder = s[cat_match.end() :]
+    elif vet_match := _VETERAN_PATTERN.search(s):
+        remainder = s[vet_match.end() :]
 
-    #  Bolt: Regex direct (moteur C) — plus rapide que l'itération manuelle Python.
     num_match = _NUM_PATTERN.search(remainder)
     if num_match:
-        # _NUM_PATTERN captures only digits (\d+), so ValueError is impossible here
         numero_equipe = int(num_match.group(1))
 
     return ParsedCategorie(categorie=categorie, sexe=sexe, numero_equipe=numero_equipe)
