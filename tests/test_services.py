@@ -2296,3 +2296,43 @@ class TestServicesRobustness:
             "TEST CLUB", 123, "RM1", 1, extra_param="ignored"
         )
         assert isinstance(res, list)
+
+    @pytest.mark.asyncio
+    async def test_get_classement_service_fallback_rencontres(
+        self, patch_get_client, mock_client
+    ):
+        from ffbb_mcp.services.poule import ffbb_get_classement_service
+
+        mock_poule = MagicMock()
+        mock_poule.model_dump = MagicMock(
+            return_value={
+                "id": "100",
+                "classements": [],
+                "rencontres": [
+                    {
+                        "nomEquipe1": "TEAM A",
+                        "nomEquipe2": "TEAM B",
+                        "idOrganisme": "123",
+                    },
+                    {
+                        "nomEquipe1": "TEAM C",
+                        "nomEquipe2": "TEAM A",
+                        "idOrganisme": "456",
+                    },
+                ],
+            }
+        )
+        mock_client.get_poule_async = AsyncMock(return_value=mock_poule)
+
+        res = await ffbb_get_classement_service(
+            poule_id=100, force_refresh=True, target_organisme_id=123
+        )
+        assert len(res) == 3
+        team_names = [r["equipe"] for r in res]
+        assert "TEAM A" in team_names
+        assert "TEAM B" in team_names
+        assert "TEAM C" in team_names
+        assert all(r["status"] == "non_commence" for r in res)
+        assert all(r["match_joues"] == 0 for r in res)
+        team_a = next(r for r in res if r["equipe"] == "TEAM A")
+        assert team_a["is_target"] is True

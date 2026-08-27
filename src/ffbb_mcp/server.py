@@ -714,19 +714,31 @@ async def ffbb_club(
             return result
         elif action == "classement":
             effective_poule_id = poule_id
-            target_num = None
+            target_num = numero_equipe if numero_equipe and numero_equipe > 1 else None
 
             # Auto-résolution du poule_id si manquant mais club/filtre présents
-            if not effective_poule_id and target_org_id and filtre:
+            if not effective_poule_id and target_org_id and (filtre or numero_equipe):
                 # Parse le filtre pour extraire le numéro d'équipe si présent (ex: U11M1)
                 from .utils import parse_categorie
 
-                parsed = parse_categorie(filtre)
-                target_num = parsed.numero_equipe if parsed else None
+                effective_filtre = filtre
+                if (
+                    numero_equipe
+                    and numero_equipe > 1
+                    and filtre
+                    and str(numero_equipe) not in filtre
+                ):
+                    effective_filtre = f"{filtre}{numero_equipe}"
+                elif not effective_filtre and numero_equipe:
+                    effective_filtre = str(numero_equipe)
+
+                parsed = parse_categorie(effective_filtre)
+                if parsed and parsed.numero_equipe:
+                    target_num = parsed.numero_equipe
 
                 # Tentative de résolution de la poule via le service dédié
                 resolved_pid = await resolve_poule_id_service(
-                    target_org_id, filtre, phase_query=phase
+                    target_org_id, effective_filtre or filtre or "", phase_query=phase
                 )
                 if resolved_pid:
                     effective_poule_id = int(resolved_pid)

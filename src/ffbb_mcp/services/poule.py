@@ -357,6 +357,47 @@ async def ffbb_get_classement_service(
                     "hors_classement": c.get("hors_classement"),
                 }
             )
+
+        # Fallback si aucun classement calculé (avant début de saison) : extraire les équipes des rencontres
+        if not flat and data.get("rencontres"):
+            seen_teams: set[str] = set()
+            pos = 1
+            for r in data.get("rencontres", []):
+                for eq_key in ("nomEquipe1", "nomEquipe2"):
+                    eq_name = r.get(eq_key)
+                    if eq_name and eq_name not in seen_teams:
+                        seen_teams.add(eq_name)
+                        is_target = False
+                        if target_org_str and str(target_org_str) in str(
+                            r.get("idOrganisme", "")
+                        ):
+                            is_target = True
+                        flat.append(
+                            {
+                                "position": pos,
+                                "equipe": eq_name,
+                                "points": 0,
+                                "match_joues": 0,
+                                "gagnes": 0,
+                                "perdus": 0,
+                                "difference": 0,
+                                "is_target": is_target,
+                                "paniers_marques": 0,
+                                "paniers_encaisses": 0,
+                                "logo_url": None,
+                                "point_initiaux": None,
+                                "penalites_arbitrage": None,
+                                "penalites_entraineur": None,
+                                "penalites_diverses": None,
+                                "nombre_forfaits": None,
+                                "nombre_defauts": None,
+                                "quotient": None,
+                                "hors_classement": None,
+                                "status": "non_commence",
+                            }
+                        )
+                        pos += 1
+
         return {"_ttl": ttl, "data": flat}
 
     wrapped = await _dedupe_inflight(
