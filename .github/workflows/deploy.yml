@@ -41,8 +41,12 @@ jobs:
           fi
 
           response=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
+            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" \
             -H "x-api-key: $DOKPLOY_API_KEY" \
             -H "Content-Type: application/json" \
+            -H "Accept: application/json, text/plain, */*" \
+            -H "Origin: $DOKPLOY_URL" \
+            -H "Referer: $DOKPLOY_URL/dashboard" \
             -d "{\"0\": {\"json\": {\"applicationId\": \"$APPLICATION_ID\"}}}" \
             "$DOKPLOY_URL/api/trpc/application.deploy?batch=1")
 
