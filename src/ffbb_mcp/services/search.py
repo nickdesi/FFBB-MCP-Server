@@ -745,6 +745,7 @@ async def ffbb_resolve_team_service(
     club_name: str | None = None,
     organisme_id: int | str | None = None,
     categorie: str | None = None,
+    numero_equipe: int | str | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Résout une équipe unique d'un club pour une catégorie donnée.
@@ -852,7 +853,16 @@ async def ffbb_resolve_team_service(
     # 3) Matching intelligent du numéro
     candidates = equipes
     parsed = parse_categorie(categorie)
-    target_num = str(parsed.numero_equipe) if parsed.numero_equipe else None
+    raw_num = (
+        numero_equipe
+        if numero_equipe is not None
+        else (
+            parsed.numero_equipe
+            if parsed.numero_equipe is not None
+            else kwargs.get("numero_equipe")
+        )
+    )
+    target_num = str(raw_num) if raw_num is not None else None
 
     # On cherche d'abord le numéro exact, fallback sur équipe sans numéro
     matched = _resolve_team_number(candidates, target_num)

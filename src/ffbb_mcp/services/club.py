@@ -1051,22 +1051,26 @@ async def _build_bilan_payload(
             if stats_from_rencontres:
                 for k, v in stats_from_rencontres.items():
                     totaux[k] += v
-                matching_nums = [
-                    eng_to_num[eid] for eid in eng_ids_here if eid in eng_to_num
-                ]
-                num_equipe = matching_nums[0] if matching_nums else "1"
-                phases.append(
-                    {
-                        "competition": poule_to_comp.get(pid, ""),
-                        "poule_id": pid,
-                        "numero_equipe": num_equipe,
-                        "position": None,
-                        "total_equipes": None,
-                        "phase_type": _detect_phase_type(poule_to_comp.get(pid, "")),
-                        "phase_terminee": poule_data.get("phase_terminee", False),
-                        **stats_from_rencontres,
-                    }
-                )
+                stats_to_use = stats_from_rencontres
+            else:
+                stats_to_use = _new_bilan_totals()
+
+            matching_nums = [
+                eng_to_num[eid] for eid in eng_ids_here if eid in eng_to_num
+            ]
+            num_equipe = matching_nums[0] if matching_nums else "1"
+            phases.append(
+                {
+                    "competition": poule_to_comp.get(pid, ""),
+                    "poule_id": pid,
+                    "numero_equipe": num_equipe,
+                    "position": None,
+                    "total_equipes": None,
+                    "phase_type": _detect_phase_type(poule_to_comp.get(pid, "")),
+                    "phase_terminee": poule_data.get("phase_terminee", False),
+                    **stats_to_use,
+                }
+            )
 
     def _phase_sort_key_by_age(p: dict) -> tuple[int, str, int, str]:
         comp = p.get("competition") or ""
@@ -1298,6 +1302,19 @@ async def _build_calendar_matches(
         ):
             continue
 
+        equipe_eng_id = str(
+            equipe.get("engagement_id")
+            or equipe.get("team_id")
+            or equipe.get("id")
+            or ""
+        )
+        eq_num = None
+        raw_eq_num = equipe.get("numero_equipe")
+        try:
+            eq_num = int(raw_eq_num) if raw_eq_num is not None else numero_equipe
+        except ValueError, TypeError:
+            eq_num = numero_equipe
+
         for match in poule_data.get("rencontres", []) or []:
             if not isinstance(match, dict):
                 continue
@@ -1305,19 +1322,63 @@ async def _build_calendar_matches(
             if not match_id or match_id in seen_match_ids:
                 continue
 
-            seen_match_ids.add(match_id)
-
             eng1 = match.get("idEngagementEquipe1")
             eng2 = match.get("idEngagementEquipe2")
+            id_eng1 = str(eng1.get("id") if isinstance(eng1, dict) else (eng1 or ""))
+            id_eng2 = str(eng2.get("id") if isinstance(eng2, dict) else (eng2 or ""))
+
             num1 = _engagement_numero(eng1)
             num2 = _engagement_numero(eng2)
 
-            eq1 = format_team_name(
-                match.get("nomEquipe1", match.get("nom_equipe1", "")), num1
-            )
-            eq2 = format_team_name(
-                match.get("nomEquipe2", match.get("nom_equipe2", "")), num2
-            )
+            raw_nom1 = match.get("nomEquipe1", match.get("nom_equipe1", ""))
+            raw_nom2 = match.get("nomEquipe2", match.get("nom_equipe2", ""))
+            eq1 = format_team_name(raw_nom1, num1)
+            eq2 = format_team_name(raw_nom2, num2)
+
+            # Ne retenir que les matchs où cette équipe du club participe
+            is_our_match = False
+            if equipe_eng_id and equipe_eng_id in (id_eng1, id_eng2):
+                is_our_match = True
+            elif club_nom_resolu:
+                org_nom_norm = _normalize_name(club_nom_resolu)
+                is_our_match = _match_team_name(
+                    str(raw_nom1),
+                    org_nom_norm,
+                    eq_num,
+                    is_organisme_nom_normalized=True,
+                ) or _match_team_name(
+                    str(raw_nom2),
+                    org_nom_norm,
+                    eq_num,
+                    is_organisme_nom_normalized=True,
+                )
+
+            if not is_our_match:
+                # Vérifier aussi par nom_equipe de l'équipe résolue (fallback si nom du club diffère)
+                equipe_nom = str(
+                    equipe.get("nom_equipe") or equipe.get("team_label") or ""
+                )
+                if equipe_nom:
+                    eq_nom_norm = _normalize_name(equipe_nom)
+                    raw1_norm = _normalize_name(str(raw_nom1))
+                    raw2_norm = _normalize_name(str(raw_nom2))
+                    if (
+                        (
+                            eq_nom_norm
+                            and (eq_nom_norm in raw1_norm or eq_nom_norm in raw2_norm)
+                        )
+                        or (raw1_norm and raw1_norm in eq_nom_norm)
+                        or (raw2_norm and raw2_norm in eq_nom_norm)
+                    ):
+                        is_our_match = True
+                elif not equipe_eng_id and not club_nom_resolu:
+                    is_our_match = True
+
+            if not is_our_match:
+                continue
+
+            seen_match_ids.add(match_id)
+
             score1 = match.get("resultatEquipe1", match.get("resultat_equipe1"))
             score2 = match.get("resultatEquipe2", match.get("resultat_equipe2"))
             date_match = match.get("date_rencontre", match.get("date", ""))

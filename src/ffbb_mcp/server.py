@@ -49,7 +49,7 @@ from .services import (
     resolve_club_and_org,
     resolve_poule_id_service,
 )
-from .utils import prune_payload
+from .utils import parse_categorie, prune_payload
 
 
 def zipai_surgical(func: Any) -> Any:
@@ -844,6 +844,10 @@ async def ffbb_resolve_team(
             ),
         ),
     ] = None,
+    numero_equipe: Annotated[
+        int | None,
+        Field(description="Numéro d'équipe facultatif (ex: 1, 2)."),
+    ] = None,
 ) -> dict[str, Any]:
     """Identifie une equipe unique (Pivot central).
 
@@ -852,7 +856,10 @@ async def ffbb_resolve_team(
     """
     try:
         return await ffbb_resolve_team_service(
-            club_name=club_name, organisme_id=organisme_id, categorie=categorie
+            club_name=club_name,
+            organisme_id=organisme_id,
+            categorie=categorie,
+            numero_equipe=numero_equipe,
         )
     except Exception as e:
         raise handle_api_error(e) from e
@@ -911,8 +918,13 @@ async def ffbb_team_summary(
     """
     try:
         await _safe_report_progress(ctx, 0, total=3, message="Résolution de l'équipe…")
+        parsed_cat = parse_categorie(categorie) if categorie else None
         effective_cat = categorie
-        if numero_equipe > 1 and categorie and str(numero_equipe) not in categorie:
+        if (
+            parsed_cat
+            and parsed_cat.numero_equipe is None
+            and numero_equipe is not None
+        ):
             effective_cat = f"{categorie}{numero_equipe}"
 
         # Résoudre l'équipe d'abord pour obtenir organisme_id et catégorie
@@ -920,6 +932,7 @@ async def ffbb_team_summary(
             club_name=club_name,
             organisme_id=organisme_id,
             categorie=effective_cat,
+            numero_equipe=numero_equipe,
         )
 
         resolved_team = resolve_result.get("team")
@@ -927,12 +940,14 @@ async def ffbb_team_summary(
         resolved_org_id = (
             club_resolu.get("organisme_id") if club_resolu else organisme_id
         )
-        resolved_num = 1
+        resolved_num = numero_equipe or 1
         if resolved_team:
             try:
-                resolved_num = int(resolved_team.get("numero_equipe") or 1)
+                resolved_num = int(
+                    resolved_team.get("numero_equipe") or numero_equipe or 1
+                )
             except (TypeError, ValueError):  # fmt: skip
-                resolved_num = 1
+                resolved_num = numero_equipe or 1
 
         # last_result et next_match nécessitent organisme_id
         effective_org_id = resolved_org_id
@@ -949,7 +964,7 @@ async def ffbb_team_summary(
         bilan_coro = ffbb_bilan_service(
             club_name=None,
             organisme_id=effective_org_id,
-            categorie=categorie,
+            categorie=effective_cat or categorie,
         )
 
         if effective_org_id and categorie:
@@ -981,8 +996,14 @@ async def ffbb_team_summary(
             next_match = None
 
         await _safe_report_progress(ctx, 3, total=3, message="Résumé prêt.")
+        team_data = (
+            resolved_team
+            or (next_match.get("team") if isinstance(next_match, dict) else None)
+            or (last_match.get("team") if isinstance(last_match, dict) else None)
+            or (bilan.get("team") if isinstance(bilan, dict) else None)
+        )
         return {
-            "team": resolved_team or bilan.get("team"),
+            "team": team_data,
             "phase_courante": bilan.get("phase_courante"),
             "last_match": last_match,
             "next_match": next_match,

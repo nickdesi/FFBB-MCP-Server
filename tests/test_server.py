@@ -315,3 +315,62 @@ def test_allowed_origins_default_to_wildcard(monkeypatch):
     import ffbb_mcp.server as server_mod
 
     assert "*" in server_mod._allowed_origins
+
+
+@pytest.mark.asyncio
+async def test_team_summary_resolves_team_with_numero_equipe():
+    """Vérifie que ffbb_team_summary passe effective_cat et numero_equipe à ffbb_resolve_team_service."""
+    from unittest.mock import AsyncMock, patch
+
+    from ffbb_mcp.server import ffbb_team_summary
+
+    mock_resolve = AsyncMock(
+        return_value={
+            "status": "resolved",
+            "team": {
+                "team_id": 1001,
+                "team_label": "SEM1",
+                "numero_equipe": "1",
+                "nom_equipe": "STADE CLERMONTOIS",
+                "competition": "Pré nationale masculine",
+            },
+            "club_resolu": {"organisme_id": 9326, "nom": "STADE CLERMONTOIS"},
+        }
+    )
+    mock_bilan = AsyncMock(
+        return_value={
+            "bilan_total": {"match_joues": 0, "gagnes": 0, "perdus": 0},
+            "phase_courante": {"competition": "Pré nationale masculine"},
+        }
+    )
+    mock_last = AsyncMock(return_value=None)
+    mock_next = AsyncMock(
+        return_value={
+            "status": "ok",
+            "team": {"team_id": 1001, "team_label": "SEM1"},
+            "match": {"adversaire": "OUEST LYONNAIS BASKET"},
+        }
+    )
+
+    with (
+        patch("ffbb_mcp.server.ffbb_resolve_team_service", mock_resolve),
+        patch("ffbb_mcp.server.ffbb_bilan_service", mock_bilan),
+        patch("ffbb_mcp.server.ffbb_last_result_service", mock_last),
+        patch("ffbb_mcp.server.ffbb_next_match_service", mock_next),
+    ):
+        res = await ffbb_team_summary(
+            organisme_id=9326,
+            categorie="SEM",
+            numero_equipe=1,
+        )
+
+        mock_resolve.assert_awaited_once_with(
+            club_name=None,
+            organisme_id=9326,
+            categorie="SEM1",
+            numero_equipe=1,
+        )
+        assert res["team"] is not None
+        assert res["team"]["team_label"] == "SEM1"
+        assert res["phase_courante"] == {"competition": "Pré nationale masculine"}
+        assert res["next_match"] is not None

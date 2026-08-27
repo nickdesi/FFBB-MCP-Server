@@ -813,6 +813,69 @@ class TestCalendrierClubService:
         assert "warning" in warning
         assert "Résultat tronqué" in warning["warning"]
 
+    @pytest.mark.asyncio
+    async def test_calendrier_filters_matches_to_club_team_only(
+        self, patch_get_client, mock_client
+    ):
+        """Vérifie que les matchs entre équipes tierces dans la même poule sont exclus du calendrier club."""
+        org_mock = MagicMock()
+        org_mock.model_dump = MagicMock(
+            return_value={
+                "id": 9326,
+                "nom": "STADE CLERMONTOIS",
+                "engagements": [
+                    {
+                        "id": 5001,
+                        "idCompetition": {
+                            "id": 101,
+                            "nom": "Pré nationale masculine",
+                            "categorie": {"code": "SE"},
+                            "sexe": "M",
+                        },
+                        "idPoule": {"id": 2001},
+                        "numeroEquipe": 1,
+                    }
+                ],
+            }
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        # Poule contenant 1 match du Stade Clermontois et 1 match entre deux adversaires
+        poule_mock = MagicMock()
+        poule_mock.model_dump = MagicMock(
+            return_value={
+                "id": 2001,
+                "rencontres": [
+                    {
+                        "id": "match_our_team",
+                        "date_rencontre": "2026-09-19",
+                        "nomEquipe1": "OUEST LYONNAIS BASKET - 2",
+                        "nomEquipe2": "STADE CLERMONTOIS - 1",
+                        "idEngagementEquipe1": {"id": 9991},
+                        "idEngagementEquipe2": {"id": 5001},
+                    },
+                    {
+                        "id": "match_third_party",
+                        "date_rencontre": "2026-09-19",
+                        "nomEquipe1": "BEAUJOLAIS BASKET - 2",
+                        "nomEquipe2": "CS PONT DU CHATEAU - 1",
+                        "idEngagementEquipe1": {"id": 9992},
+                        "idEngagementEquipe2": {"id": 9993},
+                    },
+                ],
+                "classements": [],
+            }
+        )
+        mock_client.get_poule_async = AsyncMock(return_value=poule_mock)
+
+        result = await get_calendrier_club_service(
+            organisme_id=9326, categorie="SEM", numero_equipe=1
+        )
+
+        assert len(result) == 1
+        assert result[0]["id"] == "match_our_team"
+        assert result[0]["equipe2"] == "STADE CLERMONTOIS - 1"
+
 
 # ---------------------------------------------------------------------------
 # Tests — multi_search_service
@@ -1261,6 +1324,55 @@ class TestResolveTeamService:
             == "STADE CLERMONTOIS BASKET AUVERGNE"
         )
         assert result.get("club_resolu", {}).get("organisme_id") == 9326
+
+    @pytest.mark.asyncio
+    async def test_resolve_team_with_explicit_numero_equipe(
+        self, patch_get_client, mock_client
+    ):
+        """Vérifie que numero_equipe=1 désambiguïse une catégorie non numérotée (SEM)."""
+        org_mock = MagicMock()
+        org_mock.model_dump = MagicMock(
+            return_value={
+                "id": 9326,
+                "nom": "STADE CLERMONTOIS BASKET AUVERGNE",
+                "engagements": [
+                    {
+                        "id": "eng_sem1",
+                        "numeroEquipe": "1",
+                        "idCompetition": {
+                            "id": "comp_1",
+                            "nom": "Pré nationale masculine",
+                            "sexe": "M",
+                            "categorie": {"code": "SE"},
+                        },
+                        "idPoule": {"id": "poule_1"},
+                    },
+                    {
+                        "id": "eng_sem2",
+                        "numeroEquipe": "2",
+                        "idCompetition": {
+                            "id": "comp_2",
+                            "nom": "Régionale masculine seniors - Division 2",
+                            "sexe": "M",
+                            "categorie": {"code": "SE"},
+                        },
+                        "idPoule": {"id": "poule_2"},
+                    },
+                ],
+            }
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        result = await ffbb_resolve_team_service(
+            organisme_id=9326,
+            categorie="SEM",
+            numero_equipe=1,
+        )
+
+        assert result.get("status") == "resolved"
+        assert result.get("team") is not None
+        assert result.get("team", {}).get("numero_equipe") == "1"
+        assert result.get("team", {}).get("competition") == "Pré nationale masculine"
 
 
 # ---------------------------------------------------------------------------
