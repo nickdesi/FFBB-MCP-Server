@@ -112,6 +112,21 @@ _GENERIC_CLUB_WORDS: frozenset[str] = frozenset(
         "SPORTS",
         "GARDE",
         "ENTENTE",
+        "STADE",
+        "ETOILE",
+        "AMICALE",
+        "OLYMPIQUE",
+        "PATRONAGE",
+        "JEUNESSE",
+        "AVENIR",
+        "CERCLE",
+        "ES",
+        "CS",
+        "EB",
+        "AL",
+        "CA",
+        "SA",
+        "PL",
     ]
 )
 
@@ -403,6 +418,8 @@ async def resolve_club_and_org(
             ententes = _resolve_ententes(
                 ent_orgs_raw, existing_ids, key_word, club_name
             )
+            if categorie:
+                ententes = _filter_orgs_by_gender(ententes, categorie, club_name)
             resolved.extend(ententes)
 
         # Jaro-Winkler Sorting Optimization
@@ -675,14 +692,6 @@ async def ffbb_resolve_team_service(
             )
         )
 
-    if not categorie:
-        raise McpError(
-            error=ErrorData(
-                code=INTERNAL_ERROR,
-                message="Paramètre 'categorie' requis (ex: 'U11M1', 'U13F2').",
-            )
-        )
-
     # 1) Résoudre l'organisme avec métadonnées
     resolved_clubs, _ = await resolve_club_and_org(
         club_name=club_name, organisme_id=organisme_id, categorie=categorie
@@ -711,6 +720,37 @@ async def ffbb_resolve_team_service(
     target_org_id = str(club_resolu["organisme_id"])
 
     # 2) Récupérer toutes les équipes candidates
+    if not categorie:
+        equipes = await ffbb_mcp.services.ffbb_equipes_club_service(
+            organisme_id=target_org_id
+        )
+        if not equipes or (
+            isinstance(equipes, list) and len(equipes) == 1 and "error" in equipes[0]
+        ):
+            return {
+                "status": "not_found",
+                "team": None,
+                "candidates": [],
+                "ambiguity": f"Aucune équipe trouvée pour le club '{club_resolu.get('nom', target_org_id)}'.",
+                "club_resolu": club_resolu,
+            }
+        equipes = _deduplicate_same_team_phases(equipes)
+        if len(equipes) == 1:
+            return {
+                "status": "resolved",
+                "team": equipes[0],
+                "candidates": equipes,
+                "ambiguity": None,
+                "club_resolu": club_resolu,
+            }
+        return {
+            "status": "ambiguous",
+            "team": None,
+            "candidates": equipes,
+            "ambiguity": "Veuillez préciser la catégorie souhaitée parmi les équipes du club.",
+            "club_resolu": club_resolu,
+        }
+
     equipes = await ffbb_mcp.services.ffbb_equipes_club_service(
         organisme_id=target_org_id, filtre=categorie
     )

@@ -1097,6 +1097,89 @@ class TestResolveTeamService:
         assert "message" in result or "ambiguity" in result
 
     @pytest.mark.asyncio
+    async def test_resolve_team_without_categorie_returns_club_teams_ambiguous(
+        self, patch_get_client, mock_client
+    ):
+        """Sans catégorie, ffbb_resolve_team retourne toutes les équipes du club comme candidats."""
+        org_mock = MagicMock()
+        org_mock.model_dump = MagicMock(
+            return_value={
+                "id": 123,
+                "nom": "Club Multi Equipes",
+                "engagements": [
+                    {
+                        "id": "eng1",
+                        "numeroEquipe": "1",
+                        "idCompetition": {
+                            "nom": "U11M1",
+                            "sexe": "M",
+                            "categorie": {"code": "U11"},
+                        },
+                        "idPoule": {"id": "p1"},
+                    },
+                    {
+                        "id": "eng2",
+                        "numeroEquipe": "2",
+                        "idCompetition": {
+                            "nom": "SEM2",
+                            "sexe": "M",
+                            "categorie": {"code": "SE"},
+                        },
+                        "idPoule": {"id": "p2"},
+                    },
+                ],
+            }
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        result = await ffbb_resolve_team_service(
+            organisme_id=123,
+            club_name=None,
+            categorie=None,
+        )
+
+        assert result.get("status") == "ambiguous"
+        assert result.get("team") is None
+        assert len(result.get("candidates", [])) == 2
+        assert "préciser la catégorie" in (result.get("ambiguity") or "")
+
+    @pytest.mark.asyncio
+    async def test_resolve_team_without_categorie_single_team_resolved(
+        self, patch_get_client, mock_client
+    ):
+        """Sans catégorie, si le club n'a qu'une seule équipe, elle est résolue directement."""
+        org_mock = MagicMock()
+        org_mock.model_dump = MagicMock(
+            return_value={
+                "id": 123,
+                "nom": "Club Mono Equipe",
+                "engagements": [
+                    {
+                        "id": "eng1",
+                        "numeroEquipe": "1",
+                        "idCompetition": {
+                            "nom": "SEM1",
+                            "sexe": "M",
+                            "categorie": {"code": "SE"},
+                        },
+                        "idPoule": {"id": "p1"},
+                    }
+                ],
+            }
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        result = await ffbb_resolve_team_service(
+            organisme_id=123,
+            club_name=None,
+            categorie=None,
+        )
+
+        assert result.get("status") == "resolved"
+        assert result.get("team") is not None
+        assert result.get("team", {}).get("team_label") == "SEM1"
+
+    @pytest.mark.asyncio
     async def test_resolve_team_gender_filtering_rm1_auto_resolves_club(
         self, patch_get_client, mock_client
     ):
