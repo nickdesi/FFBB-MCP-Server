@@ -525,7 +525,6 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
         from ffbb_data_client.config import (
             MEILISEARCH_INDEX_COMPETITIONS,
             MEILISEARCH_INDEX_ORGANISMES,
-            MEILISEARCH_INDEX_PRATIQUES,
             MEILISEARCH_INDEX_RENCONTRES,
             MEILISEARCH_INDEX_SALLES,
             MEILISEARCH_INDEX_TERRAINS,
@@ -554,11 +553,6 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
             ),
             MultiSearchQuery(
                 index_uid=MEILISEARCH_INDEX_SALLES,
-                q=normalized_query,
-                limit=secondary_limit,
-            ),
-            MultiSearchQuery(
-                index_uid=MEILISEARCH_INDEX_PRATIQUES,
                 q=normalized_query,
                 limit=secondary_limit,
             ),

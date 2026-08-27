@@ -844,13 +844,13 @@ class TestMultiSearchService:
         await multi_search_service("test", limit=20)
 
         queries = mock_client.multi_search_async.await_args.args[0]
+        assert len(queries) == 6
         assert queries[0].limit == 7
         assert queries[1].limit == 7
         assert queries[2].limit == 7
         assert queries[3].limit == 2
         assert queries[4].limit == 2
         assert queries[5].limit == 2
-        assert queries[6].limit == 2
 
     @pytest.mark.asyncio
     async def test_caches_empty_multi_search_results(

@@ -376,6 +376,10 @@ async def ffbb_bilan(
             ),
         ),
     ] = None,
+    numero_equipe: Annotated[
+        int | None,
+        Field(description="Numéro d'équipe facultatif (ex: 1, 2)."),
+    ] = None,
     force_refresh: Annotated[
         bool,
         Field(
@@ -399,10 +403,19 @@ async def ffbb_bilan(
     try:
         await _safe_report_progress(ctx, 0, total=3, message="Résolution du club…")
         effective_refresh = force_refresh
+        effective_cat = categorie
+        if (
+            numero_equipe is not None
+            and numero_equipe > 1
+            and categorie
+            and str(numero_equipe) not in categorie
+        ):
+            effective_cat = f"{categorie}{numero_equipe}"
+
         result = await ffbb_bilan_service(
             club_name=club_name,
             organisme_id=organisme_id,
-            categorie=categorie,
+            categorie=effective_cat,
             force_refresh=effective_refresh,
         )
         await _safe_report_progress(ctx, 3, total=3, message="Bilan prêt.")
@@ -860,6 +873,16 @@ async def ffbb_team_summary(
             description="Catégorie + genre + numéro d'équipe (ex: 'U11M1', 'U13F2', 'U15M', 'Senior').",
         ),
     ] = None,
+    numero_equipe: Annotated[
+        int,
+        Field(
+            description="Numéro d'équipe dans la catégorie (ex: 1, 2).",
+        ),
+    ] = 1,
+    force_refresh: Annotated[
+        bool,
+        Field(description="Si True, force un rafraichissement des donnees"),
+    ] = False,
     ctx: Context[Any, Any, Any] | None = None,
 ) -> dict[str, Any]:
     """Résumé complet et agent-friendly pour une équipe.
@@ -876,11 +899,15 @@ async def ffbb_team_summary(
     """
     try:
         await _safe_report_progress(ctx, 0, total=3, message="Résolution de l'équipe…")
+        effective_cat = categorie
+        if numero_equipe > 1 and categorie and str(numero_equipe) not in categorie:
+            effective_cat = f"{categorie}{numero_equipe}"
+
         # Résoudre l'équipe d'abord pour obtenir organisme_id et catégorie
         resolve_result = await ffbb_resolve_team_service(
             club_name=club_name,
             organisme_id=organisme_id,
-            categorie=categorie,
+            categorie=effective_cat,
         )
 
         resolved_team = resolve_result.get("team")
