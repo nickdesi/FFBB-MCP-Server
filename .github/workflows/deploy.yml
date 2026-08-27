@@ -1,20 +1,14 @@
-name: Deploy to Dokploy
+name: Manual Deploy to Dokploy
 
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows: ["CI"]
-    types:
-      - completed
-    branches:
-      - main
 
 permissions:
   contents: read
 
 concurrency:
   group: deploy-${{ github.workflow }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -24,31 +18,16 @@ jobs:
     name: Trigger Dokploy deployment
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    # Ne se lance que sur action manuelle OU si le workflow de CI sur main a réussi
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     steps:
-      - name: Trigger Dokploy Deployment
+      - name: Trigger Dokploy Deployment Webhook
         env:
-          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL || 'https://dokploy.desimone.fr' }}
-          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-          APPLICATION_ID: ${{ secrets.DOKPLOY_APP_ID || '5XoCmCzBkds_9lInJFGpt' }}
+          DOKPLOY_DEPLOY_WEBHOOK: ${{ secrets.DOKPLOY_DEPLOY_WEBHOOK || 'https://dokploy.desimone.fr/api/deploy/kT8qjozNoHE0rdsAB_Sfl' }}
         run: |
-          echo "🚀 Déclenchement du déploiement Dokploy pour l'application $APPLICATION_ID sur $DOKPLOY_URL..."
-          
-          if [ -z "$DOKPLOY_API_KEY" ]; then
-            echo "❌ Erreur : Le secret DOKPLOY_API_KEY n'est pas configuré dans les secrets GitHub."
-            exit 1
-          fi
-
+          echo "🚀 Déclenchement manuel du webhook de déploiement Dokploy..."
           response=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
-            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" \
-            -H "x-api-key: $DOKPLOY_API_KEY" \
             -H "Content-Type: application/json" \
-            -H "Accept: application/json, text/plain, */*" \
-            -H "Origin: $DOKPLOY_URL" \
-            -H "Referer: $DOKPLOY_URL/dashboard" \
-            -d "{\"0\": {\"json\": {\"applicationId\": \"$APPLICATION_ID\"}}}" \
-            "$DOKPLOY_URL/api/trpc/application.deploy?batch=1")
+            -d '{"ref": "refs/heads/main"}' \
+            "$DOKPLOY_DEPLOY_WEBHOOK")
 
           http_status=$(echo "$response" | grep "HTTP_STATUS:" | cut -d':' -f2)
           body=$(echo "$response" | sed '/HTTP_STATUS:/d')
