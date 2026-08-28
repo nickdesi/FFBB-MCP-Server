@@ -107,6 +107,7 @@ def test_dynamique_various_matches_and_streak():
     # Série extérieur : 1 victoire à l'extérieur (Match 4)
     assert res["serie_exterieur"]["type"] == "victoires"
     assert res["serie_exterieur"]["count"] == 1
+    assert res["serie_exterieur"]["label"] == "1 victoire à l'extérieur"
 
     # Moyennes
     # Points marqués : (80 + 65 + 90 + 82 + 85) / 5 = 402 / 5 = 80.4

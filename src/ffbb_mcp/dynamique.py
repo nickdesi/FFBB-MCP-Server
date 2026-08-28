@@ -168,19 +168,30 @@ def compute_team_dynamique(
 
         type_map = {"V": "victoires", "D": "defaites", "N": "nuls"}
         st_type = type_map.get(last_res, "inconnue")
-
         ctx_suffix = f" {context_name}" if context_name else ""
+
+        if count <= 0:
+            return SerieEnCours(type="aucune", count=0, label="")
+
+        if count == 1:
+            if last_res == "V":
+                label = f"1 victoire{ctx_suffix}"
+            elif last_res == "D":
+                label = f"1 défaite{ctx_suffix}"
+            else:
+                label = f"1 match nul{ctx_suffix}"
+            return SerieEnCours(type=st_type, count=1, label=label)
+
+        # count >= 2 : véritable série consécutive
         if last_res == "V":
             if context_name == "à domicile":
-                label = (
-                    f"Invaincu à domicile ({count} victoire{'s' if count > 1 else ''})"
-                )
+                label = f"Invaincu à domicile ({count} victoires)"
             else:
-                label = f"{count} victoire{'s' if count > 1 else ''} consécutive{'s' if count > 1 else ''}{ctx_suffix}"
+                label = f"{count} victoires consécutives{ctx_suffix}"
         elif last_res == "D":
-            label = f"{count} défaite{'s' if count > 1 else ''} consécutive{'s' if count > 1 else ''}{ctx_suffix}"
+            label = f"{count} défaites consécutives{ctx_suffix}"
         else:
-            label = f"{count} match{'s' if count > 1 else ''} nul{'s' if count > 1 else ''} consécutif{'s' if count > 1 else ''}{ctx_suffix}"
+            label = f"{count} matchs nuls consécutifs{ctx_suffix}"
 
         return SerieEnCours(type=st_type, count=count, label=label)
 
