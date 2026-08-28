@@ -21,11 +21,18 @@ def _build_benchmark_html() -> str:
     trends = get_benchmark_trends()
     latest = trends["latest"]
 
+    header_btn = (
+        "<div style='display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin:34px 0 16px;'>"
+        "<div class='section-title' style='margin:0;flex:1;'><span class='ic'>&#9889;</span> Benchmark Performance</div>"
+        "<button id='btn-run-bench' class='nav-btn' style='background:rgba(34,211,238,0.12);border-color:rgba(34,211,238,0.3);color:var(--cyan);cursor:pointer;display:inline-flex;align-items:center;gap:6px;' onclick='runBenchmark()'>&#9889; Lancer un run</button>"
+        "</div>"
+    )
+
     if not latest:
         return (
-            "<div class='section-title'>&#9889; Benchmark Performance</div>"
+            f"{header_btn}"
             "<div class='kpi'><p class='label'>Aucun benchmark lancé. "
-            "Utilisez <code>/benchmark</code> ou lancez depuis GitHub Actions.</p></div>"
+            "Cliquez sur <b>Lancer un run</b> ci-dessus ou utilisez <code>/benchmark/run</code>.</p></div>"
         )
 
     direction_icon = {
@@ -74,7 +81,7 @@ def _build_benchmark_html() -> str:
         )
 
     html = (
-        "<div class='section-title'>&#9889; Benchmark Performance</div>"
+        f"{header_btn}"
         "<div class='kpi-grid'>"
         f"<div class='kpi'><div class='label'>Dernier run</div>"
         f"<div class='value'>{latest_ms}<span style='font-size:14px;color:var(--muted)'>ms</span></div>"
@@ -437,6 +444,20 @@ def _build_dashboard_html() -> str:
         "      if(upBase !== null){ const s = upBase + (Date.now() - upT)/1000; setText('k-uptime', uptimeStr(s)); setText('k-uptime-s', Math.floor(s) + 's actifs'); }\n"
         "    }\n"
         "    $('btn-refresh').addEventListener('click', () => location.reload());\n"
+        "    window.runBenchmark = function(){\n"
+        "      const btn = $('btn-run-bench');\n"
+        "      if(btn){ btn.disabled = true; btn.innerHTML = '&#9203; Benchmark...'; btn.style.opacity = '0.7'; }\n"
+        "      fetch('/benchmark/run', { method: 'POST' })\n"
+        "        .then(r => {\n"
+        "          if(!r.ok) return r.json().then(j => Promise.reject(new Error(j.error || ('HTTP ' + r.status))));\n"
+        "          return r.json();\n"
+        "        })\n"
+        "        .then(() => { setTimeout(() => location.reload(), 400); })\n"
+        "        .catch(err => {\n"
+        "          alert('Erreur benchmark: ' + err.message);\n"
+        "          if(btn){ btn.disabled = false; btn.innerHTML = '&#9889; Lancer un run'; btn.style.opacity = '1'; }\n"
+        "        });\n"
+        "    };\n"
         "    window.addEventListener('resize', drawSpark);\n"
         "    refresh(); setInterval(refresh, 5000); setInterval(tick, 1000);\n"
         "  })();\n"
