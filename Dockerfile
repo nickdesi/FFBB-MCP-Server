@@ -15,7 +15,6 @@ RUN uv sync --frozen --no-dev --no-editable --no-install-project
 COPY src/ ./src/
 COPY assets/ ./assets/
 COPY website/ ./website/
-COPY blueprints/ ./blueprints/
 RUN uv sync --frozen --no-dev --no-editable
 
 FROM python:3.14-slim
@@ -33,7 +32,7 @@ ENV HOME=/app
 COPY --from=builder /opt/venv /opt/venv
 COPY assets/ ./assets/
 COPY website/ ./website/
-COPY blueprints/ ./blueprints/
+
 
 
 # Création du répertoire de données persistant

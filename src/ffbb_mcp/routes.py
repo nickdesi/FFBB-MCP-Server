@@ -57,28 +57,6 @@ def _find_website_dir() -> Path:
     return Path.cwd() / "website"
 
 
-def _find_blueprint_path() -> Path | None:
-    repo_path = (
-        Path(__file__).resolve().parents[2]
-        / "blueprints"
-        / "automation"
-        / "ffbb_match_notification.yaml"
-    )
-    if repo_path.exists():
-        return repo_path
-    prod_path = Path("/app/blueprints/automation/ffbb_match_notification.yaml")
-    if prod_path.exists():
-        return prod_path
-    return None
-
-
-def _read_blueprint_content() -> str | None:
-    bp = _find_blueprint_path()
-    if bp is not None and bp.exists():
-        return bp.read_text(encoding="utf-8")
-    return None
-
-
 _WEBSITE_DIR = _find_website_dir()
 _LOGO_PATH = _WEBSITE_DIR / "logo.webp"
 
@@ -626,16 +604,6 @@ def register_routes(mcp: FastMCP) -> None:
                 status_code=500,
                 headers={"Access-Control-Allow-Origin": "*"},
             )
-
-    @mcp.custom_route(
-        "/blueprints/automation/ffbb_match_notification.yaml", methods=["GET"]
-    )  # type: ignore[untyped-decorator]
-    async def blueprint_ffbb_notification(_request: Request) -> Response:
-        """Sert le blueprint officiel Home Assistant."""
-        content = await asyncio.to_thread(_read_blueprint_content)
-        if content is not None:
-            return Response(content, media_type="text/yaml")
-        return Response("Blueprint not found", status_code=404)
 
     @mcp.custom_route("/cache/warmup", methods=["GET"])  # type: ignore[untyped-decorator]
     async def cache_warmup_get(_request: Request) -> Response:

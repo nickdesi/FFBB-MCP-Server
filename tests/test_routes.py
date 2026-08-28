@@ -218,14 +218,6 @@ def test_find_website_dir():
     assert website_dir.exists()
 
 
-def test_blueprint_route(client):
-    """Teste l'endpoint de téléchargement du blueprint Home Assistant."""
-    response = client.get("/blueprints/automation/ffbb_match_notification.yaml")
-    assert response.status_code == 200
-    assert "blueprint:" in response.text
-    assert "FFBB - Notification Jour de Match" in response.text
-
-
 def test_next_match_api_route(client):
     """Teste l'endpoint REST /api/v1/next-match."""
     with patch("ffbb_mcp.services.club.ffbb_next_match_service") as mock_next_match:
