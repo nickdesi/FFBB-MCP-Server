@@ -1,18 +1,26 @@
 blueprint:
-  name: "FFBB - Notification Jour de Match & Itinéraire Salle"
+  name: "FFBB - Notification Multi-Équipes & Itinéraire Salle"
   description: >
-    Envoie une notification push pour les matchs de basket FFBB :
+    Envoie des notifications push pour les matchs de votre club et de vos catégories (ex: SEM1, U18M, U15, etc.) :
     - Le matin du match (heure configurable)
-    - En rappel avant le match avec l'adresse de la salle et un bouton d'itinéraire GPS (Google Maps / Waze).
+    - En rappel 2h avant le coup d'envoi avec l'adresse de la salle et un bouton GPS direct (Google Maps / Waze).
+    - Supporte un ou plusieurs capteurs de catégories simultanément.
   domain: automation
   source_url: https://github.com/nickdesi/FFBB-MCP-Server/blob/main/blueprints/automation/ffbb_match_notification.yaml
   input:
-    match_sensor:
-      name: Capteur Prochain Match FFBB
-      description: L'entité sensor REST qui contient les attributs du match FFBB.
+    match_sensors:
+      name: Capteurs des Catégories FFBB à surveiller
+      description: Sélectionnez un ou plusieurs capteurs de vos équipes (ex: sensor.ffbb_match_sem1, sensor.ffbb_match_u18m).
       selector:
         entity:
           domain: sensor
+          multiple: true
+    categories_filter:
+      name: Filtre de catégories (optionnel)
+      description: Laissez vide pour tout notifier, ou indiquez les catégories autorisées séparées par une virgule (ex: SEM1, U18M).
+      default: ""
+      selector:
+        text: {}
     notify_device:
       name: Appareil à notifier
       description: Le smartphone ou la tablette recevant la notification Companion.
@@ -47,92 +55,103 @@ trigger:
     id: check_prematch_trigger
 
 variables:
-  sensor_entity: !input match_sensor
   morning_enabled: !input morning_reminder
   prematch_enabled: !input prematch_reminder
-  match_status: "{{ state_attr(sensor_entity, 'status') }}"
-  match_date_str: "{{ state_attr(sensor_entity, 'date') }}"
-  is_match_today: >
-    {{ match_date_str is defined and match_date_str is not none and match_date_str[:10] == now().strftime('%Y-%m-%d') }}
-  adversaire: "{{ state_attr(sensor_entity, 'adversaire') or 'Adversaire inconnu' }}"
-  is_home: "{{ state_attr(sensor_entity, 'domicile') }}"
-  salle: "{{ state_attr(sensor_entity, 'salle') or 'Salle non précisée' }}"
-  adresse: "{{ state_attr(sensor_entity, 'adresse') or '' }}"
-  ville: "{{ state_attr(sensor_entity, 'ville') or '' }}"
-  competition: "{{ state_attr(sensor_entity, 'competition') or 'Championnat FFBB' }}"
-  horaire: >
-    {% if match_date_str is defined and match_date_str|length >= 16 %}
-      {{ match_date_str[11:16] }}
-    {% else %}
-      {{ state_attr(sensor_entity, 'time') or 'Heure à confirmer' }}
-    {% endif %}
-  map_url: >
-    {% if adresse is defined and adresse != '' %}
-      https://www.google.com/maps/search/?api=1&query={{ (salle ~ ' ' ~ adresse) | urlencode }}
-    {% else %}
-      https://www.google.com/maps/search/?api=1&query={{ (salle ~ ' ' ~ ville) | urlencode }}
-    {% endif %}
-
-condition:
-  - condition: template
-    value_template: "{{ is_match_today }}"
+  cat_filter_str: !input categories_filter
+  sensors_list: !input match_sensors
 
 action:
-  - choose:
-      # Cas 1 : Rappel du matin
-      - conditions:
-          - condition: trigger
-            id: morning_trigger
-          - condition: template
-            value_template: "{{ morning_enabled }}"
-        sequence:
-          - domain: mobile_app
-            type: notify
-            device_id: !input notify_device
-            title: "🏀 Jour de Match FFBB !"
-            message: >
-              Match à {{ horaire }} :
-              {{ '🏠 Domicile' if is_home else '🚗 Déplacement' }} vs {{ adversaire }}.
-              📍 {{ salle }}{% if ville %} ({{ ville }}){% endif %}
-            data:
-              tag: "ffbb-match-today"
-              url: "{{ map_url }}"
-              actions:
-                - action: "URI"
-                  title: "📍 Itinéraire GPS"
-                  uri: "{{ map_url }}"
-
-      # Cas 2 : Rappel 2h avant le coup d'envoi
-      - conditions:
-          - condition: trigger
-            id: check_prematch_trigger
-          - condition: template
-            value_template: >
-              {% if prematch_enabled and match_date_str is defined and match_date_str != '' %}
-                {% set match_time = as_datetime(match_date_str) %}
-                {% if match_time is not none %}
-                  {% set diff_min = ((match_time - now()).total_seconds() / 60) | int %}
-                  {{ 105 <= diff_min <= 125 }}
-                {% else %}
-                  false
-                {% endif %}
+  - repeat:
+      for_each: "{{ sensors_list }}"
+      sequence:
+        - variables:
+            sensor_entity: "{{ repeat.item }}"
+            match_date_str: "{{ state_attr(sensor_entity, 'date') }}"
+            is_match_today: >
+              {{ match_date_str is defined and match_date_str is not none and match_date_str[:10] == now().strftime('%Y-%m-%d') }}
+            team_label: "{{ state_attr(sensor_entity, 'team') or state_attr(sensor_entity, 'friendly_name') or '' }}"
+            adversaire: "{{ state_attr(sensor_entity, 'adversaire') or 'Adversaire inconnu' }}"
+            is_home: "{{ state_attr(sensor_entity, 'domicile') }}"
+            salle: "{{ state_attr(sensor_entity, 'salle') or 'Salle non précisée' }}"
+            adresse: "{{ state_attr(sensor_entity, 'adresse') or '' }}"
+            ville: "{{ state_attr(sensor_entity, 'ville') or '' }}"
+            competition: "{{ state_attr(sensor_entity, 'competition') or '' }}"
+            horaire: >
+              {% if match_date_str is defined and match_date_str|length >= 16 %}
+                {{ match_date_str[11:16] }}
               {% else %}
-                false
+                {{ state_attr(sensor_entity, 'time') or 'Heure à confirmer' }}
               {% endif %}
-        sequence:
-          - domain: mobile_app
-            type: notify
-            device_id: !input notify_device
-            title: "⏰ Match dans 2 heures !"
-            message: >
-              Départ pour la salle : {{ salle }}.
-              Coup d'envoi à {{ horaire }} vs {{ adversaire }}.
-            data:
-              tag: "ffbb-match-imminent"
-              url: "{{ map_url }}"
-              actions:
-                - action: "URI"
-                  title: "🚗 Ouvrir le GPS"
-                  uri: "{{ map_url }}"
+            map_url: >
+              {% if adresse is defined and adresse != '' %}
+                https://www.google.com/maps/search/?api=1&query={{ (salle ~ ' ' ~ adresse) | urlencode }}
+              {% else %}
+                https://www.google.com/maps/search/?api=1&query={{ (salle ~ ' ' ~ ville) | urlencode }}
+              {% endif %}
+            passes_filter: >
+              {% if cat_filter_str is defined and cat_filter_str != '' %}
+                {% set allowed = cat_filter_str.upper().replace(' ', '').split(',') %}
+                {{ team_label.upper() in allowed or competition.upper() in allowed }}
+              {% else %}
+                true
+              {% endif %}
+        - condition: template
+          value_template: "{{ is_match_today and passes_filter }}"
+        - choose:
+            # Cas 1 : Rappel du matin
+            - conditions:
+                - condition: trigger
+                  id: morning_trigger
+                - condition: template
+                  value_template: "{{ morning_enabled }}"
+              sequence:
+                - domain: mobile_app
+                  type: notify
+                  device_id: !input notify_device
+                  title: "🏀 Match {{ team_label }} aujourd'hui !"
+                  message: >
+                    Match à {{ horaire }} :
+                    {{ '🏠 Domicile' if is_home else '🚗 Déplacement' }} vs {{ adversaire }}.
+                    📍 {{ salle }}{% if ville %} ({{ ville }}){% endif %}
+                  data:
+                    tag: "ffbb-match-{{ sensor_entity }}"
+                    url: "{{ map_url }}"
+                    actions:
+                      - action: "URI"
+                        title: "📍 Itinéraire GPS"
+                        uri: "{{ map_url }}"
+
+            # Cas 2 : Rappel 2h avant le coup d'envoi
+            - conditions:
+                - condition: trigger
+                  id: check_prematch_trigger
+                - condition: template
+                  value_template: >
+                    {% if prematch_enabled and match_date_str is defined and match_date_str != '' %}
+                      {% set match_time = as_datetime(match_date_str) %}
+                      {% if match_time is not none %}
+                        {% set diff_min = ((match_time - now()).total_seconds() / 60) | int %}
+                        {{ 105 <= diff_min <= 125 }}
+                      {% else %}
+                        false
+                      {% endif %}
+                    {% else %}
+                      false
+                    {% endif %}
+              sequence:
+                - domain: mobile_app
+                  type: notify
+                  device_id: !input notify_device
+                  title: "⏰ Match {{ team_label }} dans 2 heures !"
+                  message: >
+                    Départ pour la salle : {{ salle }}.
+                    Coup d'envoi à {{ horaire }} vs {{ adversaire }}.
+                  data:
+                    tag: "ffbb-match-imminent-{{ sensor_entity }}"
+                    url: "{{ map_url }}"
+                    actions:
+                      - action: "URI"
+                        title: "🚗 Ouvrir le GPS"
+                        uri: "{{ map_url }}"
 
 mode: single
