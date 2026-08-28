@@ -175,6 +175,18 @@ class FFBBClientFactory:
         cls._token_created_at = 0.0
         cls._init_lock = None
 
+    @classmethod
+    async def close_client_async(cls) -> None:
+        """Ferme proprement le client et annule les tâches de fond."""
+        if cls._instance is not None and hasattr(cls._instance, "aclose"):
+            try:
+                await cls._instance.aclose()
+            except Exception as e:
+                logger.debug(
+                    "Erreur lors de la fermeture asynchrone du client FFBB: %s", e
+                )
+        cls.reset()
+
 
 async def get_client_async() -> FFBBDataClient:
     """Helper shortcut for FFBBClientFactory.get_client_async()."""

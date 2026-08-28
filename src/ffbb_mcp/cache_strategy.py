@@ -77,7 +77,26 @@ _STATIC_TTLS = {
     "search": 86_400,
     "poule": 5,  # 5s fallback; TTL dynamique via get_poule_ttl() ajuste selon matches en cours
     "salle": 604_800,  # 7 jours (immuable)
+    "saisons": 2_592_000,  # 30 jours (quasi immuable)
+    "competitions": 2_592_000,  # 30 jours
 }
+
+
+def get_rencontre_ttl(rencontre_data: dict | None = None) -> int:
+    """Calcule le TTL d'une rencontre selon son statut (terminée vs programmée vs live)."""
+    if not isinstance(rencontre_data, dict):
+        return 300
+    statut = str(rencontre_data.get("statut") or "").upper()
+    # Match joué / terminé : score définitif, figeable sur 7 jours
+    if statut in ("JOU", "TERMINE", "TERMINEE", "FORFAIT", "REPORTE"):
+        return 604_800  # 7 jours
+    # Match en cours / live
+    if statut in ("LIVE", "EN_COURS"):
+        return 30  # 30s
+    # Match futur
+    if is_in_match_window():
+        return 300
+    return 86_400
 
 
 # TTLs statiques pour les autres caches

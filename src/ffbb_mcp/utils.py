@@ -22,24 +22,25 @@ def serialize_model(obj: Any) -> JSONValue:
     if obj is None:
         return None
 
-    # Fast path: exact type check avoids slow subclass resolution
-    # for 99% of common JSON payloads, bringing a ~3x speedup.
+    # Fast path: exact primitive types
     obj_type = type(obj)
-    if obj_type is str or obj_type is int or obj_type is float or obj_type is bool:
+    if obj_type in (str, int, float, bool):
         return obj
+
+    # Pydantic v2 fast path: model_dump(mode="json") is natively JSON-safe in Rust/C
+    if (dump_fn := getattr(obj, "model_dump", None)) is not None:
+        return dump_fn(mode="json")
+
     if obj_type is dict:
         return {k: serialize_model(v) for k, v in obj.items()}
     if obj_type is list:
         return [serialize_model(item) for item in obj]
 
-    # Let Pydantic do the heavy lifting natively in C/Rust (V2)
-    if (val := getattr(obj, "model_dump", None)) is not None:  # Pydantic v2
-        return val(mode="json")
-    if (val := getattr(obj, "dict", None)) is not None:  # Pydantic v1
-        return val()
+    if (dict_fn := getattr(obj, "dict", None)) is not None:  # Pydantic v1
+        return dict_fn()
 
     # Fallback: isinstance pour supporter les sous-classes (ex: IntEnum)
-    if isinstance(obj, str | int | float | bool):
+    if isinstance(obj, (str, int, float, bool)):
         return obj
 
     if (val := getattr(obj, "__dict__", None)) is not None:

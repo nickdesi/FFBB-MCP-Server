@@ -92,10 +92,10 @@ def create_app(mcp: FastMCP, allowed_origins: list[str]) -> Starlette:
                 try:
                     from ffbb_mcp.client import FFBBClientFactory
 
-                    FFBBClientFactory.reset()
+                    await FFBBClientFactory.close_client_async()
                 except Exception as e:
                     logger.warning(
-                        "Erreur lors de la réinitialisation du client au shutdown : %s",
+                        "Erreur lors de la fermeture asynchrone du client au shutdown : %s",
                         e,
                     )
 

@@ -104,3 +104,13 @@ def test_services_import_ignores_invalid_max_concurrent_ffbb(monkeypatch):
 
     monkeypatch.delenv("MAX_CONCURRENT_FFBB", raising=False)
     importlib.reload(services)
+
+
+def test_get_rencontre_ttl():
+    from ffbb_mcp.cache_strategy import get_rencontre_ttl
+
+    assert get_rencontre_ttl(None) == 300
+    assert get_rencontre_ttl({"statut": "JOU"}) == 604_800
+    assert get_rencontre_ttl({"statut": "TERMINE"}) == 604_800
+    assert get_rencontre_ttl({"statut": "LIVE"}) == 30
+    assert get_rencontre_ttl({"statut": "EN_COURS"}) == 30
