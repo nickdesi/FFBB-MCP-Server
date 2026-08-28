@@ -29,6 +29,7 @@ from .services import (
     ffbb_bilan_service,
     ffbb_equipes_club_service,
     ffbb_get_classement_service,
+    ffbb_head_to_head_service,
     ffbb_last_result_service,
     ffbb_next_match_service,
     ffbb_resolve_team_service,
@@ -1253,8 +1254,76 @@ async def ffbb_bilan_saison(
 
 
 # ---------------------------------------------------------------------------
+# TOOL 13 — Face-à-Face & Matchup Analyzer (Head-to-Head)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(
+    name="ffbb_head_to_head",
+    title="Face-à-Face & Comparaison d'équipes (H2H)",
+    annotations=_READONLY_ANNOTATIONS,
+)
+@track_tool_usage("ffbb_head_to_head")
+@zipai_surgical
+async def ffbb_head_to_head(
+    club_a: Annotated[
+        str | None,
+        Field(description="Nom du premier club (ex: 'Stade Clermontois')."),
+    ] = None,
+    organisme_id_a: Annotated[
+        int | str | None,
+        Field(description="ID FFBB du premier club (ex: 9326)."),
+    ] = None,
+    club_b: Annotated[
+        str | None,
+        Field(description="Nom du second club (ex: 'Vichy', 'Roanne')."),
+    ] = None,
+    organisme_id_b: Annotated[
+        int | str | None,
+        Field(description="ID FFBB du second club."),
+    ] = None,
+    categorie: Annotated[
+        str | None,
+        Field(
+            description="Catégorie d'équipe commune à comparer (ex: 'SEM1', 'U18M', 'Senior').",
+        ),
+    ] = None,
+    force_refresh: Annotated[
+        bool,
+        Field(description="Si True, force le rafraîchissement des données"),
+    ] = False,
+    ctx: Context[Any, Any, Any] | None = None,
+) -> dict[str, Any]:
+    """Compare deux équipes et analyse leurs confrontations directes (H2H).
+
+    Fournit :
+      - Bilan historique des confrontations directes de la saison (victoires A vs B, scores, écarts)
+      - Forme récente respective de chaque équipe (V-D-V-V...) et séries en cours
+      - Duel statistique des styles : Attaque vs Défense, ratio de victoires domicile/extérieur
+      - Points clés narratifs prêts pour la rédaction d'articles ou de synthèses d'avant-match
+    """
+    try:
+        await _safe_report_progress(
+            ctx, 0, total=2, message="Analyse du face-à-face..."
+        )
+        result = await ffbb_head_to_head_service(
+            club_a=club_a,
+            organisme_id_a=organisme_id_a,
+            club_b=club_b,
+            organisme_id_b=organisme_id_b,
+            categorie=categorie,
+            force_refresh=force_refresh,
+        )
+        await _safe_report_progress(ctx, 2, total=2, message="Face-à-face prêt.")
+        return result
+    except Exception as e:
+        raise handle_api_error(e) from e
+
+
+# ---------------------------------------------------------------------------
 # Injections
 # ---------------------------------------------------------------------------
+
 
 register_routes(mcp)
 register_prompts(mcp)

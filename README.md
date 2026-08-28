@@ -145,6 +145,7 @@ Configurez directement l'URL distante dans `mcp_config.json` via la directive na
 | `ffbb_last_result` | Dernier résultat d'une équipe précise. |
 | `ffbb_next_match` | Prochain match à jouer pour une équipe précise. |
 | `ffbb_bilan_saison` | Bilan détaillé de la saison pour une équipe précise (toutes phases). |
+| `ffbb_head_to_head` | Compare deux équipes et analyse leurs confrontations directes (H2H). |
 
 > [!NOTE]
 > Référence complète des paramètres : [`docs/TOOLS_REFERENCE.md`](docs/TOOLS_REFERENCE.md).

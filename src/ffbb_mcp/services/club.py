@@ -1866,3 +1866,148 @@ async def ffbb_last_result_service(
         "victoire": victoire,
         "_meta": _freshness_meta(cache="poule", force_refresh_supported=True),
     }
+
+
+async def ffbb_head_to_head_service(
+    club_a: str | None = None,
+    organisme_id_a: int | str | None = None,
+    club_b: str | None = None,
+    organisme_id_b: int | str | None = None,
+    categorie: str | None = None,
+    force_refresh: bool = False,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Compare 2 équipes et analyse leurs confrontations directes (H2H), formes et stats comparatives."""
+    from ..analytics import compute_head_to_head, compute_poule_advanced_stats
+    from ..dynamique import compute_team_dynamique
+    from .poule import get_poule_service
+
+    # 1. Résolution des équipes A et B
+    err_a, eq_a, club_res_a = await _resolve_team_equipes(
+        club_name=club_a,
+        organisme_id=organisme_id_a,
+        categorie=categorie,
+        numero_equipe=None,
+        not_found_status="not_found_a",
+    )
+    if err_a:
+        return {
+            "error": f"Équipe A ({club_a or organisme_id_a}) introuvable",
+            "details": err_a,
+        }
+
+    err_b, eq_b, club_res_b = await _resolve_team_equipes(
+        club_name=club_b,
+        organisme_id=organisme_id_b,
+        categorie=categorie,
+        numero_equipe=None,
+        not_found_status="not_found_b",
+    )
+    if err_b:
+        return {
+            "error": f"Équipe B ({club_b or organisme_id_b}) introuvable",
+            "details": err_b,
+        }
+
+    nom_a = (club_res_a or {}).get("nom") or club_a or "Équipe A"
+    nom_b = (club_res_b or {}).get("nom") or club_b or "Équipe B"
+
+    poules_a = {str(e["poule_id"]) for e in eq_a if e.get("poule_id")}
+    poules_b = {str(e["poule_id"]) for e in eq_b if e.get("poule_id")}
+    common_poules = poules_a.intersection(poules_b)
+
+    target_poules = common_poules if common_poules else (poules_a.union(poules_b))
+    if not target_poules:
+        return {
+            "status": "not_found",
+            "message": f"Aucune poule trouvée pour comparer {nom_a} et {nom_b}.",
+        }
+
+    poules_raw = await asyncio.gather(
+        *[get_poule_service(pid, force_refresh=force_refresh) for pid in target_poules],
+        return_exceptions=True,
+    )
+    poules_list = [p for p in poules_raw if isinstance(p, dict)]
+    all_rencontres = [r for p in poules_list for r in (p.get("rencontres", []) or [])]
+
+    eng_ids_a = {str(e["engagement_id"]) for e in eq_a if e.get("engagement_id")}
+    eng_ids_b = {str(e["engagement_id"]) for e in eq_b if e.get("engagement_id")}
+
+    h2h_data = compute_head_to_head(
+        all_rencontres,
+        eng_id_a=next(iter(eng_ids_a)) if eng_ids_a else None,
+        nom_a=nom_a,
+        eng_id_b=next(iter(eng_ids_b)) if eng_ids_b else None,
+        nom_b=nom_b,
+    )
+
+    # Forme récente
+    dynamique_a = compute_team_dynamique(
+        all_rencontres, eng_ids=eng_ids_a, club_nom=nom_a
+    )
+    dynamique_b = compute_team_dynamique(
+        all_rencontres, eng_ids=eng_ids_b, club_nom=nom_b
+    )
+
+    # Stats de poule (si poule commune)
+    profil_a = None
+    profil_b = None
+    if common_poules and poules_list:
+        poule_commune = poules_list[0]
+        profil_a = compute_poule_advanced_stats(
+            poule_commune,
+            target_eng_id=next(iter(eng_ids_a)) if eng_ids_a else None,
+            club_nom=nom_a,
+        )
+        profil_b = compute_poule_advanced_stats(
+            poule_commune,
+            target_eng_id=next(iter(eng_ids_b)) if eng_ids_b else None,
+            club_nom=nom_b,
+        )
+
+    # Synthèse d'avant-match pour LLM
+    narrative_points = []
+    if h2h_data["confrontations_count"] > 0:
+        narrative_points.append(h2h_data["bilan_h2h"])
+    if dynamique_a.get("forme_str"):
+        label_a = (
+            dynamique_a.get("serie_actuelle", {}).get("label") or ""  # type: ignore[union-attr]
+        )
+        narrative_points.append(
+            f"Forme {nom_a} (5 derniers) : {dynamique_a['forme_str']} ({label_a})"
+        )
+    if dynamique_b.get("forme_str"):
+        label_b = (
+            dynamique_b.get("serie_actuelle", {}).get("label") or ""  # type: ignore[union-attr]
+        )
+        narrative_points.append(
+            f"Forme {nom_b} (5 derniers) : {dynamique_b['forme_str']} ({label_b})"
+        )
+    if (
+        profil_a
+        and profil_b
+        and profil_a.get("rang_attaque")
+        and profil_b.get("rang_defense")
+    ):
+        narrative_points.append(
+            f"Duel des styles : Attaque {nom_a} ({profil_a['rang_attaque']}) vs Défense {nom_b} ({profil_b['rang_defense']})"
+        )
+
+    return {
+        "status": "ok",
+        "equipe_a": {
+            "nom": nom_a,
+            "club_resolu": club_res_a,
+            "dynamique": dynamique_a,
+            "profil": profil_a,
+        },
+        "equipe_b": {
+            "nom": nom_b,
+            "club_resolu": club_res_b,
+            "dynamique": dynamique_b,
+            "profil": profil_b,
+        },
+        "face_a_face": h2h_data,
+        "points_cles_llm": narrative_points,
+        "_meta": _freshness_meta(cache="poule", force_refresh_supported=True),
+    }

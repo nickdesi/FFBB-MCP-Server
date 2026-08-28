@@ -176,6 +176,10 @@ class BilanResponse(BaseModel):
         default=None,
         description="Dynamique et forme récente de l'équipe principale sur les 5 derniers matchs.",
     )
+    profil_avance: dict[str, Any] | None = Field(
+        default=None,
+        description="Profil tactique avancé : rangs attaque/défense, style de jeu, clutch index et bilans domicile/extérieur.",
+    )
     meta: dict[str, Any] = Field(
         default_factory=dict,
         alias="_meta",
