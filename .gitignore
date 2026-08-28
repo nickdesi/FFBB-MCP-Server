@@ -24,9 +24,8 @@ ffbb-data-client_Ref/
 external/antigravity-awesome-skills/
 tools/skill_router/
 
-# Runtime data & graphify artifacts
+# Runtime data
 data/
-graphify-out/
 
 # Acronyms cache (runtime writes to ~/.cache/ffbb-mcp/acronyms_cache.json;
 # the tracked copy in src/ffbb_mcp/ is a one-off seed, not read by code)
