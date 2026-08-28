@@ -1,47 +1,47 @@
 blueprint:
   name: "FFBB - Notification Multi-Équipes & Itinéraire Salle"
   description: >
-    Envoie des notifications push pour les matchs de votre club et de vos catégories (ex: SEM1, U18M, U15, etc.) :
+    Envoie des notifications push pour les matchs de votre club et de vos catégories (ex. SEM1, U18M, U15) :
     - Le matin du match (heure configurable)
     - En rappel 2h avant le coup d'envoi avec l'adresse de la salle et un bouton GPS direct (Google Maps / Waze).
     - Supporte un ou plusieurs capteurs de catégories simultanément.
   domain: automation
-  source_url: https://github.com/nickdesi/FFBB-MCP-Server/blob/main/blueprints/automation/ffbb_match_notification.yaml
+  source_url: "https://github.com/nickdesi/FFBB-MCP-Server/blob/main/blueprints/automation/ffbb_match_notification.yaml"
   input:
     match_sensors:
-      name: Capteurs des Catégories FFBB à surveiller
-      description: Sélectionnez un ou plusieurs capteurs de vos équipes (ex: sensor.ffbb_match_sem1, sensor.ffbb_match_u18m).
+      name: "Capteurs des Catégories FFBB à surveiller"
+      description: "Sélectionnez un ou plusieurs capteurs de vos équipes (ex. sensor.ffbb_match_sem1, sensor.ffbb_match_u18m)."
       selector:
         entity:
           domain: sensor
           multiple: true
     categories_filter:
-      name: Filtre de catégories (optionnel)
-      description: Laissez vide pour tout notifier, ou indiquez les catégories autorisées séparées par une virgule (ex: SEM1, U18M).
+      name: "Filtre de catégories (optionnel)"
+      description: "Laissez vide pour tout notifier, ou indiquez les catégories autorisées séparées par une virgule (ex. SEM1, U18M)."
       default: ""
       selector:
         text: {}
     notify_device:
-      name: Appareil à notifier
-      description: Le smartphone ou la tablette recevant la notification Companion.
+      name: "Appareil à notifier"
+      description: "Le smartphone ou la tablette recevant la notification Companion."
       selector:
         device:
           integration: mobile_app
     morning_reminder:
-      name: Activer le rappel du matin
-      description: Notifier le matin même du match.
+      name: "Activer le rappel du matin"
+      description: "Notifier le matin même du match."
       default: true
       selector:
         boolean: {}
     morning_time:
-      name: Heure du rappel du matin
-      description: Heure à laquelle la notification matinale est envoyée.
+      name: "Heure du rappel du matin"
+      description: "Heure à laquelle la notification matinale est envoyée."
       default: "08:30:00"
       selector:
         time: {}
     prematch_reminder:
-      name: Activer le rappel d'avant-match
-      description: Envoi d'un rappel 2h avant le coup d'envoi.
+      name: "Activer le rappel d'avant-match"
+      description: "Envoi d'un rappel 2h avant le coup d'envoi."
       default: true
       selector:
         boolean: {}
