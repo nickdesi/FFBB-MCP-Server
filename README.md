@@ -134,7 +134,6 @@ Configurez directement l'URL distante dans `mcp_config.json` via la directive na
 | Outil | Usage |
 | --- | --- |
 | `ffbb_version` | Informations de version et configuration runtime du serveur FFBB MCP. |
-| `ffbb_benchmark` | Exécute ou consulte le benchmark de performance du serveur MCP FFBB. |
 | `ffbb_search` | Recherche FFBB — clubs, compétitions, matchs, salles, tournois, etc. |
 | `ffbb_bilan` | Bilan complet d'une équipe toutes phases confondues en UN seul appel. |
 | `ffbb_get` | Recupere une ressource FFBB par identifiant. |

@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB MCP server | server.py: 1336 lignes | services.py: 4369 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 1310 lignes | services.py: 4369 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -125,7 +125,7 @@ src/ffbb_mcp/
 ├── prompts.py             # Prompts MCP réutilisables
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
-├── server.py              # Tools MCP + main() (≈1336 lignes)
+├── server.py              # Tools MCP + main() (≈1310 lignes)
 ├── services/              # Logique métier modularisée (≈4369 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── club.py            # Service de gestion des clubs
@@ -200,7 +200,6 @@ Avant push/tag/release :
 | `FFBB_CACHE_BACKEND` | `sqlite` | Choix du backend de cache HTTP (`sqlite` ou `redis`) |
 | `FFBB_SERVICE_CACHE_PERSIST` | `1` | Activer la persistance des caches service sur disque (SQLite) entre redémarrages |
 | `FFBB_KNOWN_CLUB_IDS` | `` | Override JSON de la liste d'organisme_id connus pour les prompts MCP (fallback : _DEFAULT_KNOWN_CLUB_IDS) |
-| `FFBB_ENABLE_BENCHMARK` | `` | Activer endpoint `/benchmark/run` (sécurité) |
 | `FFBB_WARMUP_API_KEY` | `` | Clé d'API secrète requise pour déclencher le warmup via l'endpoint HTTP `/warmup` |
 | `FFBB_WARMUP_MAX_ORGANISMES` | `50` | Nombre maximum d'organismes à charger lors d'un cycle de warmup |
 | `PUBLIC_URL` | `https://ffbb.desimone.fr` | URL publique pour liens/sitemap |
@@ -218,6 +217,7 @@ Avant push/tag/release :
 | `FFBB_WARMUP_ORGANISMES` | `` | Liste d'organisme_id séparés par des virgules à préchauffer au démarrage |
 | `FFBB_WARMUP_CONCURRENCY` | `5` | Concurrence maximale lors du préchauffage du cache |
 | `FFBB_MCP_PRUNE_LIMIT` | `50` | Limite troncature payload |
+| `FFBB_ENABLE_BENCHMARK` | — | Activer endpoint `/benchmark/run` (sécurité) |
 | `FFBB_POULE_FETCH_CONCURRENCY` | — | Concurrence max fetch poules |
 | `FFBB_CACHE_TTL_*` | — | TTL par type de cache (voir cache_strategy.py) |
 | `FFBB_REDIS_URL` | — | URL de connexion à l'instance Redis si backend=redis |

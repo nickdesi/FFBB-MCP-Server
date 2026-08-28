@@ -26,7 +26,6 @@ from starlette.responses import (
 
 from . import __version__ as _PACKAGE_VERSION
 from ._state import _read_positive_int_env
-from .benchmark import get_benchmark_trends, run_benchmark
 from .dashboard import _build_dashboard_html
 from .metrics import generate_prometheus_metrics, get_snapshot, summarize_health
 from .utils import OrjsonResponse
@@ -184,36 +183,6 @@ def register_routes(mcp: FastMCP) -> None:
     async def dashboard(_request: Request) -> Response:
         """Dashboard de supervision HTML — lisible humain, demo-friendly."""
         return HTMLResponse(content=_build_dashboard_html(), status_code=200)
-
-    @mcp.custom_route("/benchmark", methods=["GET"])  # type: ignore[untyped-decorator]
-    async def benchmark_get(_request: Request) -> Response:
-        """Retourne les tendances historiques du benchmark."""
-        trends = get_benchmark_trends()
-        if os.environ.get("FFBB_ENABLE_BENCHMARK", "").lower() != "true":
-            trends["benchmark_enabled"] = False
-            trends["hint"] = "Set FFBB_ENABLE_BENCHMARK=true to run benchmarks"
-        else:
-            trends["benchmark_enabled"] = True
-        return OrjsonResponse(trends)
-
-    @mcp.custom_route("/benchmark/run", methods=["POST"])  # type: ignore[untyped-decorator]
-    async def benchmark_post(_request: Request) -> Response:
-        """Exécute un benchmark de performance."""
-        if os.environ.get("FFBB_ENABLE_BENCHMARK", "").lower() != "true":
-            return OrjsonResponse(
-                {
-                    "error": "Benchmark endpoint disabled. Set FFBB_ENABLE_BENCHMARK=true to enable."
-                },
-                status_code=403,
-            )
-        try:
-            result = await run_benchmark()
-            return OrjsonResponse(result, status_code=201)
-        except Exception as e:
-            logger.exception("Benchmark failed")
-            return OrjsonResponse(
-                {"error": str(e), "error_type": type(e).__name__}, status_code=500
-            )
 
     @mcp.custom_route("/docs", methods=["GET"])  # type: ignore[untyped-decorator]
     async def docs(_request: Request) -> Response:

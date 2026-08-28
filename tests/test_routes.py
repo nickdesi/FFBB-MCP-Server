@@ -1,7 +1,7 @@
 """Tests unitaires pour le module routes.py de FFBB MCP server."""
 
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 from urllib.parse import urlparse
 
 import pytest
@@ -60,66 +60,6 @@ def test_dashboard_route(client):
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "FFBB" in response.text
-
-
-def test_benchmark_get_route_disabled(client, monkeypatch):
-    """Teste /benchmark quand le benchmark est désactivé par défaut."""
-    monkeypatch.setenv("FFBB_ENABLE_BENCHMARK", "false")
-    response = client.get("/benchmark")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["benchmark_enabled"] is False
-    assert "hint" in data
-
-
-def test_benchmark_get_route_enabled(client, monkeypatch):
-    """Teste /benchmark quand le benchmark est activé."""
-    monkeypatch.setenv("FFBB_ENABLE_BENCHMARK", "true")
-    response = client.get("/benchmark")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["benchmark_enabled"] is True
-
-
-def test_benchmark_post_route_disabled(client, monkeypatch):
-    """Teste /benchmark/run quand le benchmark est désactivé."""
-    monkeypatch.setenv("FFBB_ENABLE_BENCHMARK", "false")
-    response = client.post("/benchmark/run")
-    assert response.status_code == 403
-    assert "disabled" in response.json()["error"]
-
-
-@pytest.mark.asyncio
-async def test_benchmark_post_route_enabled_success(client, monkeypatch):
-    """Teste /benchmark/run avec succès quand il est activé."""
-    monkeypatch.setenv("FFBB_ENABLE_BENCHMARK", "true")
-    mock_run = {"success": True, "total_ms": 150.0, "steps": []}
-
-    with patch(
-        "ffbb_mcp.routes.run_benchmark", new_callable=AsyncMock, return_value=mock_run
-    ) as mock_bench:
-        response = client.post("/benchmark/run")
-        assert response.status_code == 201
-        data = response.json()
-        assert data["success"] is True
-        mock_bench.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_benchmark_post_route_enabled_failure(client, monkeypatch):
-    """Teste /benchmark/run en échec (exception levée)."""
-    monkeypatch.setenv("FFBB_ENABLE_BENCHMARK", "true")
-
-    with patch(
-        "ffbb_mcp.routes.run_benchmark",
-        new_callable=AsyncMock,
-        side_effect=ValueError("Test Failure"),
-    ) as mock_bench:
-        response = client.post("/benchmark/run")
-        assert response.status_code == 500
-        data = response.json()
-        assert data["error"] == "Test Failure"
-        mock_bench.assert_called_once()
 
 
 def test_docs_redirect(client):
