@@ -1163,27 +1163,31 @@ async def ffbb_next_match(
 @track_tool_usage("ffbb_bilan_saison")
 @zipai_surgical
 async def ffbb_bilan_saison(
+    club_name: Annotated[
+        str | None,
+        Field(description="Nom du club (ex: 'Stade Clermontois', 'ASVEL')."),
+    ] = None,
     organisme_id: Annotated[
-        int | str,
-        Field(description="ID FFBB du club (organisme) concerné."),
-    ],
+        int | str | None,
+        Field(description="ID FFBB du club (alternative plus rapide à club_name)."),
+    ] = None,
     categorie: Annotated[
-        str,
+        str | None,
         Field(
             description=(
-                "Catégorie + genre (ex: 'U11M', 'U13F', 'SeniorM'). "
+                "Catégorie + genre + numéro d'équipe facultatif (ex: 'U11M', 'U11M1', 'U13F2', 'SeniorM'). "
                 "Cette valeur sert à filtrer les engagements et les poules."
             ),
         ),
-    ],
+    ] = None,
     numero_equipe: Annotated[
-        int,
+        int | None,
         Field(
             description=(
-                "Numéro d'équipe (1, 2, ...) pour identifier l'équipe précise dans la catégorie."
+                "Numéro d'équipe (1, 2, ...) pour identifier l'équipe précise dans la catégorie (défaut: 1)."
             )
         ),
-    ],
+    ] = 1,
     force_refresh: Annotated[
         bool,
         Field(
@@ -1198,7 +1202,7 @@ async def ffbb_bilan_saison(
     "Quel est le bilan de la saison des U11M1 ?".
 
     Il agrège toutes les phases (toutes poules) de la saison FFBB pour
-    l'équipe identifiée par (organisme_id, categorie, numero_equipe).
+    l'équipe identifiée par (organisme_id/club_name, categorie, numero_equipe).
 
     Pour chaque phase, il retourne :
       - competition
@@ -1212,10 +1216,18 @@ async def ffbb_bilan_saison(
     try:
         await _safe_report_progress(ctx, 0, total=1, message="Calcul du bilan saison…")
         effective_refresh = force_refresh
+        effective_num = numero_equipe if numero_equipe is not None else 1
+        effective_cat = categorie
+        if categorie:
+            parsed = parse_categorie(categorie)
+            if parsed.numero_equipe is not None:
+                effective_num = parsed.numero_equipe
+
         result = await ffbb_saison_bilan_service(
+            club_name=club_name,
             organisme_id=organisme_id,
-            categorie=categorie,
-            numero_equipe=numero_equipe,
+            categorie=effective_cat,
+            numero_equipe=effective_num,
             force_refresh=effective_refresh,
         )
         await _safe_report_progress(ctx, 1, total=1, message="Bilan saison prêt.")

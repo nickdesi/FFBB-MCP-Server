@@ -748,6 +748,11 @@ async def ffbb_saison_bilan_service(
 ) -> dict[str, Any]:
     from .poule import get_poule_service
 
+    if categorie:
+        parsed_cat = parse_categorie(categorie)
+        if parsed_cat.numero_equipe is not None:
+            numero_equipe = parsed_cat.numero_equipe
+
     if not organisme_id and club_name:
         from .search import resolve_club_and_org
 
@@ -791,6 +796,8 @@ async def ffbb_saison_bilan_service(
         filtered_equipes = [
             e for e in equipes if not (e.get("numero_equipe") or "").strip()
         ]
+    if not filtered_equipes and len(equipes) == 1 and numero_equipe == 1:
+        filtered_equipes = equipes
 
     if not filtered_equipes:
         return {

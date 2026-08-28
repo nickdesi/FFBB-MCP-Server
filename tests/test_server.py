@@ -374,3 +374,63 @@ async def test_team_summary_resolves_team_with_numero_equipe():
         assert res["team"]["team_label"] == "SEM1"
         assert res["phase_courante"] == {"competition": "Pré nationale masculine"}
         assert res["next_match"] is not None
+
+
+@pytest.mark.asyncio
+async def test_ffbb_bilan_saison_extracts_numero_equipe():
+    """Vérifie que ffbb_bilan_saison extrait numero_equipe de la catégorie."""
+    from unittest.mock import AsyncMock, patch
+
+    from ffbb_mcp.server import ffbb_bilan_saison
+
+    mock_service = AsyncMock(
+        return_value={
+            "status": "ok",
+            "club": "STADE CLERMONTOIS",
+            "bilan_total": {"match_joues": 0},
+        }
+    )
+
+    with patch("ffbb_mcp.server.ffbb_saison_bilan_service", mock_service):
+        res = await ffbb_bilan_saison(
+            organisme_id=9326,
+            categorie="SEM2",
+        )
+        mock_service.assert_awaited_once_with(
+            club_name=None,
+            organisme_id=9326,
+            categorie="SEM2",
+            numero_equipe=2,
+            force_refresh=False,
+        )
+        assert res["status"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_ffbb_bilan_saison_supports_club_name():
+    """Vérifie que ffbb_bilan_saison accepte club_name."""
+    from unittest.mock import AsyncMock, patch
+
+    from ffbb_mcp.server import ffbb_bilan_saison
+
+    mock_service = AsyncMock(
+        return_value={
+            "status": "ok",
+            "club": "ASVEL",
+            "bilan_total": {"match_joues": 0},
+        }
+    )
+
+    with patch("ffbb_mcp.server.ffbb_saison_bilan_service", mock_service):
+        res = await ffbb_bilan_saison(
+            club_name="ASVEL",
+            categorie="U11M",
+        )
+        mock_service.assert_awaited_once_with(
+            club_name="ASVEL",
+            organisme_id=None,
+            categorie="U11M",
+            numero_equipe=1,
+            force_refresh=False,
+        )
+        assert res["status"] == "ok"
