@@ -5,6 +5,7 @@ from __future__ import annotations
 # FastMCP `mcp.custom_route` dont les stubs officiels ne sont pas typés.
 # Pas de fond à corriger côté projet — la convention est documentée ici.
 import asyncio
+import contextlib
 import datetime
 import logging
 import os
@@ -54,6 +55,28 @@ def _find_website_dir() -> Path:
     if prod_path.exists():
         return prod_path
     return Path.cwd() / "website"
+
+
+def _find_blueprint_path() -> Path | None:
+    repo_path = (
+        Path(__file__).resolve().parents[2]
+        / "blueprints"
+        / "automation"
+        / "ffbb_match_notification.yaml"
+    )
+    if repo_path.exists():
+        return repo_path
+    prod_path = Path("/app/blueprints/automation/ffbb_match_notification.yaml")
+    if prod_path.exists():
+        return prod_path
+    return None
+
+
+def _read_blueprint_content() -> str | None:
+    bp = _find_blueprint_path()
+    if bp is not None and bp.exists():
+        return bp.read_text(encoding="utf-8")
+    return None
 
 
 _WEBSITE_DIR = _find_website_dir()
@@ -551,6 +574,68 @@ def register_routes(mcp: FastMCP) -> None:
             },
             headers={"Access-Control-Allow-Origin": "*"},
         )
+
+    @mcp.custom_route("/api/v1/next-match", methods=["GET"])  # type: ignore[untyped-decorator]
+    @mcp.custom_route("/api/v1/club/{organisme_id}/next-match", methods=["GET"])  # type: ignore[untyped-decorator]
+    async def next_match_api(request: Request) -> Response:
+        """Retourne le prochain match d'un club/équipe pour Home Assistant ou les widgets."""
+        organisme_id_raw = request.path_params.get(
+            "organisme_id"
+        ) or request.query_params.get("organisme_id")
+        club_name = request.query_params.get("club_name")
+        categorie = (
+            request.query_params.get("categorie")
+            or request.query_params.get("category")
+            or "SEM1"
+        )
+        num_eq_raw = request.query_params.get(
+            "numero_equipe"
+        ) or request.query_params.get("num")
+        force_refresh = request.query_params.get("force_refresh", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+
+        organisme_id: int | str | None = None
+        if organisme_id_raw:
+            try:
+                organisme_id = int(organisme_id_raw)
+            except ValueError:
+                organisme_id = str(organisme_id_raw)
+
+        numero_equipe: int = 1
+        if num_eq_raw:
+            with contextlib.suppress(ValueError):
+                numero_equipe = int(num_eq_raw)
+
+        from .services.club import ffbb_next_match_service
+
+        try:
+            res = await ffbb_next_match_service(
+                categorie=categorie,
+                club_name=club_name,
+                organisme_id=organisme_id,
+                numero_equipe=numero_equipe,
+                force_refresh=force_refresh,
+            )
+            return OrjsonResponse(res, headers={"Access-Control-Allow-Origin": "*"})
+        except Exception as e:
+            return OrjsonResponse(
+                {"status": "error", "error": str(e)},
+                status_code=500,
+                headers={"Access-Control-Allow-Origin": "*"},
+            )
+
+    @mcp.custom_route(
+        "/blueprints/automation/ffbb_match_notification.yaml", methods=["GET"]
+    )  # type: ignore[untyped-decorator]
+    async def blueprint_ffbb_notification(_request: Request) -> Response:
+        """Sert le blueprint officiel Home Assistant."""
+        content = await asyncio.to_thread(_read_blueprint_content)
+        if content is not None:
+            return Response(content, media_type="text/yaml")
+        return Response("Blueprint not found", status_code=404)
 
     @mcp.custom_route("/cache/warmup", methods=["GET"])  # type: ignore[untyped-decorator]
     async def cache_warmup_get(_request: Request) -> Response:
