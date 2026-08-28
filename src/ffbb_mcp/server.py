@@ -1002,13 +1002,29 @@ async def ffbb_team_summary(
             or (last_match.get("team") if isinstance(last_match, dict) else None)
             or (bilan.get("team") if isinstance(bilan, dict) else None)
         )
+
+        dynamique_data = None
+        if isinstance(bilan, dict):
+            eq_bilans = bilan.get("equipes_bilan") or {}
+            num_str = str(resolved_num)
+            if (
+                num_str in eq_bilans
+                and isinstance(eq_bilans[num_str], dict)
+                and eq_bilans[num_str].get("dynamique")
+            ):
+                dynamique_data = eq_bilans[num_str]["dynamique"]
+            else:
+                dynamique_data = bilan.get("dynamique")
+
         return {
             "team": team_data,
             "phase_courante": bilan.get("phase_courante"),
             "last_match": last_match,
             "next_match": next_match,
             "summary": bilan.get("bilan_total"),
+            "dynamique": dynamique_data,
         }
+
     except Exception as e:
         raise handle_api_error(e) from e
 

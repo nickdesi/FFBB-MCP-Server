@@ -897,11 +897,33 @@ async def ffbb_saison_bilan_service(
         {p["competition"] for p in phases if p.get("competition")}
     )
 
+    all_rencontres = [
+        r
+        for pd in poules_map.values()
+        if isinstance(pd, dict)
+        for r in (pd.get("rencontres", []) or [])
+    ]
+    from ..dynamique import compute_team_dynamique
+
+    total_gagnes = totaux.get("gagnes", 0)
+    total_joues = totaux.get("match_joues", 0)
+    ratio_saison = (
+        round(total_gagnes / total_joues * 100, 1) if total_joues > 0 else None
+    )
+
+    dynamique = compute_team_dynamique(
+        all_rencontres,
+        eng_ids=eng_ids,
+        club_nom=club_nom,
+        ratio_global_victoires=ratio_saison,
+    )
+
     return {
         "status": "ok",
         "club": club_nom,
         "categorie": categorie or "",
         "bilan_total": totaux,
+        "dynamique": dynamique,
         "saison_terminee": saison_terminee,
         "competitions_incluses": competitions_incluses,
         "phases": phases,
@@ -1149,10 +1171,56 @@ async def _build_bilan_payload(
         key=_comp_sort_key_by_age,
     )
 
+    all_rencontres = [
+        r
+        for pd in poules_map.values()
+        if isinstance(pd, dict)
+        for r in (pd.get("rencontres", []) or [])
+    ]
+    from ..dynamique import compute_team_dynamique
+
+    # Calcul de la dynamique pour chaque équipe ventilée
+    for num, eq_data in equipes_bilan.items():
+        team_eng_ids = {eid for eid, n in eng_to_num.items() if n == num}
+        if not team_eng_ids:
+            team_eng_ids = set(org_ids_str)
+
+        b = eq_data["bilan"]
+        t_gagnes = b.get("gagnes", 0)
+        t_joues = b.get("match_joues", 0)
+        ratio_team = round(t_gagnes / t_joues * 100, 1) if t_joues > 0 else None
+
+        eq_data["dynamique"] = compute_team_dynamique(
+            all_rencontres,
+            eng_ids=team_eng_ids,
+            club_nom=club_nom,
+            ratio_global_victoires=ratio_team,
+        )
+
+    # Dynamique principale (équipe 1 ou première équipe disponible)
+    main_team_num = (
+        "1"
+        if "1" in equipes_bilan
+        else (next(iter(equipes_bilan.keys())) if equipes_bilan else None)
+    )
+    if main_team_num and main_team_num in equipes_bilan:
+        main_dynamique = equipes_bilan[main_team_num]["dynamique"]
+    else:
+        tot_gagnes = totaux.get("gagnes", 0)
+        tot_joues = totaux.get("match_joues", 0)
+        tot_ratio = round(tot_gagnes / tot_joues * 100, 1) if tot_joues > 0 else None
+        main_dynamique = compute_team_dynamique(
+            all_rencontres,
+            eng_ids=set(org_ids_str),
+            club_nom=club_nom,
+            ratio_global_victoires=tot_ratio,
+        )
+
     res_dict = {
         "club": club_nom,
         "categorie": categorie or "",
         "bilan_total": totaux,
+        "dynamique": main_dynamique,
         "phase_courante": phase_courante,
         "saison_terminee": saison_terminee,
         "competitions_incluses": competitions_incluses,
