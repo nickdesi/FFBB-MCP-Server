@@ -21,6 +21,7 @@ from pydantic import Field
 from ffbb_mcp.models import BilanResponse, CalendrierMatch  # noqa: TC001
 
 from . import __version__ as _PACKAGE_VERSION
+from .benchmark import get_benchmark_trends, run_benchmark
 from .metrics import record_tool_call
 from .prompts import ROUTING_PROMPT, register_prompts
 from .resources import register_resources
@@ -274,6 +275,31 @@ async def ffbb_version() -> dict[str, Any]:
         else "stdio",
         "cache_ttls": get_cache_ttls(),
     }
+
+
+@mcp.tool(
+    name="ffbb_benchmark",
+    title="Exécution et métriques du benchmark de performance",
+    annotations=_READONLY_ANNOTATIONS,
+)
+@track_tool_usage("ffbb_benchmark")
+@zipai_surgical
+async def ffbb_benchmark(
+    run_now: Annotated[
+        bool,
+        Field(
+            description="Si True, exécute immédiatement un run de benchmark complet (recherche -> équipes -> bilan). Si False, retourne l'historique et les tendances existantes.",
+        ),
+    ] = False,
+) -> dict[str, Any]:
+    """Exécute ou consulte le benchmark de performance du serveur MCP FFBB.
+
+    Mesure la latence réelle des requêtes (search_club, get_equipes, get_bilan)
+    et expose les tendances de performance (P95, moyenne, taux de succès).
+    """
+    if run_now:
+        return await run_benchmark()
+    return get_benchmark_trends()
 
 
 # ---------------------------------------------------------------------------

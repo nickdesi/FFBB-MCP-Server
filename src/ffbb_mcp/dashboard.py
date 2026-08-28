@@ -14,6 +14,7 @@ _CORE_TOOLS = {
     "ffbb_last_result",
     "ffbb_club",
     "ffbb_get",
+    "ffbb_benchmark",
 }
 
 
