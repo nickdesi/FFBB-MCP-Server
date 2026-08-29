@@ -341,7 +341,7 @@ wheels = [
 
 [[package]]
 name = "ffbb-data-client"
-version = "2.4.5"
+version = "2.4.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "hishel", extra = ["async"] },
@@ -350,9 +350,9 @@ dependencies = [
     { name = "python-dateutil" },
     { name = "python-dotenv" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6c/ab/b7feb2b10dfa16dad229b04ffdfce9475f4324754f02056e438433be1904/ffbb_data_client-2.4.5.tar.gz", hash = "sha256:00d0e2e8499835779ba6fbe9545317645755d87774fe085bb1a3cb78b63112f9", size = 635756, upload-time = "2026-08-29T13:20:55.667Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b3/36/c46de29ad389199bc6d744ecad934e36159c1f8b35c9faf57ba456409dd5/ffbb_data_client-2.4.6.tar.gz", hash = "sha256:a1b20aed37586eb632887e2bea8a29d8904a96169ddf1c949929bd81045b296e", size = 636036, upload-time = "2026-08-29T13:27:49.411Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/00/eb/f886af5dceafb2180d43530c17549c4a43979e4c6940c5f0e2cd4baff10d/ffbb_data_client-2.4.5-py3-none-any.whl", hash = "sha256:f0cb0eadfe809a93a4f4021a0b689f941710c0eca146b629d5299062042d139d", size = 239841, upload-time = "2026-08-29T13:20:54.085Z" },
+    { url = "https://files.pythonhosted.org/packages/20/ce/4ba13cd122e61c33e64065018cbd60f7a082d4ca19d2991c6cac4c758984/ffbb_data_client-2.4.6-py3-none-any.whl", hash = "sha256:aef11bdddeb8029dce58b33715d26fb65f7e5dda81de6a2d355c699cc6c74a87", size = 239967, upload-time = "2026-08-29T13:27:47.785Z" },
 ]
 
 [[package]]
@@ -390,7 +390,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "cachetools", specifier = ">=5.3.0" },
-    { name = "ffbb-data-client", specifier = ">=2.4.5,<3.0.0" },
+    { name = "ffbb-data-client", specifier = ">=2.4.6,<3.0.0" },
     { name = "httpx", specifier = ">=0.28.0" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.28.1,<2.0.0" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6.0" },
