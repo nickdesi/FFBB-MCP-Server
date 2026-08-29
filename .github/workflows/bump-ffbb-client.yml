@@ -62,7 +62,7 @@ jobs:
       - name: Install dependencies & Run Schema Parity Tests
         if: steps.current.outputs.version != steps.new.outputs.version
         run: |
-          uv sync --dev
+          uv sync --all-extras
           uv run pytest tests/test_schema_parity.py -v
           uv run pytest
 
