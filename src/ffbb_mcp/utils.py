@@ -24,17 +24,17 @@ def serialize_model(obj: Any) -> JSONValue:
 
     # Fast path: exact primitive types
     obj_type = type(obj)
-    if obj_type in (str, int, float, bool):
+    if obj_type is str or obj_type is int or obj_type is float or obj_type is bool:
         return obj
-
-    # Pydantic v2 fast path: model_dump(mode="json") is natively JSON-safe in Rust/C
-    if (dump_fn := getattr(obj, "model_dump", None)) is not None:
-        return dump_fn(mode="json")
 
     if obj_type is dict:
         return {k: serialize_model(v) for k, v in obj.items()}
     if obj_type is list:
         return [serialize_model(item) for item in obj]
+
+    # Pydantic v2 fast path: model_dump(mode="json") is natively JSON-safe in Rust/C
+    if (dump_fn := getattr(obj, "model_dump", None)) is not None:
+        return dump_fn(mode="json")
 
     if (dict_fn := getattr(obj, "dict", None)) is not None:  # Pydantic v1
         return dict_fn()
