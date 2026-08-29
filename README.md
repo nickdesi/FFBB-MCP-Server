@@ -13,7 +13,7 @@ Serveur [MCP](https://modelcontextprotocol.io) pour consulter calendriers, class
 
 <br />
 
-[![Version](https://img.shields.io/badge/version-1.7.0-green?style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.8.0-green?style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/releases/latest)
 [![Python](https://img.shields.io/badge/Python-3.14%2B-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org)
 [![CI](https://img.shields.io/github/actions/workflow/status/nickdesi/FFBB-MCP-Server/ci.yml?label=CI&style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/actions/workflows/ci.yml)
 [![MCP](https://img.shields.io/badge/MCP-Ready-00ADD8?style=for-the-badge&logo=modelcontextprotocol&logoColor=white)](https://modelcontextprotocol.io)

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-08-29
+
+### Added
+- **Outil MCP Face-à-Face & Comparaison (`ffbb_head_to_head`)** : Analyse comparative complète entre deux équipes (bilan historique direct de la saison, formes récentes respectives, duel statistique attaque vs défense, ratio domicile/extérieur et points clés narratifs d'avant-match).
+- **Calculs de dynamique avancés** : Évaluation de la forme récente (`V-D-V-V...`), calcul précis des séries de victoires/défaites en cours et tendances de scoring.
+- **Support Home Assistant Blueprint & REST next-match** : Endpoint REST dédié `/api/v1/next-match` et blueprint officiel d'automatisation Home Assistant avec support multi-capteurs et sélection multi-catégories.
+
+### Changed & Performance
+- **Optimisation du cycle de vie async & sérialisation** : Fermeture propre du client HTTP (`aclose`), sérialisation Pydantic accélérée et calculs de TTL dynamiques pilotés par l'état des rencontres.
+
+### Fixed
+- **Formulation des séries** : Correction du libellé des séries consécutives pour les occurrences `>= 2` uniquement.
+
 ## [1.7.0] - 2026-08-19
 
 ### Added

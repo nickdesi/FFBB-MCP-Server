@@ -1,6 +1,6 @@
 # 📚 Référence Complète des Outils FFBB MCP
 
-> Version courante : **1.7.0**
+> Version courante : **1.8.0**
 
 Ce document fournit une documentation technique exhaustive pour les outils exposés par le serveur FFBB MCP. Il est destiné aux développeurs et aux agents IA pour comprendre les capacités et les schémas de données du serveur.
 
@@ -380,7 +380,7 @@ la logique de désambiguïsation (U11M1, U13F-2, etc.).
 
   ```jsonc
   {
-    "package_version": "1.7.0",       // version du package ffbb-mcp
+    "package_version": "1.8.0",       // version du package ffbb-mcp
     "mcp_sdk_version": "1.27.0",      // version du SDK MCP Python installé
     "python_version": "3.12.9",       // version de l'interpréteur Python
     "transport": "streamable-http",   // "streamable-http" ou "stdio"
@@ -656,3 +656,29 @@ Il agrège toutes les phases (toutes poules) de la saison FFBB pour l'équipe id
   ]
 }
 ```
+
+---
+
+## 🥊 Outil de Face-à-Face & Comparaison (H2H)
+
+### `ffbb_head_to_head`
+
+**Description** : Compare deux équipes et analyse leurs confrontations directes (H2H) sur la saison.
+
+Fournit une analyse tactique complète et narrative pour préparer un avant-match ou analyser une rivalité sportive.
+
+**Arguments** :
+
+- `club_a` (string, optionnel) : Nom du premier club (ex: `"Stade Clermontois"`).
+- `organisme_id_a` (integer|string, optionnel) : ID FFBB du premier club.
+- `club_b` (string, optionnel) : Nom du second club (ex: `"Vichy"`).
+- `organisme_id_b` (integer|string, optionnel) : ID FFBB du second club.
+- `categorie` (string, optionnel) : Catégorie d'équipe commune à comparer (ex: `"SEM1"`, `"U18M"`, `"Senior"`).
+- `force_refresh` (boolean, défaut: `false`) : Force le rafraîchissement des caches poules.
+
+**Retour** : un objet JSON structuré comprenant :
+- Bilan historique des confrontations directes de la saison (victoires A vs B, scores, écarts)
+- Forme récente respective de chaque équipe (`V-D-V-V...`) et séries en cours
+- Duel statistique des styles : Attaque vs Défense, ratio de victoires domicile/extérieur
+- Points clés narratifs synthétiques prêts pour les LLMs
+
