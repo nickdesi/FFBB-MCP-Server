@@ -257,6 +257,42 @@ def register_routes(mcp: FastMCP) -> None:
     async def sitemap_xml(_request: Request) -> Response:
         return Response(_build_sitemap_xml(), media_type="application/xml")
 
+    @mcp.custom_route("/install.sh", methods=["GET"])  # type: ignore[untyped-decorator]
+    async def install_sh(_request: Request) -> Response:
+        p = _WEBSITE_DIR / "install.sh"
+        if p.exists():
+            return FileResponse(p, media_type="text/x-shellscript")
+        return Response("Not Found", status_code=404)
+
+    @mcp.custom_route("/install.ps1", methods=["GET"])  # type: ignore[untyped-decorator]
+    async def install_ps1(_request: Request) -> Response:
+        p = _WEBSITE_DIR / "install.ps1"
+        if p.exists():
+            return FileResponse(p, media_type="text/plain; charset=utf-8")
+        return Response("Not Found", status_code=404)
+
+    @mcp.custom_route("/install-ffbb-mac.command", methods=["GET"])  # type: ignore[untyped-decorator]
+    async def install_mac_command(_request: Request) -> Response:
+        p = _WEBSITE_DIR / "install-ffbb-mac.command"
+        if p.exists():
+            return FileResponse(
+                p,
+                media_type="application/x-sh",
+                filename="install-ffbb-mac.command",
+            )
+        return Response("Not Found", status_code=404)
+
+    @mcp.custom_route("/install-ffbb-windows.bat", methods=["GET"])  # type: ignore[untyped-decorator]
+    async def install_windows_bat(_request: Request) -> Response:
+        p = _WEBSITE_DIR / "install-ffbb-windows.bat"
+        if p.exists():
+            return FileResponse(
+                p,
+                media_type="application/x-bat",
+                filename="install-ffbb-windows.bat",
+            )
+        return Response("Not Found", status_code=404)
+
     @mcp.custom_route("/cache/warmup", methods=["POST"])  # type: ignore[untyped-decorator]
     async def cache_warmup_post(request: Request) -> Response:
         """Déclenche le préchauffage du cache."""

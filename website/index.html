@@ -333,7 +333,92 @@
                 <div class="section-head">
                     <span class="chip chip-mint">INTÉGRATION MCP 1 CLIC</span>
                     <h2>Connectez votre client IA préféré</h2>
-                    <p>Ajoutez l'URL Streamable HTTP officielle dans votre configuration et commencez immédiatement à poser vos questions.</p>
+                    <p>Lanceurs automatiques en 1 clic pour PC/Mac ou intégration directe dans votre éditeur préféré.</p>
+                </div>
+
+                <!-- 1-Click One-Touch Launchers Cards -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.25rem; margin-bottom: 2.5rem;">
+                    <!-- Launcher 1: Cursor 1-Click Protocol -->
+                    <div class="tool-card" style="border: 1px solid rgba(99, 102, 241, 0.4); background: linear-gradient(145deg, rgba(99, 102, 241, 0.08), rgba(15, 23, 42, 0.7)); display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                                <span class="chip chip-indigo">⚡ 1-CLIC DIRECT</span>
+                                <span style="font-size: 1.6rem;">🖱️</span>
+                            </div>
+                            <h3 style="font-size: 1.2rem; color: #fff; margin-bottom: 0.5rem;">Cursor & Windsurf</h3>
+                            <p style="color: var(--text-secondary); font-size: 0.88rem; line-height: 1.4; margin-bottom: 1.25rem;">
+                                Ouvre instantanément Cursor et configure le serveur MCP FFBB en 1 seul clic sans copier aucun code.
+                            </p>
+                        </div>
+                        <a href="cursor://anysphere.cursor-mcp/add?url=https%3A%2F%2Fffbb.desimone.fr%2Fmcp&name=ffbb" class="btn btn-primary btn-sm" style="width: 100%; text-align: center; display: flex; align-items: center; justify-content: center; gap: 0.5rem; text-decoration: none;">
+                            <span>⚡</span> <strong>Installer dans Cursor (1-Clic)</strong>
+                        </a>
+                    </div>
+
+                    <!-- Launcher 2: macOS / Linux Auto-Installer -->
+                    <div class="tool-card" style="border: 1px solid rgba(16, 185, 129, 0.4); background: linear-gradient(145deg, rgba(16, 185, 129, 0.08), rgba(15, 23, 42, 0.7)); display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                                <span class="chip chip-mint">🍎 MAC / LINUX</span>
+                                <span style="font-size: 1.6rem;">💻</span>
+                            </div>
+                            <h3 style="font-size: 1.2rem; color: #fff; margin-bottom: 0.5rem;">Installateur Mac (.command)</h3>
+                            <p style="color: var(--text-secondary); font-size: 0.88rem; line-height: 1.4; margin-bottom: 1.25rem;">
+                                Détecte automatiquement <strong>Claude Desktop</strong>, <strong>Cursor</strong> et <strong>Antigravity</strong> et les configure en 1 seconde.
+                            </p>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <a href="/install-ffbb-mac.command" download="install-ffbb-mac.command" class="btn btn-primary btn-sm" style="width: 100%; text-align: center; display: flex; align-items: center; justify-content: center; gap: 0.5rem; text-decoration: none;">
+                                <span>⬇️</span> <strong>Télécharger le lanceur Mac</strong>
+                            </a>
+                            <button class="btn btn-surface btn-sm" onclick="copySnippet('curl -fsSL https://ffbb.desimone.fr/install.sh | bash')" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                                <span>📋</span> <code>curl -fsSL ... | bash</code>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Launcher 3: Windows PowerShell Auto-Installer -->
+                    <div class="tool-card" style="border: 1px solid rgba(59, 130, 246, 0.4); background: linear-gradient(145deg, rgba(59, 130, 246, 0.08), rgba(15, 23, 42, 0.7)); display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                                <span class="chip chip-orange">🪟 WINDOWS PC</span>
+                                <span style="font-size: 1.6rem;">🖥️</span>
+                            </div>
+                            <h3 style="font-size: 1.2rem; color: #fff; margin-bottom: 0.5rem;">Installateur PC (.bat)</h3>
+                            <p style="color: var(--text-secondary); font-size: 0.88rem; line-height: 1.4; margin-bottom: 1.25rem;">
+                                Lanceur double-clic ou commande PowerShell pour configurer <strong>Claude Desktop</strong> et <strong>Cursor</strong> sous Windows.
+                            </p>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <a href="/install-ffbb-windows.bat" download="install-ffbb-windows.bat" class="btn btn-primary btn-sm" style="width: 100%; text-align: center; display: flex; align-items: center; justify-content: center; gap: 0.5rem; text-decoration: none;">
+                                <span>⬇️</span> <strong>Télécharger le lanceur PC</strong>
+                            </a>
+                            <button class="btn btn-surface btn-sm" onclick="copySnippet('iwr -useb https://ffbb.desimone.fr/install.ps1 | iex')" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                                <span>📋</span> <code>iwr ... | iex</code>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Launcher 4: Claude Code CLI -->
+                    <div class="tool-card" style="border: 1px solid rgba(244, 63, 94, 0.4); background: linear-gradient(145deg, rgba(244, 63, 94, 0.08), rgba(15, 23, 42, 0.7)); display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                                <span class="chip chip-live">🤖 CLAUDE CODE CLI</span>
+                                <span style="font-size: 1.6rem;">📟</span>
+                            </div>
+                            <h3 style="font-size: 1.2rem; color: #fff; margin-bottom: 0.5rem;">Claude Code / Terminal</h3>
+                            <p style="color: var(--text-secondary); font-size: 0.88rem; line-height: 1.4; margin-bottom: 1.25rem;">
+                                Ajoutez directement le serveur MCP FFBB dans vos sessions terminal Claude Code ou assistants CLI.
+                            </p>
+                        </div>
+                        <button class="btn btn-primary btn-sm" onclick="copySnippet('claude mcp add --transport sse ffbb https://ffbb.desimone.fr/mcp')" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                            <span>📋</span> <strong>Copier <code>claude mcp add ...</code></strong>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="section-head" style="margin-bottom: 1.5rem; text-align: left;">
+                    <h3 style="font-size: 1.3rem; color: #fff;">⚙️ Configuration Manuelle (JSON par application)</h3>
                 </div>
 
                 <div class="setup-wrapper">
