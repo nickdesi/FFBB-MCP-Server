@@ -101,7 +101,7 @@
                         "name": "Quelle est la différence entre ffbb.desimone.fr (MCP) et ffbb-api.desimone.fr (API REST) ?",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "ffbb.desimone.fr est le serveur MCP dédié aux intelligences artificielles (Claude, Cursor, Copilot) avec 12 outils spécialisés et optimisés en tokens. ffbb-api.desimone.fr est l'API REST FastAPI indépendante et le SDK Python (ffbb-data-client sur PyPI) destinés aux applications web (comme SCBA Bénévolat), sites de clubs et scripts personnalisés."
+                            "text": "ffbb.desimone.fr est le serveur MCP dédié aux intelligences artificielles (Claude, Cursor, Copilot) avec 13 outils spécialisés et optimisés en tokens. ffbb-api.desimone.fr est l'API REST FastAPI indépendante et le SDK Python (ffbb-data-client sur PyPI) destinés aux applications web (comme SCBA Bénévolat), sites de clubs et scripts personnalisés."
                         }
                     },
                     {
@@ -150,7 +150,7 @@
             </a>
             <nav class="main-nav">
                 <a href="#demo">Démo</a>
-                <a href="#outils">12 Outils IA</a>
+                <a href="#outils">13 Outils IA</a>
                 <a href="#integration">Intégration MCP</a>
                 <a href="#architecture">Architecture & API</a>
                 <a href="#dashboard">Dashboard</a>
@@ -170,7 +170,7 @@
         <div class="mobile-nav-drawer" id="mobileDrawer">
             <ul class="mobile-nav-links">
                 <li><a href="#demo" onclick="closeMobileMenu()">🎯 Démo en direct</a></li>
-                <li><a href="#outils" onclick="closeMobileMenu()">⚡ 12 Outils IA Spécialisés</a></li>
+                <li><a href="#outils" onclick="closeMobileMenu()">⚡ 13 Outils IA Spécialisés</a></li>
                 <li><a href="#integration" onclick="closeMobileMenu()">🚀 Intégration 1 Clic (Cursor, Claude, Copilot)</a></li>
                 <li><a href="#architecture" onclick="closeMobileMenu()">🏗️ Architecture & API REST</a></li>
                 <li><a href="#dashboard" onclick="closeMobileMenu()">📊 Dashboard & Santé du Service</a></li>
@@ -201,7 +201,7 @@
                     </p>
                     <div class="hero-actions">
                         <a href="#integration" class="btn btn-primary btn-lg">🚀 Connecter l'IA en 1 Clic</a>
-                        <a href="#outils" class="btn btn-surface btn-lg">⚡ Découvrir les 12 Outils IA</a>
+                        <a href="#outils" class="btn btn-surface btn-lg">⚡ Découvrir les 13 Outils IA</a>
                     </div>
                     <div style="margin-top: 1.25rem;">
                         <a href="https://ffbb-api.desimone.fr" target="_blank" rel="noopener" class="chip chip-indigo" style="text-decoration: none; padding: 0.5rem 1rem; display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.82rem;">
@@ -210,7 +210,7 @@
                     </div>
                     <div class="hero-badges-row">
                         <div class="hero-badge-item">
-                            <span class="hero-badge-val">12 Outils IA</span>
+                            <span class="hero-badge-val">13 Outils IA</span>
                             <span class="hero-badge-lbl">Spécialisés Basket</span>
                         </div>
                         <div class="hero-badge-item">
@@ -283,7 +283,7 @@
             <div class="container">
                 <div class="section-head">
                     <span class="chip chip-orange">OUTILS IA</span>
-                    <h2>12 Outils pour explorer tout le basket français</h2>
+                    <h2>13 Outils pour explorer tout le basket français</h2>
                     <p>Votre assistant IA sélectionne automatiquement le meilleur outil pour vous répondre avec une précision totale.</p>
                 </div>
 
@@ -291,37 +291,79 @@
                     <div class="tool-card">
                         <div class="tool-icon">⚡</div>
                         <h3><code>ffbb_team_summary</code></h3>
-                        <p>Le résumé ultime en un seul appel : bilan de la saison, position au classement, dernier résultat et prochain match à jouer.</p>
+                        <p>Le résumé ultime en un seul appel : bilan complet de la saison, position au classement, forme récente, dernier résultat et prochain match.</p>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-icon">📅</div>
+                        <h3><code>ffbb_next_match</code></h3>
+                        <p>Détails complets de la prochaine rencontre programmée : date, horaire, adversaire et gymnase résolu avec adresse exacte.</p>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-icon">🏁</div>
+                        <h3><code>ffbb_last_result</code></h3>
+                        <p>Feuille de match officielle et score précis du dernier match disputé par une équipe.</p>
                     </div>
 
                     <div class="tool-card">
                         <div class="tool-icon">🔴</div>
                         <h3><code>ffbb_lives</code></h3>
-                        <p>Scores en temps réel, quarts-temps et statut des matchs en cours sur l'ensemble des championnats français.</p>
+                        <p>Scores en direct, quarts-temps et statut des matchs en cours le week-end sur l'ensemble des divisions françaises.</p>
                     </div>
 
                     <div class="tool-card">
-                        <div class="tool-icon">🏆</div>
+                        <div class="tool-icon">📊</div>
                         <h3><code>ffbb_bilan</code></h3>
-                        <p>Bilan exhaustif d'une équipe toutes phases confondues : victoires, défaites, points marqués/encaissés et goal-average.</p>
+                        <p>Bilan exhaustif d'une équipe : victoires, défaites, points marqués, points encaissés et goal-average.</p>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-icon">📈</div>
+                        <h3><code>ffbb_bilan_saison</code></h3>
+                        <p>Synthèse approfondie des performances d'une équipe sur l'ensemble des phases d'une saison sportive.</p>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-icon">⚔️</div>
+                        <h3><code>ffbb_head_to_head</code></h3>
+                        <p>Face-à-face et historique des confrontations directes entre deux clubs ou équipes.</p>
                     </div>
 
                     <div class="tool-card">
                         <div class="tool-icon">🏟️</div>
                         <h3><code>ffbb_club</code></h3>
-                        <p>Fiche complète d'un club : calendrier des matchs du week-end, liste des équipes engagées et classements officiels.</p>
+                        <p>Fiche administrative et sportive d'un club : coordonnées, gymnase principal, calendrier des matchs et équipes engagées.</p>
                     </div>
 
                     <div class="tool-card">
                         <div class="tool-icon">🔍</div>
                         <h3><code>ffbb_search</code></h3>
-                        <p>Recherche universelle et rapide : clubs, compétitions, tournois, gymnases, arbitres et terrains de basket 3x3.</p>
+                        <p>Recherche universelle rapide multi-index : clubs, compétitions, tournois 3x3, gymnases et arbitres.</p>
                     </div>
 
                     <div class="tool-card">
-                        <div class="tool-icon">📅</div>
-                        <h3><code>ffbb_next_match</code> / <code>last_result</code></h3>
-                        <p>Détails précis de la prochaine rencontre programmée ou de la dernière feuille de match jouée.</p>
+                        <div class="tool-icon">🎯</div>
+                        <h3><code>ffbb_resolve_team</code></h3>
+                        <p>Désambiguïsation intelligente pour identifier une équipe unique et sa poule à partir d'un nom ou d'un club.</p>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-icon">📦</div>
+                        <h3><code>ffbb_get</code></h3>
+                        <p>Extraction brute et directe d'entités FFBB par identifiant (organismes, poules, rencontres, terrains 3x3).</p>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-icon">🗓️</div>
+                        <h3><code>ffbb_saisons</code></h3>
+                        <p>Consultation de la liste des saisons sportives disponibles et historiques de la FFBB.</p>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-icon">⚙️</div>
+                        <h3><code>ffbb_version</code></h3>
+                        <p>Informations sur la version active du serveur MCP, le transport et l'état de l'infrastructure.</p>
                     </div>
                 </div>
             </div>
@@ -418,7 +460,7 @@
                         </div>
                         <h3 style="font-size: 1.3rem; margin-bottom: 0.5rem; color: #fff;">FFBB MCP Server</h3>
                         <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5; margin-bottom: 1rem;">
-                            Dédié exclusivement aux <strong>assistants IA & LLMs</strong> (Claude, Cursor, VS Code Copilot, Antigravity). Expose 12 outils standardisés avec agrégation intelligente pour minimiser la consommation de tokens.
+                            Dédié exclusivement aux <strong>assistants IA & LLMs</strong> (Claude, Cursor, VS Code Copilot, Antigravity). Expose 13 outils standardisés avec agrégation intelligente pour minimiser la consommation de tokens.
                         </p>
                         <ul style="color: var(--text-secondary); font-size: 0.85rem; space-y: 0.5rem; padding-left: 1.2rem; margin-bottom: 1.5rem;">
                             <li>Protocole Streamable HTTP / SSE standard</li>
@@ -525,7 +567,7 @@ lives = client.<span style="color: #d2a8ff;">get_lives</span>()
                             <span class="faq-plus">+</span>
                         </div>
                         <div class="faq-answer-row">
-                            <p>Il suffit d'ajouter l'URL <code>https://ffbb.desimone.fr/mcp</code> dans votre client MCP (Cursor, Claude Desktop, Copilot, Antigravity). Votre IA saura automatiquement utiliser les 12 outils spécialisés pour vous répondre.</p>
+                            <p>Il suffit d'ajouter l'URL <code>https://ffbb.desimone.fr/mcp</code> dans votre client MCP (Cursor, Claude Desktop, Copilot, Antigravity). Votre IA saura automatiquement utiliser les 13 outils spécialisés pour vous répondre.</p>
                         </div>
                     </div>
 

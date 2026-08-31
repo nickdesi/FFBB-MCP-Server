@@ -1,5 +1,5 @@
 # FFBB MCP Server — Serveur Model Context Protocol pour le Basket Français
-> Serveur FastMCP public et open-source exposant 12 outils d'agrégation spécialisés pour interroger les données officielles de la Fédération Française de BasketBall (FFBB) depuis n'importe quel client MCP (Claude Desktop, Cursor, VS Code Copilot, ChatGPT, Antigravity, OpenCode).
+> Serveur FastMCP public et open-source exposant 13 outils d'agrégation spécialisés pour interroger les données officielles de la Fédération Française de BasketBall (FFBB) depuis n'importe quel client MCP (Claude Desktop, Cursor, VS Code Copilot, ChatGPT, Antigravity, OpenCode).
 > Propulsé par le SDK Python officiel et l'API REST `ffbb-data-client` (https://ffbb-api.desimone.fr).
 
 ## Endpoints Publics & Ressources
@@ -12,7 +12,7 @@
 - SDK Python (ffbb-data-client) : https://nickdesi.github.io/ffbb-data-client/
 - Package PyPI : https://pypi.org/project/ffbb-data-client/
 
-## 12 Outils MCP Disponibles
+## 13 Outils MCP Disponibles
 1. `ffbb_team_summary` : Synthèse complète en un seul appel (bilan, position au classement, dernier match joué, prochain match).
 2. `ffbb_lives` : Scores en direct, statut et temps forts des rencontres du week-end sur toutes les divisions françaises.
 3. `ffbb_bilan` : Bilan victoires / défaites exhaustif, points marqués/encaissés et goal-average d'une équipe.

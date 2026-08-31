@@ -4,7 +4,7 @@
 Le serveur **FFBB MCP Server** est une passerelle officielle et haute performance connectant les modèles de langage (Claude, Cursor, GitHub Copilot, ChatGPT, Antigravity) et les applications aux bases de données officielles de la Fédération Française de BasketBall (FFBB).
 
 Il repose sur une architecture à deux niveaux :
-1. **Couche Métier MCP (FastMCP / Starlette / Uvicorn)** : Expose 12 outils haut niveau optimisés pour les LLMs (agrégation "one-shot", cache TTL adaptatif, gestion proactive du token).
+1. **Couche Métier MCP (FastMCP / Starlette / Uvicorn)** : Expose 13 outils haut niveau optimisés pour les LLMs (agrégation "one-shot", cache TTL adaptatif, gestion proactive du token).
 2. **Couche Moteur Python (`ffbb-data-client`)** : SDK Python asynchrone (Pydantic v2, HTTPX, Hishel SQLite cache, Directus REST API + Meilisearch).
 
 ### Endpoints Publics
@@ -15,7 +15,7 @@ Il repose sur une architecture à deux niveaux :
 
 ---
 
-## 2. Spécification Détaillée des 12 Outils MCP
+## 2. Spécification Détaillée des 13 Outils MCP
 
 ### `ffbb_team_summary`
 - **Description** : Résumé tout-en-un d'une équipe (position au classement, victoires/défaites, dernier match et prochain match).
@@ -33,6 +33,13 @@ Il repose sur une architecture à deux niveaux :
 - **Paramètres** :
   - `organisme_id` (str) : Identifiant du club/organisme.
   - `saison_id` (str, optionnel).
+
+
+### `ffbb_head_to_head`
+- **Description** : Analyse des confrontations directes entre deux équipes.
+- **Paramètres** :
+  - `club1` (str) : Nom ou identifiant du premier club.
+  - `club2` (str) : Nom ou identifiant du second club.
 
 ### `ffbb_club`
 - **Description** : Informations complètes sur un club (coordonnées, liste des équipes, gymnases rattachés, calendrier).
