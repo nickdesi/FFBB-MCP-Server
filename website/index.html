@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="TuCtfpsMfaMi13jU8fbz5LFA1vxzqeLZMHc74ulWRig" />
-    <title>FFBB MCP Server & API Basket : Données Officielles pour IA & Python</title>
-    <meta name="description" content="Serveur MCP public & API connectés aux données officielles de la FFBB : scores live, classements complets, calendriers, fiches clubs et résultats pour Claude, Cursor, Copilot, ChatGPT ou Python (ffbb-data-client).">
-    <meta name="keywords" content="FFBB MCP, API FFBB, API Basket France, ffbb-data-client, Model Context Protocol, Claude MCP, Cursor MCP, GitHub Copilot Basketball, Scores Live Basket, Classement FFBB IA, Python FFBB API">
+    <title>FFBB MCP Server : Serveur Model Context Protocol pour le Basket Français</title>
+    <meta name="description" content="Serveur MCP public et officiel pour interroger les données de la Fédération Française de BasketBall (scores live, classements, calendriers, fiches clubs) depuis vos assistants IA : Cursor, Claude Desktop, VS Code Copilot, Google Antigravity.">
+    <meta name="keywords" content="FFBB MCP Server, Model Context Protocol, Claude MCP, Cursor MCP, GitHub Copilot Basketball, Scores Live Basket, Classement FFBB IA, ffbb-data-client, Basket France IA">
     <meta name="author" content="Nicolas De Simone">
     <meta name="robots" content="index, follow, max-image-preview:large">
     <link rel="canonical" href="https://ffbb.desimone.fr/" />
@@ -15,17 +15,17 @@
 
     <!-- Open Graph / Social Media -->
     <meta property="og:type" content="website">
-    <meta property="og:site_name" content="FFBB MCP Server & API Basket">
-    <meta property="og:title" content="FFBB MCP Server & API Basket : Données Officielles pour IA & Python">
-    <meta property="og:description" content="Calendriers, classements, bilans, résultats et scores live FFBB accessibles directement depuis Claude, Cursor, Copilot, VS Code ou en Python via ffbb-data-client.">
+    <meta property="og:site_name" content="FFBB MCP Server">
+    <meta property="og:title" content="FFBB MCP Server : Données Officielles du Basket Français pour Assistants IA">
+    <meta property="og:description" content="Calendriers, classements, bilans, résultats et scores live FFBB accessibles directement depuis Claude, Cursor, Copilot, VS Code et Google Antigravity.">
     <meta property="og:url" content="https://ffbb.desimone.fr/">
     <meta property="og:image" content="https://ffbb.desimone.fr/apple-touch-icon.png">
     <meta property="og:locale" content="fr_FR">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="FFBB MCP Server & API Basket : Données Officielles pour IA & Python">
-    <meta name="twitter:description" content="Connectez vos assistants IA aux données du basket français en 1 clic via MCP ou développez en Python avec ffbb-data-client.">
+    <meta name="twitter:title" content="FFBB MCP Server : Données Officielles du Basket Français pour Assistants IA">
+    <meta name="twitter:description" content="Connectez vos assistants IA aux données du basket français en 1 clic via le Model Context Protocol (Streamable HTTP).">
     <meta name="twitter:image" content="https://ffbb.desimone.fr/apple-touch-icon.png">
 
     <!-- Favicons for Google, Apple and Browsers -->
@@ -51,8 +51,8 @@
                 "@id": "https://ffbb.desimone.fr/#website",
                 "url": "https://ffbb.desimone.fr/",
                 "name": "FFBB MCP Server",
-                "alternateName": ["API FFBB MCP", "FFBB MCP", "ffbb-mcp", "API Basket FFBB"],
-                "description": "Serveur MCP public et SDK Python connectés aux données officielles de la Fédération Française de BasketBall.",
+                "alternateName": ["FFBB MCP", "ffbb-mcp", "Serveur MCP Basket FFBB"],
+                "description": "Serveur MCP public connectant les assistants IA aux données officielles de la Fédération Française de BasketBall.",
                 "inLanguage": "fr-FR",
                 "publisher": { "@id": "https://ffbb.desimone.fr/#person" }
             },
@@ -60,20 +60,20 @@
                 "@type": "SoftwareApplication",
                 "@id": "https://ffbb.desimone.fr/#software",
                 "name": "FFBB MCP Server",
-                "alternateName": ["API FFBB", "FFBB Model Context Protocol", "ffbb-data-client"],
+                "alternateName": ["FFBB Model Context Protocol Server", "ffbb-mcp"],
                 "applicationCategory": "DeveloperApplication, SportsApplication",
                 "operatingSystem": "macOS, Windows, Linux",
-                "description": "Serveur MCP et API Python pour accéder aux données officielles de la Fédération Française de BasketBall depuis un assistant IA ou une application Python.",
+                "description": "Serveur MCP standardisé pour accéder aux données officielles de la Fédération Française de BasketBall depuis un assistant IA.",
                 "url": "https://ffbb.desimone.fr",
                 "image": "https://ffbb.desimone.fr/logo.webp",
                 "softwareVersion": "1.8.0",
                 "datePublished": "2025-01-01T00:00:00Z",
-                "dateModified": "2026-08-29T12:51:31Z",
+                "dateModified": "2026-08-31T22:00:00Z",
                 "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
                 "author": { "@id": "https://ffbb.desimone.fr/#person" },
                 "sameAs": [
                     "https://github.com/nickdesi/FFBB-MCP-Server",
-                    "https://nickdesi.github.io/ffbb-data-client/",
+                    "https://ffbb-api.desimone.fr",
                     "https://pypi.org/project/ffbb-data-client/"
                 ]
             },
@@ -82,7 +82,7 @@
                 "@id": "https://ffbb.desimone.fr/#person",
                 "name": "Nicolas De Simone",
                 "url": "https://github.com/nickdesi",
-                "description": "Développeur Python spécialisé dans l'écosystème open source pour le basket français."
+                "description": "Développeur spécialisé dans l'écosystème open source pour le basket français."
             },
             {
                 "@type": "FAQPage",
@@ -90,18 +90,18 @@
                 "mainEntity": [
                     {
                         "@type": "Question",
-                        "name": "Comment poser des questions sur le basket à son IA ?",
+                        "name": "Comment connecter mon assistant IA au basket français ?",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "Il suffit d'ajouter l'endpoint public https://ffbb.desimone.fr/mcp dans votre client MCP préféré (Cursor, Claude Desktop, VS Code Copilot). Votre IA saura alors automatiquement interroger les calendriers, classements et scores de la FFBB."
+                            "text": "Il suffit d'ajouter l'endpoint Streamable HTTP https://ffbb.desimone.fr/mcp dans votre client MCP préféré (Cursor, Claude Desktop, VS Code Copilot, Google Antigravity). Votre IA saura alors automatiquement interroger les calendriers, classements et scores de la FFBB."
                         }
                     },
                     {
                         "@type": "Question",
-                        "name": "Quelle est la différence entre le serveur MCP et le SDK ffbb-data-client ?",
+                        "name": "Quelle est la différence entre ffbb.desimone.fr (MCP) et ffbb-api.desimone.fr (API REST) ?",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "Le serveur MCP (https://ffbb.desimone.fr/mcp) est une couche d'agrégation haut niveau optimisée pour les assistants IA (Claude, Cursor, Copilot). Il est alimenté par ffbb-data-client, qui est le SDK Python officiel disponible sur PyPI (pip install ffbb-data-client) pour les développeurs souhaitant créer des applications ou des scripts."
+                            "text": "ffbb.desimone.fr est le serveur MCP dédié aux intelligences artificielles (Claude, Cursor, Copilot) avec 12 outils spécialisés et optimisés en tokens. ffbb-api.desimone.fr est l'API REST FastAPI indépendante et le SDK Python (ffbb-data-client sur PyPI) destinés aux applications web (comme SCBA Bénévolat), sites de clubs et scripts personnalisés."
                         }
                     },
                     {
@@ -114,7 +114,7 @@
                     },
                     {
                         "@type": "Question",
-                        "name": "Le service est-il gratuit et public ?",
+                        "name": "Le serveur MCP est-il gratuit et public ?",
                         "acceptedAnswer": {
                             "@type": "Answer",
                             "text": "Oui, l'instance officielle publique est hébergée, maintenue et accessible gratuitement avec le transport standard Streamable HTTP."
@@ -125,7 +125,7 @@
                         "name": "Les scores et classements sont-ils officiels ?",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "Oui, toutes les données proviennent directement des flux et index officiels de la Fédération Française de BasketBall via le SDK ffbb-data-client."
+                            "text": "Oui, toutes les données proviennent directement des flux et index officiels de la Fédération Française de BasketBall via le moteur ffbb-data-client."
                         }
                     }
                 ]
@@ -146,13 +146,13 @@
         <div class="container header-inner">
             <a href="#" class="brand">
                 <img src="logo.webp" alt="Logo FFBB MCP" class="brand-logo" width="36" height="36">
-                <span>FFBB <strong>MCP & API</strong></span>
+                <span>FFBB <strong>MCP Server</strong></span>
             </a>
             <nav class="main-nav">
                 <a href="#demo">Démo</a>
-                <a href="#outils">Outils IA</a>
+                <a href="#outils">12 Outils IA</a>
                 <a href="#integration">Intégration MCP</a>
-                <a href="#sdk-python">SDK Python</a>
+                <a href="#architecture">Architecture & API</a>
                 <a href="#dashboard">Dashboard</a>
                 <a href="#faq">FAQ</a>
             </nav>
@@ -172,7 +172,7 @@
                 <li><a href="#demo" onclick="closeMobileMenu()">🎯 Démo en direct</a></li>
                 <li><a href="#outils" onclick="closeMobileMenu()">⚡ 12 Outils IA Spécialisés</a></li>
                 <li><a href="#integration" onclick="closeMobileMenu()">🚀 Intégration 1 Clic (Cursor, Claude, Copilot)</a></li>
-                <li><a href="#sdk-python" onclick="closeMobileMenu()">🐍 Espace Développeur Python (SDK)</a></li>
+                <li><a href="#architecture" onclick="closeMobileMenu()">🏗️ Architecture & API REST</a></li>
                 <li><a href="#dashboard" onclick="closeMobileMenu()">📊 Dashboard & Santé du Service</a></li>
                 <li><a href="#faq" onclick="closeMobileMenu()">❓ Questions fréquentes</a></li>
             </ul>
@@ -191,17 +191,22 @@
                     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
                         <span class="chip chip-orange">🏀 BASKET FRANÇAIS + IA</span>
                         <span class="chip chip-live"><span class="live-pulse"></span> STREAMABLE HTTP ENDPOINT</span>
-                        <span class="chip chip-mint">🐍 SDK PYTHON</span>
+                        <span class="chip chip-mint">🤖 SERVEUR MCP OFFICIEL</span>
                     </div>
                     <h1 class="hero-title">
                         Donnez à vos assistants IA la connaissance du <span class="text-gradient">basket français</span>.
                     </h1>
                     <p class="hero-lead">
-                        Résultats, calendriers de toutes les divisions, classements de poules, fiches de clubs et scores en direct : interrogez la FFBB en langage naturel (Cursor, Claude, Copilot) ou intégrez l'API en Python avec <code>ffbb-data-client</code>.
+                        Résultats, calendriers de toutes les divisions, classements de poules, fiches de clubs et scores en direct : interrogez la FFBB en langage naturel directement depuis vos éditeurs et assistants IA (Cursor, Claude Desktop, VS Code Copilot, Google Antigravity).
                     </p>
                     <div class="hero-actions">
                         <a href="#integration" class="btn btn-primary btn-lg">🚀 Connecter l'IA en 1 Clic</a>
-                        <a href="#sdk-python" class="btn btn-surface btn-lg">🐍 Utiliser le SDK Python</a>
+                        <a href="#outils" class="btn btn-surface btn-lg">⚡ Découvrir les 12 Outils IA</a>
+                    </div>
+                    <div style="margin-top: 1.25rem;">
+                        <a href="https://ffbb-api.desimone.fr" target="_blank" rel="noopener" class="chip chip-indigo" style="text-decoration: none; padding: 0.5rem 1rem; display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.82rem;">
+                            <span>🌐</span> <strong>Vous cherchez l'API REST directe ou le SDK ?</strong> Rendez-vous sur <code>ffbb-api.desimone.fr</code> →
+                        </a>
                     </div>
                     <div class="hero-badges-row">
                         <div class="hero-badge-item">
@@ -391,13 +396,51 @@
             </div>
         </section>
 
-        <!-- Python Developer SDK Section -->
-        <section id="sdk-python" style="background: rgba(255, 255, 255, 0.015); border-top: 1px solid var(--theme-border); border-bottom: 1px solid var(--theme-border); padding: 5rem 0;">
+        <!-- Architecture & Ecosystem Section -->
+        <section id="architecture" style="background: rgba(255, 255, 255, 0.015); border-top: 1px solid var(--theme-border); border-bottom: 1px solid var(--theme-border); padding: 5rem 0;">
             <div class="container">
                 <div class="section-head">
-                    <span class="chip chip-orange">🐍 POUR LES DÉVELOPPEURS PYTHON</span>
-                    <h2>Le Moteur : SDK <code>ffbb-data-client</code></h2>
-                    <p>Le serveur MCP repose sur le package officiel Python disponible sur PyPI. Développez vos propres applications, sites de clubs ou scripts d'analyse.</p>
+                    <span class="chip chip-orange">🏗️ ARCHITECTURE & ÉCOSYSTÈME</span>
+                    <h2>Deux briques dédiées : Serveur MCP & API REST</h2>
+                    <p>Le serveur MCP (<strong>ffbb.desimone.fr</strong>) et l'API REST officielle (<strong>ffbb-api.desimone.fr</strong>) sont deux services distincts et complémentaires propulsés par le SDK Python <code>ffbb-data-client</code>.</p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 2.5rem;">
+                    <!-- Card 1: MCP Server -->
+                    <div class="tool-card" style="border: 1px solid rgba(99, 102, 241, 0.3); background: linear-gradient(145deg, rgba(99, 102, 241, 0.05), rgba(15, 23, 42, 0.6));">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                            <span class="chip chip-indigo">🤖 CE SITE WEB</span>
+                            <span style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary);">ffbb.desimone.fr</span>
+                        </div>
+                        <h3 style="font-size: 1.3rem; margin-bottom: 0.5rem; color: #fff;">FFBB MCP Server</h3>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5; margin-bottom: 1rem;">
+                            Dédié exclusivement aux <strong>assistants IA & LLMs</strong> (Claude, Cursor, VS Code Copilot, Antigravity). Expose 12 outils standardisés avec agrégation intelligente pour minimiser la consommation de tokens.
+                        </p>
+                        <ul style="color: var(--text-secondary); font-size: 0.85rem; space-y: 0.5rem; padding-left: 1.2rem; margin-bottom: 1.5rem;">
+                            <li>Protocole Streamable HTTP / SSE standard</li>
+                            <li>Zéro clé d'API requise pour les utilisateurs</li>
+                            <li>Résolution automatique des identifiants et poules</li>
+                        </ul>
+                        <a href="#integration" class="btn btn-surface btn-sm" style="width: 100%; text-align: center;">⚡ Configurer dans votre IA</a>
+                    </div>
+
+                    <!-- Card 2: REST API & SDK -->
+                    <div class="tool-card" style="border: 1px solid rgba(16, 185, 129, 0.3); background: linear-gradient(145deg, rgba(16, 185, 129, 0.05), rgba(15, 23, 42, 0.6));">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                            <span class="chip chip-mint">🌐 SERVICE INDÉPENDANT</span>
+                            <span style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary);">ffbb-api.desimone.fr</span>
+                        </div>
+                        <h3 style="font-size: 1.3rem; margin-bottom: 0.5rem; color: #fff;">FFBB Data Client (API & SDK)</h3>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5; margin-bottom: 1rem;">
+                            Dédié aux <strong>développeurs d'applications web, mobiles et scripts</strong> (ex. SCBA Bénévolat). Fournit une API REST FastAPI OpenAPI/Swagger et un package Python sur PyPI.
+                        </p>
+                        <ul style="color: var(--text-secondary); font-size: 0.85rem; space-y: 0.5rem; padding-left: 1.2rem; margin-bottom: 1.5rem;">
+                            <li>Documentation interactive Swagger & OpenAPI</li>
+                            <li>Endpoints directs pour clubs, matchs et classements</li>
+                            <li>SDK Python asynchrone et typé Pydantic v2</li>
+                        </ul>
+                        <a href="https://ffbb-api.desimone.fr" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="width: 100%; text-align: center;">🌐 Ouvrir l'API REST (ffbb-api.desimone.fr) →</a>
+                    </div>
                 </div>
 
                 <div class="setup-wrapper">
@@ -415,7 +458,7 @@
 
                     <div class="setup-code-box" style="display: block;">
                         <button class="copy-btn" onclick="copySnippet('pip install ffbb-data-client')">📋 Copier pip install</button>
-                        <pre><code><span style="color: #8b949e;"># Installation via pip</span>
+                        <pre><code><span style="color: #8b949e;"># Installation via pip pour vos projets et scripts Python</span>
 <span style="color: #ff6b00;">pip install</span> <span style="color: #a5d6ff;">ffbb-data-client</span>
 
 <span style="color: #8b949e;"># Utilisation rapide en Python (async ou synchrone)</span>
@@ -468,7 +511,7 @@ lives = client.<span style="color: #d2a8ff;">get_lives</span>()
                 <div class="section-head">
                     <span class="chip chip-mint">FAQ</span>
                     <h2>Questions fréquentes</h2>
-                    <p>Tout ce que vous devez savoir pour démarrer et utiliser le serveur MCP et le SDK Python.</p>
+                    <p>Tout ce que vous devez savoir pour démarrer et comprendre l'écosystème FFBB MCP & API.</p>
                 </div>
 
                 <div class="faq-grid">
@@ -478,17 +521,17 @@ lives = client.<span style="color: #d2a8ff;">get_lives</span>()
                             <span class="faq-plus">+</span>
                         </div>
                         <div class="faq-answer-row">
-                            <p>Il suffit d'ajouter l'URL <code>https://ffbb.desimone.fr/mcp</code> dans votre client MCP (Cursor, Claude Desktop, Copilot). Votre IA saura automatiquement utiliser les 12 outils spécialisés pour vous répondre.</p>
+                            <p>Il suffit d'ajouter l'URL <code>https://ffbb.desimone.fr/mcp</code> dans votre client MCP (Cursor, Claude Desktop, Copilot, Antigravity). Votre IA saura automatiquement utiliser les 12 outils spécialisés pour vous répondre.</p>
                         </div>
                     </div>
 
                     <div class="faq-box" onclick="toggleFaqBox(this)">
                         <div class="faq-question-row">
-                            <span>Quelle est la différence entre le serveur MCP et ffbb-data-client ?</span>
+                            <span>Quelle est la différence entre ffbb.desimone.fr et ffbb-api.desimone.fr ?</span>
                             <span class="faq-plus">+</span>
                         </div>
                         <div class="faq-answer-row">
-                            <p>Le <strong>serveur MCP</strong> est une interface conçue spécifiquement pour les LLMs (Claude, Cursor, Copilot) avec des outils d'agrégation "one-shot" pour réduire les tokens consommés. Il est propulsé par <strong><code>ffbb-data-client</code></strong>, le SDK Python complet disponible sur PyPI (<code>pip install ffbb-data-client</code>) pour les développeurs d'applications.</p>
+                            <p><strong>ffbb.desimone.fr</strong> est le serveur MCP conçu exclusivement pour les LLMs (Claude, Cursor, Copilot) avec des outils d'agrégation haut niveau. <strong>ffbb-api.desimone.fr</strong> est l'API REST dédiée aux développeurs et applications tierces (comme SCBA Bénévolat), disponible aussi sous forme de SDK Python via <code>pip install ffbb-data-client</code>.</p>
                         </div>
                     </div>
 
@@ -504,11 +547,11 @@ lives = client.<span style="color: #d2a8ff;">get_lives</span>()
 
                     <div class="faq-box" onclick="toggleFaqBox(this)">
                         <div class="faq-question-row">
-                            <span>Faut-il installer Python pour utiliser le MCP ?</span>
+                            <span>Faut-il installer Python pour utiliser le serveur MCP ?</span>
                             <span class="faq-plus">+</span>
                         </div>
                         <div class="faq-answer-row">
-                            <p>Non ! Pour utiliser le serveur MCP dans votre IA, l'instance publique <code>https://ffbb.desimone.fr/mcp</code> est hébergée et prête à l'emploi. L'installation Python n'est requise que si vous souhaitez développer votre propre code avec la bibliothèque <code>ffbb-data-client</code>.</p>
+                            <p>Non ! L'instance publique <code>https://ffbb.desimone.fr/mcp</code> est hébergée et prête à l'emploi en Streamable HTTP. L'installation Python n'est requise que si vous souhaitez développer votre propre code avec la bibliothèque <code>ffbb-data-client</code>.</p>
                         </div>
                     </div>
 
@@ -518,7 +561,7 @@ lives = client.<span style="color: #d2a8ff;">get_lives</span>()
                             <span class="faq-plus">+</span>
                         </div>
                         <div class="faq-answer-row">
-                            <p>Oui, toutes les données proviennent directement des flux officiels de la Fédération Française de BasketBall via le SDK <code>ffbb-data-client</code> avec une actualisation en direct pour les scores du week-end.</p>
+                            <p>Oui, toutes les données proviennent directement des flux officiels de la Fédération Française de BasketBall via le moteur <code>ffbb-data-client</code> avec une actualisation en direct pour les scores du week-end.</p>
                         </div>
                     </div>
                 </div>
@@ -533,25 +576,25 @@ lives = client.<span style="color: #d2a8ff;">get_lives</span>()
                 <div class="footer-brand">
                     <a href="#" class="brand">
                         <img src="logo.webp" alt="Logo" width="36" height="36">
-                        <span>FFBB MCP & API</span>
+                        <span>FFBB MCP Server</span>
                     </a>
-                    <p>Serveur officiel communautaire du Model Context Protocol et SDK Python pour connecter les intelligences artificielles et applications au basketball français.</p>
+                    <p>Serveur officiel communautaire du Model Context Protocol pour connecter les intelligences artificielles au basketball français. Propulsé par le SDK et l'API ffbb-data-client.</p>
                 </div>
                 <div class="footer-col">
-                    <h4>Endpoints Publics</h4>
+                    <h4>Endpoints Publics MCP</h4>
                     <ul>
                         <li><a href="/mcp">Endpoint MCP (Streamable HTTP)</a></li>
-                        <li><a href="/dashboard">Tableau de Bord</a></li>
+                        <li><a href="/dashboard">Tableau de Bord Live</a></li>
                         <li><a href="/metrics.json">Métriques JSON</a></li>
                         <li><a href="/health">Santé & Diagnostic</a></li>
                     </ul>
                 </div>
                 <div class="footer-col">
-                    <h4>Écosystème & Open Source</h4>
+                    <h4>Écosystème & API REST</h4>
                     <ul>
-                        <li><a href="https://github.com/nickdesi/FFBB-MCP-Server" target="_blank" rel="noopener">Dépôt GitHub MCP</a></li>
-                        <li><a href="https://nickdesi.github.io/ffbb-data-client/" target="_blank" rel="noopener">SDK Python ffbb-data-client</a></li>
-                        <li><a href="https://pypi.org/project/ffbb-data-client/" target="_blank" rel="noopener">Package PyPI</a></li>
+                        <li><a href="https://ffbb-api.desimone.fr" target="_blank" rel="noopener">🌐 API REST Dédiée (ffbb-api.desimone.fr)</a></li>
+                        <li><a href="https://pypi.org/project/ffbb-data-client/" target="_blank" rel="noopener">📦 SDK Python ffbb-data-client</a></li>
+                        <li><a href="https://github.com/nickdesi/FFBB-MCP-Server" target="_blank" rel="noopener">⭐ Dépôt GitHub MCP Server</a></li>
                     </ul>
                 </div>
                 <div class="footer-col">

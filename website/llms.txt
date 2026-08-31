@@ -1,6 +1,6 @@
-# FFBB MCP Server — Serveur MCP Public & API Basket Français
+# FFBB MCP Server — Serveur Model Context Protocol pour le Basket Français
 > Serveur FastMCP public et open-source exposant 12 outils d'agrégation spécialisés pour interroger les données officielles de la Fédération Française de BasketBall (FFBB) depuis n'importe quel client MCP (Claude Desktop, Cursor, VS Code Copilot, ChatGPT, Antigravity, OpenCode).
-> Propulsé par le SDK Python officiel `ffbb-data-client` (pip install ffbb-data-client).
+> Propulsé par le SDK Python officiel et l'API REST `ffbb-data-client` (https://ffbb-api.desimone.fr).
 
 ## Endpoints Publics & Ressources
 - Endpoint MCP (Streamable HTTP) : https://ffbb.desimone.fr/mcp
@@ -8,6 +8,7 @@
 - Métriques JSON : https://ffbb.desimone.fr/metrics.json
 - Healthcheck : https://ffbb.desimone.fr/health
 - Dépôt GitHub MCP : https://github.com/nickdesi/FFBB-MCP-Server
+- API REST Dédiée (FastAPI / Swagger) : https://ffbb-api.desimone.fr
 - SDK Python (ffbb-data-client) : https://nickdesi.github.io/ffbb-data-client/
 - Package PyPI : https://pypi.org/project/ffbb-data-client/
 
@@ -72,20 +73,7 @@
 }
 ```
 
-## Pour les Développeurs Python (SDK ffbb-data-client)
-```bash
-pip install ffbb-data-client
-```
-
-```python
-from ffbb_data_client import FFBBDataClient
-
-# Initialisation avec auto-résolution des tokens
-client = FFBBDataClient.create()
-
-# Recherche multi-index
-results = client.multi_search("Stade Clermontois")
-
-# Scores live du week-end
-lives = client.get_lives()
-```
+## Écosystème Développeurs : API REST & SDK Python (ffbb-data-client)
+Pour intégrer directement l'API REST dans vos applications ou développer en Python :
+- API REST OpenAPI/Swagger : https://ffbb-api.desimone.fr/docs
+- Installation du SDK Python : `pip install ffbb-data-client`
