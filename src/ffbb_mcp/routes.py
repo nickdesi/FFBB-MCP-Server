@@ -89,7 +89,38 @@ def _build_index_html() -> str:
 
 def _build_robots_txt() -> str:
     base_url = _get_public_base_url()
-    return f"User-agent: *\nAllow: /\nSitemap: {base_url}/sitemap.xml\n"
+    return f"""User-agent: *
+Allow: /
+Allow: /docs/
+
+Sitemap: {base_url}/sitemap.xml
+
+# AI Search & GEO Discovery (Perplexity, Gemini, ChatGPT, Claude)
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: GoogleOther
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+# Aggressive Model-Training Scrapers
+User-agent: Bytespider
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+"""
 
 
 def _build_sitemap_xml() -> str:
