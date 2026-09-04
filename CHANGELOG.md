@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-09-05
+
+### Added & Conformance
+- **Contrainte JSON Schema `anyOf` (MCP Conformance)** : Déclaration formelle de `anyOf: [{"required": ["club_name"]}, {"required": ["organisme_id"]}]` sur 7 outils clés (`ffbb_resolve_team`, `ffbb_bilan`, `ffbb_team_summary`, `ffbb_bilan_saison`, `ffbb_last_result`, `ffbb_next_match`, `ffbb_club`). Élimine le round-trip réseau inutile où les agents IA tentaient un appel sans arguments.
+- **Autorisation explicite des moteurs de recherche IA** : Intégration de `PerplexityBot`, `Perplexity-User`, `Google-Extended`, `GoogleOther`, `Claude-Web` et `ChatGPT-User` dans `_build_robots_txt()`, et blocage des scrapers d'entraînement brut (`Bytespider`, `CCBot`).
+
+### Changed & Performance
+- **Division par deux de l'empreinte de tokens initiale** :
+  - Suppression totale de l'`outputSchema` généré par FastMCP sur tous les outils (-13,2k caractères / ~3 300 tokens économisés).
+  - Épuration chirurgicale des docstrings et descriptions de paramètres sur `ffbb_club` (-64%) et `ffbb_bilan` (-88%).
+  - Condensation dense (ZipAI) du `ROUTING_PROMPT` d'initialisation (-67% de caractères).
+  - Réduction du payload global `tools/list` de 36 835 à 20 294 caractères (-45%).
+- **Optimisation SEO / GEO** : Calibrage strict du titre (60 caractères) et de la meta description (157 caractères) pour un affichage SERP optimal à 100%.
+
 ## [1.8.0] - 2026-08-29
 
 ### Added
