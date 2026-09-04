@@ -223,19 +223,8 @@ else:
 mcp: FastMCP = FastMCP(
     "FFBB MCP Server",
     instructions=(
-        ROUTING_PROMPT + "\n\n" + "Données FFBB (basketball français). "
-        ""
-        "[ZIPAI DIRECTIVE: Output technical data only. No filler, no echo, no meta.]\n"
-        "## RÈGLE ABSOLUE — CLASSEMENT POULE\n"
-        "Suivre strictement le format de tableau et les colonnes définis dans le prompt expert `expert_basket` (Rang, Équipe, PTS, J, G, P, M, E, Diff). "
-        "Interdiction de recalculer les points ou la différence.\n\n"
-        "## Règle : Matchs restants d'une équipe\n"
-        "Pour répondre à 'combien de matchs restent-il à [équipe] ?', NE PAS se contenter de ffbb_get(type='poule') "
-        "car les données peuvent être tronquées (_omitted_count > 0).\n"
-        "Workflow obligatoire :\n"
-        "1. ffbb_team_summary → identifier poule_id, dernière journée jouée.\n"
-        "2. ffbb_club(action='calendrier', filtre='<categorie>') → calendrier complet du club, "
-        "puis filtrer les rencontres non jouées."
+        ROUTING_PROMPT
+        + "\n[ZIPAI: Données FFBB live. Format tableau classement strict (Rang, Équipe, PTS, J, G, P, M, E, Diff). Pas de recalcul.]"
     ),
     dependencies=["mcp", "ffbb-data-client"],
     # Streamable HTTP transport (MCP spec 2025-11-25)
@@ -367,39 +356,25 @@ async def ffbb_bilan(
     ] = None,
     organisme_id: Annotated[
         int | str | None,
-        Field(description="ID FFBB du club (alternative plus rapide à club_name)."),
+        Field(description="ID FFBB du club (ex: 9326)."),
     ] = None,
     categorie: Annotated[
         str | None,
-        Field(
-            description=(
-                "Catégorie + genre + numéro d'équipe (ex: 'U11M1', 'U13F2', 'U15M', 'Senior')."
-            ),
-        ),
+        Field(description="Catégorie/genre/numéro (ex: 'U11M1', 'Senior')."),
     ] = None,
     numero_equipe: Annotated[
         int | None,
-        Field(description="Numéro d'équipe facultatif (ex: 1, 2)."),
+        Field(description="Numéro d'équipe (ex: 1, 2)."),
     ] = None,
     force_refresh: Annotated[
         bool,
-        Field(
-            description="Si True, contourne le cache pour récupérer des données fraîches."
-        ),
+        Field(description="Si True, contourne le cache."),
     ] = False,
     ctx: Context[Any, Any, Any] | None = None,
 ) -> dict[str, Any] | BilanResponse:
-    """Bilan complet d'une équipe toutes phases confondues en UN seul appel.
+    """Bilan complet d'une équipe toutes phases confondues en UN seul appel (V/D/N, paniers, phases).
 
-    ⚡ C'est l'outil à utiliser en priorité pour toute question de type
-    "quel est le bilan de X cette saison ?" ou "résultats de U11M1".
-
-    Encapsule en interne : recherche club → équipes → classements de toutes
-    les phases en parallèle → agrégation V/D/N et paniers marqués/encaissés.
-
-    Retourne :
-    - bilan_total : total V/D/N, paniers marqués/encaissés, différence
-    - phases : détail par compétition/phase (position, V/D/N, paniers)
+    Outil prioritaire pour 'quel est le bilan de X ?' ou 'résultats de U11M1'.
     """
     try:
         await _safe_report_progress(ctx, 0, total=3, message="Résolution du club…")
@@ -519,121 +494,62 @@ async def ffbb_club(
             "classement",
         ],
         Field(
-            description=(
-                "Action club. Utiliser 'calendrier' pour les demandes au pluriel "
-                "(matchs restants, calendrier, prochaines journées)."
-            )
+            description="Action : 'calendrier' (matchs pluriels/restants), 'equipes' ou 'classement'."
         ),
     ],
     club_name: Annotated[
         str | None,
         Field(
-            description=(
-                "Nom du club (recommande, ex: 'Stade Clermontois'). Si absent, "
-                "`organisme_id` doit etre fourni."
-            )
+            description="Nom du club (ex: 'Stade Clermontois'). Requis si organisme_id absent."
         ),
     ] = None,
     organisme_id: Annotated[
         int | str | None,
-        Field(
-            description=(
-                "Identifiant FFBB du club (ex: 1234 ou 'ARA0063058'). Si absent, `club_name` est utilise pour "
-                "effectuer une recherche."
-            )
-        ),
+        Field(description="ID FFBB du club (ex: 9326). Requis si club_name absent."),
     ] = None,
     filtre: Annotated[
         str | None,
-        Field(
-            description=(
-                "Filtre facultatif de categorie/genre (ex: 'U11', 'U11M', 'U11F'). "
-                "Pour une équipe précise, compléter avec numero_equipe."
-            )
-        ),
+        Field(description="Filtre catégorie/genre (ex: 'U11M', 'Senior')."),
     ] = None,
     adversaire: Annotated[
         str | None,
         Field(
-            description=(
-                "Nom de l'équipe adversaire pour filtrer uniquement les confrontations directes "
-                "(ex: 'Royat Orcines', 'Stade Clermontois'). "
-                "Utilisé avec action='calendrier'. Insensible à la casse et aux accents."
-            )
+            description="Nom adversaire pour filtrer les confrontations directes (action='calendrier')."
         ),
     ] = None,
     poule_id: Annotated[
         int | None,
-        Field(
-            description=(
-                "Identifiant de la poule (obligatoire pour action='classement' si "
-                "aucun filtre ne permet de determiner la poule)."
-            )
-        ),
+        Field(description="ID poule (action='classement')."),
     ] = None,
     numero_equipe: Annotated[
         int | None,
-        Field(
-            description=(
-                "Numéro d'équipe facultatif (ex: 1, 2, 3). "
-                "Utilisé avec action='calendrier' pour ne récupérer que les matchs de cette équipe précise."
-            )
-        ),
+        Field(description="Numéro d'équipe (ex: 1, 2) pour action='calendrier'."),
     ] = None,
     phase: Annotated[
         str | None,
-        Field(
-            description=(
-                "Nom ou numéro de la phase (ex: 'Phase 3', '2'). "
-                "Utilisé avec action='classement' pour auto-résoudre la poule."
-            )
-        ),
+        Field(description="Nom ou numéro de phase (ex: 'Phase 2')."),
     ] = None,
     date_debut: Annotated[
         str | None,
-        Field(
-            description="Date de début de filtrage au format YYYY-MM-DD (ex: '2026-05-01')."
-        ),
+        Field(description="Date début YYYY-MM-DD (action='calendrier')."),
     ] = None,
     date_fin: Annotated[
         str | None,
-        Field(
-            description="Date de fin de filtrage au format YYYY-MM-DD (ex: '2026-05-31')."
-        ),
+        Field(description="Date fin YYYY-MM-DD (action='calendrier')."),
     ] = None,
     limit: Annotated[
         int | None,
-        Field(
-            description="Nombre maximum de matchs de calendrier à retourner (pagination/limite)."
-        ),
+        Field(description="Nombre max de matchs retournés (pagination)."),
     ] = None,
     force_refresh: Annotated[
         bool,
-        Field(
-            description=(
-                "Si True, contourne le cache pour les donnees de calendrier ou "
-                "de classement (utile les jours de match)."
-            )
-        ),
+        Field(description="Si True, contourne le cache."),
     ] = False,
 ) -> list[dict[str, Any]] | list[CalendrierMatch]:
-    """Outils agreges autour d'un club (calendrier, equipes, classement).
+    """Outils agrégés club : calendrier (matchs pluriels), équipes engagées ou classement.
 
-    ✅ Outil de référence pour toute demande au pluriel :
-    "matchs restants", "derniers matchs à jouer", "prochaines journées",
-    "calendrier de fin de saison".
-
-    ⚡ `action="calendrier"` est l'outil le plus fiable pour obtenir TOUTES les rencontres
-    passées et futures d'une équipe/catégorie, sans les limitations de `ffbb_get(poule)`.
-
-    🎯 Pour isoler les confrontations directes entre deux équipes :
-    Utilise le paramètre `adversaire` avec `action="calendrier"`.
-    Exemple : confrontations Royat vs Pont-du-Château en phase 3
-    → ffbb_club(action="calendrier", club_name="Pont du Chateau", filtre="U11M",
-                adversaire="Royat Orcines", numero_equipe=1)
-
-    Avertissement: ne pas utiliser pour obtenir un score ou un prochain match
-    d'une equipe specifique. Utiliser `ffbb_last_result` et `ffbb_next_match` a la place.
+    Outil de référence pour toute demande au pluriel : matchs restants, calendrier complet.
+    Utiliser adversaire avec action='calendrier' pour isoler les confrontations directes.
     """
     try:
         # Action calendrier : le service gère résolution + ambiguïté en interne
@@ -1321,13 +1237,60 @@ async def ffbb_head_to_head(
 
 
 # ---------------------------------------------------------------------------
-# Injections
+# Injections & Optimisations de Schémas MCP
 # ---------------------------------------------------------------------------
+
+
+def _optimize_tool_schemas(mcp_instance: FastMCP) -> None:
+    """Optimise les schémas JSON des outils MCP et élimine l'empreinte token superflue.
+
+    1. anyOf inter-arguments : indique formellement aux agents IA qu'au moins un identifiant
+       de club (club_name ou organisme_id) est obligatoire avant l'appel d'outil.
+    2. Suppression d'output_schema : FastMCP génère des milliers de caractères de schémas
+       Pydantic internes inutilisés par les clients MCP pour invoquer des outils.
+    """
+    tools_map = getattr(mcp_instance._tool_manager, "_tools", {})
+
+    # Outils nécessitant au moins club_name OU organisme_id
+    club_disambiguation_tools = (
+        "ffbb_resolve_team",
+        "ffbb_bilan",
+        "ffbb_team_summary",
+        "ffbb_bilan_saison",
+        "ffbb_last_result",
+        "ffbb_next_match",
+    )
+    for tool_name in club_disambiguation_tools:
+        tool = tools_map.get(tool_name)
+        if tool and hasattr(tool, "parameters") and isinstance(tool.parameters, dict):
+            tool.parameters["anyOf"] = [
+                {"required": ["club_name"]},
+                {"required": ["organisme_id"]},
+            ]
+
+    # ffbb_club accepte soit club_name, soit organisme_id, soit poule_id (pour le classement)
+    club_tool = tools_map.get("ffbb_club")
+    if (
+        club_tool
+        and hasattr(club_tool, "parameters")
+        and isinstance(club_tool.parameters, dict)
+    ):
+        club_tool.parameters["anyOf"] = [
+            {"required": ["club_name"]},
+            {"required": ["organisme_id"]},
+            {"required": ["poule_id"]},
+        ]
+
+    # Suppression de l'output_schema verbeux sur tous les outils pour diviser le payload tools/list
+    for tool in tools_map.values():
+        if hasattr(tool, "output_schema"):
+            tool.output_schema = None
 
 
 register_routes(mcp)
 register_prompts(mcp)
 register_resources(mcp)
+_optimize_tool_schemas(mcp)
 
 
 # ---------------------------------------------------------------------------

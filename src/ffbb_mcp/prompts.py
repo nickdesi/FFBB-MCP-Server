@@ -64,63 +64,15 @@ def _format_known_club_ids() -> str:
 _KNOWN_CLUBS_HINTS = _format_known_club_ids()
 
 ROUTING_PROMPT = f"""\
-## RÈGLES DE ROUTAGE DES OUTILS FFBB
-
-### RÈGLE 1 — Matchs : choisir le bon outil selon la cardinalité
-
-Avant tout appel lié à des matchs, détermine la cardinalité demandée :
-
-SINGULIER → `ffbb_next_match` ou `ffbb_last_result`
-  Formulations : "prochain match", "dernier match", "prochain résultat",
-  "prochain adversaire", "quand jouent-ils ?", "ont-ils joué ?"
-
-PLURIEL → `ffbb_club(action="calendrier")` OBLIGATOIREMENT
-  Formulations : "prochains matchs", "matchs restants", "matchs à jouer",
-  "derniers matchs à jouer", "fin de saison", "calendrier restant",
-  "combien de matchs il reste", "quelles sont les échéances",
-  "matchs de la semaine", "programme des prochaines journées"
-
-⚠️ NE JAMAIS appeler `ffbb_next_match` si la demande est au pluriel
-   ou implique plusieurs échéances. Utiliser directement le calendrier
-   et filtrer les matchs non joués (played=false) côté agent.
-
----
-
-### RÈGLE 2 — Réutilisation des organisme_id résolus
-
-Tout `organisme_id` résolu au cours de la conversation DOIT être
-mémorisé et réutilisé pour tous les appels suivants concernant ce club.
-
-NE JAMAIS repasser par `club_name` si l'`organisme_id` est déjà connu.
-
-Référence des clubs fréquents (hints, IDs susceptibles de changer) :
+## ROUTAGE DES OUTILS FFBB
+1. CARDINALITÉ MATCHS :
+- SINGULIER (prochain/dernier match) → `ffbb_next_match` ou `ffbb_last_result`.
+- PLURIEL (calendrier, matchs restants/à venir) → OBLIGATOIREMENT `ffbb_club(action="calendrier")` puis filtrer `played == false`. Ne JAMAIS appeler `ffbb_next_match` pour une demande plurielle.
+2. RÉUTILISATION D'ID : Mémoriser tout `organisme_id` résolu. Ne jamais repasser par `club_name` si l'ID est connu.
+Hints fréquents :
 {_KNOWN_CLUBS_HINTS}
-
-Si un club produit une erreur d'ambiguïté malgré un `club_name` clair,
-sélectionner le premier candidat dont le nom correspond exactement,
-sans relancer une recherche interactive.
-
----
-
-### RÈGLE 3 — Désambiguïsation proactive
-
-Quand une catégorie est fournie sans numéro d'équipe (ex: "U13M"),
-appeler `ffbb_resolve_team` AVANT `ffbb_next_match` ou `ffbb_last_result`
-sauf si le contexte de la conversation confirme déjà que le club
-n'a qu'une seule équipe dans cette catégorie.
-
----
-
-### RÈGLE 4 — Calendrier : filtrage des matchs restants
-
-Quand `ffbb_club(action="calendrier")` est utilisé pour répondre à
-"matchs restants / à jouer", filtrer le résultat ainsi :
-  - Garder uniquement les entrées avec `played: false`
-  - Trier par date croissante
-  - Identifier domicile/déplacement : si le club est `equipe1` → domicile,
-    si le club est `equipe2` → déplacement
-
-Ne jamais retourner l'intégralité du calendrier brut à l'utilisateur.
+3. DÉSAMBIGUÏSATION : Si catégorie sans numéro (ex: 'U13M'), appeler `ffbb_resolve_team` avant `ffbb_next_match`/`ffbb_last_result`.
+4. CALENDRIER : Pour matchs restants, filtrer `played: false`, trier par date croissante, identifier domicile/extérieur (club == equipe1 → domicile).
 """
 
 

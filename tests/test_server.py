@@ -434,3 +434,53 @@ async def test_ffbb_bilan_saison_supports_club_name():
             force_refresh=False,
         )
         assert res["status"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_tool_schemas_conformance_and_token_budget():
+    """Vérifie la conformité des schémas MCP (anyOf) et le respect du budget token."""
+    import json
+
+    tools = await mcp.list_tools()
+    tools_map = {t.name: t for t in tools}
+
+    # 1. Vérification anyOf sur les outils de club
+    club_tools = [
+        "ffbb_resolve_team",
+        "ffbb_bilan",
+        "ffbb_team_summary",
+        "ffbb_bilan_saison",
+        "ffbb_last_result",
+        "ffbb_next_match",
+    ]
+    for tool_name in club_tools:
+        tool = tools_map[tool_name]
+        any_of = tool.inputSchema.get("anyOf")
+        assert any_of == [
+            {"required": ["club_name"]},
+            {"required": ["organisme_id"]},
+        ], f"anyOf manquant ou incorrect sur {tool_name}"
+
+    # 2. Vérification anyOf sur ffbb_club (inclut poule_id)
+    assert tools_map["ffbb_club"].inputSchema.get("anyOf") == [
+        {"required": ["club_name"]},
+        {"required": ["organisme_id"]},
+        {"required": ["poule_id"]},
+    ]
+
+    # 3. Vérification de la suppression d'outputSchema inutile
+    for tool in tools:
+        assert getattr(tool, "outputSchema", None) is None, (
+            f"outputSchema inattendu sur {tool.name}"
+        )
+
+    # 4. Vérification du budget token
+    total_tools_chars = sum(len(json.dumps(t.model_dump())) for t in tools)
+    assert total_tools_chars < 25000, (
+        f"Payload tools trop lourd ({total_tools_chars} chars, attendu < 25000)"
+    )
+
+    instructions_len = len(mcp.instructions or "")
+    assert instructions_len < 1500, (
+        f"Instructions trop longues ({instructions_len} chars, attendu < 1500)"
+    )

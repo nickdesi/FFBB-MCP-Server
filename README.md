@@ -135,9 +135,9 @@ Configurez directement l'URL distante dans `mcp_config.json` via la directive na
 | --- | --- |
 | `ffbb_version` | Informations de version et configuration runtime du serveur FFBB MCP. |
 | `ffbb_search` | Recherche FFBB — clubs, compétitions, matchs, salles, tournois, etc. |
-| `ffbb_bilan` | Bilan complet d'une équipe toutes phases confondues en UN seul appel. |
+| `ffbb_bilan` | Bilan complet d'une équipe toutes phases confondues en UN seul appel (V/D/N, paniers, phases). |
 | `ffbb_get` | Recupere une ressource FFBB par identifiant. |
-| `ffbb_club` | Outils agreges autour d'un club (calendrier, equipes, classement). |
+| `ffbb_club` | Outils agrégés club : calendrier (matchs pluriels), équipes engagées ou classement. |
 | `ffbb_lives` | Matchs en cours (scores live, cache 30s). Retourne [] si aucun match. |
 | `ffbb_saisons` | Liste des saisons FFBB. active_only=True pour la saison en cours uniquement. |
 | `ffbb_resolve_team` | Identifie une equipe unique (Pivot central). |
