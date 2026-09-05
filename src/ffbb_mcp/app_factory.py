@@ -71,6 +71,10 @@ async def _bootstrap_cache() -> None:
 
 
 def create_app(mcp: FastMCP, allowed_origins: list[str]) -> Starlette:
+    from ffbb_mcp.sse_patch import apply_sse_reconnect_patch
+
+    apply_sse_reconnect_patch()
+
     @contextlib.asynccontextmanager
     async def lifespan(app: Starlette) -> AsyncGenerator[None]:
         # Tâches de fond réservées au mode HTTP (1 client = 1 requête en stdio).
