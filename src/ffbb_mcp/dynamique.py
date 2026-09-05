@@ -18,12 +18,22 @@ def _parse_dt_safe(dt_str: str | None) -> datetime | None:
         return None
     with contextlib.suppress(ValueError, TypeError):
         dt_clean = dt_str.replace("Z", "+00:00")
-        if "T" in dt_clean:
-            return datetime.fromisoformat(dt_clean)
-        if len(dt_clean) >= 10:
-            return datetime.strptime(dt_clean[:10], "%Y-%m-%d").replace(
-                tzinfo=_PARIS_TZ
-            )
+        try:
+            # ⚡ Bolt: Fast-path. datetime.fromisoformat() natively supports space separators
+            # and formats like YYYY-MM-DD in Python 3.11+. It is significantly faster than strptime.
+            dt = datetime.fromisoformat(dt_clean)
+            if "T" not in dt_clean:
+                # Maintain original behavior: string without 'T' truncate time and add TZ
+                dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=_PARIS_TZ)
+            return dt
+        except ValueError:
+            # Fallback for non-standard formats or single-digit months/days (e.g., "2023-1-1")
+            if len(dt_clean) >= 10:
+                return datetime.strptime(dt_clean[:10], "%Y-%m-%d").replace(
+                    tzinfo=_PARIS_TZ
+                )
     return None
 
 
