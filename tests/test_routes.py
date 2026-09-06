@@ -265,10 +265,18 @@ def test_club_matches_api_route(client):
     mock_client.get_organisme_async = AsyncMock(return_value=mock_org)
     mock_client.get_poule_async = AsyncMock(return_value=mock_poule)
 
+    async def mock_enrich_salles(matches):
+        for m in matches:
+            if m.get("salle") == "salle_1":
+                m["adresse_salle"] = (
+                    "GYMNASE THEVENET - 9 Rue Albert Mallet, 63000 Clermont-Ferrand"
+                )
+
     with (
         patch("ffbb_mcp.client.get_client_async", AsyncMock(return_value=mock_client)),
         patch(
-            "ffbb_mcp.services.salle._enrich_matches_with_salle_details", AsyncMock()
+            "ffbb_mcp.services.salle._enrich_matches_with_salle_details",
+            side_effect=mock_enrich_salles,
         ),
     ):
         response = client.get("/api/v1/club/9326/matches")
@@ -282,5 +290,5 @@ def test_club_matches_api_route(client):
         assert data["matches"][0]["isHome"] is True
         assert (
             data["matches"][0]["location"]
-            == "Maison des Sports, Place des Bughes, 63000 Clermont-Ferrand"
+            == "GYMNASE THEVENET - 9 Rue Albert Mallet, 63000 Clermont-Ferrand"
         )

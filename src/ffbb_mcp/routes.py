@@ -626,12 +626,12 @@ def register_routes(mcp: FastMCP) -> None:
             if opp_id and opp_id in logo_map:
                 m["opponentLogo"] = logo_map[opp_id]
             is_h = m.get("isHome", False)
-            if is_h and organisme_id == 9326:
-                m["location"] = (
-                    "Maison des Sports, Place des Bughes, 63000 Clermont-Ferrand"
-                )
-            elif m.get("adresse_salle"):
+            if m.get("adresse_salle"):
                 m["location"] = m["adresse_salle"]
+            elif is_h:
+                m["location"] = f"Domicile ({club_name})"
+            else:
+                m["location"] = f"Extérieur ({m.get('opponent', 'Adversaire')})"
             m.pop("salle", None)
             m.pop("salle_details", None)
             m.pop("adresse_salle", None)
