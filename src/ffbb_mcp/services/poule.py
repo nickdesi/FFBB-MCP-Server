@@ -4,8 +4,8 @@ import contextlib
 import logging
 from typing import Any
 
-from mcp.shared.exceptions import ErrorData, McpError
-from mcp.types import INTERNAL_ERROR
+from mcp.shared.exceptions import McpError
+from mcp.types import INTERNAL_ERROR, ErrorData
 
 from ffbb_mcp._state import _read_positive_int_env, state
 from ffbb_mcp.cache_strategy import get_poule_ttl, get_static_ttl
@@ -437,9 +437,10 @@ async def ffbb_get_classement_service(
         cache_name="classement",
         swr_ttl=ttl,
     )
-    return (
-        wrapped["data"] if isinstance(wrapped, dict) and "data" in wrapped else wrapped
-    )
+    if isinstance(wrapped, dict) and "data" in wrapped:
+        data_res = wrapped["data"]
+        return data_res if isinstance(data_res, list) else []
+    return wrapped if isinstance(wrapped, list) else []
 
 
 async def find_team_poule_service(

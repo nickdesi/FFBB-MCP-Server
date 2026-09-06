@@ -625,8 +625,16 @@ _PROMPTS = [
     calendrier_equipe,
 ]
 
-# __all__ généré dynamiquement depuis _PROMPTS → jamais de désynchronisation
-__all__ = [fn.__name__ for fn in _PROMPTS] + ["register_prompts"] + ["ROUTING_PROMPT"]
+__all__ = [
+    "ROUTING_PROMPT",
+    "bilan_equipe",
+    "calendrier_equipe",
+    "classement_poule",
+    "prochain_match",
+    "register_prompts",
+    "scores_live",
+    "trouver_club",
+]
 
 
 def register_prompts(mcp: Any) -> None:

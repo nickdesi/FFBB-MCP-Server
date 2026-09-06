@@ -7,8 +7,8 @@ from functools import lru_cache
 from typing import Any, Protocol, cast
 
 import httpx
-from mcp.shared.exceptions import ErrorData, McpError
-from mcp.types import INTERNAL_ERROR
+from mcp.shared.exceptions import McpError
+from mcp.types import INTERNAL_ERROR, ErrorData
 from pydantic import ValidationError
 
 from ffbb_mcp._state import state
