@@ -37,6 +37,7 @@ from .poule import (
     get_poule_service,
     get_saisons_service,
 )
+from .salle import get_salle_service
 from .search import (
     _extract_club_key_word,
     ffbb_resolve_team_service,
@@ -86,6 +87,7 @@ __all__ = [
     "get_poule_service",
     "get_rencontre_service",
     "get_saisons_service",
+    "get_salle_service",
     "get_static_ttl",
     "handle_api_error",
     "multi_search_service",

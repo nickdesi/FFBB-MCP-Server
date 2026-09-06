@@ -47,6 +47,7 @@ from .services import (
     get_poule_service,
     get_rencontre_service,
     get_saisons_service,
+    get_salle_service,
     handle_api_error,
     resolve_club_and_org,
     resolve_poule_id_service,
@@ -432,6 +433,7 @@ async def ffbb_get(
             "rencontre",
             "officiel",
             "entraineur",
+            "salle",
         ],
         Field(description="Type de ressource a charger."),
     ],
@@ -460,6 +462,7 @@ async def ffbb_get(
     - `type="poule"` charge la poule (classements + rencontres).
     - `type="organisme"` charge les details d'un club.
     - `type="rencontre"` charge une rencontre précise.
+    - `type="salle"` charge les details d'une salle et son adresse normalisée.
 
     ⚠️ Attention: `type="poule"` peut être tronqué si la poule est grande.
     Pour un calendrier exhaustif, préférez `ffbb_club(action="calendrier")`.
@@ -486,6 +489,8 @@ async def ffbb_get(
             return await get_officiel_service(id)
         elif type == "entraineur":
             return await get_entraineur_service(id)
+        elif type == "salle":
+            return await get_salle_service(id)
         return {"error": f"Type inconnu: {type}"}
     except Exception as e:
         raise handle_api_error(e) from e

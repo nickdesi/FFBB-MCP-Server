@@ -327,6 +327,7 @@ async def resolve_club_and_org(
     organisme_id: int | str | None,
     categorie: str | None = None,
     limit: int = 5,
+    force_refresh: bool = False,
 ) -> tuple[list[dict[str, Any]], dict | None]:
     """Centralise la résolution d'un club vers une liste d'organismes candidats.
     Retourne (candidats, premier_org_data).
@@ -338,9 +339,10 @@ async def resolve_club_and_org(
     from ffbb_mcp.services.common import _cache_get, _cache_set
 
     cache_key = f"resolve_club:{club_name}:{organisme_id}:{categorie}:{limit}"
-    cached = _cache_get(state.cache_resolve_club, cache_key, "resolve_club")
-    if cached is not None:
-        return copy.deepcopy(cached)
+    if not force_refresh:
+        cached = _cache_get(state.cache_resolve_club, cache_key, "resolve_club")
+        if cached is not None:
+            return copy.deepcopy(cached)
 
     import ffbb_mcp.services
 
@@ -413,6 +415,7 @@ async def resolve_club_and_org(
         resolved = _build_resolved_entries(orgs)
 
         # Ajout des ententes associées issues de la recherche secondaire.
+        norm_club_name = _normalize_name(club_name)
         if key_word and ent_orgs_raw:
             existing_ids = {str(r["organisme_id"]) for r in resolved}
             ententes = _resolve_ententes(
@@ -422,10 +425,14 @@ async def resolve_club_and_org(
                 ententes = _filter_orgs_by_gender(ententes, categorie, club_name)
             resolved.extend(ententes)
 
-        # Jaro-Winkler Sorting Optimization
+        # Jaro-Winkler Sorting Optimization avec priorité absolue au match exact
         if len(resolved) > 1 and club_name:
             resolved.sort(
-                key=lambda c: jaro_winkler_similarity(club_name, c["nom"]),
+                key=lambda c: (
+                    2.0
+                    if _normalize_name(c.get("nom", "")) == norm_club_name
+                    else jaro_winkler_similarity(club_name, c["nom"])
+                ),
                 reverse=True,
             )
 

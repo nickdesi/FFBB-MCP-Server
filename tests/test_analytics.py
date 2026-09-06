@@ -158,3 +158,78 @@ async def test_ffbb_head_to_head_service():
         assert res["face_a_face"]["victoires_b"] == 0
         assert "Avantage SCBA" in res["face_a_face"]["bilan_h2h"]
         assert len(res["points_cles_llm"]) >= 1
+
+
+def test_compute_poule_advanced_stats_season_start_zero_matches():
+    """Vérifie le comportement propre en début de saison 2026-2027 (0 match disputé)."""
+    poule_data = {
+        "classements": [
+            {
+                "position": 1,
+                "nom_equipe": "STADE CLERMONTOIS",
+                "id_engagement": {"id": "100"},
+                "match_joues": 0,
+                "paniers_marques": 0,
+                "paniers_encaisses": 0,
+            },
+            {
+                "position": 2,
+                "nom_equipe": "OUEST LYONNAIS BASKET",
+                "id_engagement": {"id": "200"},
+                "match_joues": 0,
+                "paniers_marques": 0,
+                "paniers_encaisses": 0,
+            },
+        ],
+        "rencontres": [
+            {
+                "joue": 0,
+                "nomEquipe1": "OUEST LYONNAIS BASKET",
+                "nomEquipe2": "STADE CLERMONTOIS",
+                "resultatEquipe1": None,
+                "resultatEquipe2": None,
+                "idEngagementEquipe1": {"id": "200"},
+                "idEngagementEquipe2": {"id": "100"},
+            }
+        ],
+    }
+
+    stats = compute_poule_advanced_stats(
+        poule_data, target_eng_id="100", club_nom="Stade Clermontois"
+    )
+    assert stats["rang_attaque"] is None
+    assert stats["rang_defense"] is None
+    assert "Saison en attente de démarrage" in stats["style_de_jeu"]
+    assert stats["domicile"]["matchs_joues"] == 0
+    assert stats["exterieur"]["matchs_joues"] == 0
+    assert stats["clutch_index"]["matchs_serres_joues"] == 0
+
+
+@pytest.mark.asyncio
+async def test_ffbb_head_to_head_service_polymorphic_kwargs():
+    """Vérifie le support des arguments polymorphes (club_name, adversaire, organisme_id) et la narration d'ouverture."""
+    with (
+        patch("ffbb_mcp.services.club._resolve_team_equipes") as mock_resolve,
+        patch(
+            "ffbb_mcp.services.poule.get_poule_service", new_callable=AsyncMock
+        ) as mock_poule,
+    ):
+        mock_resolve.side_effect = [
+            (None, [{"poule_id": "P1", "engagement_id": "E1"}], {"nom": "SCBA"}),
+            (None, [{"poule_id": "P1", "engagement_id": "E2"}], {"nom": "OLB"}),
+        ]
+        mock_poule.return_value = {
+            "classements": [],
+            "rencontres": [],
+        }
+
+        res = await ffbb_head_to_head_service(
+            club_name="SCBA",
+            adversaire="OLB",
+            organisme_id=9326,
+            adversaire_id=11102,
+            categorie="PNM",
+        )
+        assert res["status"] == "ok"
+        assert res["face_a_face"]["confrontations_count"] == 0
+        assert any("Début de saison" in p for p in res["points_cles_llm"])

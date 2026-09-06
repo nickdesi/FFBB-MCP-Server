@@ -325,13 +325,14 @@ async def ffbb_equipes_club_service(
     organisme_id: int | str | None = None,
     filtre: str | None = None,
     org_data: dict | None = None,
+    force_refresh: bool = False,
 ) -> list[dict[str, Any]]:
     from .poule import get_organisme_service
 
     if org_data is not None:
         data: dict[str, Any] | None = org_data
     elif organisme_id is not None:
-        data = await get_organisme_service(organisme_id)
+        data = await get_organisme_service(organisme_id, force_refresh=force_refresh)
     else:
         return []
     if not data:
@@ -345,7 +346,7 @@ async def ffbb_equipes_club_service(
         if organisme_id is not None and org_data is None
         else None
     )
-    if _eq_key is not None:
+    if _eq_key is not None and not force_refresh:
         _cached_equipes = state.cache_equipes.get(_eq_key)
         if _cached_equipes is not None:
             return [t.copy() for t in _cached_equipes]
@@ -500,14 +501,20 @@ def _match_team_name(
         return False
 
     search_num = numero_equipe if numero_equipe is not None else 1
-    suffix = f"- {search_num}"
-    suffix_norm = _normalize_name(suffix)
+    str_num = str(search_num)
+
+    has_trailing_num = (
+        nom_norm.endswith(f"- {str_num}")
+        or nom_norm.endswith(f" {str_num}")
+        or nom_norm.endswith(f"-{str_num}")
+        or nom_norm.endswith(f"_{str_num}")
+    )
 
     if search_num == 1:
         has_digit = bool(_NUMERIC_EXTRACT_PATTERN.search(nom_norm))
-        return nom_norm.endswith(suffix_norm) or not has_digit
+        return has_trailing_num or not has_digit
 
-    return nom_norm.endswith(suffix_norm)
+    return has_trailing_num
 
 
 async def _resolve_team_equipes(
@@ -517,6 +524,7 @@ async def _resolve_team_equipes(
     categorie: str | None = None,
     numero_equipe: int | None,
     not_found_status: str = "not_found",
+    force_refresh: bool = False,
 ) -> tuple[dict | None, list[dict], dict | None]:
 
     if not club_name and not organisme_id:
@@ -532,6 +540,7 @@ async def _resolve_team_equipes(
         club_name=club_name,
         organisme_id=organisme_id,
         categorie=categorie,
+        force_refresh=force_refresh,
     )
 
     if not resolved_clubs:
@@ -544,6 +553,40 @@ async def _resolve_team_equipes(
             [],
             None,
         )
+
+    if len(resolved_clubs) > 1 and not organisme_id and club_name:
+        norm_name = _normalize_name(club_name)
+        if _normalize_name(resolved_clubs[0].get("nom", "")) == norm_name:
+            second_norm = (
+                _normalize_name(resolved_clubs[1].get("nom", ""))
+                if len(resolved_clubs) > 1
+                else ""
+            )
+            if second_norm != norm_name:
+                resolved_clubs = [resolved_clubs[0]]
+
+    equipes: list[dict[str, Any]] | None = None
+    if len(resolved_clubs) > 1 and not organisme_id and categorie:
+        matching_clubs: list[tuple[dict[str, Any], list[dict[str, Any]]]] = []
+        for rc in resolved_clubs:
+            rc_id = rc.get("organisme_id")
+            if not rc_id:
+                continue
+            try:
+                rc_teams = await ffbb_mcp.services.ffbb_equipes_club_service(
+                    organisme_id=rc_id, filtre=categorie, force_refresh=force_refresh
+                )
+            except Exception:
+                rc_teams = []
+            if rc_teams and not (
+                isinstance(rc_teams, list)
+                and len(rc_teams) == 1
+                and "error" in rc_teams[0]
+            ):
+                matching_clubs.append((rc, rc_teams))
+        if len(matching_clubs) == 1:
+            resolved_clubs = [matching_clubs[0][0]]
+            equipes = matching_clubs[0][1]
 
     if len(resolved_clubs) > 1 and not organisme_id:
         return (
@@ -562,9 +605,13 @@ async def _resolve_team_equipes(
 
     import ffbb_mcp.services
 
-    equipes = await ffbb_mcp.services.ffbb_equipes_club_service(
-        organisme_id=target_org_id, filtre=categorie, org_data=org_data
-    )
+    if equipes is None:
+        equipes = await ffbb_mcp.services.ffbb_equipes_club_service(
+            organisme_id=target_org_id,
+            filtre=categorie,
+            org_data=org_data,
+            force_refresh=force_refresh,
+        )
 
     if not equipes or (
         isinstance(equipes, list) and len(equipes) == 1 and "error" in equipes[0]
@@ -2048,35 +2095,73 @@ async def ffbb_head_to_head_service(
     from ..dynamique import compute_team_dynamique
     from .poule import get_poule_service
 
+    # Normalisation polymorphe des arguments A et B
+    eff_club_a = (
+        club_a
+        or kwargs.get("club_name")
+        or kwargs.get("club")
+        or kwargs.get("club_a_nom")
+        or kwargs.get("nom_club")
+    )
+    eff_org_id_a = (
+        organisme_id_a
+        or kwargs.get("organisme_id")
+        or kwargs.get("org_id")
+        or kwargs.get("organisme_id_a")
+    )
+    eff_num_a = (
+        kwargs.get("numero_equipe_a")
+        if kwargs.get("numero_equipe_a") is not None
+        else kwargs.get("numero_equipe")
+    )
+
+    eff_club_b = (
+        club_b
+        or kwargs.get("adversaire")
+        or kwargs.get("opponent")
+        or kwargs.get("club_adversaire")
+        or kwargs.get("club_b_nom")
+    )
+    eff_org_id_b = (
+        organisme_id_b
+        or kwargs.get("adversaire_id")
+        or kwargs.get("organisme_id_adversaire")
+        or kwargs.get("organisme_id_b")
+        or kwargs.get("org_id_b")
+    )
+    eff_num_b = kwargs.get("numero_equipe_b")
+
     # 1. Résolution des équipes A et B
     err_a, eq_a, club_res_a = await _resolve_team_equipes(
-        club_name=club_a,
-        organisme_id=organisme_id_a,
+        club_name=eff_club_a,
+        organisme_id=eff_org_id_a,
         categorie=categorie,
-        numero_equipe=None,
+        numero_equipe=eff_num_a,
         not_found_status="not_found_a",
+        force_refresh=force_refresh,
     )
     if err_a:
         return {
-            "error": f"Équipe A ({club_a or organisme_id_a}) introuvable",
+            "error": f"Équipe A ({eff_club_a or eff_org_id_a}) introuvable",
             "details": err_a,
         }
 
     err_b, eq_b, club_res_b = await _resolve_team_equipes(
-        club_name=club_b,
-        organisme_id=organisme_id_b,
+        club_name=eff_club_b,
+        organisme_id=eff_org_id_b,
         categorie=categorie,
-        numero_equipe=None,
+        numero_equipe=eff_num_b,
         not_found_status="not_found_b",
+        force_refresh=force_refresh,
     )
     if err_b:
         return {
-            "error": f"Équipe B ({club_b or organisme_id_b}) introuvable",
+            "error": f"Équipe B ({eff_club_b or eff_org_id_b}) introuvable",
             "details": err_b,
         }
 
-    nom_a = (club_res_a or {}).get("nom") or club_a or "Équipe A"
-    nom_b = (club_res_b or {}).get("nom") or club_b or "Équipe B"
+    nom_a = (club_res_a or {}).get("nom") or eff_club_a or "Équipe A"
+    nom_b = (club_res_b or {}).get("nom") or eff_club_b or "Équipe B"
 
     poules_a = {str(e["poule_id"]) for e in eq_a if e.get("poule_id")}
     poules_b = {str(e["poule_id"]) for e in eq_b if e.get("poule_id")}
@@ -2157,6 +2242,10 @@ async def ffbb_head_to_head_service(
     ):
         narrative_points.append(
             f"Duel des styles : Attaque {nom_a} ({profil_a['rang_attaque']}) vs Défense {nom_b} ({profil_b['rang_defense']})"
+        )
+    elif not narrative_points:
+        narrative_points.append(
+            f"Début de saison : première confrontation officielle de la saison entre {nom_a} et {nom_b}."
         )
 
     return {

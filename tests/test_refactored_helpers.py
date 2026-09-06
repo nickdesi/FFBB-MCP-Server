@@ -313,13 +313,16 @@ class TestMatchTeamName:
             ("CSB ANNECY", "CSB", None, True),
             # Pas de match : club absent du nom de l'équipe
             ("AUTRE CLUB", "CSB", None, False),
-            # numero_equipe=2 : exige le suffixe "- 2"
+            # numero_equipe=2 : accepte "- 2", " 2", "-2"
             ("CSB - 2", "CSB", 2, True),
-            ("CSB", "CSB", 2, False),  # pas de suffixe "- 2"
+            ("CSB 2", "CSB", 2, True),
+            ("CSB-2", "CSB", 2, True),
+            ("CSB", "CSB", 2, False),  # pas de suffixe 2
             ("CSB - 3", "CSB", 2, False),  # mauvais suffixe
-            # numero_equipe=1 (ou None) : OK si pas de chiffre OU suffixe "- 1"
+            # numero_equipe=1 (ou None) : OK si pas de chiffre OU suffixe 1
             ("CSB - 1", "CSB", 1, True),
-            ("CSB - 2", "CSB", 1, False),  # has_digit + endswith("- 1") False
+            ("CSB 1", "CSB", 1, True),
+            ("CSB - 2", "CSB", 1, False),  # has_digit + endswith 1 False
             ("CSB - 2", "CSB", None, False),  # idem via défaut None→1
             # Chaînes vides : doivent renvoyer False
             ("", "CSB", None, False),

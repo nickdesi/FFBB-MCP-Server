@@ -246,9 +246,16 @@ async def format_poule_response(poule_data: dict) -> dict[str, Any]:
     return res
 
 
-async def get_organisme_service(organisme_id: int | str) -> dict:
+async def get_organisme_service(
+    organisme_id: int | str,
+    force_refresh: bool = False,
+    **kwargs: Any,
+) -> dict:
     organisme_id_int = _coerce_numeric_id(organisme_id, "organisme_id")
     cache_key = f"organisme:{organisme_id_int}"
+
+    if force_refresh and state.cache_organisme is not None:
+        state.cache_organisme.pop(cache_key, None)
 
     async def _fetch() -> dict:
         client = await get_client_async()

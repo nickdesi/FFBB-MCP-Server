@@ -52,3 +52,31 @@ def register_resources(mcp: Any) -> None:
         from .services import get_organisme_service
 
         return await _resource_to_json(get_organisme_service(organisme_id))
+
+    @mcp.resource("ffbb://rencontre/{rencontre_id}")
+    async def resource_rencontre(rencontre_id: int) -> str:
+        """Détails d'une rencontre au format JSON."""
+        from .services import get_rencontre_service
+
+        return await _resource_to_json(get_rencontre_service(rencontre_id))
+
+    @mcp.resource("ffbb://salle/{salle_id}")
+    async def resource_salle(salle_id: int) -> str:
+        """Détails d'une salle au format JSON."""
+        from .services import get_salle_service
+
+        return await _resource_to_json(get_salle_service(salle_id))
+
+    @mcp.resource("ffbb://officiel/{officiel_id}")
+    async def resource_officiel(officiel_id: int) -> str:
+        """Détails d'un officiel/arbitre au format JSON."""
+        from .services import get_officiel_service
+
+        return await _resource_to_json(get_officiel_service(officiel_id))
+
+    @mcp.resource("ffbb://entraineur/{entraineur_id}")
+    async def resource_entraineur(entraineur_id: int) -> str:
+        """Détails d'un entraîneur/coach au format JSON."""
+        from .services import get_entraineur_service
+
+        return await _resource_to_json(get_entraineur_service(entraineur_id))

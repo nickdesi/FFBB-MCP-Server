@@ -61,14 +61,23 @@ class ParsedCategorie(NamedTuple):
 
 
 _CAT_PATTERN = re.compile(r"\bU-?(\d{1,2})\b|U(\d{1,2})")
+_JEUNES_SHORTHAND_PATTERN = re.compile(
+    r"\b(?:[RDN]|PN|PR)([MF])(7|9|11|13|15|17|18|20|21)\b"
+)
 _JEUNES_NAMED_MAP = [
-    (re.compile(r"\bMINI[\s_-]?POUSSIN(?:ES?|S)?\b"), "U9"),
+    (re.compile(r"\bBABY(?:[\s_-]?BASKET)?\b"), "U7"),
+    (re.compile(r"\bMINI[\s_-]?(?:POUSSIN(?:ES?|S)?|BASKET)\b"), "U9"),
     (re.compile(r"\bPOUSSIN(?:ES?|S)?\b"), "U11"),
     (re.compile(r"\bBENJAMIN(?:ES?|S)?\b"), "U13"),
     (re.compile(r"\bMINIMES?\b"), "U15"),
     (re.compile(r"\bCADET(?:TES?|S)?\b"), "U17"),
+    (re.compile(r"\bJUNIORS?\b"), "U20"),
     (re.compile(r"\bESPOIRS?\b"), "U21"),
 ]
+_3X3_PATTERN = re.compile(
+    r"\b(3[\s_-]?X[\s_-]?3|SUPERLEAGUE|JUNIORLEAGUE|OPEN[\s_-]?PLUS|OPEN[\s_-]?START)\b"
+)
+_3X3_CLEANUP_PATTERN = re.compile(r"\b3[\s_-]?X[\s_-]?3\b")
 _VETERAN_PATTERN = re.compile(
     r"\b(VETERANS?|VÉTÉRANS?|VET|V35|V40|V45|V50)\b",
 )
@@ -90,7 +99,8 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
 
     La logique est volontairement tolérante (espaces, casse, tirets) pour
     accepter des entrées utilisateur comme "u11m1", "U11 M 1", "u11-f-2",
-    "RM1", "RF2", "DM1", "PNM", "Senior F", "Benjamines 2", etc.
+    "RM1", "RF2", "DM1", "PNM", "Senior F", "Benjamines 2", "Baby Basket",
+    "RM18", "DM15", "3x3", etc.
     """
 
     if not raw:
@@ -101,44 +111,64 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
         return ParsedCategorie(categorie=None, sexe=None, numero_equipe=None)
 
     # ⚡ Bolt: Fast-path par conversion globale en majuscule, supprimant
-    # le besoin de re.IGNORECASE sur 10 expressions régulières.
-    # Évite le coût pure Python des appels à IGNORECASE (-20% temps exec).
+    # le besoin de re.IGNORECASE sur les expressions régulières.
     s_upper = s.upper()
 
-    # 1) Catégorie type Uxx, jeunes nommés, vétérans ou SENIOR
+    # 1) Catégorie type Uxx, jeunes nommés, vétérans, 3x3 ou SENIOR
     cat_match = _CAT_PATTERN.search(s_upper) if "U" in s_upper else None
+    shorthand_match = None
+    matched_pat = None
     categorie: str | None = None
+    sexe: str | None = None
+
     if cat_match:
         val = cat_match.group(1) or cat_match.group(2)
         categorie = f"U{val}"
     else:
-        for pat, cat_val in _JEUNES_NAMED_MAP:
-            if pat.search(s_upper):
-                categorie = cat_val
-                break
-        if not categorie:
-            if _VETERAN_PATTERN.search(s_upper):
-                categorie = "VETERAN"
-            elif _SENIOR_PATTERN.search(s_upper):
-                categorie = "SENIOR"
+        shorthand_match = _JEUNES_SHORTHAND_PATTERN.search(s_upper)
+        if shorthand_match:
+            sexe = shorthand_match.group(1)
+            categorie = f"U{shorthand_match.group(2)}"
+        else:
+            for pat, cat_val in _JEUNES_NAMED_MAP:
+                named_match = pat.search(s_upper)
+                if named_match:
+                    categorie = cat_val
+                    matched_pat = named_match
+                    break
+            if not categorie:
+                vet_match = _VETERAN_PATTERN.search(s_upper)
+                if vet_match:
+                    categorie = "VETERAN"
+                    matched_pat = vet_match
+                elif _SENIOR_PATTERN.search(s_upper):
+                    categorie = "SENIOR"
+                else:
+                    match_3x3 = _3X3_PATTERN.search(s_upper)
+                    if match_3x3:
+                        categorie = "3X3"
+                        matched_pat = match_3x3
 
-    # 2) Sexe (M/F)
-    sexe: str | None = None
-    # ⚡ Bolt: early exit logique pour éviter d'exécuter _F_PATTERN si _M_PATTERN
-    # est trouvé de manière exclusive, et inversement
-    if _M_PATTERN.search(s_upper):
-        if not _F_PATTERN.search(s_upper):
-            sexe = "M"
-    elif _F_PATTERN.search(s_upper):
-        sexe = "F"
+    # 2) Sexe (M/F) si non déjà défini par le shorthand jeune
+    if sexe is None:
+        if _M_PATTERN.search(s_upper):
+            if not _F_PATTERN.search(s_upper):
+                sexe = "M"
+        elif _F_PATTERN.search(s_upper):
+            sexe = "F"
 
-    # 3) Numéro d'équipe (chiffre final non lié à Uxx / Vxx)
+    # 3) Numéro d'équipe (chiffre final non lié à Uxx / Vxx / shorthand / 3x3)
     numero_equipe: int | None = None
     remainder = s_upper
     if cat_match:
         remainder = s_upper[cat_match.end() :]
-    elif vet_match := _VETERAN_PATTERN.search(s_upper):
-        remainder = s_upper[vet_match.end() :]
+    elif shorthand_match:
+        remainder = s_upper[shorthand_match.end() :]
+    elif matched_pat:
+        remainder = s_upper[matched_pat.end() :]
+
+    if "3" in remainder:
+        remainder = _3X3_CLEANUP_PATTERN.sub("", remainder)
 
     num_match = _NUM_PATTERN.search(remainder)
     if num_match:

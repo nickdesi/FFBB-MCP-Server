@@ -132,3 +132,27 @@ async def _enrich_matches_with_salle_details(matches: list[dict[str, Any]]) -> N
         adresse = _format_salle_address(salle_cache[salle_id])
         if adresse:
             match["adresse_salle"] = adresse
+
+
+async def get_salle_service(salle_id: int | str) -> dict[str, Any]:
+    """Récupère les détails enrichis d'une salle par son identifiant."""
+    sid = str(salle_id)
+    cached = _cache_get(state.cache_salle, sid, "salle")
+    if cached is not None:
+        return cached
+
+    client = await get_client_async()
+    salle = await _with_ffbb_semaphore(
+        _safe_call_with_inflight(
+            f"Get salle {sid}",
+            lambda: client.get_salle_async(sid),
+        )
+    )
+    salle_data = serialize_model(salle) if salle is not None else {}
+    if isinstance(salle_data, dict) and salle_data:
+        await _enrich_salle_data_with_meilisearch(salle_data, client)
+        adresse = _format_salle_address(salle_data)
+        if adresse:
+            salle_data["adresse_formatee"] = adresse
+        _cache_set(state.cache_salle, sid, salle_data, "salle")
+    return salle_data

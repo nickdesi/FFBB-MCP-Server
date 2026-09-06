@@ -77,9 +77,12 @@ def compute_poule_advanced_stats(
         key=lambda x: float(str(x.get("avg_defense") or 0.0))
     )  # Plus petit = meilleure défense
 
+    total_matches_poule = sum(int(e.get("matchs_joues") or 0) for e in rankings_attack)
+    target_mj = int(target_entry.get("matchs_joues") or 0) if target_entry else 0
+
     rang_attaque = None
     rang_defense = None
-    if target_entry:
+    if target_entry and total_matches_poule > 0 and target_mj > 0:
         with contextlib.suppress(ValueError):
             rang_attaque = rankings_attack.index(target_entry) + 1
         with contextlib.suppress(ValueError):
@@ -180,24 +183,29 @@ def compute_poule_advanced_stats(
     }
 
     # Style de jeu
-    style = "Équipe équilibrée ⚖️"
-    if rang_attaque and rang_defense and total_equipes:
-        if (
-            rang_attaque <= max(2, total_equipes // 3)
-            and rang_defense > total_equipes // 2
-        ):
-            style = "Attaque explosive 💥 (Portée vers l'offensive)"
-        elif (
-            rang_defense <= max(2, total_equipes // 3)
-            and rang_attaque > total_equipes // 2
-        ):
-            style = "Forteresse défensive 🛡️ (Verrouille les matchs)"
-        elif rang_attaque <= max(3, total_equipes // 3) and rang_defense <= max(
-            3, total_equipes // 3
-        ):
-            style = "Complète & dominante 👑 (Top attaque et défense)"
-        elif rang_attaque > total_equipes // 2 and rang_defense > total_equipes // 2:
-            style = "En difficulté sur les deux côtés du terrain ⚠️"
+    if target_mj == 0 or total_matches_poule == 0:
+        style = "Saison en attente de démarrage ⏳ (0 match disputé)"
+    else:
+        style = "Équipe équilibrée ⚖️"
+        if rang_attaque and rang_defense and total_equipes:
+            if (
+                rang_attaque <= max(2, total_equipes // 3)
+                and rang_defense > total_equipes // 2
+            ):
+                style = "Attaque explosive 💥 (Portée vers l'offensive)"
+            elif (
+                rang_defense <= max(2, total_equipes // 3)
+                and rang_attaque > total_equipes // 2
+            ):
+                style = "Forteresse défensive 🛡️ (Verrouille les matchs)"
+            elif rang_attaque <= max(3, total_equipes // 3) and rang_defense <= max(
+                3, total_equipes // 3
+            ):
+                style = "Complète & dominante 👑 (Top attaque et défense)"
+            elif (
+                rang_attaque > total_equipes // 2 and rang_defense > total_equipes // 2
+            ):
+                style = "En difficulté sur les deux côtés du terrain ⚠️"
 
     clutch_ratio = (
         round(clutch_matches["v"] / clutch_matches["joues"] * 100, 1)

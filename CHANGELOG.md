@@ -8,12 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Gestion optimisée du démarrage de saison 2026-2027 (0 match disputé)** : Neutralisation des faux classements d'attaque/défense dans `analytics.py` et statut explicite en ouverture de saison.
+- **Enrichissement des catégories & formats FFBB** : Support de `U7` (Baby Basket), `U9` (Mini Basket), `U20` (Juniors), `U21` (Espoirs), formats 3x3 (`Superleague`, `Juniorleague`, `Open Plus`, `Open Start`) et codes jeunes régionaux/départementaux (`RM18`, `RF18`, `DM15`, `DF13`, `RM20`, `DM20`).
+- **Couverture intégrale des Ressources MCP (URI `ffbb://`)** : Enregistrement de `ffbb://rencontre/{id}`, `ffbb://salle/{id}`, `ffbb://officiel/{id}`, `ffbb://entraineur/{id}` et support étendu de `type="salle"` dans `ffbb_get`.
+- **Résolution précise des clubs et ententes** : Boost de score 2.0 pour égalité exacte de nom de club et support de `force_refresh` sur l'ensemble de la chaîne de recherche.
 - **Formatage standardisé de `result` (MCP)** : Sérialisation des listes d'objets de données en un tableau JSON unique `[...]` au lieu de blocs NDJSON sans crochets (`apply_fastmcp_json_formatting_patch`).
 - **Support du paramètre `categorie` dans `ffbb_club`** : `categorie` est désormais accepté comme alias direct de `filtre`, permettant d'obtenir le classement complet en 1 étape fluide via `club_name` + `categorie`.
 
 ### Changed & Performance
 - **Tri numérique natif des classements** : Normalisation et tri ascendant strict sur la position entière (`int(position)`), garantissant l'ordre `1, 2, ..., 10, 11...` au lieu de l'ordre lexicographique.
 - **Épuration chirurgicale du payload `ffbb_team_summary`** : Suppression de la triple répétition de `club_resolu`, `team` et `_meta` dans `last_match` et `next_match` (gain de 40 à 50% de tokens).
+
 
 ## [1.10.0] - 2026-09-06
 

@@ -230,7 +230,10 @@ class TestParseCategorie:
         assert parse_categorie("SF2") == ("SENIOR", "F", 2)
 
     def test_parse_traditional_youth_names(self):
-        # Poussins, Benjamines, Minimes, Cadettes, Espoirs
+        # Baby, Mini, Poussins, Benjamines, Minimes, Cadettes, Juniors, Espoirs
+        assert parse_categorie("Baby Basket") == ("U7", None, None)
+        assert parse_categorie("Baby Basket 1") == ("U7", None, 1)
+        assert parse_categorie("Mini Basket M") == ("U9", "M", None)
         assert parse_categorie("Poussins 1") == ("U11", "M", 1)
         assert parse_categorie("Poussines 2") == ("U11", "F", 2)
         assert parse_categorie("Benjamins M") == ("U13", "M", None)
@@ -238,7 +241,28 @@ class TestParseCategorie:
         assert parse_categorie("Minimes Filles") == ("U15", "F", None)
         assert parse_categorie("Cadettes 1") == ("U17", "F", 1)
         assert parse_categorie("Cadets 2") == ("U17", "M", 2)
+        assert parse_categorie("Juniors 1") == ("U20", None, 1)
+        assert parse_categorie("Juniors M 1") == ("U20", "M", 1)
+        assert parse_categorie("Juniors F") == ("U20", "F", None)
         assert parse_categorie("Espoirs") == ("U21", None, None)
+
+    def test_parse_youth_shorthand_divisions(self):
+        # RM18, RF18, DM15, DF13, RM20, DM20
+        assert parse_categorie("RM18") == ("U18", "M", None)
+        assert parse_categorie("RM18 2") == ("U18", "M", 2)
+        assert parse_categorie("RF18-1") == ("U18", "F", 1)
+        assert parse_categorie("DM15") == ("U15", "M", None)
+        assert parse_categorie("DF13 2") == ("U13", "F", 2)
+        assert parse_categorie("RM20") == ("U20", "M", None)
+        assert parse_categorie("DM20 1") == ("U20", "M", 1)
+
+    def test_parse_3x3_formats(self):
+        # 3x3, Superleague, Juniorleague, Open Plus
+        assert parse_categorie("3X3") == ("3X3", None, None)
+        assert parse_categorie("3x3 M") == ("3X3", "M", None)
+        assert parse_categorie("Superleague 3x3") == ("3X3", None, None)
+        assert parse_categorie("Open Plus 3x3 F 1") == ("3X3", "F", 1)
+        assert parse_categorie("Juniorleague 3x3 M 2") == ("3X3", "M", 2)
 
     def test_parse_veterans(self):
         assert parse_categorie("Vétérans M 1") == ("VETERAN", "M", 1)
