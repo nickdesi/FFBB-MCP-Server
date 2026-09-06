@@ -618,8 +618,14 @@ def register_routes(mcp: FastMCP) -> None:
                 *[_fetch_logo(oid) for oid in opp_org_ids], return_exceptions=True
             )
             for res in logo_results:
-                if isinstance(res, tuple) and res[1]:
-                    logo_map[res[0]] = res[1]
+                if isinstance(res, tuple) and len(res) == 2:
+                    org_id, logo_url = res
+                    if (
+                        isinstance(org_id, str)
+                        and isinstance(logo_url, str)
+                        and logo_url
+                    ):
+                        logo_map[org_id] = logo_url
 
         for m in matches_list:
             opp_id = m.pop("opp_org_id", None)
