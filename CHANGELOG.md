@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-09-06
+
+### Added
+- **Résolution automatique des codes de division (seniors et jeunes)** :
+  - Correspondance intelligente des divisions nationales (`NM1`, `NM2`, `NM3`, `NF1`, `NF2`, `NF3`), régionales (`PNM`, `PNF`, `PRM`, `PRF`, `R1`, `R2`, `R3`) et départementales (`DM1`, `DM2`, `DM3`, `DF1`, `DF2`, `DF3`).
+  - Prise en charge des championnats jeunes (`NMU15`, `RMU15`, `DMU15`, `RFU18`, etc.) avec matching précis sur les codes et intitulés de compétitions.
+  - Résolution directe vers l'équipe réelle engagée (ex: `NM3` -> `SEM1`, `PRM` -> `SEM2`, `RF2` -> `SEF2`, `NMU15` -> `U15M1`) sans confusion entre le chiffre de la division et le numéro d'équipe.
+  - Filtrage automatique des rencontres amicales ou plateaux de pré-saison (`PLAT`, `AMICAL`) lorsqu'un championnat officiel existe.
+- **Localisation directe d'un club dans une compétition multi-poules** :
+  - Nouveau service `find_team_poule_service(competition_id, organisme_id_or_name)` avec fast-path ultra-rapide par inspection des engagements club et fallback multi-poules.
+  - Nouveau paramètre `club` dans l'outil MCP `ffbb_get(type="competition", id=..., club="...")` retournant directement l'ID et le nom de la poule où évolue le club.
+  - Auto-résolution du `poule_id` dans `ffbb_club(action="classement")` lorsqu'un filtre de division ou de niveau est fourni.
+  - Tolérance pré-saison renforcée : inspection des `rencontres` quand les classements officiels sont encore vides avant la 1ère journée.
+
+### Fixed
+- **Désambiguïsation de clubs partagés** : utilisation du genre et de la catégorie demandée pour désambiguïser immédiatement les clubs homonymes (ex: sections féminine vs masculine).
+- **Typage Pyright** : sécurisation de l'indexation de `equipes_bilan` dans `ffbb_team_summary`.
+
 ## [1.9.0] - 2026-09-05
 
 ### Added & Conformance
