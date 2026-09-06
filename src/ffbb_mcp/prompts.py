@@ -280,10 +280,10 @@ résoudre une phase spécifique — non fiable. L'appel automagique sans paramè
 - **M / E** : Paniers marqués / encaissés
 - **Diff** : Différence de paniers (PM - PE)
 
-**Règles de mise en forme :**
-- **Équipe cible** : Si la requête concerne une équipe précise, mettre toute sa ligne en **gras** et ajouter 🎯.
+**Règles de mise en forme obligatoires :**
+- **Équipe cible en GRAS (OBLIGATOIRE)** : Identifier l'équipe de la requête via `is_target: true` dans le payload (ou par correspondance avec le club demandé). Afficher OBLIGATOIREMENT son nom en **gras** avec l'indicateur 🎯 dans la colonne Équipe (ex : `| 9 | **ETOILE DE CHAMALIERES SAYAT - 1** 🎯 | 1 | ... |`).
 - **Incohérence** : Si G + P ≠ J, ajouter : "⚠️ *Données en cours de synchronisation par la FFBB*".
-- **Tri** : Respecter l'ordre `Rang` retourné par l'API, jamais recalculé.\
+- **Tri** : Respecter l'ordre `Rang` retourné par l'API (tri numérique natif croissant), jamais recalculé.\
 """
 
 _RULES_TEAM_REPORT = """\
