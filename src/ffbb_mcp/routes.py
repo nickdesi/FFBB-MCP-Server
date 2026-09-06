@@ -462,6 +462,12 @@ def register_routes(mcp: FastMCP) -> None:
 
             raw = (team_raw or "").upper().strip()
             comp = (comp_name or "").upper().strip()
+
+            if "BABY" in raw or "BABY" in comp:
+                return "U7 M1"
+            if "MINI" in raw or "MINI" in comp:
+                return "U9 M1"
+
             m_cat = re.search(r"U\s*(\d+)", raw) or re.search(r"U\s*(\d+)", comp)
             if m_cat:
                 cat = m_cat.group(1)
@@ -473,7 +479,13 @@ def register_routes(mcp: FastMCP) -> None:
             if not num:
                 if "RM2" in comp or "DIVISION 2" in comp:
                     num = "2"
-                elif "RM3" in comp or "DIVISION 3" in comp:
+                elif (
+                    "RM3" in comp
+                    or "DIVISION 3" in comp
+                    or "DM2" in comp
+                    or "DM3" in comp
+                    or "PRM" in comp
+                ):
                     num = "3"
                 elif (
                     "PNM" in comp or "PRE NATIONALE" in comp or "PRÉ NATIONALE" in comp
@@ -524,6 +536,7 @@ def register_routes(mcp: FastMCP) -> None:
                 is_home = is_club1
                 local_team_raw = nom_eq1 if is_home else nom_eq2
                 opp_team_raw = nom_eq2 if is_home else nom_eq1
+                opp_org_id = id_org2 if is_home else id_org1
 
                 team_name = _norm_team(local_team_raw, comp_nom)
                 opponent = _clean_opp(opp_team_raw)
@@ -555,9 +568,6 @@ def register_routes(mcp: FastMCP) -> None:
                     if ":" in time_part:
                         time_str = time_part
 
-                location = (
-                    f"Domicile ({club_name})" if is_home else f"Extérieur ({opponent})"
-                )
                 match_data = {
                     "ffbbMatchId": m_id,
                     "team": team_name,
@@ -565,12 +575,66 @@ def register_routes(mcp: FastMCP) -> None:
                     "date": _fmt_date(date_iso),
                     "dateISO": date_iso,
                     "time": time_str,
-                    "location": location,
+                    "location": f"Domicile ({club_name})"
+                    if is_home
+                    else f"Extérieur ({opponent})",
                     "isHome": is_home,
                     "competition": comp_nom,
                     "teamLogo": club_logo_url,
+                    "salle": getattr(m, "salle", None),
+                    "opp_org_id": opp_org_id,
                 }
                 matches_list.append(match_data)
+
+        # Enrichissement en batch des adresses de gymnases
+        from .services.salle import _enrich_matches_with_salle_details
+
+        await _enrich_matches_with_salle_details(matches_list)
+
+        # Enrichissement des logos adverses
+        opp_org_ids = [
+            str(oid)
+            for m in matches_list
+            if (oid := m.get("opp_org_id")) is not None and str(oid).strip()
+        ]
+        opp_org_ids = list(dict.fromkeys(opp_org_ids))
+        logo_map: dict[str, str] = {}
+        if opp_org_ids:
+
+            async def _fetch_logo(org_id: str) -> tuple[str, str | None]:
+                try:
+                    org_data = await client.get_organisme_async(
+                        organisme_id=int(org_id)
+                    )
+                    if org_data and getattr(org_data, "logo", None):
+                        logo_id = getattr(org_data.logo, "id", None) or org_data.logo
+                        if logo_id:
+                            return org_id, f"https://api.ffbb.com/assets/{logo_id}"
+                except Exception:
+                    pass
+                return org_id, None
+
+            logo_results = await asyncio.gather(
+                *[_fetch_logo(oid) for oid in opp_org_ids], return_exceptions=True
+            )
+            for res in logo_results:
+                if isinstance(res, tuple) and res[1]:
+                    logo_map[res[0]] = res[1]
+
+        for m in matches_list:
+            opp_id = m.pop("opp_org_id", None)
+            if opp_id and opp_id in logo_map:
+                m["opponentLogo"] = logo_map[opp_id]
+            is_h = m.get("isHome", False)
+            if is_h and organisme_id == 9326:
+                m["location"] = (
+                    "Maison des Sports, Place des Bughes, 63000 Clermont-Ferrand"
+                )
+            elif m.get("adresse_salle"):
+                m["location"] = m["adresse_salle"]
+            m.pop("salle", None)
+            m.pop("salle_details", None)
+            m.pop("adresse_salle", None)
 
         matches_list.sort(key=lambda x: (x.get("dateISO", ""), x.get("time", "")))
 

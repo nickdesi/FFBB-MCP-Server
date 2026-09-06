@@ -234,3 +234,53 @@ def test_next_match_api_route(client):
         data = response.json()
         assert data["status"] == "ok"
         assert data["match"]["adversaire"] == "TEST ADVERSAIRE"
+
+
+def test_club_matches_api_route(client):
+    """Teste l'endpoint REST /api/v1/club/{organisme_id}/matches."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    mock_client = MagicMock()
+    mock_org = MagicMock()
+    mock_org.nom = "STADE CLERMONTOIS BASKET AUVERGNE"
+    mock_org.logo = MagicMock(id="logo123")
+
+    mock_eng = MagicMock()
+    mock_eng.idPoule = MagicMock(id=101)
+    mock_eng.idCompetition = MagicMock(nom="Pré nationale masculine")
+    mock_org.engagements = [mock_eng]
+
+    mock_poule = MagicMock()
+    mock_rencontre = MagicMock()
+    mock_rencontre.id = "m123"
+    mock_rencontre.nomEquipe1 = "SCBA"
+    mock_rencontre.nomEquipe2 = "CLERMONT BASKET"
+    mock_rencontre.idOrganismeEquipe1 = "9326"
+    mock_rencontre.idOrganismeEquipe2 = "5555"
+    mock_rencontre.date = "2026-10-10"
+    mock_rencontre.horaire = "20h30"
+    mock_rencontre.salle = "salle_1"
+    mock_poule.rencontres = [mock_rencontre]
+
+    mock_client.get_organisme_async = AsyncMock(return_value=mock_org)
+    mock_client.get_poule_async = AsyncMock(return_value=mock_poule)
+
+    with (
+        patch("ffbb_mcp.client.get_client_async", AsyncMock(return_value=mock_client)),
+        patch(
+            "ffbb_mcp.services.salle._enrich_matches_with_salle_details", AsyncMock()
+        ),
+    ):
+        response = client.get("/api/v1/club/9326/matches")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["organisme_id"] == 9326
+        assert data["count"] == 1
+        assert len(data["matches"]) == 1
+        assert data["matches"][0]["ffbbMatchId"] == "m123"
+        assert data["matches"][0]["team"] == "SENIOR M1"
+        assert data["matches"][0]["isHome"] is True
+        assert (
+            data["matches"][0]["location"]
+            == "Maison des Sports, Place des Bughes, 63000 Clermont-Ferrand"
+        )
