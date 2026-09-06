@@ -420,6 +420,7 @@ Avant push/tag/release :
 - `rtk uv run ruff format --check .`
 - `rtk uv run ruff check .`
 - `rtk uv run mypy src`
+- `rtk uv run pyright src`
 - `rtk uv run pytest`
 - Si version files modifiés : `rtk uv run tools/sync_version.py` + vérifier diff docs/website
 - Vérifier cache (`src/ffbb_mcp/acronyms_cache.json`) — revert impératif de toute modification non liée à votre tâche
