@@ -71,9 +71,13 @@ async def _bootstrap_cache() -> None:
 
 
 def create_app(mcp: FastMCP, allowed_origins: list[str]) -> Starlette:
-    from ffbb_mcp.sse_patch import apply_sse_reconnect_patch
+    from ffbb_mcp.sse_patch import (
+        apply_fastmcp_json_formatting_patch,
+        apply_sse_reconnect_patch,
+    )
 
     apply_sse_reconnect_patch()
+    apply_fastmcp_json_formatting_patch()
 
     @contextlib.asynccontextmanager
     async def lifespan(app: Starlette) -> AsyncGenerator[None]:

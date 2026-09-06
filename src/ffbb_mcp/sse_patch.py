@@ -3,12 +3,14 @@ from __future__ import annotations
 import contextlib
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import anyio
 from sse_starlette import EventSourceResponse
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from starlette.requests import Request
     from starlette.types import Send
 
@@ -151,3 +153,49 @@ def apply_sse_reconnect_patch() -> None:
     logger.info(
         "✅ Patch de reconnexion gracieuse StreamableHTTP SSE appliqué avec succès."
     )
+
+
+_JSON_PATCHED = False
+
+
+def apply_fastmcp_json_formatting_patch() -> None:
+    """Patch FastMCP _convert_to_content to serialize data lists as a single standard JSON array.
+
+    By default in FastMCP, returning a list (e.g. list[dict]) converts each item into an
+    isolated TextContent block. When MCP clients concatenate them, it produces unbracketed
+    NDJSON ({...}\n{...}) without array brackets or commas.
+    This patch ensures that any list/tuple of structured data is serialized as a single
+    standard JSON array TextContent block ([{...}, {...}]), ensuring 100% standard JSON compliance.
+    """
+    global _JSON_PATCHED
+    if _JSON_PATCHED:
+        return
+
+    try:
+        import mcp.server.fastmcp.utilities.func_metadata as fm
+        import pydantic_core
+        from mcp.types import ContentBlock, TextContent
+    except ImportError:  # pragma: no cover
+        logger.warning(
+            "mcp.server.fastmcp.utilities.func_metadata non disponible, patch JSON ignoré."
+        )
+        return
+
+    orig_convert = fm._convert_to_content
+
+    def _standardized_convert_to_content(result: Any) -> Sequence[ContentBlock]:
+        if isinstance(result, (list, tuple)):
+            # Si tous les éléments sont des ContentBlocks (ex: Image, Audio, Text), déballage natif
+            if result and all(isinstance(item, ContentBlock) for item in result):
+                return orig_convert(result)
+            # Liste vide -> JSON array vide standard
+            if not result:
+                return [TextContent(type="text", text="[]")]
+            # Sérialiser toute la liste en un seul bloc TextContent contenant un JSON array standard
+            json_text = pydantic_core.to_json(result, fallback=str, indent=2).decode()
+            return [TextContent(type="text", text=json_text)]
+        return orig_convert(result)
+
+    fm._convert_to_content = _standardized_convert_to_content
+    _JSON_PATCHED = True
+    logger.info("✅ Patch de formatage JSON array FastMCP appliqué avec succès.")

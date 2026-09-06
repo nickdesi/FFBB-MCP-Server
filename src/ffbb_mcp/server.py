@@ -51,6 +51,7 @@ from .services import (
     resolve_club_and_org,
     resolve_poule_id_service,
 )
+from .sse_patch import apply_fastmcp_json_formatting_patch
 from .utils import parse_categorie, prune_payload
 
 
@@ -523,7 +524,7 @@ async def ffbb_club(
     ] = None,
     filtre: Annotated[
         str | None,
-        Field(description="Filtre catégorie/genre (ex: 'U11M', 'Senior')."),
+        Field(description="Filtre catégorie/genre (ex: 'U11M', 'Senior', 'NM3')."),
     ] = None,
     adversaire: Annotated[
         str | None,
@@ -533,11 +534,15 @@ async def ffbb_club(
     ] = None,
     poule_id: Annotated[
         int | None,
-        Field(description="ID poule (action='classement')."),
+        Field(
+            description="ID poule (action='classement'). Optionnel si club et catégorie sont fournis."
+        ),
     ] = None,
     numero_equipe: Annotated[
         int | None,
-        Field(description="Numéro d'équipe (ex: 1, 2) pour action='calendrier'."),
+        Field(
+            description="Numéro d'équipe (ex: 1, 2) pour action='calendrier' ou 'classement'."
+        ),
     ] = None,
     phase: Annotated[
         str | None,
@@ -559,16 +564,24 @@ async def ffbb_club(
         bool,
         Field(description="Si True, contourne le cache."),
     ] = False,
+    categorie: Annotated[
+        str | None,
+        Field(
+            description="Catégorie, division ou filtre d'équipe (alias pour 'filtre', ex: 'NM3', 'U15M', 'Senior').",
+        ),
+    ] = None,
 ) -> list[dict[str, Any]] | list[CalendrierMatch]:
     """Outils agrégés club : calendrier (matchs pluriels), équipes engagées ou classement.
 
     Outil de référence pour toute demande au pluriel : matchs restants, calendrier complet.
     Pour une équipe senior au niveau national ou régional, la catégorie FFBB interne est souvent `SEM1` ou `SEF1` ;
     le serveur résout désormais `NM3`, `NM2`, `NF1`, `PNM`, `R2`, etc. vers la bonne équipe et sa poule.
-    Pour action='classement', le poule_id est optionnel si club_name/organisme_id et filtre (ou équipe/niveau) sont fournis.
+    Pour action='classement', le poule_id est optionnel si club_name/organisme_id et categorie (ou filtre) sont fournis.
     Utiliser adversaire avec action='calendrier' pour isoler les confrontations directes.
     """
     try:
+        effective_filtre = filtre or categorie
+
         # Action calendrier : le service gère résolution + ambiguïté en interne
         if action == "calendrier":
             if not organisme_id and not club_name:
@@ -577,7 +590,7 @@ async def ffbb_club(
             kwargs: dict[str, Any] = {
                 "club_name": club_name,
                 "organisme_id": organisme_id,
-                "categorie": filtre,
+                "categorie": effective_filtre,
                 "numero_equipe": numero_equipe,
                 "adversaire": adversaire,
                 "force_refresh": effective_refresh,
@@ -594,7 +607,10 @@ async def ffbb_club(
         target_org_id = organisme_id
         if not target_org_id and club_name:
             resolved_clubs, _ = await resolve_club_and_org(
-                club_name=club_name, organisme_id=None, categorie=filtre, limit=3
+                club_name=club_name,
+                organisme_id=None,
+                categorie=effective_filtre,
+                limit=3,
             )
 
             if not resolved_clubs:
@@ -635,7 +651,7 @@ async def ffbb_club(
                     }
                 ]
             result = await ffbb_equipes_club_service(
-                organisme_id=target_org_id, filtre=filtre
+                organisme_id=target_org_id, filtre=effective_filtre
             )
             if not result:
                 return [
@@ -655,30 +671,30 @@ async def ffbb_club(
                 from .services.club import _parse_division_code
                 from .utils import parse_categorie
 
-                effective_filtre = filtre
+                search_filtre = effective_filtre
                 if (
                     numero_equipe
                     and numero_equipe > 1
-                    and filtre
-                    and str(numero_equipe) not in filtre
+                    and search_filtre
+                    and str(numero_equipe) not in search_filtre
                 ):
-                    effective_filtre = f"{filtre}{numero_equipe}"
-                elif not effective_filtre and numero_equipe:
-                    effective_filtre = str(numero_equipe)
+                    search_filtre = f"{search_filtre}{numero_equipe}"
+                elif not search_filtre and numero_equipe:
+                    search_filtre = str(numero_equipe)
 
                 is_div = (
-                    _parse_division_code(effective_filtre) is not None
-                    if effective_filtre
+                    _parse_division_code(search_filtre) is not None
+                    if search_filtre
                     else False
                 )
-                if not is_div and effective_filtre:
-                    parsed = parse_categorie(effective_filtre)
+                if not is_div and search_filtre:
+                    parsed = parse_categorie(search_filtre)
                     if parsed and parsed.numero_equipe:
                         target_num = parsed.numero_equipe
 
                 # Tentative de résolution de la poule via le service dédié
                 resolved_pid = await resolve_poule_id_service(
-                    target_org_id, effective_filtre or filtre or "", phase_query=phase
+                    target_org_id, search_filtre or "", phase_query=phase
                 )
                 if resolved_pid:
                     effective_poule_id = int(resolved_pid)
@@ -689,7 +705,7 @@ async def ffbb_club(
                         {
                             "error": (
                                 f"Aucune poule trouvée pour la phase '{phase}' "
-                                f"(filtre: '{filtre}'). "
+                                f"(filtre: '{effective_filtre}'). "
                                 "Vérifie le numéro de phase ou utilise ffbb_club(action='equipes') "
                                 "pour lister les phases et poule_ids disponibles."
                             )
@@ -697,7 +713,12 @@ async def ffbb_club(
                     ]
                 return [
                     {
-                        "error": "poule_id requis pour action='classement' (auto-résolution échouée - indique la phase ou vérifie l'ID de poule)"
+                        "error": (
+                            f"Impossible de résoudre automatiquement la poule pour ce club "
+                            f"(filtre: '{effective_filtre}'). "
+                            "Précise la catégorie (ex: categorie='NM3') ou utilise ffbb_club(action='equipes') "
+                            "pour trouver l'identifiant exact de la poule (poule_id)."
+                        )
                     }
                 ]
 
@@ -956,11 +977,29 @@ async def ffbb_team_summary(
             if dynamique_data is None:
                 dynamique_data = bilan.get("dynamique")
 
+        # Nettoyage chirurgical des redondances (anti-verbosité) :
+        # On extrait uniquement les détails propres aux matchs en évitant
+        # de répéter club_resolu (3x), team (2x), _meta (3x) et status.
+        def _clean_match_item(m: dict[str, Any] | None) -> dict[str, Any] | None:
+            if not isinstance(m, dict):
+                return None
+            inner = m.get("match")
+            match_data: dict[str, Any] = inner if isinstance(inner, dict) else m
+            cleaned = {
+                k: v
+                for k, v in match_data.items()
+                if k not in ("club_resolu", "team", "_meta", "status") and v is not None
+            }
+            return cleaned or None
+
+        cleaned_last_match = _clean_match_item(last_match)
+        cleaned_next_match = _clean_match_item(next_match)
+
         return {
             "team": team_data,
             "phase_courante": bilan.get("phase_courante"),
-            "last_match": last_match,
-            "next_match": next_match,
+            "last_match": cleaned_last_match,
+            "next_match": cleaned_next_match,
             "summary": bilan.get("bilan_total"),
             "dynamique": dynamique_data,
         }
@@ -1314,6 +1353,7 @@ register_routes(mcp)
 register_prompts(mcp)
 register_resources(mcp)
 _optimize_tool_schemas(mcp)
+apply_fastmcp_json_formatting_patch()
 
 
 # ---------------------------------------------------------------------------

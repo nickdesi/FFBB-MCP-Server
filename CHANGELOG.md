@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Formatage standardisé de `result` (MCP)** : Sérialisation des listes d'objets de données en un tableau JSON unique `[...]` au lieu de blocs NDJSON sans crochets (`apply_fastmcp_json_formatting_patch`).
+- **Support du paramètre `categorie` dans `ffbb_club`** : `categorie` est désormais accepté comme alias direct de `filtre`, permettant d'obtenir le classement complet en 1 étape fluide via `club_name` + `categorie`.
+
+### Changed & Performance
+- **Tri numérique natif des classements** : Normalisation et tri ascendant strict sur la position entière (`int(position)`), garantissant l'ordre `1, 2, ..., 10, 11...` au lieu de l'ordre lexicographique.
+- **Épuration chirurgicale du payload `ffbb_team_summary`** : Suppression de la triple répétition de `club_resolu`, `team` et `_meta` dans `last_match` et `next_match` (gain de 40 à 50% de tokens).
+
 ## [1.10.0] - 2026-09-06
 
 ### Added

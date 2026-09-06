@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 from typing import Any
 
@@ -398,6 +399,26 @@ async def ffbb_get_classement_service(
                             }
                         )
                         pos += 1
+
+        # Normalisation du champ position en entier et tri numérique natif croissant
+        for item in flat:
+            pos_val = item.get("position")
+            if pos_val is not None:
+                with contextlib.suppress(ValueError, TypeError):
+                    item["position"] = int(pos_val)
+
+        def _position_sort_key(item: dict[str, Any]) -> tuple[int, int]:
+            pos = item.get("position")
+            if isinstance(pos, int):
+                return (0, pos)
+            try:
+                if pos is not None:
+                    return (0, int(pos))
+            except ValueError, TypeError:
+                pass
+            return (1, 999999)
+
+        flat.sort(key=_position_sort_key)
 
         return {"_ttl": ttl, "data": flat}
 
