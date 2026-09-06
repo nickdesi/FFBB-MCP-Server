@@ -782,16 +782,45 @@ async def ffbb_resolve_team_service(
 
     # Si ambiguïté club
     if len(resolved_clubs) > 1 and not organisme_id:
-        return {
-            "status": "ambiguous",
-            "team": None,
-            "candidates": resolved_clubs,
-            "ambiguity": f"Plusieurs clubs correspondent à '{club_name}'.",
-            "club_resolu": None,
-        }
-
-    club_resolu = resolved_clubs[0]
-    target_org_id = str(club_resolu["organisme_id"])
+        if categorie:
+            matching_clubs: list[tuple[dict[str, Any], list[dict[str, Any]]]] = []
+            for rc in resolved_clubs:
+                rc_id = rc.get("organisme_id")
+                if not rc_id:
+                    continue
+                rc_teams = await ffbb_mcp.services.ffbb_equipes_club_service(
+                    organisme_id=rc_id, filtre=categorie
+                )
+                if rc_teams and not (
+                    isinstance(rc_teams, list)
+                    and len(rc_teams) == 1
+                    and "error" in rc_teams[0]
+                ):
+                    matching_clubs.append((rc, rc_teams))
+            if len(matching_clubs) == 1:
+                club_resolu = matching_clubs[0][0]
+                equipes = matching_clubs[0][1]
+                target_org_id = str(club_resolu["organisme_id"])
+            else:
+                return {
+                    "status": "ambiguous",
+                    "team": None,
+                    "candidates": resolved_clubs,
+                    "ambiguity": f"Plusieurs clubs correspondent à '{club_name}'.",
+                    "club_resolu": None,
+                }
+        else:
+            return {
+                "status": "ambiguous",
+                "team": None,
+                "candidates": resolved_clubs,
+                "ambiguity": f"Plusieurs clubs correspondent à '{club_name}'.",
+                "club_resolu": None,
+            }
+    else:
+        club_resolu = resolved_clubs[0]
+        target_org_id = str(club_resolu["organisme_id"])
+        equipes = None
 
     # 2) Récupérer toutes les équipes candidates
     if not categorie:
@@ -825,9 +854,10 @@ async def ffbb_resolve_team_service(
             "club_resolu": club_resolu,
         }
 
-    equipes = await ffbb_mcp.services.ffbb_equipes_club_service(
-        organisme_id=target_org_id, filtre=categorie
-    )
+    if equipes is None:
+        equipes = await ffbb_mcp.services.ffbb_equipes_club_service(
+            organisme_id=target_org_id, filtre=categorie
+        )
 
     if not equipes or (
         isinstance(equipes, list) and len(equipes) == 1 and "error" in equipes[0]
@@ -851,15 +881,18 @@ async def ffbb_resolve_team_service(
         }
 
     # 3) Matching intelligent du numéro
+    from .club import _parse_division_code
+
     candidates = equipes
     parsed = parse_categorie(categorie)
+    is_division = _parse_division_code(categorie) is not None
     raw_num = (
         numero_equipe
         if numero_equipe is not None
         else (
-            parsed.numero_equipe
-            if parsed.numero_equipe is not None
-            else kwargs.get("numero_equipe")
+            kwargs.get("numero_equipe")
+            if kwargs.get("numero_equipe") is not None
+            else (parsed.numero_equipe if not is_division else None)
         )
     )
     target_num = str(raw_num) if raw_num is not None else None
@@ -984,7 +1017,9 @@ async def resolve_poule_id_service(
     equipes = await ffbb_mcp.services.ffbb_equipes_club_service(
         organisme_id=org_id_int, filtre=categorie
     )
-    if not equipes:
+    if not equipes or (
+        isinstance(equipes, list) and len(equipes) == 1 and "error" in equipes[0]
+    ):
         return None
 
     if phase_query:

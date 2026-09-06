@@ -25,6 +25,7 @@ from .common import (
     _dedupe_inflight_detail,
     _detect_phase_type,
     _freshness_meta,
+    _normalize_name,
     _safe_call,
     _safe_call_with_inflight,
     _swr_serve,
@@ -411,3 +412,131 @@ async def ffbb_get_classement_service(
     return (
         wrapped["data"] if isinstance(wrapped, dict) and "data" in wrapped else wrapped
     )
+
+
+async def find_team_poule_service(
+    competition_id: int | str,
+    organisme_id_or_name: int | str,
+) -> dict[str, Any]:
+    """Localise la poule d'un club/équipe dans une compétition multi-poules.
+
+    Cherche d'abord dans les engagements de l'organisme (ultra-rapide, 1 appel).
+    En fallback, inspecte les classements des poules de la compétition.
+    """
+    comp_id_int = _coerce_numeric_id(competition_id, "competition_id")
+    comp_id_str = str(comp_id_int)
+
+    org_id: str | None = None
+    club_nom = str(organisme_id_or_name)
+    org_data: dict[str, Any] | None = None
+
+    if str(organisme_id_or_name).strip().isdigit():
+        org_id = str(organisme_id_or_name).strip()
+        org_data = await get_organisme_service(org_id)
+        if org_data and isinstance(org_data, dict):
+            club_nom = org_data.get("nom", club_nom)
+    else:
+        from .search import resolve_club_and_org
+
+        resolved, org_data = await resolve_club_and_org(
+            club_name=str(organisme_id_or_name), organisme_id=None
+        )
+        if resolved:
+            org_id = str(resolved[0].get("organisme_id"))
+            club_nom = resolved[0].get("nom", club_nom)
+            if not org_data:
+                org_data = await get_organisme_service(org_id)
+
+    # 1. Fast-path : vérification directe dans les engagements du club
+    if org_data and isinstance(org_data, dict):
+        for eng in org_data.get("engagements", []):
+            if not isinstance(eng, dict):
+                continue
+            comp = eng.get("idCompetition") or {}
+            if str(comp.get("id")) == comp_id_str:
+                poule = eng.get("idPoule") or {}
+                poule_id = str(poule.get("id"))
+                poule_nom = poule.get("nom")
+                if not poule_nom:
+                    comp_data = await get_competition_service(comp_id_str)
+                    for p in comp_data.get("poules", []):
+                        if str(p.get("id")) == poule_id:
+                            poule_nom = p.get("nom")
+                            break
+                comp_nom = comp.get("nom") or ""
+                num = eng.get("numeroEquipe") or ""
+                cat = (comp.get("categorie") or {}).get("code", "")
+                sexe = comp.get("sexe", "")
+                team_label = f"{cat}{sexe}{num}".strip()
+                return {
+                    "status": "found",
+                    "poule_id": poule_id,
+                    "poule_nom": poule_nom or f"Poule {poule_id}",
+                    "competition_id": comp_id_str,
+                    "competition_nom": comp_nom,
+                    "organisme_id": org_id,
+                    "club": club_nom,
+                    "team_label": team_label or None,
+                }
+
+    # 2. Fallback : inspection des classements de chaque poule de la compétition
+    comp_data = await get_competition_service(comp_id_str)
+    comp_nom = comp_data.get("nom", "")
+    poules = comp_data.get("poules", [])
+
+    for p in poules:
+        p_id = p.get("id")
+        if not p_id:
+            continue
+        poule_data = await get_poule_service(p_id)
+        for c in poule_data.get("classements", []):
+            c_org_id = str(c.get("organisme_id") or "")
+            c_eng = c.get("id_engagement") or {}
+            c_name = _normalize_name(c_eng.get("nom") or c.get("organisme_nom") or "")
+            target_norm = _normalize_name(club_nom)
+            if (org_id and c_org_id == org_id) or (
+                target_norm and target_norm in c_name
+            ):
+                return {
+                    "status": "found",
+                    "poule_id": str(p_id),
+                    "poule_nom": p.get("nom") or f"Poule {p_id}",
+                    "competition_id": comp_id_str,
+                    "competition_nom": comp_nom,
+                    "organisme_id": c_org_id or org_id,
+                    "club": c_eng.get("nom") or club_nom,
+                    "team_label": c_eng.get("numero_equipe") or None,
+                }
+
+        # Fallback si les classements sont vides (ex: pré-saison avant la 1ère journée)
+        if not poule_data.get("classements"):
+            for r in poule_data.get("rencontres", []):
+                eq1 = _normalize_name(r.get("nomEquipe1") or "")
+                eq2 = _normalize_name(r.get("nomEquipe2") or "")
+                target_norm = _normalize_name(club_nom)
+                if target_norm and (target_norm in eq1 or target_norm in eq2):
+                    team_lbl = (
+                        r.get("nomEquipe1")
+                        if target_norm in eq1
+                        else r.get("nomEquipe2")
+                    )
+                    return {
+                        "status": "found",
+                        "poule_id": str(p_id),
+                        "poule_nom": p.get("nom") or f"Poule {p_id}",
+                        "competition_id": comp_id_str,
+                        "competition_nom": comp_nom,
+                        "organisme_id": org_id,
+                        "club": club_nom,
+                        "team_label": team_lbl,
+                    }
+
+    return {
+        "status": "not_found",
+        "message": (
+            f"Club '{organisme_id_or_name}' non trouvé dans les poules de la compétition "
+            f"{comp_nom or comp_id_str}."
+        ),
+        "competition_id": comp_id_str,
+        "competition_nom": comp_nom,
+    }

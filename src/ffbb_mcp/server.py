@@ -35,6 +35,7 @@ from .services import (
     ffbb_resolve_team_service,
     ffbb_saison_bilan_service,
     ffbb_search_service,
+    find_team_poule_service,
     format_poule_response,
     get_cache_ttls,
     get_calendrier_club_service,
@@ -433,6 +434,15 @@ async def ffbb_get(
         ],
         Field(description="Type de ressource a charger."),
     ],
+    club: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Nom ou ID du club à localiser dans les poules (si type='competition'). "
+                "Permet de trouver directement l'ID et le nom de poule d'un club dans une compétition multi-poules."
+            )
+        ),
+    ] = None,
     force_refresh: Annotated[
         bool,
         Field(
@@ -445,7 +455,7 @@ async def ffbb_get(
 ) -> dict[str, Any]:
     """Recupere une ressource FFBB par identifiant.
 
-    - `type="competition"` equivaut a `get_competition`.
+    - `type="competition"` equivaut a `get_competition`. Si `club` est fourni, localise directement la poule du club au sein de la compétition.
     - `type="poule"` charge la poule (classements + rencontres).
     - `type="organisme"` charge les details d'un club.
     - `type="rencontre"` charge une rencontre précise.
@@ -458,6 +468,10 @@ async def ffbb_get(
     """
     try:
         if type == "competition":
+            if club:
+                return await find_team_poule_service(
+                    competition_id=id, organisme_id_or_name=club
+                )
             return await get_competition_service(competition_id=id)
         elif type == "poule":
             effective_refresh = force_refresh
@@ -549,6 +563,9 @@ async def ffbb_club(
     """Outils agrégés club : calendrier (matchs pluriels), équipes engagées ou classement.
 
     Outil de référence pour toute demande au pluriel : matchs restants, calendrier complet.
+    Pour une équipe senior au niveau national ou régional, la catégorie FFBB interne est souvent `SEM1` ou `SEF1` ;
+    le serveur résout désormais `NM3`, `NM2`, `NF1`, `PNM`, `R2`, etc. vers la bonne équipe et sa poule.
+    Pour action='classement', le poule_id est optionnel si club_name/organisme_id et filtre (ou équipe/niveau) sont fournis.
     Utiliser adversaire avec action='calendrier' pour isoler les confrontations directes.
     """
     try:
@@ -633,9 +650,9 @@ async def ffbb_club(
             effective_poule_id = poule_id
             target_num = numero_equipe if numero_equipe and numero_equipe > 1 else None
 
-            # Auto-résolution du poule_id si manquant mais club/filtre présents
-            if not effective_poule_id and target_org_id and (filtre or numero_equipe):
-                # Parse le filtre pour extraire le numéro d'équipe si présent (ex: U11M1)
+            # Auto-résolution du poule_id si manquant mais club présent
+            if not effective_poule_id and target_org_id:
+                from .services.club import _parse_division_code
                 from .utils import parse_categorie
 
                 effective_filtre = filtre
@@ -649,9 +666,15 @@ async def ffbb_club(
                 elif not effective_filtre and numero_equipe:
                     effective_filtre = str(numero_equipe)
 
-                parsed = parse_categorie(effective_filtre)
-                if parsed and parsed.numero_equipe:
-                    target_num = parsed.numero_equipe
+                is_div = (
+                    _parse_division_code(effective_filtre) is not None
+                    if effective_filtre
+                    else False
+                )
+                if not is_div and effective_filtre:
+                    parsed = parse_categorie(effective_filtre)
+                    if parsed and parsed.numero_equipe:
+                        target_num = parsed.numero_equipe
 
                 # Tentative de résolution de la poule via le service dédié
                 resolved_pid = await resolve_poule_id_service(
@@ -756,7 +779,7 @@ async def ffbb_resolve_team(
         str | None,
         Field(
             description=(
-                "Catégorie + genre + numéro d'équipe (ex: 'U11M1', 'U13F2', 'U15M'). "
+                "Catégorie + genre + numéro d'équipe (ex: 'U11M1', 'U13F2', 'SEM1') ou division (ex: 'NM3', 'R2', 'PNM'). "
                 "Si le numéro manque, cet outil retourne la bonne équipe ou des candidats."
             ),
         ),
@@ -770,6 +793,8 @@ async def ffbb_resolve_team(
 
     DOIT etre utilise avant `ffbb_next_match` ou `ffbb_last_result` si l'agent
     ne connait pas le numero d'equipe exact ou si la categorie est ambiguë (ex: 'U11M').
+    Pour une équipe senior au niveau national ou régional, la catégorie FFBB interne est souvent `SEM1` ou `SEF1` ;
+    le serveur résout désormais `NM3`, `NM2`, `NF1`, `PNM`, `R2`, etc. vers la bonne équipe et sa poule.
     """
     try:
         return await ffbb_resolve_team_service(
@@ -806,7 +831,7 @@ async def ffbb_team_summary(
     categorie: Annotated[
         str | None,
         Field(
-            description="Catégorie + genre + numéro d'équipe (ex: 'U11M1', 'U13F2', 'U15M', 'Senior').",
+            description="Catégorie/division + genre + numéro d'équipe (ex: 'U11M1', 'U13F2', 'SEM1', 'NM3', 'PNM').",
         ),
     ] = None,
     numero_equipe: Annotated[
@@ -829,6 +854,8 @@ async def ffbb_team_summary(
       - dernier match joué
       - prochain match à venir
 
+    Pour une équipe senior au niveau national ou régional, la catégorie FFBB interne est souvent `SEM1` ou `SEF1` ;
+    le serveur résout désormais `NM3`, `NM2`, `NF1`, `PNM`, `R2`, etc. vers la bonne équipe et sa poule.
     Recommandé pour une vue rapide d'une équipe précise. Si la catégorie est ambiguë
     ou sans numéro d'équipe, l'outil tente une résolution via `ffbb_resolve_team`.
     Pour une liste de matchs restants, utiliser plutôt `ffbb_club(action="calendrier")`.
@@ -922,15 +949,11 @@ async def ffbb_team_summary(
 
         dynamique_data = None
         if isinstance(bilan, dict):
-            eq_bilans = bilan.get("equipes_bilan") or {}
+            eq_bilans = bilan.get("equipes_bilan")
             num_str = str(resolved_num)
-            if (
-                num_str in eq_bilans
-                and isinstance(eq_bilans[num_str], dict)
-                and eq_bilans[num_str].get("dynamique")
-            ):
-                dynamique_data = eq_bilans[num_str]["dynamique"]
-            else:
+            if isinstance(eq_bilans, dict) and isinstance(eq_bilans.get(num_str), dict):
+                dynamique_data = eq_bilans[num_str].get("dynamique")
+            if dynamique_data is None:
                 dynamique_data = bilan.get("dynamique")
 
         return {

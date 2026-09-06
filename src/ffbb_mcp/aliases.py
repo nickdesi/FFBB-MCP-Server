@@ -91,6 +91,8 @@ CLUB_ALIASES = {
     "cbbs": "charnay basket bourgogne sud",
     "fcba": "flammes carolo basket ardennes",
     "sahb": "saint-amand hainaut basket",
+    "chamalieres": "etoile de chamalieres sayat",
+    "chamalières": "etoile de chamalieres sayat",
 }
 
 # ---------------------------------------------------------------------------

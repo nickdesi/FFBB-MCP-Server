@@ -28,6 +28,7 @@ import asyncio
 import copy
 import json
 import logging
+import re
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -174,6 +175,152 @@ def _compute_bilan_from_rencontres(
     return stats if found else None
 
 
+_DIV_PATTERN = re.compile(
+    r"^(P[NR]|[NRD])([MF]?)(\d*)$"
+    r"|^(P[NR]|[NRD])(\d+)([MF]?)$"
+)
+
+
+def _parse_division_code(raw: str | None) -> tuple[str, str | None, str] | None:
+    """Parse un code de division type NM3, N3M, R2, PNM, PRM, DF2.
+
+    Retourne (niveau, sexe, division_num) ou None si pas un code de division.
+    Exemples:
+      'NM3' -> ('N', 'M', '3')
+      'N3M' -> ('N', 'M', '3')
+      'N3'  -> ('N', None, '3')
+      'R2'  -> ('R', None, '2')
+      'RM2' -> ('R', 'M', '2')
+      'PNM' -> ('PN', 'M', '')
+      'PRM' -> ('PR', 'M', '')
+      'DF2' -> ('D', 'F', '2')
+    """
+    if not raw:
+        return None
+    s = _normalize_name(raw).replace(" ", "").replace("-", "").upper()
+    m = _DIV_PATTERN.match(s)
+    if not m:
+        return None
+    if m.group(1) is not None:
+        lvl = m.group(1)
+        sexe = m.group(2) or None
+        num = m.group(3) or ""
+    else:
+        lvl = m.group(4)
+        num = m.group(5) or ""
+        sexe = m.group(6) or None
+    return (lvl, sexe, num)
+
+
+def _filter_teams_by_competition(
+    all_teams: list[dict[str, Any]], filtre: str
+) -> list[dict[str, Any]]:
+    """Filtre les équipes d'un club par niveau/division de compétition (NM3, PNM, R2, etc.).
+
+    Vérifie le code de compétition (ex: 'NM3'), la division normalisée et le libellé.
+    Exclut automatiquement les rencontres amicales si un championnat officiel existe.
+    """
+    if not filtre or not all_teams:
+        return []
+
+    f_norm = _normalize_name(filtre).upper()
+    f_div = _parse_division_code(f_norm)
+    matched: list[dict[str, Any]] = []
+
+    for t in all_teams:
+        comp_code = (t.get("competition_code") or "").strip().upper()
+        comp_nom = _normalize_name(t.get("competition") or "").upper()
+        comp_orig = _normalize_name(t.get("competition_origine_nom") or "").upper()
+        t_sexe = (t.get("sexe") or "").strip().upper()
+        t_code_norm = (
+            _normalize_name(comp_code).replace(" ", "").replace("-", "").upper()
+        )
+
+        is_match = False
+        # 1. Match direct ou sous-chaîne sur le code compétition (ex: NMU15 dans NMU15ELITE)
+        if t_code_norm != "" and (
+            f_norm == t_code_norm or (len(f_norm) >= 4 and f_norm in t_code_norm)
+        ):
+            is_match = True
+        # 2. Match via décomposition de division (ex: N3 -> NM3, R2 -> RM2, etc.)
+        elif f_div is not None:
+            f_lvl, f_sexe, f_num = f_div
+            t_div = _parse_division_code(comp_code)
+            if t_div is not None:
+                t_lvl, t_sexe_code, t_num = t_div
+                effective_t_sexe = t_sexe_code or t_sexe
+                if (
+                    f_lvl == t_lvl
+                    and f_num == t_num
+                    and (
+                        not f_sexe or not effective_t_sexe or f_sexe == effective_t_sexe
+                    )
+                ):
+                    is_match = True
+            # Match textuel si le code de la compétition n'est pas abrégé
+            if not is_match:
+                lvl_match = (
+                    (
+                        f_lvl == "N"
+                        and "NATIONALE" in comp_nom
+                        and "PRE NATIONALE" not in comp_nom
+                    )
+                    or (
+                        f_lvl == "PN"
+                        and ("PRE NATIONALE" in comp_nom or "PRE-NATIONALE" in comp_nom)
+                    )
+                    or (
+                        f_lvl == "PR"
+                        and ("PRE REGIONALE" in comp_nom or "PRE-REGIONALE" in comp_nom)
+                    )
+                    or (
+                        f_lvl == "R"
+                        and "REGIONALE" in comp_nom
+                        and "PRE REGIONALE" not in comp_nom
+                    )
+                    or (f_lvl == "D" and "DEPARTEMENTALE" in comp_nom)
+                )
+
+                if lvl_match:
+                    num_match = (not f_num) or (
+                        f" {f_num}" in comp_nom
+                        or f"DIVISION {f_num}" in comp_nom
+                        or f"- {f_num}" in comp_nom
+                    )
+                    sexe_match = (
+                        (not f_sexe)
+                        or (f_sexe == t_sexe)
+                        or (f_sexe == "M" and "MASCULIN" in comp_nom)
+                        or (f_sexe == "F" and "FEMININ" in comp_nom)
+                    )
+                    if num_match and sexe_match:
+                        is_match = True
+
+        # 3. Match textuel direct sur le nom de compétition ou le code
+        if (
+            not is_match
+            and len(f_norm) >= 3
+            and (f_norm in comp_nom or f_norm in comp_orig or f_norm in t_code_norm)
+        ):
+            is_match = True
+
+        if is_match:
+            matched.append(t)
+
+    if not matched:
+        return []
+
+    # Filtrer les matchs amicaux si une compétition officielle de division existe
+    officials = [
+        t
+        for t in matched
+        if (t.get("competition_type") or "").upper() != "PLAT"
+        and "AMICAL" not in _normalize_name(t.get("competition") or "").upper()
+        and "AMICAL" not in _normalize_name(t.get("competition_code") or "").upper()
+    ]
+    return officials if officials else matched
+
+
 async def ffbb_equipes_club_service(
     organisme_id: int | str | None = None,
     filtre: str | None = None,
@@ -195,7 +342,7 @@ async def ffbb_equipes_club_service(
     # re-interroger l'organisme à chaque appel de la session.
     _eq_key = (
         f"equipes:{organisme_id}:{_normalize_name(filtre or '')}"
-        if organisme_id is not None
+        if organisme_id is not None and org_data is None
         else None
     )
     if _eq_key is not None:
@@ -216,6 +363,9 @@ async def ffbb_equipes_club_service(
         poule = e.get("idPoule", {}) or {}
         cat = comp.get("categorie", {}) or {}
         nom_comp = comp.get("nom", "")
+        comp_code = (comp.get("code") or "").strip()
+        comp_type = (comp.get("typeCompetition") or "").strip()
+        comp_orig = (comp.get("competition_origine_nom") or "").strip()
         sexe_field = (comp.get("sexe") or "").upper()
 
         numero_equipe = e.get("numeroEquipe")
@@ -248,6 +398,9 @@ async def ffbb_equipes_club_service(
             "phase_label": phase_label,
             "nom_equipe": format_team_name(club_nom, num_suffix),
             "competition": nom_comp,
+            "competition_code": comp_code,
+            "competition_type": comp_type,
+            "competition_origine_nom": comp_orig,
             "competition_id": comp.get("id"),
             "poule_id": poule.get("id"),
             "sexe": comp.get("sexe", ""),
@@ -256,49 +409,64 @@ async def ffbb_equipes_club_service(
         }
         all_teams.append(team_info)
 
-    if parsed_filter is None:
+    if not filtre:
         if _eq_key is not None:
             state.cache_equipes[_eq_key] = [t.copy() for t in all_teams]
         return all_teams
 
-    filtered_teams: list[dict[str, Any]] = []
-    for t in all_teams:
-        t_cat = (t.get("categorie") or "").upper().strip()
-        if parsed_filter.categorie:
-            f_cat = parsed_filter.categorie.upper().strip()
-            is_match = (t_cat == f_cat) or (
-                {t_cat, f_cat} <= {"SE", "SENIOR", "SENIORS"}
-            )
-            if not is_match:
+    # 1) Tentative prioritaire de filtrage par niveau / code de compétition (ex: NM3, PNM, R2...)
+    comp_matches = _filter_teams_by_competition(all_teams, filtre)
+    if comp_matches:
+        filtered_teams = comp_matches
+    else:
+        filtered_teams = []
+        for t in all_teams:
+            t_cat = (t.get("categorie") or "").upper().strip()
+            if parsed_filter and parsed_filter.categorie:
+                f_cat = parsed_filter.categorie.upper().strip()
+                is_match = (t_cat == f_cat) or (
+                    {t_cat, f_cat} <= {"SE", "SENIOR", "SENIORS"}
+                )
+                if not is_match:
+                    continue
+            if (
+                parsed_filter
+                and parsed_filter.sexe == "F"
+                and (t.get("sexe") or "").upper() == "M"
+            ):
                 continue
-        if parsed_filter.sexe == "F" and (t.get("sexe") or "").upper() == "M":
-            continue
-        if parsed_filter.sexe == "M" and (t.get("sexe") or "").upper() == "F":
-            continue
-        filtered_teams.append(t)
+            if (
+                parsed_filter
+                and parsed_filter.sexe == "M"
+                and (t.get("sexe") or "").upper() == "F"
+            ):
+                continue
+            filtered_teams.append(t)
 
-    if parsed_filter.numero_equipe is not None:
-        want_num = str(parsed_filter.numero_equipe)
-        exact_matches = [
-            t
-            for t in filtered_teams
-            if (t.get("numero_equipe") or "").strip() == want_num
-        ]
-
-        if exact_matches:
-            filtered_teams = exact_matches
-        else:
-            empty_num_matches = [
-                t for t in filtered_teams if not (t.get("numero_equipe") or "").strip()
+        if parsed_filter and parsed_filter.numero_equipe is not None:
+            want_num = str(parsed_filter.numero_equipe)
+            exact_matches = [
+                t
+                for t in filtered_teams
+                if (t.get("numero_equipe") or "").strip() == want_num
             ]
-            if empty_num_matches:
-                filtered_teams = empty_num_matches
-                for t in filtered_teams:
-                    t["note"] = (
-                        "équipe sans numéro explicite, correspond potentiellement à ce numéro"
-                    )
+
+            if exact_matches:
+                filtered_teams = exact_matches
             else:
-                filtered_teams = []
+                empty_num_matches = [
+                    t
+                    for t in filtered_teams
+                    if not (t.get("numero_equipe") or "").strip()
+                ]
+                if empty_num_matches:
+                    filtered_teams = empty_num_matches
+                    for t in filtered_teams:
+                        t["note"] = (
+                            "équipe sans numéro explicite, correspond potentiellement à ce numéro"
+                        )
+                else:
+                    filtered_teams = []
 
     if not filtered_teams:
         suggestions = sorted(list({t["team_label"] for t in all_teams}))
@@ -309,8 +477,6 @@ async def ffbb_equipes_club_service(
                 "hint": "Utilise l'un des labels suggérés pour une précision exacte.",
             }
         ]
-        if _eq_key is not None:
-            state.cache_equipes[_eq_key] = copy.deepcopy(_error_result)
         return _error_result
 
     if _eq_key is not None:
