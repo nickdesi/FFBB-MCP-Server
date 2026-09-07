@@ -61,3 +61,6 @@
 ## 2024-05-14 - [Optimize Regex Category Parsing]
 **Learning:** Initializing regular expressions with `re.IGNORECASE` incurs pure Python execution overhead on every regex match in `parse_categorie`.
 **Action:** Replace `re.IGNORECASE` by compiling regexes in uppercase format, and convert the input string to uppercase once before running the exact match patterns. This yields a significant performance improvement by delegating case-insensitivity to a single fast-path string operation.
+## 2024-09-07 - [Jaro-Winkler Substring Fast-Path]
+**Learning:** In nested character-matching loops like Jaro-Winkler string similarity, skipping the inner loop with a C-level fast-path substring check (e.g., `if s1_i not in s2[start:end]: continue`) significantly reduces pure Python execution overhead for missing characters.
+**Action:** Always insert substring membership checks (`in` or `not in`) before iterating over character sequences in algorithms where partial mismatches are frequent.
