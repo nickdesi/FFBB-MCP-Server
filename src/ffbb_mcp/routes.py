@@ -95,7 +95,7 @@ Allow: /docs/
 
 Sitemap: {base_url}/sitemap.xml
 
-# AI Search & GEO Discovery (Perplexity, Gemini, ChatGPT, Claude)
+# AI Search & GEO Discovery (Perplexity, Google AI, OpenAI, Anthropic, Apple)
 User-agent: PerplexityBot
 Allow: /
 
@@ -111,7 +111,19 @@ Allow: /
 User-agent: ChatGPT-User
 Allow: /
 
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
 User-agent: Claude-Web
+Allow: /
+
+User-agent: Applebot-Extended
 Allow: /
 
 # Aggressive Model-Training Scrapers
