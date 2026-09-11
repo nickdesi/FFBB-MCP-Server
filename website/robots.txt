@@ -4,7 +4,7 @@ Allow: /docs/
 
 Sitemap: https://ffbb.desimone.fr/sitemap.xml
 
-# AI Search & GEO Discovery (Perplexity, Gemini, ChatGPT, Claude)
+# AI Search & GEO Discovery (Perplexity, Google AI, OpenAI, Anthropic, Apple)
 User-agent: PerplexityBot
 Allow: /
 
@@ -20,13 +20,26 @@ Allow: /
 User-agent: ChatGPT-User
 Allow: /
 
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
 User-agent: Claude-Web
 Allow: /
 
-# Aggressive Model-Training Scrapers
+User-agent: Applebot-Extended
+Allow: /
+
+# Aggressive Training Scrapers
 User-agent: Bytespider
 Disallow: /
 
 User-agent: CCBot
 Disallow: /
+
 
