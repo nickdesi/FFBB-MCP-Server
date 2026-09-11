@@ -197,7 +197,7 @@ def format_team_name(name: str | None, number: int | str | None) -> str:
         num_int = int(number)
         if num_int > 1:
             return f"{name} - {num_int}"
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         pass
 
     return name
@@ -431,6 +431,11 @@ def jaro_winkler_similarity(s1: str, s2: str) -> float:
             end = len2
 
         s1_i = s1[i]
+
+        # ⚡ Bolt: Fast-path substring check before inner matching loop
+        if s1_i not in s2[start:end]:
+            continue
+
         for j in range(start, end):
             # ⚡ Bolt: Fast-path string character equality check before list index lookup
             if s1_i == s2[j] and not s2_matches[j]:
