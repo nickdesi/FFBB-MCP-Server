@@ -63,7 +63,7 @@ jobs:
         if: steps.current.outputs.version != steps.new.outputs.version
         run: |
           uv sync --all-extras
-          uv run pytest tests/test_schema_parity.py -v
+          uv run pytest tests/test_schema_parity.py -v --no-cov
           uv run pytest
 
       - name: Update AGENTS.md documentation
