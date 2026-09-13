@@ -287,8 +287,57 @@ def test_club_matches_api_route(client):
         assert len(data["matches"]) == 1
         assert data["matches"][0]["ffbbMatchId"] == "m123"
         assert data["matches"][0]["team"] == "SENIOR M1"
-        assert data["matches"][0]["isHome"] is True
+        assert data["matches"][0]["poule"] == ""
+        assert data["matches"][0]["pouleId"] == "101"
+        assert data["matches"][0]["time"] == "20:30"
         assert (
             data["matches"][0]["location"]
             == "GYMNASE THEVENET - 9 Rue Albert Mallet, 63000 Clermont-Ferrand"
         )
+
+
+def test_club_matches_api_horaire_tbd(client):
+    """Teste que horaire='0' renvoie 'Horaire à fixer' et que poule.nom est projeté."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    mock_client = MagicMock()
+    mock_org = MagicMock()
+    mock_org.nom = "SCBA"
+    mock_org.logo = None
+
+    mock_eng = MagicMock()
+    mock_eng.idPoule = MagicMock(id=200000003057825)
+    mock_eng.idCompetition = MagicMock(nom="U13M Poule Haute")
+    mock_org.engagements = [mock_eng]
+
+    mock_poule = MagicMock()
+    mock_poule.nom = "Poule Haute 2"
+    mock_rencontre = MagicMock()
+    mock_rencontre.id = "m456"
+    mock_rencontre.nomEquipe1 = "SCBA 2"
+    mock_rencontre.nomEquipe2 = "BEAUMONT"
+    mock_rencontre.idOrganismeEquipe1 = "9326"
+    mock_rencontre.idOrganismeEquipe2 = "9999"
+    mock_rencontre.date = "2026-11-15"
+    mock_rencontre.horaire = "0"
+    mock_rencontre.salle = None
+    mock_poule.rencontres = [mock_rencontre]
+
+    mock_client.get_organisme_async = AsyncMock(return_value=mock_org)
+    mock_client.get_poule_async = AsyncMock(return_value=mock_poule)
+
+    with (
+        patch("ffbb_mcp.client.get_client_async", AsyncMock(return_value=mock_client)),
+        patch(
+            "ffbb_mcp.services.salle._enrich_matches_with_salle_details",
+            AsyncMock(),
+        ),
+    ):
+        response = client.get("/api/v1/club/9326/matches")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["matches"]) == 1
+        m = data["matches"][0]
+        assert m["time"] == "Horaire à fixer"
+        assert m["poule"] == "Poule Haute 2"
+        assert m["pouleId"] == "200000003057825"

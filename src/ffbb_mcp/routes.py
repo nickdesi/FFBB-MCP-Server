@@ -507,21 +507,52 @@ def register_routes(mcp: FastMCP) -> None:
                     num = "1"
             return f"SENIOR M{num}"
 
-        for eng in engagements:
+        sem = asyncio.Semaphore(10)
+
+        async def _fetch_poule_data(eng: Any) -> tuple[Any, str, str, list[Any]]:
             poule_obj = getattr(eng, "idPoule", None)
             comp_obj = getattr(eng, "idCompetition", None)
             poule_id = getattr(poule_obj, "id", None) or (
                 str(poule_obj) if poule_obj else None
             )
             comp_nom = getattr(comp_obj, "nom", "") or ""
-
             if not poule_id:
-                continue
+                return (None, "", "", [])
+            async with sem:
+                try:
+                    poule = await client.get_poule_async(poule_id=int(poule_id))
+                    rencontres = getattr(poule, "rencontres", []) or []
+                    poule_nom_val = getattr(poule, "nom", None)
+                    p_nom = getattr(poule_obj, "nom", None)
+                    if isinstance(poule_nom_val, str):
+                        poule_nom = poule_nom_val
+                    elif isinstance(p_nom, str):
+                        poule_nom = p_nom
+                    else:
+                        poule_nom = ""
+                    return (
+                        str(poule_id),
+                        str(comp_nom) if isinstance(comp_nom, str) else "",
+                        poule_nom,
+                        rencontres,
+                    )
+                except Exception:
+                    return (
+                        str(poule_id),
+                        str(comp_nom) if isinstance(comp_nom, str) else "",
+                        "",
+                        [],
+                    )
 
-            try:
-                poule = await client.get_poule_async(poule_id=int(poule_id))
-                rencontres = getattr(poule, "rencontres", []) or []
-            except Exception:
+        poule_results = await asyncio.gather(
+            *[_fetch_poule_data(eng) for eng in engagements], return_exceptions=True
+        )
+
+        for res in poule_results:
+            if not isinstance(res, tuple) or len(res) != 4:
+                continue
+            poule_id, comp_nom, poule_nom, rencontres = res
+            if not rencontres:
                 continue
 
             for m in rencontres:
@@ -567,18 +598,19 @@ def register_routes(mcp: FastMCP) -> None:
 
                 import re
 
-                time_str = "15:00"
-                horaire = str(getattr(m, "horaire", "") or "")
-                if horaire:
-                    h_clean = re.sub(r"[hH:]", "", horaire).strip()
+                horaire_raw = str(getattr(m, "horaire", "") or "").strip()
+                if horaire_raw in ("0", "00:00", "00h00", ""):
+                    time_str = "Horaire à fixer"
+                else:
+                    h_clean = re.sub(r"[hH:]", "", horaire_raw).strip()
                     if len(h_clean) == 4:
                         time_str = f"{h_clean[:2]}:{h_clean[2:]}"
                     elif len(h_clean) == 2:
                         time_str = f"{h_clean}:00"
-                elif " " in date_raw:
-                    time_part = date_raw.split(" ")[1][:5]
-                    if ":" in time_part:
-                        time_str = time_part
+                    elif " " in date_raw and ":" in date_raw.split(" ")[1]:
+                        time_str = date_raw.split(" ")[1][:5]
+                    else:
+                        time_str = "Horaire à fixer"
 
                 match_data = {
                     "ffbbMatchId": m_id,
@@ -592,6 +624,8 @@ def register_routes(mcp: FastMCP) -> None:
                     else f"Extérieur ({opponent})",
                     "isHome": is_home,
                     "competition": comp_nom,
+                    "poule": poule_nom,
+                    "pouleId": str(poule_id) if poule_id else "",
                     "teamLogo": club_logo_url,
                     "salle": getattr(m, "salle", None),
                     "opp_org_id": opp_org_id,
@@ -629,9 +663,9 @@ def register_routes(mcp: FastMCP) -> None:
             logo_results = await asyncio.gather(
                 *[_fetch_logo(oid) for oid in opp_org_ids], return_exceptions=True
             )
-            for res in logo_results:
-                if isinstance(res, tuple) and len(res) == 2:
-                    org_id, logo_url = res
+            for logo_res in logo_results:
+                if isinstance(logo_res, tuple) and len(logo_res) == 2:
+                    org_id, logo_url = logo_res
                     if (
                         isinstance(org_id, str)
                         and isinstance(logo_url, str)
