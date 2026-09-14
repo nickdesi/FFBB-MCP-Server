@@ -1119,29 +1119,8 @@ async def ffbb_resolve_team_service(
             "club_resolu": club_resolu,
         }
 
-    # 3) Matching intelligent du numéro
-    from .club import _parse_division_code
-
+    # 3) Application des filtres explicites de désambiguïsation par ordre de priorité strict
     candidates = list(equipes)
-    parsed = parse_categorie(categorie)
-    is_division = _parse_division_code(categorie) is not None
-    raw_num = (
-        numero_equipe
-        if numero_equipe is not None
-        else (
-            kwargs.get("numero_equipe")
-            if kwargs.get("numero_equipe") is not None
-            else (parsed.numero_equipe if not is_division else None)
-        )
-    )
-    target_num = str(raw_num) if raw_num is not None else None
-
-    # On cherche d'abord le numéro exact, fallback sur équipe sans numéro
-    matched = _resolve_team_number(candidates, target_num)
-    if matched:
-        candidates = matched
-
-    # 3.5) Application des filtres explicites de désambiguïsation
     if engagement_id is not None:
         target_eng_id = str(engagement_id).strip()
         candidates = [
@@ -1149,6 +1128,14 @@ async def ffbb_resolve_team_service(
             for c in candidates
             if str(c.get("engagement_id") or c.get("team_id") or "").strip()
             == target_eng_id
+        ]
+
+    if poule_id is not None:
+        target_poule_id = str(poule_id).strip()
+        candidates = [
+            c
+            for c in candidates
+            if str(c.get("poule_id") or "").strip() == target_poule_id
         ]
 
     if competition_id is not None:
@@ -1167,13 +1154,26 @@ async def ffbb_resolve_team_service(
             if str(c.get("competition_type") or "").strip().upper() == target_comp_type
         ]
 
-    if poule_id is not None:
-        target_poule_id = str(poule_id).strip()
-        candidates = [
-            c
-            for c in candidates
-            if str(c.get("poule_id") or "").strip() == target_poule_id
-        ]
+    # 3.5) Matching intelligent du numéro
+    from .club import _parse_division_code
+
+    parsed = parse_categorie(categorie)
+    is_division = _parse_division_code(categorie) is not None
+    raw_num = (
+        numero_equipe
+        if numero_equipe is not None
+        else (
+            kwargs.get("numero_equipe")
+            if kwargs.get("numero_equipe") is not None
+            else (parsed.numero_equipe if not is_division else None)
+        )
+    )
+    target_num = str(raw_num) if raw_num is not None else None
+
+    # On cherche d'abord le numéro exact, fallback sur équipe sans numéro
+    matched = _resolve_team_number(candidates, target_num)
+    if matched:
+        candidates = matched
 
     # Déduplication sémantique : uniquement au sein d'une MÊME compétition
     candidates = _deduplicate_same_team_phases(candidates)

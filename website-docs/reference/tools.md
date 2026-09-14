@@ -1,19 +1,31 @@
 # 📚 Référence Complète des Outils FFBB MCP
 
-> Version courante : **1.12.0**
+> Version courante : **1.12.1**
 
 Ce document fournit une documentation technique exhaustive pour les outils exposés par le serveur FFBB MCP. Il est destiné aux développeurs et aux agents IA pour comprendre les capacités et les schémas de données du serveur.
 
-## ✨ Nouveautés v1.11.0
+## ✨ Nouveautés v1.12.1
 
 | # | Amélioration | Impact |
 | --- | --- | --- |
-| 1 | **Résolution divisions seniors & régionales (`NM3`, `NF1`, `RM2`, `DM1`)** — Parsing robuste dans `parse_categorie` pour reconnaître les niveaux de divisions sans altérer le numéro d'équipe. | `ffbb_bilan_saison`, `ffbb_resolve_team`, `ffbb_club` |
-| 2 | **Déduplication des poules amicales/tournois** — Déduplication stricte par `poule_id` pour éliminer les doublons de statistiques dans `bilan_total`. | `ffbb_bilan_saison` |
-| 3 | **Filtrage strict des rencontres en direct (`ffbb_lives`)** — Prédicat `_is_live_match` retournant `[]` en l'absence de match en cours + option `include_scheduled`. | `ffbb_lives` |
-| 4 | **Indicateur de fiabilité horaire (`horaire_renseigne`)** — Flag booléen pour détecter et neutraliser les faux horaires (`"0"`, `"00:00:00"`). | `ffbb_next_match`, `ffbb_last_result`, `ffbb_club` |
-| 5 | **Polymorphisme des alias H2H** — Support de `club_name` / `adversaire` et `organisme_id` / `adversaire_id`. | `ffbb_head_to_head` |
-| 6 | **Herméticité des Linters (`pyright>=1.1.414`)** — Dépendance dev verrouillée, éliminant les warnings de version. | Environnement Dev & CI |
+| 1 | **Publication exhaustive des paramètres MCP** — `offset`, `engagement_id`, `competition_id`, `competition_type`, `poule_id`, `season_id` officiellement déclarés dans les schémas JSON Schema exposés aux clients. | Tous les outils d'équipe, `ffbb_search`, `ffbb_club` |
+| 2 | **Uniformisation des identifiants (`str | None`)** — Tous les IDs FFBB sont standardisés sous forme de chaînes de caractères pour une interopérabilité parfaite avec les clients stricts. | Tous les outils |
+| 3 | **Priorité stricte de résolution** — `engagement_id` > `poule_id` > `competition_id` > `competition_type` > `categorie` + `numero_equipe` > `ambiguous`. | `ffbb_resolve_team`, `ffbb_club`, outils d'équipe |
+| 4 | **Flexibilité d'invocation `anyOf`** — Possibilité d'invoquer les outils d'équipe directement avec n'importe quel identifiant unique (`engagement_id`, `poule_id`, `competition_id`) sans `club_name` ni `categorie` obligatoires. | Outils d'équipe, `ffbb_club`, `ffbb_head_to_head` |
+
+---
+
+## ✨ Nouveautés v1.12.0
+
+| # | Amélioration | Impact |
+| --- | --- | --- |
+| 1 | **Enveloppe paginée uniforme (`items` + `_meta`)** — Standardisation de la structure de réponse avec pagination prévisible et métadonnées (`total`, `returned`, `has_more`, `next_offset`, `sort`). | `ffbb_search`, `ffbb_club(action='calendrier')` |
+| 2 | **Modélisation temporelle stricte des rencontres** — Gestion propre des dates sans horaire confirmé (`scheduled_at: null`, `time_confirmed: false`). | `ffbb_club`, `ffbb_next_match`, `ffbb_last_result` |
+| 3 | **Sécurisation de la résolution d'équipe** — Retour `status="ambiguous"` avec `candidates` et `clarification_prompt` au lieu d'une résolution arbitraire en cas de candidatures multiples. | `ffbb_resolve_team`, outils d'équipe |
+
+---
+
+## ✨ Nouveautés v1.11.0
 
 ---
 
@@ -394,7 +406,7 @@ la logique de désambiguïsation (U11M1, U13F-2, etc.).
 
   ```jsonc
   {
-    "package_version": "1.12.0",       // version du package ffbb-mcp
+    "package_version": "1.12.1",       // version du package ffbb-mcp
     "mcp_sdk_version": "1.27.0",      // version du SDK MCP Python installé
     "python_version": "3.12.9",       // version de l'interpréteur Python
     "transport": "streamable-http",   // "streamable-http" ou "stdio"

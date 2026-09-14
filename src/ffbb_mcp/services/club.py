@@ -703,6 +703,38 @@ async def _resolve_team_equipes(
             club_resolu,
         )
 
+    # Application des filtres de désambiguïsation explicites par ordre de priorité strict
+    if engagement_id is not None:
+        target_eng = str(engagement_id).strip()
+        equipes = [
+            e
+            for e in equipes
+            if str(e.get("engagement_id") or e.get("team_id") or "").strip()
+            == target_eng
+        ]
+
+    if poule_id is not None:
+        target_poule = str(poule_id).strip()
+        equipes = [
+            e for e in equipes if str(e.get("poule_id") or "").strip() == target_poule
+        ]
+
+    if competition_id is not None:
+        target_comp = str(competition_id).strip()
+        equipes = [
+            e
+            for e in equipes
+            if str(e.get("competition_id") or "").strip() == target_comp
+        ]
+
+    if competition_type is not None:
+        target_type = str(competition_type).strip().upper()
+        equipes = [
+            e
+            for e in equipes
+            if str(e.get("competition_type") or "").strip().upper() == target_type
+        ]
+
     if numero_equipe is not None:
         want = str(numero_equipe)
         filtered = [
@@ -732,38 +764,6 @@ async def _resolve_team_equipes(
                 club_resolu,
             )
         equipes = filtered
-
-    # Application des filtres de désambiguïsation explicites
-    if engagement_id is not None:
-        target_eng = str(engagement_id).strip()
-        equipes = [
-            e
-            for e in equipes
-            if str(e.get("engagement_id") or e.get("team_id") or "").strip()
-            == target_eng
-        ]
-
-    if competition_id is not None:
-        target_comp = str(competition_id).strip()
-        equipes = [
-            e
-            for e in equipes
-            if str(e.get("competition_id") or "").strip() == target_comp
-        ]
-
-    if competition_type is not None:
-        target_type = str(competition_type).strip().upper()
-        equipes = [
-            e
-            for e in equipes
-            if str(e.get("competition_type") or "").strip().upper() == target_type
-        ]
-
-    if poule_id is not None:
-        target_poule = str(poule_id).strip()
-        equipes = [
-            e for e in equipes if str(e.get("poule_id") or "").strip() == target_poule
-        ]
 
     if not equipes:
         return (

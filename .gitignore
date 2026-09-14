@@ -33,3 +33,5 @@ src/ffbb_mcp/acronyms_cache.json
 
 # Local Agent Customizations
 .agents/
+scratch/
+.vscode/

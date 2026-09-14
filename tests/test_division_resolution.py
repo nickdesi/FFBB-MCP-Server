@@ -399,7 +399,7 @@ async def test_ffbb_club_classement_with_division_filter():
             200000002677671, "NM3", phase_query=None
         )
         mock_classement.assert_called_once_with(
-            poule_id=200000003054381,
+            poule_id="200000003054381",
             force_refresh=False,
             target_organisme_id=200000002677671,
             target_num=None,

@@ -243,8 +243,8 @@ async def test_ffbb_get_competition_via_call_tool():
         new_callable=AsyncMock,
         return_value=fake_comp,
     ) as mock_svc:
-        result = await mcp.call_tool("ffbb_get", {"id": 42, "type": "competition"})
-        mock_svc.assert_called_once_with(competition_id=42)
+        result = await mcp.call_tool("ffbb_get", {"id": "42", "type": "competition"})
+        mock_svc.assert_called_once_with(competition_id="42")
         content_list, _structured = result
         assert content_list, "FastMCP doit renvoyer au moins un TextContent"
         payload = json.loads(content_list[0].text)
@@ -514,15 +514,20 @@ async def test_tool_schemas_conformance_and_token_budget():
         tool = tools_map[tool_name]
         any_of = tool.inputSchema.get("anyOf")
         assert any_of == [
-            {"required": ["club_name"]},
             {"required": ["organisme_id"]},
+            {"required": ["club_name"]},
+            {"required": ["engagement_id"]},
+            {"required": ["poule_id"]},
+            {"required": ["competition_id"]},
         ], f"anyOf manquant ou incorrect sur {tool_name}"
 
-    # 2. Vérification anyOf sur ffbb_club (inclut poule_id)
+    # 2. Vérification anyOf sur ffbb_club (inclut poule_id, engagement_id, competition_id)
     assert tools_map["ffbb_club"].inputSchema.get("anyOf") == [
-        {"required": ["club_name"]},
         {"required": ["organisme_id"]},
+        {"required": ["club_name"]},
         {"required": ["poule_id"]},
+        {"required": ["engagement_id"]},
+        {"required": ["competition_id"]},
     ]
 
     # 3. Vérification de la suppression d'outputSchema inutile

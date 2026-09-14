@@ -375,13 +375,17 @@ async def ffbb_search(
 @track_tool_usage("ffbb_bilan")
 @zipai_surgical
 async def ffbb_bilan(
+    organisme_id: Annotated[
+        str | None,
+        Field(
+            description="ID FFBB du club (ex: '9326' ou 'ARA0063058'). Requis si club_name absent."
+        ),
+    ] = None,
     club_name: Annotated[
         str | None,
-        Field(description="Nom du club (ex: 'Stade Clermontois', 'ASVEL')."),
-    ] = None,
-    organisme_id: Annotated[
-        int | str | None,
-        Field(description="ID FFBB du club (ex: 9326)."),
+        Field(
+            description="Nom du club (ex: 'Stade Clermontois', 'ASVEL'). Requis si organisme_id absent."
+        ),
     ] = None,
     categorie: Annotated[
         str | None,
@@ -392,11 +396,11 @@ async def ffbb_bilan(
         Field(description="Numéro d'équipe (ex: 1, 2)."),
     ] = None,
     engagement_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de l'engagement (prioritaire pour désambiguïser)."),
     ] = None,
     competition_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de la compétition pour désambiguïser."),
     ] = None,
     competition_type: Annotated[
@@ -406,11 +410,11 @@ async def ffbb_bilan(
         ),
     ] = None,
     poule_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de la poule pour désambiguïser."),
     ] = None,
     season_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID de la saison FFBB (optionnel)."),
     ] = None,
     force_refresh: Annotated[
@@ -466,7 +470,7 @@ async def ffbb_bilan(
 @zipai_surgical
 async def ffbb_get(
     id: Annotated[
-        int | str,
+        str,
         Field(
             description=(
                 "Identifiant FFBB exact (string opaque, ex: '200000003057825'). Ne pas passer un nom de club: "
@@ -565,31 +569,21 @@ async def ffbb_club(
         Field(
             description="Action : 'calendrier' (matchs pluriels/restants), 'equipes' ou 'classement'."
         ),
-    ],
+    ] = "calendrier",
+    organisme_id: Annotated[
+        str | None,
+        Field(description="ID FFBB du club (ex: '9326'). Requis si club_name absent."),
+    ] = None,
     club_name: Annotated[
         str | None,
         Field(
             description="Nom du club (ex: 'Stade Clermontois'). Requis si organisme_id absent."
         ),
     ] = None,
-    organisme_id: Annotated[
-        int | str | None,
-        Field(description="ID FFBB du club (ex: 9326). Requis si club_name absent."),
-    ] = None,
-    filtre: Annotated[
-        str | None,
-        Field(description="Filtre catégorie/genre (ex: 'U11M', 'Senior', 'NM3')."),
-    ] = None,
-    adversaire: Annotated[
+    categorie: Annotated[
         str | None,
         Field(
-            description="Nom adversaire pour filtrer les confrontations directes (action='calendrier')."
-        ),
-    ] = None,
-    poule_id: Annotated[
-        int | str | None,
-        Field(
-            description="ID poule (action='classement'). Optionnel si club et catégorie sont fournis."
+            description="Catégorie, division ou filtre d'équipe (alias pour 'filtre', ex: 'NM3', 'U15M', 'Senior').",
         ),
     ] = None,
     numero_equipe: Annotated[
@@ -598,17 +592,29 @@ async def ffbb_club(
             description="Numéro d'équipe (ex: 1, 2) pour action='calendrier' ou 'classement'."
         ),
     ] = None,
-    phase: Annotated[
+    engagement_id: Annotated[
         str | None,
-        Field(description="Nom ou numéro de phase (ex: 'Phase 2')."),
+        Field(description="ID FFBB de l'engagement (prioritaire pour désambiguïser)."),
     ] = None,
-    date_debut: Annotated[
+    competition_id: Annotated[
         str | None,
-        Field(description="Date début YYYY-MM-DD (action='calendrier')."),
+        Field(description="ID FFBB de la compétition pour désambiguïser."),
     ] = None,
-    date_fin: Annotated[
+    competition_type: Annotated[
         str | None,
-        Field(description="Date fin YYYY-MM-DD (action='calendrier')."),
+        Field(
+            description="Type de compétition ('PLAT', 'COUPE', etc.) pour désambiguïser."
+        ),
+    ] = None,
+    poule_id: Annotated[
+        str | None,
+        Field(
+            description="ID poule (action='classement' ou 'calendrier'). Optionnel si club et catégorie sont fournis."
+        ),
+    ] = None,
+    season_id: Annotated[
+        str | None,
+        Field(description="ID de la saison FFBB (optionnel)."),
     ] = None,
     limit: Annotated[
         int | None,
@@ -629,29 +635,29 @@ async def ffbb_club(
         bool,
         Field(description="Si True, contourne le cache."),
     ] = False,
-    categorie: Annotated[
+    filtre: Annotated[
         str | None,
         Field(
-            description="Catégorie, division ou filtre d'équipe (alias pour 'filtre', ex: 'NM3', 'U15M', 'Senior').",
+            description="Filtre catégorie/genre (alias pour 'categorie', ex: 'U11M', 'Senior', 'NM3')."
         ),
     ] = None,
-    engagement_id: Annotated[
-        int | str | None,
-        Field(description="ID FFBB de l'engagement (prioritaire pour désambiguïser)."),
-    ] = None,
-    competition_id: Annotated[
-        int | str | None,
-        Field(description="ID FFBB de la compétition pour désambiguïser."),
-    ] = None,
-    competition_type: Annotated[
+    adversaire: Annotated[
         str | None,
         Field(
-            description="Type de compétition ('PLAT', 'COUPE', etc.) pour désambiguïser."
+            description="Nom adversaire pour filtrer les confrontations directes (action='calendrier')."
         ),
     ] = None,
-    season_id: Annotated[
-        int | str | None,
-        Field(description="ID de la saison FFBB (optionnel)."),
+    phase: Annotated[
+        str | None,
+        Field(description="Nom ou numéro de phase (ex: 'Phase 2')."),
+    ] = None,
+    date_debut: Annotated[
+        str | None,
+        Field(description="Date début YYYY-MM-DD (action='calendrier')."),
+    ] = None,
+    date_fin: Annotated[
+        str | None,
+        Field(description="Date fin YYYY-MM-DD (action='calendrier')."),
     ] = None,
 ) -> list[dict[str, Any]] | list[CalendrierMatch] | dict[str, Any]:
     """Outils agrégés club : calendrier (matchs pluriels), équipes engagées ou classement.
@@ -792,7 +798,7 @@ async def ffbb_club(
                     target_org_id, search_filtre or "", phase_query=phase
                 )
                 if resolved_pid:
-                    effective_poule_id = int(resolved_pid)
+                    effective_poule_id = str(resolved_pid)
 
             if not effective_poule_id:
                 if phase:
@@ -898,13 +904,13 @@ async def ffbb_get_saisons(
 @track_tool_usage("ffbb_resolve_team")
 @zipai_surgical
 async def ffbb_resolve_team(
+    organisme_id: Annotated[
+        str | None,
+        Field(description="ID FFBB du club (alternative plus rapide à club_name)."),
+    ] = None,
     club_name: Annotated[
         str | None,
         Field(description="Nom du club (ex: 'Stade Clermontois', 'ASVEL')."),
-    ] = None,
-    organisme_id: Annotated[
-        int | str | None,
-        Field(description="ID FFBB du club (alternative plus rapide à club_name)."),
     ] = None,
     categorie: Annotated[
         str | None,
@@ -920,11 +926,11 @@ async def ffbb_resolve_team(
         Field(description="Numéro d'équipe facultatif (ex: 1, 2)."),
     ] = None,
     engagement_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de l'engagement (prioritaire pour désambiguïser)."),
     ] = None,
     competition_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de la compétition pour désambiguïser."),
     ] = None,
     competition_type: Annotated[
@@ -934,11 +940,11 @@ async def ffbb_resolve_team(
         ),
     ] = None,
     poule_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de la poule pour désambiguïser."),
     ] = None,
     season_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID de la saison FFBB (optionnel)."),
     ] = None,
     force_refresh: Annotated[
@@ -983,13 +989,13 @@ async def ffbb_resolve_team(
 @track_tool_usage("ffbb_team_summary")
 @zipai_surgical
 async def ffbb_team_summary(
+    organisme_id: Annotated[
+        str | None,
+        Field(description="ID FFBB du club (alternative plus rapide à club_name)."),
+    ] = None,
     club_name: Annotated[
         str | None,
         Field(description="Nom du club (ex: 'Stade Clermontois', 'ASVEL')."),
-    ] = None,
-    organisme_id: Annotated[
-        int | str | None,
-        Field(description="ID FFBB du club (alternative plus rapide à club_name)."),
     ] = None,
     categorie: Annotated[
         str | None,
@@ -998,17 +1004,17 @@ async def ffbb_team_summary(
         ),
     ] = None,
     numero_equipe: Annotated[
-        int,
+        int | None,
         Field(
             description="Numéro d'équipe dans la catégorie (ex: 1, 2).",
         ),
-    ] = 1,
+    ] = None,
     engagement_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de l'engagement (prioritaire pour désambiguïser)."),
     ] = None,
     competition_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de la compétition pour désambiguïser."),
     ] = None,
     competition_type: Annotated[
@@ -1018,11 +1024,11 @@ async def ffbb_team_summary(
         ),
     ] = None,
     poule_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de la poule pour désambiguïser."),
     ] = None,
     season_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID de la saison FFBB (optionnel)."),
     ] = None,
     force_refresh: Annotated[
@@ -1212,33 +1218,33 @@ async def ffbb_team_summary(
 @track_tool_usage("ffbb_last_result")
 @zipai_surgical
 async def ffbb_last_result(
-    categorie: Annotated[
-        str,
+    organisme_id: Annotated[
+        str | None,
         Field(
-            description="Catégorie de l'équipe précise (ex: 'U11M1', 'U11M', 'U11F')"
+            description="Identifiant FFBB du club (organisme_id, ex: '9326' ou 'ARA0063058')."
         ),
-    ],
+    ] = None,
     club_name: Annotated[
         str | None, Field(description="Nom du club (ex: 'Stade Clermontois')")
     ] = None,
-    organisme_id: Annotated[
-        int | str | None,
+    categorie: Annotated[
+        str | None,
         Field(
-            description="Identifiant FFBB du club (organisme_id, ex: 1234 ou 'ARA0063058')"
+            description="Catégorie de l'équipe précise (ex: 'U11M1', 'U11M', 'SEM1', 'NM3')."
         ),
     ] = None,
     numero_equipe: Annotated[
-        int,
+        int | None,
         Field(
             description="Numéro d'équipe dans la catégorie. Résoudre avec ffbb_resolve_team si ambigu."
         ),
-    ] = 1,
+    ] = None,
     engagement_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de l'engagement (prioritaire pour désambiguïser)."),
     ] = None,
     competition_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de la compétition pour désambiguïser."),
     ] = None,
     competition_type: Annotated[
@@ -1248,11 +1254,11 @@ async def ffbb_last_result(
         ),
     ] = None,
     poule_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de la poule pour désambiguïser."),
     ] = None,
     season_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID de la saison FFBB (optionnel)."),
     ] = None,
     force_refresh: Annotated[
@@ -1267,19 +1273,20 @@ async def ffbb_last_result(
     appeler d'abord `ffbb_resolve_team` pour obtenir le `numero_equipe` reel.
     """
 
-    if club_name is None and organisme_id is None:
+    if not any((club_name, organisme_id, engagement_id, poule_id, competition_id)):
         return {
             "status": "error",
-            "message": "Veuillez fournir club_name ou organisme_id pour trouver l'équipe.",
+            "message": "Veuillez fournir un identifiant (club_name, organisme_id, engagement_id ou poule_id) pour trouver l'équipe.",
         }
 
     try:
         effective_refresh = force_refresh
+        effective_num = numero_equipe if numero_equipe is not None else 1
         return await ffbb_last_result_service(
             club_name=club_name,
             organisme_id=organisme_id,
-            categorie=categorie,
-            numero_equipe=numero_equipe,
+            categorie=categorie or "",
+            numero_equipe=effective_num,
             engagement_id=engagement_id,
             competition_id=competition_id,
             competition_type=competition_type,
@@ -1304,33 +1311,33 @@ async def ffbb_last_result(
 @track_tool_usage("ffbb_next_match")
 @zipai_surgical
 async def ffbb_next_match(
-    categorie: Annotated[
-        str,
+    organisme_id: Annotated[
+        str | None,
         Field(
-            description="Catégorie de l'équipe précise (ex: 'U11M1', 'U11M', 'U11F')"
+            description="Identifiant FFBB du club (organisme_id, ex: '9326' ou 'ARA0063058')."
         ),
-    ],
+    ] = None,
     club_name: Annotated[
         str | None, Field(description="Nom du club (ex: 'Stade Clermontois')")
     ] = None,
-    organisme_id: Annotated[
-        int | str | None,
+    categorie: Annotated[
+        str | None,
         Field(
-            description="Identifiant FFBB du club (organisme_id, ex: 1234 ou 'ARA0063058')"
+            description="Catégorie de l'équipe précise (ex: 'U11M1', 'U11M', 'SEM1', 'NM3')."
         ),
     ] = None,
     numero_equipe: Annotated[
-        int,
+        int | None,
         Field(
             description="Numéro d'équipe dans la catégorie. Résoudre avec ffbb_resolve_team si ambigu."
         ),
-    ] = 1,
+    ] = None,
     engagement_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de l'engagement (prioritaire pour désambiguïser)."),
     ] = None,
     competition_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de la compétition pour désambiguïser."),
     ] = None,
     competition_type: Annotated[
@@ -1340,11 +1347,11 @@ async def ffbb_next_match(
         ),
     ] = None,
     poule_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de la poule pour désambiguïser."),
     ] = None,
     season_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID de la saison FFBB (optionnel)."),
     ] = None,
     force_refresh: Annotated[
@@ -1367,18 +1374,19 @@ async def ffbb_next_match(
     appeler d'abord `ffbb_resolve_team` pour obtenir le `numero_equipe` reel.
     """
 
-    if club_name is None and organisme_id is None:
+    if not any((club_name, organisme_id, engagement_id, poule_id, competition_id)):
         return {
             "status": "error",
-            "message": "Veuillez fournir club_name ou organisme_id pour trouver l'équipe.",
+            "message": "Veuillez fournir un identifiant (club_name, organisme_id, engagement_id ou poule_id) pour trouver l'équipe.",
         }
 
     try:
+        effective_num = numero_equipe if numero_equipe is not None else 1
         return await ffbb_next_match_service(
             club_name=club_name,
             organisme_id=organisme_id,
-            categorie=categorie,
-            numero_equipe=numero_equipe,
+            categorie=categorie or "",
+            numero_equipe=effective_num,
             engagement_id=engagement_id,
             competition_id=competition_id,
             competition_type=competition_type,
@@ -1403,13 +1411,13 @@ async def ffbb_next_match(
 @track_tool_usage("ffbb_bilan_saison")
 @zipai_surgical
 async def ffbb_bilan_saison(
+    organisme_id: Annotated[
+        str | None,
+        Field(description="ID FFBB du club (alternative plus rapide à club_name)."),
+    ] = None,
     club_name: Annotated[
         str | None,
         Field(description="Nom du club (ex: 'Stade Clermontois', 'ASVEL')."),
-    ] = None,
-    organisme_id: Annotated[
-        int | str | None,
-        Field(description="ID FFBB du club (alternative plus rapide à club_name)."),
     ] = None,
     categorie: Annotated[
         str | None,
@@ -1427,13 +1435,13 @@ async def ffbb_bilan_saison(
                 "Numéro d'équipe (1, 2, ...) pour identifier l'équipe précise dans la catégorie (défaut: 1)."
             )
         ),
-    ] = 1,
+    ] = None,
     engagement_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de l'engagement (prioritaire pour désambiguïser)."),
     ] = None,
     competition_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de la compétition pour désambiguïser."),
     ] = None,
     competition_type: Annotated[
@@ -1443,11 +1451,11 @@ async def ffbb_bilan_saison(
         ),
     ] = None,
     poule_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de la poule pour désambiguïser."),
     ] = None,
     season_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID de la saison FFBB (optionnel)."),
     ] = None,
     force_refresh: Annotated[
@@ -1521,15 +1529,15 @@ async def ffbb_head_to_head(
         Field(description="Nom du premier club (ex: 'Stade Clermontois')."),
     ] = None,
     organisme_id_a: Annotated[
-        int | str | None,
-        Field(description="ID FFBB du premier club (ex: 9326)."),
+        str | None,
+        Field(description="ID FFBB du premier club (ex: '9326')."),
     ] = None,
     club_b: Annotated[
         str | None,
         Field(description="Nom du second club / adversaire (ex: 'Vichy', 'Roanne')."),
     ] = None,
     organisme_id_b: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB du second club / adversaire."),
     ] = None,
     categorie: Annotated[
@@ -1538,42 +1546,22 @@ async def ffbb_head_to_head(
             description="Catégorie d'équipe commune à comparer (ex: 'SEM1', 'U18M', 'Senior').",
         ),
     ] = None,
-    club_name: Annotated[
-        str | None,
-        Field(
-            description="Alias pour club_a : nom du premier club (ex: 'Stade Clermontois')."
-        ),
-    ] = None,
-    organisme_id: Annotated[
-        int | str | None,
-        Field(description="Alias pour organisme_id_a : ID FFBB du premier club."),
-    ] = None,
-    adversaire: Annotated[
-        str | None,
-        Field(
-            description="Alias pour club_b : nom du second club / adversaire (ex: 'Vichy')."
-        ),
-    ] = None,
-    adversaire_id: Annotated[
-        int | str | None,
-        Field(
-            description="Alias pour organisme_id_b : ID FFBB du second club / adversaire."
-        ),
-    ] = None,
-    engagement_id: Annotated[
-        int | str | None,
-        Field(description="ID FFBB de l'engagement (prioritaire pour désambiguïser)."),
-    ] = None,
     engagement_id_a: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de l'engagement équipe A (prioritaire)."),
     ] = None,
     engagement_id_b: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de l'engagement équipe B (prioritaire)."),
     ] = None,
+    engagement_id: Annotated[
+        str | None,
+        Field(
+            description="ID FFBB de l'engagement partagé ou équipe A (alias pour engagement_id_a)."
+        ),
+    ] = None,
     competition_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de la compétition pour désambiguïser."),
     ] = None,
     competition_type: Annotated[
@@ -1583,17 +1571,39 @@ async def ffbb_head_to_head(
         ),
     ] = None,
     poule_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID FFBB de la poule pour désambiguïser."),
     ] = None,
     season_id: Annotated[
-        int | str | None,
+        str | None,
         Field(description="ID de la saison FFBB (optionnel)."),
     ] = None,
     force_refresh: Annotated[
         bool,
         Field(description="Si True, force le rafraîchissement des données"),
     ] = False,
+    club_name: Annotated[
+        str | None,
+        Field(
+            description="Alias pour club_a : nom du premier club (ex: 'Stade Clermontois')."
+        ),
+    ] = None,
+    organisme_id: Annotated[
+        str | None,
+        Field(description="Alias pour organisme_id_a : ID FFBB du premier club."),
+    ] = None,
+    adversaire: Annotated[
+        str | None,
+        Field(
+            description="Alias pour club_b : nom du second club / adversaire (ex: 'Vichy')."
+        ),
+    ] = None,
+    adversaire_id: Annotated[
+        str | None,
+        Field(
+            description="Alias pour organisme_id_b : ID FFBB du second club / adversaire."
+        ),
+    ] = None,
     ctx: Context[Any, Any, Any] | None = None,
 ) -> dict[str, Any]:
     """Compare deux équipes et analyse leurs confrontations directes (H2H).
@@ -1644,15 +1654,16 @@ async def ffbb_head_to_head(
 def _optimize_tool_schemas(mcp_instance: FastMCP) -> None:
     """Optimise les schémas JSON des outils MCP et élimine l'empreinte token superflue.
 
-    1. anyOf inter-arguments : indique formellement aux agents IA qu'au moins un identifiant
-       de club (club_name ou organisme_id) est obligatoire avant l'appel d'outil.
+    1. anyOf inter-arguments : indique formellement aux agents IA qu'au moins un critère
+       d'identification (organisme_id, club_name, engagement_id, poule_id, competition_id)
+       est requis pour cibler l'équipe ou le club.
     2. Suppression d'output_schema : FastMCP génère des milliers de caractères de schémas
        Pydantic internes inutilisés par les clients MCP pour invoquer des outils.
     """
     tools_map = getattr(mcp_instance._tool_manager, "_tools", {})
 
-    # Outils nécessitant au moins club_name OU organisme_id
-    club_disambiguation_tools = (
+    # Outils d'équipe acceptant organisme_id, club_name, engagement_id, poule_id ou competition_id
+    team_disambiguation_tools = (
         "ffbb_resolve_team",
         "ffbb_bilan",
         "ffbb_team_summary",
@@ -1660,15 +1671,18 @@ def _optimize_tool_schemas(mcp_instance: FastMCP) -> None:
         "ffbb_last_result",
         "ffbb_next_match",
     )
-    for tool_name in club_disambiguation_tools:
+    for tool_name in team_disambiguation_tools:
         tool = tools_map.get(tool_name)
         if tool and hasattr(tool, "parameters") and isinstance(tool.parameters, dict):
             tool.parameters["anyOf"] = [
-                {"required": ["club_name"]},
                 {"required": ["organisme_id"]},
+                {"required": ["club_name"]},
+                {"required": ["engagement_id"]},
+                {"required": ["poule_id"]},
+                {"required": ["competition_id"]},
             ]
 
-    # ffbb_club accepte soit club_name, soit organisme_id, soit poule_id (pour le classement)
+    # ffbb_club accepte soit organisme_id, club_name, poule_id, engagement_id ou competition_id
     club_tool = tools_map.get("ffbb_club")
     if (
         club_tool
@@ -1676,8 +1690,27 @@ def _optimize_tool_schemas(mcp_instance: FastMCP) -> None:
         and isinstance(club_tool.parameters, dict)
     ):
         club_tool.parameters["anyOf"] = [
+            {"required": ["organisme_id"]},
+            {"required": ["club_name"]},
+            {"required": ["poule_id"]},
+            {"required": ["engagement_id"]},
+            {"required": ["competition_id"]},
+        ]
+
+    # ffbb_head_to_head accepte soit club_a/organisme_id_a/club_name/organisme_id/engagement_id
+    h2h_tool = tools_map.get("ffbb_head_to_head")
+    if (
+        h2h_tool
+        and hasattr(h2h_tool, "parameters")
+        and isinstance(h2h_tool.parameters, dict)
+    ):
+        h2h_tool.parameters["anyOf"] = [
+            {"required": ["club_a"]},
+            {"required": ["organisme_id_a"]},
             {"required": ["club_name"]},
             {"required": ["organisme_id"]},
+            {"required": ["engagement_id_a"]},
+            {"required": ["engagement_id"]},
             {"required": ["poule_id"]},
         ]
 

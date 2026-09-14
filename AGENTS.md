@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB MCP server | server.py: 1759 lignes | services.py: 5946 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 1792 lignes | services.py: 5946 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -136,7 +136,7 @@ src/ffbb_mcp/
 ├── prompts.py             # Prompts MCP réutilisables
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
-├── server.py              # Tools MCP + main() (≈1759 lignes)
+├── server.py              # Tools MCP + main() (≈1792 lignes)
 ├── services/              # Logique métier modularisée (≈5946 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── club.py            # Service de gestion des clubs

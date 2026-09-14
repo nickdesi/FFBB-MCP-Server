@@ -128,7 +128,7 @@ async def test_ffbb_club_classement_with_categorie_auto_resolution():
         )
         mock_resolve_poule.assert_called_once_with(2001, "NM3", phase_query=None)
         mock_classement.assert_called_once_with(
-            poule_id=3001,
+            poule_id="3001",
             force_refresh=False,
             target_organisme_id=2001,
             target_num=None,

@@ -66,7 +66,10 @@ async def test_ffbb_club_equipes_auto_resolution():
         )
         mock_resolve_poule.assert_called_once_with(123, "U11M", phase_query="Phase 3")
         mock_classement.assert_called_once_with(
-            poule_id=456, force_refresh=False, target_organisme_id=123, target_num=None
+            poule_id="456",
+            force_refresh=False,
+            target_organisme_id=123,
+            target_num=None,
         )
         assert result == [{"position": 1, "nom": "Stade Clermontois"}]
 
