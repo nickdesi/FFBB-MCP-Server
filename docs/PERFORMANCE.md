@@ -61,6 +61,30 @@ Cache names currently include:
 
 These metrics allow you to verify that hot paths are effectively cached and to tune TTLs or cache keys if necessary.
 
+### Matrice TTL (source unique : `src/ffbb_mcp/cache_strategy.py` + `services/common.py`)
+
+| Cache | TTL statique | TTL dynamique | Condition | Env override | SWR ? |
+|-------|--------------|---------------|-----------|--------------|-------|
+| `lives` | 15 s | — | Toujours statique ; rafraîchi proactivement toutes les `10 s` en fenêtre match | `FFBB_CACHE_TTL_LIVES` | `15 s` (stale 11 s) |
+| `saisons` | 86 400 s (24 h) | — | Figé, saisons annuelles | `FFBB_CACHE_TTL_SAISONS` | Oui (via TTLCache) |
+| `organisme` / `search` | 43 200 s (12 h) | — | Clubs et index Meilisearch quasi-immuables | `FFBB_CACHE_TTL_DETAIL` / `FFBB_CACHE_TTL_SEARCH` | Oui |
+| `salle` | 604 800 s (7 j) | — | Adresse gymnase immuable | `FFBB_CACHE_TTL_SALLE` | Oui |
+| `competition` | 86 400 s (24 h) | — | Métadonnées compétition | `FFBB_CACHE_TTL_DETAIL` | Oui |
+| `poule` / `classement` | 5 s (fallback) | 86 400 s hors fenêtre · 1 800 s post-match · 15 s si live dans poule · 300 s fenêtre sans live | `is_in_match_window()` (sam-dim 8-21, ven 18-23, mer 13-20) / `is_post_match_cooling()` (dim 21+, lun <10, mer 20+) / `get_lives()` | `FFBB_CACHE_TTL_POULE` | Oui + `get_poule_ttl()` → SWR seuil |
+| `bilan` / `classement` (aggr.) | — | 900 s en fenêtre · 3 600 s hors fenêtre | Même fenêtres que poule, via `get_static_ttl("bilan")` (TLRUCache `_ttu_bilan`) | `FFBB_CACHE_TTL_BILAN` | Oui (fraction 0.75 → refresh à 675 s / 2 700 s) |
+| `calendrier` | — | 300 s en fenêtre · 900 s post-match · 1 800 s hors fenêtre | `get_static_ttl("calendrier")` (TLRUCache `_ttu_calendrier`) | `FFBB_CACHE_TTL_CALENDRIER` | Oui |
+| `rencontre` (détail) | — | 604 800 s si JOU/TERMINE/FORFAIT · 15 s si LIVE · 300 s fenêtre · 3 600 s hors fenêtre | `get_rencontre_ttl(statut)` | — | Oui si `joue=1` figé 7 j |
+| `resolve_club` / `equipes` | 3 600 s | — | Cache normalisé clubs → `organisme_id` | `FFBB_CACHE_TTL_RESOLVE_CLUB` / `FFBB_CACHE_TTL_EQUIPES` | Non (lookup simple) |
+| `HTTP hishel` | 30 s | — | Déduplication réseau stricte concurrent (SQLite `requests_cache`) | `FFBB_CACHE_EXPIRE_AFTER` / `FFBB_CACHE_BACKEND` | Non (couche transport) |
+
+**SWR bornage (R3)** — `FFBB_SWR_ENABLED=1` (défaut) · fraction stale `FFBB_SWR_STALE_FRACTION=0.75` · max `FFBB_SWR_MAX_TASKS=32` tâches concurrentes au-delà duquel le refresh est droppé et compté via `ffbb_swr_dropped_total` (visible `/metrics` + `get_snapshot()["swr_dropped"]`). Métriques dédiées :
+
+- `ffbb_swr_active` (gauge) — SWR en vol
+- `ffbb_swr_total` (counter) — lancées
+- `ffbb_swr_dropped_total` (counter) — abandonnées par limite
+
+Fenêtre match détaillée (`cache_strategy.is_in_match_window`): ven 18-23, sam-dim 8-21, mer 13-20. Cooling (`is_post_match_cooling`): dim ≥21h, lun <10h, mer ≥20h, ven ≥23h.
+
 ## Local benchmarking (fast, mock-based)
 
 Run the lightweight benchmark that measures `ffbb_bilan_service` and `get_calendrier_club_service` using internal mocks:

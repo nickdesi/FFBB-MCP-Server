@@ -102,7 +102,7 @@ def compute_poule_advanced_stats(
             continue
         try:
             s1, s2 = int(str(score1)), int(str(score2))
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             continue
 
         eng1 = r.get("idEngagementEquipe1") or {}
@@ -268,7 +268,7 @@ def compute_head_to_head(
             continue
         try:
             s1, s2 = int(str(score1)), int(str(score2))
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             continue
 
         eq1 = str(r.get("nomEquipe1", "") or "")

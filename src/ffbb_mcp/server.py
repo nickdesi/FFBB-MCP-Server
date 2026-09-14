@@ -18,7 +18,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from ffbb_mcp.models import BilanResponse, CalendrierMatch  # noqa: TC001
+from ffbb_mcp.models import BilanResponse, CalendrierMatch
 
 from . import __version__ as _PACKAGE_VERSION
 from .metrics import record_tool_call
@@ -140,7 +140,7 @@ async def _safe_report_progress(
         return
     try:
         await ctx.report_progress(progress, total=total, message=message)
-    except ValueError, AssertionError:
+    except (ValueError, AssertionError):
         # Hors d'un vrai RequestContext FastMCP ou état dégradé → no-op
         # mais on trace en DEBUG pour ne pas perdre la trace d'un bug.
         logger.debug("progress report skipped", exc_info=True)

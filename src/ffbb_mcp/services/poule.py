@@ -537,7 +537,7 @@ async def ffbb_get_classement_service(
             try:
                 if pos is not None:
                     return (0, int(pos))
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 pass
             return (1, 999999)
 

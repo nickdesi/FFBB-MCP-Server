@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import os
 import random
@@ -31,10 +32,13 @@ async def get_client_async(*args, **kwargs):
 
 from ffbb_mcp.metrics import (
     dec_inflight,
+    dec_swr,
     inc_inflight,
+    inc_swr,
     record_cache_hit,
     record_cache_miss,
     record_call,
+    record_swr_dropped,
 )
 
 if TYPE_CHECKING:
@@ -73,6 +77,9 @@ _SWR_STALE_FRACTION = float(os.environ.get("FFBB_SWR_STALE_FRACTION", "0.75"))
 # Timeout applicatif par tentative d'appel FFBB (sec). Indépendant des
 # timeouts httpx : un appel qui pend ne bloque jamais la réponse MCP.
 _API_TIMEOUT_SECONDS = float(os.environ.get("FFBB_API_TIMEOUT_SECONDS", "30"))
+# Nombre max de tâches SWR concurrentes (CWE-770 / 400). Au-delà, le refresh
+# est abandonné et compté via ffbb_swr_dropped_total.
+_SWR_MAX_TASKS = _read_positive_int_env("FFBB_SWR_MAX_TASKS", 32)
 
 # Hooks simples pour les metrics de cache.
 _cache_hit_hook: Callable[..., None] | None = record_cache_hit
@@ -705,7 +712,7 @@ def _cache_set(cache: Any, key: Any, val: Any, cache_name: str) -> None:
         cache[key] = val
         # Horodatage du dernier fetch réel pour le SWR.
         state.swr_last_fetch[f"{cache_name}:{key}"] = time.monotonic()
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         logger.debug(
             "Impossible d'écrire dans le cache %s",
             cache_name,
@@ -733,15 +740,29 @@ def _swr_schedule(
     make_coro: Callable[[], Any],
     cache: Any = None,
 ) -> None:
-    """Déclenche (fire-and-forget, dédupliqué) un refresh en arrière-plan.
+    """Déclenche (fire-and-forget, dédupliqué, borné) un refresh en arrière-plan.
 
     Si ``cache`` est fourni, le résultat du refresh est (ré)écrit dans le cache,
     ce qui permet d'utiliser cette fonction avec des ``make_coro`` qui ne
     persistent pas eux-mêmes (ex: ``_fetch`` des poules/classements).
+
+    Bornage : si ``len(state.swr_tasks) >= _SWR_MAX_TASKS`` le refresh est
+    abandonné et ``record_swr_dropped`` est incrémenté (observable Prometheus).
     """
     name = f"{cache_name}:{key}"
     existing = state.swr_tasks.get(name)
     if existing is not None and not existing.done():
+        return
+
+    if len(state.swr_tasks) >= _SWR_MAX_TASKS:
+        logger.debug(
+            "SWR: limite atteinte (%d/%d) — refresh '%s' abandonné",
+            len(state.swr_tasks),
+            _SWR_MAX_TASKS,
+            name,
+        )
+        with contextlib.suppress(Exception):
+            record_swr_dropped()
         return
 
     async def _run() -> None:
@@ -753,9 +774,13 @@ def _swr_schedule(
             logger.debug("SWR refresh '%s' échoué", name, exc_info=True)
         finally:
             state.swr_tasks.pop(name, None)
+            with contextlib.suppress(Exception):
+                dec_swr()
 
     try:
         state.swr_tasks[name] = asyncio.ensure_future(_run())
+        with contextlib.suppress(Exception):
+            inc_swr()
     except RuntimeError:
         # Pas de loop en cours (ex: import hors contexte async) → on ignore.
         logger.debug("SWR: impossible de planifier le refresh '%s' (pas de loop)", name)

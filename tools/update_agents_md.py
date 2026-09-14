@@ -220,6 +220,7 @@ ENV_DESCRIPTIONS = {
     "FFBB_API_TIMEOUT_SECONDS": "Timeout en secondes pour les requêtes vers l'API FFBB / Meilisearch",
     "FFBB_SWR_ENABLED": "Activer le Stale-While-Revalidate : servir le cache et rafraîchir en arrière-plan (défaut : 1)",
     "FFBB_SWR_STALE_FRACTION": "Fraction du TTL au-delà de laquelle une entrée est rafraîchie en arrière-plan (défaut : 0.75)",
+    "FFBB_SWR_MAX_TASKS": "Nombre max de tâches SWR concurrentes (défaut : 32)",
     "FFBB_LIVES_REFRESH_INTERVAL": "Intervalle de rafraîchissement proactif des lives en secondes, mode HTTP (défaut : 10)",
     "FFBB_KNOWN_CLUB_IDS": "Override JSON de la liste d'organisme_id connus pour les prompts MCP (fallback : _DEFAULT_KNOWN_CLUB_IDS)",
 }

@@ -42,6 +42,11 @@ _tool_calls: dict[str, int] = {}
 # Gauge : appels FFBB en vol
 _ffbb_inflight: int = 0
 
+# SWR background refresh
+_swr_active: int = 0
+_swr_total: int = 0
+_swr_dropped: int = 0
+
 _metrics_lock = Lock()
 
 
@@ -110,10 +115,35 @@ def record_tool_call(tool_name: str) -> None:
     _mark_dirty()
 
 
+def inc_swr() -> None:
+    """Incrémente SWR active/total."""
+    global _swr_active, _swr_total
+    with _metrics_lock:
+        _swr_active += 1
+        _swr_total += 1
+    _mark_dirty()
+
+
+def dec_swr() -> None:
+    """Décrémente SWR active."""
+    global _swr_active
+    with _metrics_lock:
+        _swr_active = max(0, _swr_active - 1)
+    _mark_dirty()
+
+
+def record_swr_dropped() -> None:
+    """Compteur de SWR drops (limite atteinte)."""
+    global _swr_dropped
+    with _metrics_lock:
+        _swr_dropped += 1
+    _mark_dirty()
+
+
 def reset_metrics() -> None:
     """Réinitialise les métriques en mémoire (usage tests)."""
     global START_TIME, _calls_success, _calls_error, _latency_sum, _latency_count
-    global _ffbb_inflight
+    global _ffbb_inflight, _swr_active, _swr_total, _swr_dropped
     with _metrics_lock:
         START_TIME = time.time()
         _calls_success = 0
@@ -121,6 +151,9 @@ def reset_metrics() -> None:
         _latency_sum = 0.0
         _latency_count = 0
         _ffbb_inflight = 0
+        _swr_active = 0
+        _swr_total = 0
+        _swr_dropped = 0
         for i in range(len(_latency_bucket_counts)):
             _latency_bucket_counts[i] = 0
         _cache_hits.clear()
@@ -150,6 +183,9 @@ def get_snapshot() -> dict[str, Any]:
         lat_count = _latency_count
         lat_buckets = list(_latency_bucket_counts)
         inflight = _ffbb_inflight
+        swr_active = _swr_active
+        swr_total = _swr_total
+        swr_dropped = _swr_dropped
         hits = dict(_cache_hits)
         misses = dict(_cache_misses)
         miss_reasons = dict(_cache_miss_reasons)
@@ -181,6 +217,9 @@ def get_snapshot() -> dict[str, Any]:
         "api_latency_count": lat_count,
         "api_latency_buckets": lat_buckets,
         "api_inflight_requests": inflight,
+        "swr_active": swr_active,
+        "swr_total": swr_total,
+        "swr_dropped": swr_dropped,
         "cache": cache_stats,
         "cache_miss_reasons": miss_reasons,
         "tool_calls": tool_calls,
@@ -293,6 +332,27 @@ def generate_prometheus_metrics() -> str:
             ],
         )
 
+    lines += (
+        _prom_block(
+            "ffbb_swr_active",
+            "Nombre de tâches SWR en cours",
+            "gauge",
+            f"ffbb_swr_active {snap.get('swr_active', 0)}",
+        )
+        + _prom_block(
+            "ffbb_swr_total",
+            "Total des tâches SWR lancées",
+            "counter",
+            f"ffbb_swr_total {snap.get('swr_total', 0)}",
+        )
+        + _prom_block(
+            "ffbb_swr_dropped_total",
+            "Total des tâches SWR abandonnées (limite atteinte)",
+            "counter",
+            f"ffbb_swr_dropped_total {snap.get('swr_dropped', 0)}",
+        )
+    )
+
     return "\n".join(lines) + "\n"
 
 
@@ -373,6 +433,9 @@ def _save_metrics_to_disk() -> None:
                     f"{k[0]}|{k[1]}": v for k, v in _cache_miss_reasons.items()
                 },
                 "tool_calls": _tool_calls,
+                "swr_active": _swr_active,
+                "swr_total": _swr_total,
+                "swr_dropped": _swr_dropped,
             }
 
         # Écriture atomique
@@ -434,6 +497,7 @@ def load_metrics() -> None:
         _latency_sum, \
         _latency_count
     global _cache_hits, _cache_misses, _cache_miss_reasons, _tool_calls
+    global _swr_active, _swr_total, _swr_dropped
 
     metrics_file = _get_metrics_file()
     if not metrics_file.exists():
@@ -463,12 +527,18 @@ def load_metrics() -> None:
                     _cache_miss_reasons[(parts[0], parts[1])] = v
 
             _tool_calls.update(data.get("tool_calls", {}))
+
+            _swr_active = int(data.get("swr_active", 0))
+            _swr_total = int(data.get("swr_total", 0))
+            _swr_dropped = int(data.get("swr_dropped", 0))
         logger.info(
-            "Métriques chargées avec succès : %d succès / %d erreurs, %d hits de cache, %d misses",
+            "Métriques chargées avec succès : %d succès / %d erreurs, %d hits de cache, %d misses, swr %d/%d",
             _calls_success,
             _calls_error,
             sum(_cache_hits.values()),
             sum(_cache_misses.values()),
+            _swr_active,
+            _swr_total,
         )
     except Exception as e:
         logger.error("Erreur de chargement des métriques depuis le disque : %s", e)

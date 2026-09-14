@@ -7,7 +7,7 @@ name = "ffbb-mcp-server"
 version = "1.12.6"
 description = "MCP Server for FFBB (Fédération Française de Basketball) data"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
 dependencies = [
     "mcp[cli]>=1.28.1,<2.0.0",
@@ -65,7 +65,7 @@ filterwarnings = [
 
 [tool.ruff]
 line-length = 88
-target-version = "py314"
+target-version = "py312"
 exclude = [
     ".agent",
     ".git",

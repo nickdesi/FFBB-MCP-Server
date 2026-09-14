@@ -82,7 +82,7 @@ def compute_team_dynamique(
 
         try:
             s1, s2 = int(str(score1)), int(str(score2))
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             continue
 
         # Déterminer quel côté est notre équipe
