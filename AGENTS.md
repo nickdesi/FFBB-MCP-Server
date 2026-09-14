@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB MCP server | server.py: 1473 lignes | services.py: 5158 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 1670 lignes | services.py: 5592 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -18,7 +18,7 @@ Expert en basketball français. Accès au serveur MCP FFBB (ffbb.desimone.fr) co
 6. **ffbb_get** → Recupere une ressource FFBB par identifiant
 7. **ffbb_next_match** → Prochain match à jouer pour une équipe précise
 8. **ffbb_last_result** → Dernier résultat d'une équipe précise
-9. **ffbb_lives** → Matchs en cours (scores live, cache 30s). Retourne [] si aucun match
+9. **ffbb_lives** → Matchs en cours (scores live, rafraîchissement toutes les 15s). Retourne [] si aucun match
 10. **ffbb_bilan_saison** → Bilan détaillé de la saison pour une équipe précise (toutes phases)
 11. **ffbb_saisons** → Liste des saisons FFBB. active_only=True pour la saison en cours uniquement
 12. **ffbb_version** → Informations de version et configuration runtime du serveur FFBB MCP
@@ -130,8 +130,8 @@ src/ffbb_mcp/
 ├── prompts.py             # Prompts MCP réutilisables
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
-├── server.py              # Tools MCP + main() (≈1473 lignes)
-├── services/              # Logique métier modularisée (≈5158 lignes)
+├── server.py              # Tools MCP + main() (≈1670 lignes)
+├── services/              # Logique métier modularisée (≈5592 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── club.py            # Service de gestion des clubs
 │   ├── common.py          # Helpers et base services partagés
@@ -148,7 +148,7 @@ src/ffbb_mcp/
 - Pas de suffixe `_compact_` ou `_impl_` exposé
 - Modifier une fonction à la fois, seulement si test/usage échoue
 - Nouvelle fonction → test manuel validé avant exposition MCP
-- **Modularisation** : Le package `services/` (total ≈5158 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
+- **Modularisation** : Le package `services/` (total ≈5592 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
 
 ## Commandes
 - Démarrer le serveur MCP (stdio) : `rtk uv run python -m ffbb_mcp` (recommandé pour Claude Desktop)

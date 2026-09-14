@@ -189,6 +189,11 @@ async def test_ffbb_saison_bilan_poule_deduplication():
             new_callable=AsyncMock,
             return_value=fake_poule,
         ),
+        patch(
+            "ffbb_mcp.services.get_organisme_service",
+            new_callable=AsyncMock,
+            return_value={"id": 123, "nom": "CS PONT DU CHATEAU"},
+        ),
     ):
         res = await ffbb_saison_bilan_service(
             organisme_id=123,

@@ -83,11 +83,11 @@ def test_get_cache_ttls_calendrier_dynamic_report(mock_get_static):
 
 def test_get_static_ttl_calendrier_adaptive():
     with patch("ffbb_mcp.cache_strategy.datetime") as mock_datetime:
-        mock_datetime.now.return_value = datetime(2025, 1, 7, 12, 0)  # mardi
-        assert get_static_ttl("calendrier") == 86_400
+        mock_datetime.now.return_value = datetime(2025, 1, 7, 12, 0)  # mardi hors match
+        assert get_static_ttl("calendrier") == 1_800
 
         mock_datetime.now.return_value = datetime(2025, 1, 6, 9, 0)  # lundi post-match
-        assert get_static_ttl("calendrier") == 1_800
+        assert get_static_ttl("calendrier") == 900
 
         mock_datetime.now.return_value = datetime(2025, 1, 4, 10, 0)  # samedi live
         assert get_static_ttl("calendrier") == 300
@@ -112,5 +112,5 @@ def test_get_rencontre_ttl():
     assert get_rencontre_ttl(None) == 300
     assert get_rencontre_ttl({"statut": "JOU"}) == 604_800
     assert get_rencontre_ttl({"statut": "TERMINE"}) == 604_800
-    assert get_rencontre_ttl({"statut": "LIVE"}) == 30
-    assert get_rencontre_ttl({"statut": "EN_COURS"}) == 30
+    assert get_rencontre_ttl({"statut": "LIVE"}) == 15
+    assert get_rencontre_ttl({"statut": "EN_COURS"}) == 15

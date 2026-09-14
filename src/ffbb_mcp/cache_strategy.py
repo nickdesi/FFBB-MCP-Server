@@ -73,12 +73,12 @@ async def get_poule_ttl(
 # Cache TTLs constants
 _STATIC_TTLS = {
     "lives": 15,
-    "organisme": 86_400,
-    "search": 86_400,
+    "organisme": 43_200,  # 12h
+    "search": 43_200,  # 12h
     "poule": 5,  # 5s fallback; TTL dynamique via get_poule_ttl() ajuste selon matches en cours
     "salle": 604_800,  # 7 jours (immuable)
-    "saisons": 2_592_000,  # 30 jours (quasi immuable)
-    "competitions": 2_592_000,  # 30 jours
+    "saisons": 86_400,  # 24h
+    "competitions": 86_400,  # 24h
 }
 
 
@@ -92,11 +92,11 @@ def get_rencontre_ttl(rencontre_data: dict | None = None) -> int:
         return 604_800  # 7 jours
     # Match en cours / live
     if statut in ("LIVE", "EN_COURS"):
-        return 30  # 30s
+        return 15  # 15s
     # Match futur
     if is_in_match_window():
         return 300
-    return 86_400
+    return 3_600
 
 
 # TTLs statiques pour les autres caches
@@ -108,13 +108,13 @@ def get_static_ttl(cache_name: str) -> int:
         return val
 
     if cache_name == "bilan" or cache_name == "classement":
-        return 1_800 if is_in_match_window() else 86_400
+        return 900 if is_in_match_window() else 3_600
 
     if cache_name == "calendrier":
         if is_in_match_window():
             return 300
         if is_post_match_cooling():
-            return 1_800
-        return 86_400
+            return 900
+        return 1_800
 
     return 3_600  # fallback 1h

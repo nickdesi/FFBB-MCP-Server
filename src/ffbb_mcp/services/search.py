@@ -62,29 +62,59 @@ def _phase_sort_key(e: dict) -> tuple[int, int, int]:
     return (is_elimination, phase_num, niveau)
 
 
-def _deduplicate_same_team_phases(candidates: list[dict]) -> list[dict]:
-    """Déduplique les candidats qui sont la même équipe à travers différentes phases.
+_PHASE_PATTERN = re.compile(
+    r"\s*[-–]\s*(phase\s*\d+|1/\d+\s*finales?|demi[- ]finales?|quarts?|finales?|poules?|brassage|plateaux?)\b.*",  # noqa: RUF001
+    re.IGNORECASE,
+)
 
-    Si tous les candidats partagent le même nom_equipe (normalisé),
-    ils représentent la même équipe dans des phases successives.
-    On retourne uniquement l'entrée de la phase la plus avancée.
+
+def _extract_base_competition_name(comp_name: str) -> str:
+    if not comp_name:
+        return ""
+    base = _PHASE_PATTERN.sub("", comp_name).strip()
+    return _normalize_name(base)
+
+
+def _is_coupe_competition(comp_name: str, comp_type: str | None) -> bool:
+    if comp_type and comp_type.upper() == "COUPE":
+        return True
+    norm = _normalize_name(comp_name)
+    return (
+        "COUPE" in norm or "CHALLENGE" in norm or "TROFEE" in norm or "TROPHEE" in norm
+    )
+
+
+def _deduplicate_same_team_phases(candidates: list[dict]) -> list[dict]:
+    """Déduplique les candidats qui sont la même équipe au sein de la MÊME compétition (phases successives).
+
+    Ne déduplique JAMAIS si les candidats appartiennent à des compétitions ou types de compétition distincts
+    (ex: Championnat vs Coupe ARA).
     """
     if len(candidates) <= 1:
         return candidates
 
-    # Vérifier si tous les candidats ont le même nom_equipe
-    noms = [
-        _normalize_name(c.get("nom_equipe") or c.get("team_label") or "")
-        for c in candidates
-    ]
-    unique_noms = {n for n in noms if n}
+    # Regrouper par (team_name, is_coupe, base_competition_name)
+    # Les phases d'un même championnat pour une même équipe partagent (nom_equipe, False)
+    groups: dict[tuple[str, bool, str], list[dict]] = {}
+    for c in candidates:
+        team_name = _normalize_name(c.get("nom_equipe") or c.get("team_label") or "")
+        comp_name = c.get("competition") or c.get("competition_code") or ""
+        comp_type = c.get("competition_type")
+        is_coupe = _is_coupe_competition(comp_name, comp_type)
+        base_comp = _extract_base_competition_name(comp_name)
 
-    if len(unique_noms) <= 1:
-        # Même équipe → retourner uniquement la phase la plus avancée
-        best = max(candidates, key=_phase_sort_key)
-        return [best]
+        key = (team_name, is_coupe, base_comp if is_coupe else "")
+        groups.setdefault(key, []).append(c)
 
-    return candidates
+    deduped: list[dict] = []
+    for group in groups.values():
+        if len(group) == 1:
+            deduped.append(group[0])
+        else:
+            best = max(group, key=_phase_sort_key)
+            deduped.append(best)
+
+    return deduped
 
 
 # Mots génériques qui n'identifient pas un club de manière distinctive.
@@ -132,6 +162,7 @@ _GENERIC_CLUB_WORDS: frozenset[str] = frozenset(
 
 # Mapping de configuration pour les types de recherche non exposés individuellement.
 _SEARCH_TYPE_METHOD: dict[str, str] = {
+    "organismes": "search_organismes_async",
     "competitions": "search_competitions_async",
     "salles": "search_salles_async",
     "rencontres": "search_rencontres_async",
@@ -446,92 +477,35 @@ async def resolve_club_and_org(
     return result
 
 
-def _build_search_results(results: Any, limit: int) -> list[dict]:
-    """Construit la liste de résultats et attache _total_hits si troncature."""
-    if not results or not results.hits:
-        return []
-    result_list = [serialize_model(hit) for hit in results.hits[:limit]]
-    total = getattr(results, "estimated_total_hits", None)
-    if total is not None and total > len(result_list):
-        for item in result_list:
-            item["_total_hits"] = total
-    return result_list
-
-
-async def _search_generic(
-    operation: str,
-    method_name: str,
-    query: str,
-    limit: int = 20,
-    filter_by: str | None = None,
-    sort: list[str] | None = None,
-) -> list[dict]:
-    normalized_query = normalize_query(query)
-    filter_part = filter_by or ""
-    sort_part = ",".join(sort) if sort else ""
-    cache_key = (
-        f"search:{operation}:{normalized_query}:{limit}:{filter_part}:{sort_part}"
-    )
-
-    async def _fetch() -> list[dict]:
-        client = await get_client_async()
-        method = getattr(client, method_name)
-        call_kwargs: dict[str, Any] = {}
-        if filter_by:
-            call_kwargs["filter_by"] = filter_by
-        if sort:
-            call_kwargs["sort"] = sort
-        results = await _with_ffbb_semaphore(
-            _safe_call_with_inflight(
-                f"Search {operation}: {query}",
-                lambda: method(normalized_query, **call_kwargs),
-            )
-        )
-        if not results or not results.hits:
-            # Fallback : essayer les variantes de requête
-            fallbacks = _build_fallback_queries(query)
-            for fb in fallbacks:
-                if fb == query:
-                    continue
-                results = await _with_ffbb_semaphore(
-                    _safe_call_with_inflight(
-                        f"Search {operation} (fallback): {fb}",
-                        lambda fb=fb: method(fb, **call_kwargs),
-                    )
-                )
-                if results and results.hits:
-                    return _build_search_results(results, limit)
-            return []
-        return _build_search_results(results, limit)
-
-    return await _dedupe_inflight(
-        cache=state.cache_search,
-        cache_key=cache_key,
-        inflight_map=state.inflight_search,
-        make_coro=_fetch,
-        cache_name="search",
-    )
-
-
-async def search_organismes_service(
-    nom: str,
-    limit: int = 20,
-    filter_by: str | None = None,
-    sort: list[str] | None = None,
-) -> list[dict]:
-    return await _search_generic(
-        "organismes", "search_organismes_async", nom, limit, filter_by, sort
-    )
-
-
 from ffbb_data_client.config import (
     MEILISEARCH_INDEX_COMPETITIONS,
+    MEILISEARCH_INDEX_ENGAGEMENTS,
+    MEILISEARCH_INDEX_FORMATIONS,
+    MEILISEARCH_INDEX_GALERIES,
+    MEILISEARCH_INDEX_NEWS,
     MEILISEARCH_INDEX_ORGANISMES,
+    MEILISEARCH_INDEX_PRATIQUES,
     MEILISEARCH_INDEX_RENCONTRES,
+    MEILISEARCH_INDEX_RSS,
     MEILISEARCH_INDEX_SALLES,
     MEILISEARCH_INDEX_TERRAINS,
     MEILISEARCH_INDEX_TOURNOIS,
 )
+
+_SEARCH_INDEX_MAP: dict[str, str] = {
+    "organismes": MEILISEARCH_INDEX_ORGANISMES,
+    "competitions": MEILISEARCH_INDEX_COMPETITIONS,
+    "rencontres": MEILISEARCH_INDEX_RENCONTRES,
+    "salles": MEILISEARCH_INDEX_SALLES,
+    "pratiques": MEILISEARCH_INDEX_PRATIQUES,
+    "terrains": MEILISEARCH_INDEX_TERRAINS,
+    "tournois": MEILISEARCH_INDEX_TOURNOIS,
+    "engagements": MEILISEARCH_INDEX_ENGAGEMENTS,
+    "formations": MEILISEARCH_INDEX_FORMATIONS,
+    "news": MEILISEARCH_INDEX_NEWS,
+    "galeries": MEILISEARCH_INDEX_GALERIES,
+    "rss": MEILISEARCH_INDEX_RSS,
+}
 
 _PRIMARY_SEARCH_INDEXES = {
     MEILISEARCH_INDEX_ORGANISMES,
@@ -547,6 +521,173 @@ _ALL_CANDIDATE_SEARCH_INDEXES = [
     MEILISEARCH_INDEX_TERRAINS,
     MEILISEARCH_INDEX_TOURNOIS,
 ]
+
+
+def _build_search_results(results: Any, limit: int, offset: int = 0) -> list[dict]:
+    """Construit la liste de résultats et attache _total_hits si pagination/troncature."""
+    if not results or not getattr(results, "hits", None):
+        return []
+    result_list = [serialize_model(hit) for hit in results.hits[:limit]]
+    total = getattr(results, "estimated_total_hits", None)
+    if total is not None:
+        for item in result_list:
+            item["_total_hits"] = total
+            item["_offset"] = offset
+    return result_list
+
+
+async def _search_generic(
+    type_name: str,
+    query: str,
+    limit: int = 20,
+    offset: int = 0,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
+    force_refresh: bool = False,
+) -> list[dict[str, Any]]:
+    from ffbb_data_client.models import MultiSearchQuery
+
+    normalized_query = normalize_query(query)
+    filter_part = filter_by or ""
+    sort_part = ",".join(sort) if sort else ""
+    cache_key = f"search:{type_name}:{normalized_query}:{limit}:{offset}:{filter_part}:{sort_part}"
+
+    async def _fetch() -> list[dict[str, Any]]:
+        client = await get_client_async()
+
+        # Si une méthode de recherche directe existe sur le client (ex: search_organismes_async)
+        method_name = _SEARCH_TYPE_METHOD.get(type_name)
+        direct_method: Any = getattr(client, method_name, None) if method_name else None
+        if direct_method and callable(direct_method):
+            try:
+
+                async def _invoke_direct() -> Any:
+                    import inspect
+
+                    try:
+                        res: Any = direct_method(query, limit=limit)
+                    except TypeError:
+                        res = direct_method(nom=query, limit=limit)
+                    if inspect.isawaitable(res):
+                        return await res  # type: ignore[no-any-return]
+                    return res
+
+                direct_res = await _with_ffbb_semaphore(
+                    _safe_call_with_inflight(
+                        f"Search direct {type_name}: {query}",
+                        _invoke_direct,
+                    )
+                )
+                if direct_res is not None and getattr(direct_res, "hits", None):
+                    return _build_search_results(direct_res, limit, offset)
+            except Exception:
+                pass
+
+        index_uid = _SEARCH_INDEX_MAP.get(type_name, type_name)
+        filter_list = [filter_by] if filter_by else None
+        q = [
+            MultiSearchQuery(
+                index_uid=index_uid,
+                q=normalized_query,
+                limit=limit,
+                offset=offset,
+                filter=filter_list,
+                sort=sort,
+            )
+        ]
+
+        def _call_ms(queries: Any) -> Any:
+            meili = getattr(client, "_meilisearch", None)
+            if (
+                meili
+                and hasattr(meili, "multi_search_async")
+                and callable(meili.multi_search_async)
+            ):
+                return meili.multi_search_async(queries)
+            if hasattr(client, "multi_search_async") and callable(
+                client.multi_search_async
+            ):
+                return client.multi_search_async(queries)
+            return client._meilisearch.multi_search_async(queries)
+
+        results = await _with_ffbb_semaphore(
+            _safe_call_with_inflight(
+                f"Search {type_name}: {query}",
+                lambda: _call_ms(q),
+            )
+        )
+        if (
+            not results
+            or not getattr(results, "results", None)
+            or not results.results[0].hits
+        ):
+            # Fallback : essayer les variantes de requête
+            fallbacks = _build_fallback_queries(query)
+            for fb in fallbacks:
+                if fb == query:
+                    continue
+                q_fb = [
+                    MultiSearchQuery(
+                        index_uid=index_uid,
+                        q=normalize_query(fb),
+                        limit=limit,
+                        offset=offset,
+                        filter=filter_list,
+                        sort=sort,
+                    )
+                ]
+                results = await _with_ffbb_semaphore(
+                    _safe_call_with_inflight(
+                        f"Search {type_name} (fallback): {fb}",
+                        lambda q_target=q_fb: _call_ms(q_target),
+                    )
+                )
+                if (
+                    results
+                    and getattr(results, "results", None)
+                    and results.results[0].hits
+                ):
+                    break
+
+        if not results or not getattr(results, "results", None):
+            return []
+
+        res0 = results.results[0]
+        hits = [serialize_model(h) for h in res0.hits]
+        total = getattr(res0, "estimated_total_hits", len(hits))
+        if total is not None:
+            for item in hits:
+                item["_total_hits"] = total
+                item["_offset"] = offset
+        return hits
+
+    return await _dedupe_inflight(
+        cache=state.cache_search,
+        cache_key=cache_key,
+        inflight_map=state.inflight_search,
+        make_coro=_fetch,
+        cache_name="search",
+        force_refresh=force_refresh,
+    )
+
+
+async def search_organismes_service(
+    nom: str,
+    limit: int = 20,
+    offset: int = 0,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
+    force_refresh: bool = False,
+) -> list[dict[str, Any]]:
+    return await _search_generic(
+        "organismes",
+        nom,
+        limit=limit,
+        offset=offset,
+        filter_by=filter_by,
+        sort=sort,
+        force_refresh=force_refresh,
+    )
 
 
 def _build_multi_search_queries(
@@ -598,11 +739,16 @@ async def _execute_multi_search_with_self_healing(
     active_indexes = list(state.active_search_indexes)
     queries = _build_multi_search_queries(active_indexes, normalized_query, limit)
 
+    def _call_ms(q_list: Any) -> Any:
+        if hasattr(client, "multi_search_async") and callable(
+            client.multi_search_async
+        ):
+            return client.multi_search_async(q_list)
+        return client._meilisearch.multi_search_async(q_list)
+
     try:
         return await _with_ffbb_semaphore(
-            _safe_call_with_inflight(
-                f"Multi-search: {nom}", lambda: client.multi_search_async(queries)
-            )
+            _safe_call_with_inflight(f"Multi-search: {nom}", lambda: _call_ms(queries))
         )
     except Exception as e:
         logger.warning(
@@ -642,12 +788,16 @@ async def _execute_multi_search_with_self_healing(
         return await _with_ffbb_semaphore(
             _safe_call_with_inflight(
                 f"Multi-search (auto-healed): {nom}",
-                lambda: client.multi_search_async(recovered_queries),
+                lambda: _call_ms(recovered_queries),
             )
         )
 
 
-async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]]:
+async def multi_search_service(
+    nom: str,
+    limit: int = 20,
+    force_refresh: bool = False,
+) -> list[dict[str, Any]]:
     normalized_query = normalize_query(nom)
     cache_key = f"multi_search:{normalized_query}:{limit}"
 
@@ -687,28 +837,48 @@ async def multi_search_service(nom: str, limit: int = 20) -> list[dict[str, Any]
         inflight_map=state.inflight_search,
         make_coro=_fetch,
         cache_name="search",
+        force_refresh=force_refresh,
     )
 
 
-def _add_truncation_meta(result: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Ajoute un objet _meta en tête de liste si les résultats sont tronqués."""
+def _add_truncation_meta(
+    result: list[dict[str, Any]],
+    limit: int = 20,
+    offset: int = 0,
+) -> list[dict[str, Any]]:
+    """Ajoute un objet _meta en tête de liste pour documenter le total et la pagination."""
     if not result:
         return result
     total = result[0].pop("_total_hits", None)
+    result_offset = result[0].pop("_offset", offset)
     for item in result[1:]:
         item.pop("_total_hits", None)
+        item.pop("_offset", None)
+
     if total is not None and total > len(result):
+        has_more = (result_offset + len(result)) < total
+        next_offset = (result_offset + len(result)) if has_more else None
+        meta_dict = {
+            "total": total,
+            "returned": len(result),
+            "limit": limit,
+            "offset": result_offset,
+            "has_more": has_more,
+            "next_offset": next_offset,
+            "truncated": True,
+            "message": f"{total} résultat(s) au total, {len(result)} retourné(s) (offset={result_offset}).",
+        }
         result.insert(
             0,
             {
-                "_meta": True,
+                "_meta": meta_dict,
                 "total": total,
                 "returned": len(result),
+                "limit": limit,
+                "offset": result_offset,
+                "has_more": has_more,
+                "next_offset": next_offset,
                 "truncated": True,
-                "message": (
-                    f"{total} résultats trouvés, {len(result)} retournés. "
-                    "Utilisez ffbb_club(action='calendrier') pour les données complètes."
-                ),
             },
         )
     return result
@@ -719,31 +889,53 @@ async def ffbb_search_service(
     type: str = "all",
     query: str,
     limit: int = 20,
+    offset: int = 0,
     filter_by: str | None = None,
     sort: list[str] | None = None,
+    force_refresh: bool = False,
 ) -> list[dict[str, Any]]:
-    """Service de recherche FFBB.
+    """Service de recherche FFBB unifié avec support complet de limit et offset.
 
-    Recherche dans les données FFBB en fonction de plusieurs types de données.
+    Recherche dans les données FFBB (organismes, compétitions, rencontres, salles, tournois...).
     """
+    limit = max(1, min(100, limit))
+    offset = max(0, offset)
+
     if type == "all":
-        result = await multi_search_service(nom=query, limit=limit)
+        result = await multi_search_service(
+            nom=query, limit=limit, force_refresh=force_refresh
+        )
         if not isinstance(result, list):
             return []
-        return _add_truncation_meta(result)
+        return _add_truncation_meta(result, limit=limit, offset=offset)
 
     if type == "organismes":
-        result = await search_organismes_service(query, limit, filter_by, sort)
-        return _add_truncation_meta(result)
+        result = await search_organismes_service(
+            query,
+            limit=limit,
+            offset=offset,
+            filter_by=filter_by,
+            sort=sort,
+            force_refresh=force_refresh,
+        )
+        return _add_truncation_meta(result, limit=limit, offset=offset)
 
-    if method_name := _SEARCH_TYPE_METHOD.get(type):
-        result = await _search_generic(type, method_name, query, limit, filter_by, sort)
-        return _add_truncation_meta(result)
+    if type in _SEARCH_INDEX_MAP:
+        result = await _search_generic(
+            type_name=type,
+            query=query,
+            limit=limit,
+            offset=offset,
+            filter_by=filter_by,
+            sort=sort,
+            force_refresh=force_refresh,
+        )
+        return _add_truncation_meta(result, limit=limit, offset=offset)
 
     raise McpError(
         error=ErrorData(
             code=INTERNAL_ERROR,
-            message=f"Type de recherche inconnu: {type}",
+            message=f"Type de recherche inconnu: {type}. Types supportés: {', '.join(['all', *list(_SEARCH_INDEX_MAP.keys())])}",
         )
     )
 
@@ -753,15 +945,21 @@ async def ffbb_resolve_team_service(
     organisme_id: int | str | None = None,
     categorie: str | None = None,
     numero_equipe: int | str | None = None,
+    competition_id: int | str | None = None,
+    competition_type: str | None = None,
+    poule_id: int | str | None = None,
+    season_id: int | str | None = None,
+    force_refresh: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Résout une équipe unique d'un club pour une catégorie donnée.
 
-    Retourne un objet structuré pour les agents :
+    Retourne un objet structuré et déterministe pour les agents :
       - `status`: "resolved" | "ambiguous" | "not_found"
-      - `team`: équipe résolue (ou None si ambiguë / introuvable)
-      - `candidates`: liste des équipes candidates (peut être vide)
+      - `team`: engagement résolu (ou None si ambigu / introuvable)
+      - `candidates`: liste des engagements candidats
       - `ambiguity`: message explicite en cas d'ambiguïté
+      - `clarification_prompt`: question exploitable par le LLM pour clarifier
     """
     import ffbb_mcp.services
 
@@ -775,7 +973,10 @@ async def ffbb_resolve_team_service(
 
     # 1) Résoudre l'organisme avec métadonnées
     resolved_clubs, _ = await resolve_club_and_org(
-        club_name=club_name, organisme_id=organisme_id, categorie=categorie
+        club_name=club_name,
+        organisme_id=organisme_id,
+        categorie=categorie,
+        force_refresh=force_refresh,
     )
 
     if not resolved_clubs:
@@ -784,6 +985,7 @@ async def ffbb_resolve_team_service(
             "team": None,
             "candidates": [],
             "ambiguity": f"Club '{club_name or organisme_id}' introuvable",
+            "clarification_prompt": None,
             "club_resolu": None,
         }
 
@@ -796,7 +998,7 @@ async def ffbb_resolve_team_service(
                 if not rc_id:
                     continue
                 rc_teams = await ffbb_mcp.services.ffbb_equipes_club_service(
-                    organisme_id=rc_id, filtre=categorie
+                    organisme_id=rc_id, filtre=categorie, force_refresh=force_refresh
                 )
                 if rc_teams and not (
                     isinstance(rc_teams, list)
@@ -814,6 +1016,7 @@ async def ffbb_resolve_team_service(
                     "team": None,
                     "candidates": resolved_clubs,
                     "ambiguity": f"Plusieurs clubs correspondent à '{club_name}'.",
+                    "clarification_prompt": f"Plusieurs clubs correspondent à '{club_name}'. Précisez organisme_id.",
                     "club_resolu": None,
                 }
         else:
@@ -822,6 +1025,7 @@ async def ffbb_resolve_team_service(
                 "team": None,
                 "candidates": resolved_clubs,
                 "ambiguity": f"Plusieurs clubs correspondent à '{club_name}'.",
+                "clarification_prompt": f"Plusieurs clubs correspondent à '{club_name}'. Précisez organisme_id.",
                 "club_resolu": None,
             }
     else:
@@ -832,7 +1036,7 @@ async def ffbb_resolve_team_service(
     # 2) Récupérer toutes les équipes candidates
     if not categorie:
         equipes = await ffbb_mcp.services.ffbb_equipes_club_service(
-            organisme_id=target_org_id
+            organisme_id=target_org_id, force_refresh=force_refresh
         )
         if not equipes or (
             isinstance(equipes, list) and len(equipes) == 1 and "error" in equipes[0]
@@ -842,6 +1046,7 @@ async def ffbb_resolve_team_service(
                 "team": None,
                 "candidates": [],
                 "ambiguity": f"Aucune équipe trouvée pour le club '{club_resolu.get('nom', target_org_id)}'.",
+                "clarification_prompt": None,
                 "club_resolu": club_resolu,
             }
         equipes = _deduplicate_same_team_phases(equipes)
@@ -851,6 +1056,7 @@ async def ffbb_resolve_team_service(
                 "team": equipes[0],
                 "candidates": equipes,
                 "ambiguity": None,
+                "clarification_prompt": None,
                 "club_resolu": club_resolu,
             }
         return {
@@ -858,12 +1064,13 @@ async def ffbb_resolve_team_service(
             "team": None,
             "candidates": equipes,
             "ambiguity": "Veuillez préciser la catégorie souhaitée parmi les équipes du club.",
+            "clarification_prompt": "Veuillez préciser la catégorie souhaitée parmi les équipes du club.",
             "club_resolu": club_resolu,
         }
 
     if equipes is None:
         equipes = await ffbb_mcp.services.ffbb_equipes_club_service(
-            organisme_id=target_org_id, filtre=categorie
+            organisme_id=target_org_id, filtre=categorie, force_refresh=force_refresh
         )
 
     if not equipes or (
@@ -884,13 +1091,14 @@ async def ffbb_resolve_team_service(
             "team": None,
             "candidates": suggestions,
             "ambiguity": msg,
+            "clarification_prompt": None,
             "club_resolu": club_resolu,
         }
 
     # 3) Matching intelligent du numéro
     from .club import _parse_division_code
 
-    candidates = equipes
+    candidates = list(equipes)
     parsed = parse_categorie(categorie)
     is_division = _parse_division_code(categorie) is not None
     raw_num = (
@@ -909,17 +1117,43 @@ async def ffbb_resolve_team_service(
     if matched:
         candidates = matched
 
-    # 3.5) Déduplication sémantique : même équipe à travers différentes phases
+    # 3.5) Application des filtres explicites de désambiguïsation
+    if competition_id is not None:
+        target_comp_id = str(competition_id).strip()
+        candidates = [
+            c
+            for c in candidates
+            if str(c.get("competition_id") or "").strip() == target_comp_id
+        ]
+
+    if competition_type is not None:
+        target_comp_type = str(competition_type).strip().upper()
+        candidates = [
+            c
+            for c in candidates
+            if str(c.get("competition_type") or "").strip().upper() == target_comp_type
+        ]
+
+    if poule_id is not None:
+        target_poule_id = str(poule_id).strip()
+        candidates = [
+            c
+            for c in candidates
+            if str(c.get("poule_id") or "").strip() == target_poule_id
+        ]
+
+    # Déduplication sémantique : uniquement au sein d'une MÊME compétition
     candidates = _deduplicate_same_team_phases(candidates)
 
-    # 4) Construire la réponse
+    # 4) Machine à états de la réponse
     if not candidates:
         all_labels = sorted(list({t["team_label"] for t in equipes}))
         return {
             "status": "not_found",
             "team": None,
             "candidates": all_labels,
-            "ambiguity": f"Aucun match exact pour '{categorie}'",
+            "ambiguity": f"Aucun engagement ne correspond aux critères spécifiés pour '{categorie}'.",
+            "clarification_prompt": None,
             "club_resolu": club_resolu,
         }
 
@@ -929,27 +1163,32 @@ async def ffbb_resolve_team_service(
             "team": candidates[0],
             "candidates": candidates,
             "ambiguity": None,
+            "clarification_prompt": None,
             "club_resolu": club_resolu,
         }
 
-    # Si on a plusieurs candidats, on vérifie s'ils partagent tous le même numero_equipe.
-    unique_nums = {str(c.get("numero_equipe") or "").strip() for c in candidates}
+    # Plusieurs engagements subsistent → ambiguïté réelle déclarée explicitement
+    comp_descriptions = []
+    for c in candidates:
+        c_label = c.get("competition") or c.get("competition_code") or "Compétition"
+        c_type = c.get("competition_type") or "Type inconnu"
+        c_id = c.get("competition_id") or ""
+        comp_descriptions.append(
+            f"'{c_label}' (type: {c_type}, competition_id: {c_id})"
+        )
 
-    if len(unique_nums) == 1:
-        best = max(candidates, key=_phase_sort_key)
-        return {
-            "status": "resolved",
-            "team": best,
-            "candidates": candidates,
-            "ambiguity": None,
-            "club_resolu": club_resolu,
-        }
+    clarification = (
+        f"L'équipe {club_resolu.get('nom', '')} {categorie or ''} participe à {len(candidates)} compétitions distinctes : "
+        + " ; ".join(comp_descriptions)
+        + ". Précisez `competition_id` ou `competition_type` pour cibler la compétition voulue."
+    )
 
     return {
         "status": "ambiguous",
         "team": None,
         "candidates": candidates,
-        "ambiguity": f"Plusieurs équipes ({len(candidates)}) correspondent à '{categorie}'.",
+        "ambiguity": f"Plusieurs engagements ({len(candidates)}) correspondent à cette équipe.",
+        "clarification_prompt": clarification,
         "club_resolu": club_resolu,
     }
 

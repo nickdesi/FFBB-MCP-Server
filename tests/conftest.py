@@ -23,8 +23,9 @@ def mock_client():
     client.search_salles_async = AsyncMock(return_value=None)
     client.search_pratiques_async = AsyncMock(return_value=None)
     client.search_terrains_async = AsyncMock(return_value=None)
-    client.search_tournois_async = AsyncMock(return_value=None)
     client.multi_search_async = AsyncMock(return_value=None)
+    client._meilisearch = MagicMock()
+    client._meilisearch.multi_search_async = client.multi_search_async
     return client
 
 

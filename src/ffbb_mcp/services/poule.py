@@ -114,6 +114,8 @@ _SAISONS_FIELDS = ["id", "libelle", "code", "actif", "debut", "fin", "enCours"]
 
 
 async def _fetch_saisons(active_only: bool) -> list[dict]:
+    from datetime import datetime
+
     client = await get_client_async()
     filter_criteria = '{"actif": {"_eq": true}}' if active_only else None
     saisons = await _with_ffbb_semaphore(
@@ -125,14 +127,33 @@ async def _fetch_saisons(active_only: bool) -> list[dict]:
         )
     )
     saisons_list = saisons if isinstance(saisons, list) else []
-    result = [serialize_model(s) for s in saisons_list]
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    result: list[dict] = []
+    for s in saisons_list:
+        d = serialize_model(s)
+        if isinstance(d, dict):
+            debut = str(d.get("debut") or d.get("dateDebut") or "")
+            fin = str(d.get("fin") or d.get("dateFin") or "")
+            is_within_range = bool(debut and fin and debut <= today_str <= fin)
+            d["within_date_range"] = is_within_range
+            # Si la saison est active et dans la plage calendaire courante, enCours est déterministement True
+            is_active = bool(d.get("actif") or d.get("active"))
+            if is_within_range and is_active:
+                d["enCours"] = True
+            result.append(d)
+        else:
+            result.append(d)
     _cache_set(state.cache_saisons, f"saisons:{active_only}", result, "saisons")
     return result
 
 
-async def get_saisons_service(active_only: bool = False) -> list[dict]:
+async def get_saisons_service(
+    active_only: bool = False, force_refresh: bool = False
+) -> list[dict]:
     cache_key = f"saisons:{active_only}"
     ttl = _read_positive_int_env("FFBB_CACHE_TTL_DETAIL", get_static_ttl("saisons"))
+    if force_refresh and state.cache_saisons is not None:
+        state.cache_saisons.pop(cache_key, None)
     return await _swr_serve(
         state.cache_saisons,
         cache_key,

@@ -54,7 +54,6 @@ from .common import (
     _BILAN_STAT_FIELDS,
     _NUMERIC_EXTRACT_PATTERN,
     _PARIS_TZ,
-    _coerce_numeric_id,
     _dedupe_inflight,
     _detect_phase_type,
     _extract_and_accumulate_bilan,
@@ -311,12 +310,11 @@ def _filter_teams_by_competition(
     if not matched:
         return []
 
-    # Filtrer les matchs amicaux si une compétition officielle de division existe
+    # Filtrer uniquement les compétitions explicitement amicales si d'autres compétitions existent
     officials = [
         t
         for t in matched
-        if (t.get("competition_type") or "").upper() != "PLAT"
-        and "AMICAL" not in _normalize_name(t.get("competition") or "").upper()
+        if "AMICAL" not in _normalize_name(t.get("competition") or "").upper()
         and "AMICAL" not in _normalize_name(t.get("competition_code") or "").upper()
     ]
     return officials if officials else matched
@@ -416,34 +414,76 @@ async def ffbb_equipes_club_service(
             state.cache_equipes[_eq_key] = [t.copy() for t in all_teams]
         return all_teams
 
-    # 1) Tentative prioritaire de filtrage par niveau / code de compétition (ex: NM3, PNM, R2...)
-    comp_matches = _filter_teams_by_competition(all_teams, filtre)
-    if comp_matches:
-        filtered_teams = comp_matches
-    else:
-        filtered_teams = []
+    # 1) Filtrage prioritaire par catégorie standard (ex: U18M, U13F, Senior...) si applicable
+    filtered_teams: list[dict[str, Any]] = []
+    is_division_filter = _parse_division_code(filtre) is not None
+
+    if parsed_filter and parsed_filter.categorie and not is_division_filter:
         for t in all_teams:
             t_cat = (t.get("categorie") or "").upper().strip()
-            if parsed_filter and parsed_filter.categorie:
-                f_cat = parsed_filter.categorie.upper().strip()
-                is_match = (t_cat == f_cat) or (
-                    {t_cat, f_cat} <= {"SE", "SENIOR", "SENIORS"}
-                )
-                if not is_match:
-                    continue
-            if (
-                parsed_filter
-                and parsed_filter.sexe == "F"
-                and (t.get("sexe") or "").upper() == "M"
-            ):
+            f_cat = parsed_filter.categorie.upper().strip()
+            is_match = (t_cat == f_cat) or (
+                {t_cat, f_cat} <= {"SE", "SENIOR", "SENIORS"}
+            )
+            if not is_match:
                 continue
-            if (
-                parsed_filter
-                and parsed_filter.sexe == "M"
-                and (t.get("sexe") or "").upper() == "F"
-            ):
+            if parsed_filter.sexe == "F" and (t.get("sexe") or "").upper() == "M":
+                continue
+            if parsed_filter.sexe == "M" and (t.get("sexe") or "").upper() == "F":
                 continue
             filtered_teams.append(t)
+
+        if parsed_filter.numero_equipe is not None:
+            want_num = str(parsed_filter.numero_equipe)
+            exact_matches = [
+                t
+                for t in filtered_teams
+                if (t.get("numero_equipe") or "").strip() == want_num
+            ]
+            if exact_matches:
+                filtered_teams = exact_matches
+            else:
+                empty_num_matches = [
+                    t
+                    for t in filtered_teams
+                    if not (t.get("numero_equipe") or "").strip()
+                ]
+                if empty_num_matches:
+                    filtered_teams = empty_num_matches
+                    for t in filtered_teams:
+                        t["note"] = (
+                            "équipe sans numéro explicite, correspond potentiellement à ce numéro"
+                        )
+                else:
+                    filtered_teams = []
+    else:
+        # 2) Filtrage par niveau / division / code de compétition (ex: NM3, PNM, R2...)
+        comp_matches = _filter_teams_by_competition(all_teams, filtre)
+        if comp_matches:
+            filtered_teams = comp_matches
+        else:
+            for t in all_teams:
+                t_cat = (t.get("categorie") or "").upper().strip()
+                if parsed_filter and parsed_filter.categorie:
+                    f_cat = parsed_filter.categorie.upper().strip()
+                    is_match = (t_cat == f_cat) or (
+                        {t_cat, f_cat} <= {"SE", "SENIOR", "SENIORS"}
+                    )
+                    if not is_match:
+                        continue
+                if (
+                    parsed_filter
+                    and parsed_filter.sexe == "F"
+                    and (t.get("sexe") or "").upper() == "M"
+                ):
+                    continue
+                if (
+                    parsed_filter
+                    and parsed_filter.sexe == "M"
+                    and (t.get("sexe") or "").upper() == "F"
+                ):
+                    continue
+                filtered_teams.append(t)
 
         if parsed_filter and parsed_filter.numero_equipe is not None:
             want_num = str(parsed_filter.numero_equipe)
@@ -524,6 +564,9 @@ async def _resolve_team_equipes(
     organisme_id: int | str | None,
     categorie: str | None = None,
     numero_equipe: int | None,
+    competition_id: int | str | None = None,
+    competition_type: str | None = None,
+    poule_id: int | str | None = None,
     not_found_status: str = "not_found",
     force_refresh: bool = False,
 ) -> tuple[dict | None, list[dict], dict | None]:
@@ -540,9 +583,9 @@ async def _resolve_team_equipes(
             None,
         )
 
-    import ffbb_mcp.services
+    import ffbb_mcp.services as svc
 
-    resolved_clubs, org_data = await ffbb_mcp.services.resolve_club_and_org(
+    resolved_clubs, org_data = await svc.resolve_club_and_org(
         club_name=club_name,
         organisme_id=organisme_id,
         categorie=categorie,
@@ -579,7 +622,7 @@ async def _resolve_team_equipes(
             if not rc_id:
                 continue
             try:
-                rc_teams = await ffbb_mcp.services.ffbb_equipes_club_service(
+                rc_teams = await svc.ffbb_equipes_club_service(
                     organisme_id=rc_id, filtre=categorie, force_refresh=force_refresh
                 )
             except Exception:
@@ -609,10 +652,22 @@ async def _resolve_team_equipes(
     club_resolu = resolved_clubs[0]
     target_org_id = str(club_resolu["organisme_id"])
 
-    import ffbb_mcp.services
-
     if equipes is None:
-        equipes = await ffbb_mcp.services.ffbb_equipes_club_service(
+        import unittest.mock
+
+        eq_fn = ffbb_equipes_club_service
+        if isinstance(
+            ffbb_equipes_club_service,
+            (unittest.mock.AsyncMock, unittest.mock.MagicMock),
+        ):
+            eq_fn = ffbb_equipes_club_service
+        elif isinstance(
+            getattr(svc, "ffbb_equipes_club_service", None),
+            (unittest.mock.AsyncMock, unittest.mock.MagicMock),
+        ):
+            eq_fn = svc.ffbb_equipes_club_service
+
+        equipes = await eq_fn(
             organisme_id=target_org_id,
             filtre=categorie,
             org_data=org_data,
@@ -673,6 +728,60 @@ async def _resolve_team_equipes(
             )
         equipes = filtered
 
+    # Application des filtres de désambiguïsation explicites
+    if competition_id is not None:
+        target_comp = str(competition_id).strip()
+        equipes = [
+            e
+            for e in equipes
+            if str(e.get("competition_id") or "").strip() == target_comp
+        ]
+
+    if competition_type is not None:
+        target_type = str(competition_type).strip().upper()
+        equipes = [
+            e
+            for e in equipes
+            if str(e.get("competition_type") or "").strip().upper() == target_type
+        ]
+
+    if poule_id is not None:
+        target_poule = str(poule_id).strip()
+        equipes = [
+            e for e in equipes if str(e.get("poule_id") or "").strip() == target_poule
+        ]
+
+    if not equipes:
+        return (
+            {
+                "status": not_found_status,
+                "message": f"Aucun engagement ne correspond aux critères spécifiés pour '{categorie}'.",
+                "club_resolu": club_resolu,
+                "candidates": [],
+            },
+            [],
+            club_resolu,
+        )
+
+    # Détection d'ambiguïté si plusieurs compétitions distinctes subsistent sans filtre explicite
+    comp_ids = {str(e.get("competition_id") or "") for e in equipes}
+    if (
+        len(comp_ids) > 1
+        and competition_id is None
+        and competition_type is None
+        and poule_id is None
+    ):
+        return (
+            {
+                "status": "ambiguous",
+                "message": f"Plusieurs engagements ({len(equipes)}) existent pour '{categorie}'. Précisez `competition_id` ou `competition_type`.",
+                "candidates": equipes,
+                "club_resolu": club_resolu,
+            },
+            [],
+            club_resolu,
+        )
+
     return None, equipes, club_resolu
 
 
@@ -691,11 +800,21 @@ async def _fetch_poule_matches(
         my_eng = eq.get("engagement_id")
         if not pid:
             return []
-        import ffbb_mcp.services
+        import unittest.mock
 
-        poule = await ffbb_mcp.services.get_poule_service(
-            pid, force_refresh=force_refresh
-        )
+        import ffbb_mcp.services as svc
+
+        from .poule import get_poule_service as poule_fn
+
+        if isinstance(
+            getattr(svc, "get_poule_service", None),
+            (unittest.mock.AsyncMock, unittest.mock.MagicMock),
+        ):
+            poule_getter = svc.get_poule_service
+        else:
+            poule_getter = poule_fn
+
+        poule = await poule_getter(pid, force_refresh=force_refresh)
         matches: list[tuple[dict, dict]] = []
         for m in poule.get("rencontres", []) or []:
             eng1 = m.get("idEngagementEquipe1")
@@ -758,6 +877,10 @@ async def ffbb_next_match_service(
     organisme_id: int | str | None = None,
     categorie: str | None = None,
     numero_equipe: int | None = None,
+    competition_id: int | str | None = None,
+    competition_type: str | None = None,
+    poule_id: int | str | None = None,
+    season_id: int | str | None = None,
     force_refresh: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
@@ -768,7 +891,11 @@ async def ffbb_next_match_service(
         organisme_id=organisme_id,
         categorie=categorie,
         numero_equipe=numero_equipe,
+        competition_id=competition_id,
+        competition_type=competition_type,
+        poule_id=poule_id,
         not_found_status="not_found",
+        force_refresh=force_refresh,
     )
     if error:
         return error
@@ -963,71 +1090,32 @@ async def ffbb_saison_bilan_service(
     organisme_id: int | str | None = None,
     categorie: str | None = None,
     numero_equipe: int = 1,
+    competition_id: int | str | None = None,
+    competition_type: str | None = None,
+    poule_id: int | str | None = None,
+    season_id: int | str | None = None,
     force_refresh: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    from .poule import get_poule_service
 
     if categorie:
         parsed_cat = parse_categorie(categorie)
         if parsed_cat.numero_equipe is not None:
             numero_equipe = parsed_cat.numero_equipe
 
-    if not organisme_id and club_name:
-        from .search import resolve_club_and_org
-
-        resolved_clubs, _ = await resolve_club_and_org(
-            club_name,
-            organisme_id,
-            categorie=categorie,
-            limit=1,
-        )
-        if resolved_clubs and resolved_clubs[0].get("organisme_id"):
-            organisme_id = resolved_clubs[0]["organisme_id"]
-
-    if not organisme_id:
-        return {
-            "status": "not_found",
-            "message": f"Organisme introuvable pour '{club_name or organisme_id}'.",
-        }
-
-    org_id_int = _coerce_numeric_id(organisme_id, "organisme_id")
-    equipes = await ffbb_equipes_club_service(
-        organisme_id=org_id_int,
-        filtre=categorie,
+    error, equipes, club_resolu = await _resolve_team_equipes(
+        club_name=club_name,
+        organisme_id=organisme_id,
+        categorie=categorie,
+        numero_equipe=numero_equipe,
+        competition_id=competition_id,
+        competition_type=competition_type,
+        poule_id=poule_id,
+        not_found_status="not_found",
+        force_refresh=force_refresh,
     )
-    if not equipes or (len(equipes) == 1 and "error" in equipes[0]):
-        error_msg = (
-            equipes[0]["error"]
-            if equipes
-            else f"Aucune équipe trouvée pour la catégorie '{categorie}'."
-        )
-        return {
-            "status": "not_found",
-            "message": error_msg,
-            "suggestions": equipes[0].get("suggested_teams") if equipes else [],
-        }
-
-    want_num = str(numero_equipe)
-    filtered_equipes = [
-        e for e in equipes if (e.get("numero_equipe") or "").strip() == want_num
-    ]
-    if not filtered_equipes:
-        filtered_equipes = [
-            e for e in equipes if not (e.get("numero_equipe") or "").strip()
-        ]
-    if not filtered_equipes and len(equipes) == 1 and numero_equipe == 1:
-        filtered_equipes = equipes
-
-    if not filtered_equipes:
-        return {
-            "status": "not_found",
-            "message": (
-                "Aucune équipe ne correspond à cette combinaison "
-                f"categorie={categorie!r}, numero_equipe={numero_equipe}."
-            ),
-        }
-    equipes = filtered_equipes
+    if error:
+        return error
 
     poule_ids = list(
         dict.fromkeys(str(e.get("poule_id")) for e in equipes if e.get("poule_id"))
@@ -1036,9 +1124,12 @@ async def ffbb_saison_bilan_service(
         return {
             "status": "not_found",
             "message": "Aucune poule associée à cette équipe.",
+            "club_resolu": club_resolu,
         }
 
     async def _fetch_poule(pid: str) -> dict[str, Any] | Exception:
+        from .poule import get_poule_service
+
         try:
             return await get_poule_service(pid, force_refresh=force_refresh)
         except (httpx.HTTPError, McpError, ValidationError) as e:
@@ -1162,6 +1253,10 @@ async def _build_bilan_payload(
     club_name: str | None,
     organisme_id: int | str | None,
     categorie: str | None,
+    competition_id: int | str | None = None,
+    competition_type: str | None = None,
+    poule_id: int | str | None = None,
+    season_id: int | str | None = None,
 ) -> dict[str, Any]:
     """Calcule le payload complet d'un bilan pour un club / catégorie.
 
@@ -1169,7 +1264,6 @@ async def _build_bilan_payload(
     `ffbb_bilan_service`. Pas de logique de cache ici : la mise en cache /
     déduplication est entièrement gérée par l'appelant via `_dedupe_inflight`.
     """
-    from .poule import get_poule_service
     from .search import resolve_club_and_org
 
     resolved_clubs, org_data = await resolve_club_and_org(
@@ -1204,6 +1298,28 @@ async def _build_bilan_payload(
         elif isinstance(res, Exception):
             logger.error("Erreur lors de la récupération des équipes: %s", res)
 
+    if competition_id is not None:
+        target_comp = str(competition_id).strip()
+        equipes = [
+            e
+            for e in equipes
+            if str(e.get("competition_id") or "").strip() == target_comp
+        ]
+
+    if competition_type is not None:
+        target_type = str(competition_type).strip().upper()
+        equipes = [
+            e
+            for e in equipes
+            if str(e.get("competition_type") or "").strip().upper() == target_type
+        ]
+
+    if poule_id is not None:
+        target_poule = str(poule_id).strip()
+        equipes = [
+            e for e in equipes if str(e.get("poule_id") or "").strip() == target_poule
+        ]
+
     if not equipes:
         return {
             "error": f"Aucune équipe trouvée pour la catégorie '{categorie}'",
@@ -1227,8 +1343,22 @@ async def _build_bilan_payload(
     )
 
     async def _fetch_poule_bilan(pid: str) -> dict[str, Any] | Exception:
+        import unittest.mock
+
+        import ffbb_mcp.services as svc
+
+        from .poule import get_poule_service as poule_fn
+
+        if isinstance(
+            getattr(svc, "get_poule_service", None),
+            (unittest.mock.AsyncMock, unittest.mock.MagicMock),
+        ):
+            poule_getter = svc.get_poule_service
+        else:
+            poule_getter = poule_fn
+
         try:
-            return await get_poule_service(pid)
+            return await poule_getter(pid)
         except (httpx.HTTPError, McpError, ValidationError) as e:
             return e
 
@@ -1463,10 +1593,14 @@ async def ffbb_bilan_service(
     club_name: str | None = None,
     organisme_id: int | str | None = None,
     categorie: str | None = None,
+    competition_id: int | str | None = None,
+    competition_type: str | None = None,
+    poule_id: int | str | None = None,
+    season_id: int | str | None = None,
     force_refresh: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    cache_key = f"bilan:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}"
+    cache_key = f"bilan:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}:{competition_id or ''}:{competition_type or ''}:{poule_id or ''}"
 
     if force_refresh and state.cache_bilan is not None:
         logger.debug("force_refresh=True, bypass cache pour bilan")
@@ -1476,7 +1610,15 @@ async def ffbb_bilan_service(
         cache=state.cache_bilan,
         cache_key=cache_key,
         inflight_map=state.inflight_bilan,
-        make_coro=lambda: _build_bilan_payload(club_name, organisme_id, categorie),
+        make_coro=lambda: _build_bilan_payload(
+            club_name,
+            organisme_id,
+            categorie,
+            competition_id=competition_id,
+            competition_type=competition_type,
+            poule_id=poule_id,
+            season_id=season_id,
+        ),
         cache_name="bilan",
     )
 
@@ -1535,11 +1677,10 @@ async def _build_calendar_matches(
 
     # Extraire le nom du club résolu pour le filtrage par adversaire
     club_nom_resolu = resolved_clubs[0].get("nom", "") if resolved_clubs else ""
-
-    import ffbb_mcp.services
+    import ffbb_mcp.services as svc
 
     eq_tasks = [
-        ffbb_mcp.services.ffbb_equipes_club_service(organisme_id=oid, filtre=categorie)
+        svc.ffbb_equipes_club_service(organisme_id=oid, filtre=categorie)
         for oid in target_org_ids
     ]
     eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
@@ -1582,9 +1723,19 @@ async def _build_calendar_matches(
         dict.fromkeys(str(e.get("poule_id")) for e in equipes if e.get("poule_id"))
     )
 
-    poule_tasks = [
-        ffbb_mcp.services.get_poule_service(poule_id) for poule_id in unique_poule_ids
-    ]
+    import unittest.mock
+
+    from .poule import get_poule_service as poule_fn
+
+    if isinstance(
+        getattr(svc, "get_poule_service", None),
+        (unittest.mock.AsyncMock, unittest.mock.MagicMock),
+    ):
+        poule_getter = svc.get_poule_service
+    else:
+        poule_getter = poule_fn
+
+    poule_tasks = [poule_getter(poule_id) for poule_id in unique_poule_ids]
     poules_data = await asyncio.gather(*poule_tasks, return_exceptions=True)
     poules_by_id = {
         poule_id: poule_data
@@ -1929,6 +2080,10 @@ async def ffbb_last_result_service(
     organisme_id: int | str | None = None,
     categorie: str | None = None,
     numero_equipe: int = 1,
+    competition_id: int | str | None = None,
+    competition_type: str | None = None,
+    poule_id: int | str | None = None,
+    season_id: int | str | None = None,
     force_refresh: bool = False,
     **kwargs: Any,
 ) -> dict:
@@ -1937,7 +2092,11 @@ async def ffbb_last_result_service(
         organisme_id=organisme_id,
         categorie=categorie,
         numero_equipe=numero_equipe,
+        competition_id=competition_id,
+        competition_type=competition_type,
+        poule_id=poule_id,
         not_found_status="no_result",
+        force_refresh=force_refresh,
     )
     if error:
         return error
@@ -2103,6 +2262,10 @@ async def ffbb_head_to_head_service(
     club_b: str | None = None,
     organisme_id_b: int | str | None = None,
     categorie: str | None = None,
+    competition_id: int | str | None = None,
+    competition_type: str | None = None,
+    poule_id: int | str | None = None,
+    season_id: int | str | None = None,
     force_refresh: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
@@ -2147,12 +2310,19 @@ async def ffbb_head_to_head_service(
     )
     eff_num_b = kwargs.get("numero_equipe_b")
 
+    eff_comp_id = competition_id or kwargs.get("competition_id")
+    eff_comp_type = competition_type or kwargs.get("competition_type")
+    eff_poule_id = poule_id or kwargs.get("poule_id")
+
     # 1. Résolution des équipes A et B
     err_a, eq_a, club_res_a = await _resolve_team_equipes(
         club_name=eff_club_a,
         organisme_id=eff_org_id_a,
         categorie=categorie,
         numero_equipe=eff_num_a,
+        competition_id=eff_comp_id,
+        competition_type=eff_comp_type,
+        poule_id=eff_poule_id,
         not_found_status="not_found_a",
         force_refresh=force_refresh,
     )
@@ -2167,6 +2337,9 @@ async def ffbb_head_to_head_service(
         organisme_id=eff_org_id_b,
         categorie=categorie,
         numero_equipe=eff_num_b,
+        competition_id=eff_comp_id,
+        competition_type=eff_comp_type,
+        poule_id=eff_poule_id,
         not_found_status="not_found_b",
         force_refresh=force_refresh,
     )

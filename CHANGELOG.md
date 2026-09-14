@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.11.0] - 2026-09-14
 
 ### Added
+- **Résolution Déterministe d'Équipe & Machine à États Stricte (Axe 1)** :
+  - Gestion stricte de l'ambiguïté (`status="ambiguous"`) lorsqu'une équipe est engagée dans plusieurs compétitions actives (ex: SCBA U18M engagé en `RMU18 Brassage` [PLAT] et `Coupe ARA` [COUPE]).
+  - Révélation complète des `candidates`, d'un `clarification_prompt` directement exploitable par les LLM, et support des filtres de désambiguïsation (`competition_id`, `competition_type`, `poule_id`, `season_id`, `force_refresh`) sur toute la surface MCP (`ffbb_resolve_team`, `ffbb_next_match`, `ffbb_last_result`, `ffbb_team_summary`, `ffbb_bilan`, `ffbb_bilan_saison`, `ffbb_head_to_head`).
+- **Pagination & Recherche Conforme au Contrat (Axe 2)** :
+  - Respect strict des paramètres `limit` (1 ≤ limit ≤ 100) et `offset` sur `ffbb_search` et l'ensemble des services de recherche.
+  - Enveloppe de métadonnées enrichie `_meta` avec `total`, `returned`, `limit`, `offset`, `has_more`, `next_offset`, `truncated`.
+- **Politique de Fraîcheur & Cache Sportif Adapté (Axe 3)** :
+  - Aligner la documentation runtime sur 15s pour `ffbb_lives`.
+  - Raccourcissement des TTLs dynamiques (calendrier à 15-30m, bilan et classement à 15m) et uniformisation du support `force_refresh`.
+- **Calcul Objectif des Saisons (Axe 4)** :
+  - Calcul dynamique de `enCours: true` et `within_date_range: true` selon les dates de début et de fin de saison (`debut <= now <= fin`).
 - **Audit GLM 5.3 & Robustesse des Divisions (`ffbb_bilan_saison`)** :
   - Support précis des divisions seniors et régionales (`NM3`, `NF1`, `RM2`, `DM1`) sans décaler le `numero_equipe` par défaut (`SEM1`).
   - Déduplication stricte des poules et phases amicales de pré-saison par `poule_id` (résout le doublon de statistiques dans `bilan_total`).

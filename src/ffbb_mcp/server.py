@@ -310,8 +310,12 @@ async def ffbb_search(
     ] = "all",
     limit: Annotated[
         int,
-        Field(description="Nombre maximum de résultats à retourner."),
+        Field(description="Nombre maximum de résultats à retourner (1-100)."),
     ] = 20,
+    offset: Annotated[
+        int,
+        Field(description="Index de départ pour pagination (défaut: 0)."),
+    ] = 0,
     filter_by: Annotated[
         str | None,
         Field(
@@ -325,6 +329,10 @@ async def ffbb_search(
         list[str] | None,
         Field(description="Tri Meilisearch (ex: ['libelle:asc'])."),
     ] = None,
+    force_refresh: Annotated[
+        bool,
+        Field(description="Si True, force le rafraîchissement des données."),
+    ] = False,
 ) -> list[dict[str, Any]]:
     """Recherche FFBB — clubs, compétitions, matchs, salles, tournois, etc.
 
@@ -340,7 +348,13 @@ async def ffbb_search(
         safe_filter = _validate_filter_by(filter_by)
         # Délègue la logique détaillée au service dédié pour centraliser le dispatch
         return await ffbb_search_service(
-            query=query, type=type, limit=limit, filter_by=safe_filter, sort=sort
+            query=query,
+            type=type,
+            limit=limit,
+            offset=offset,
+            filter_by=safe_filter,
+            sort=sort,
+            force_refresh=force_refresh,
         )
     except ValueError as e:
         raise handle_api_error(e) from e
@@ -377,6 +391,24 @@ async def ffbb_bilan(
         int | None,
         Field(description="Numéro d'équipe (ex: 1, 2)."),
     ] = None,
+    competition_id: Annotated[
+        int | str | None,
+        Field(description="ID FFBB de la compétition pour désambiguïser."),
+    ] = None,
+    competition_type: Annotated[
+        str | None,
+        Field(
+            description="Type de compétition ('PLAT', 'COUPE', etc.) pour désambiguïser."
+        ),
+    ] = None,
+    poule_id: Annotated[
+        int | str | None,
+        Field(description="ID FFBB de la poule pour désambiguïser."),
+    ] = None,
+    season_id: Annotated[
+        int | str | None,
+        Field(description="ID de la saison FFBB (optionnel)."),
+    ] = None,
     force_refresh: Annotated[
         bool,
         Field(description="Si True, contourne le cache."),
@@ -403,6 +435,10 @@ async def ffbb_bilan(
             club_name=club_name,
             organisme_id=organisme_id,
             categorie=effective_cat,
+            competition_id=competition_id,
+            competition_type=competition_type,
+            poule_id=poule_id,
+            season_id=season_id,
             force_refresh=effective_refresh,
         )
         await _safe_report_progress(ctx, 3, total=3, message="Bilan prêt.")
@@ -769,7 +805,7 @@ async def ffbb_get_lives(
         ),
     ] = False,
 ) -> list[dict[str, Any]]:
-    """Matchs en cours (scores live, cache 30s). Retourne [] si aucun match."""
+    """Matchs en cours (scores live, rafraîchissement toutes les 15s). Retourne [] si aucun match."""
     try:
         return await get_lives_service(include_scheduled=include_scheduled)
     except Exception as e:
@@ -792,10 +828,15 @@ async def ffbb_get_saisons(
     active_only: Annotated[
         bool, Field(description="True = saison active uniquement.")
     ] = False,
+    force_refresh: Annotated[
+        bool, Field(description="Si True, contourne le cache.")
+    ] = False,
 ) -> list[dict[str, Any]]:
     """Liste des saisons FFBB. active_only=True pour la saison en cours uniquement."""
     try:
-        return await get_saisons_service(active_only=active_only)
+        return await get_saisons_service(
+            active_only=active_only, force_refresh=force_refresh
+        )
     except Exception as e:
         raise handle_api_error(e) from e
 
@@ -834,6 +875,28 @@ async def ffbb_resolve_team(
         int | None,
         Field(description="Numéro d'équipe facultatif (ex: 1, 2)."),
     ] = None,
+    competition_id: Annotated[
+        int | str | None,
+        Field(description="ID FFBB de la compétition pour désambiguïser."),
+    ] = None,
+    competition_type: Annotated[
+        str | None,
+        Field(
+            description="Type de compétition ('PLAT', 'COUPE', etc.) pour désambiguïser."
+        ),
+    ] = None,
+    poule_id: Annotated[
+        int | str | None,
+        Field(description="ID FFBB de la poule pour désambiguïser."),
+    ] = None,
+    season_id: Annotated[
+        int | str | None,
+        Field(description="ID de la saison FFBB (optionnel)."),
+    ] = None,
+    force_refresh: Annotated[
+        bool,
+        Field(description="Si True, force le rafraîchissement des données."),
+    ] = False,
 ) -> dict[str, Any]:
     """Identifie une equipe unique (Pivot central).
 
@@ -848,6 +911,11 @@ async def ffbb_resolve_team(
             organisme_id=organisme_id,
             categorie=categorie,
             numero_equipe=numero_equipe,
+            competition_id=competition_id,
+            competition_type=competition_type,
+            poule_id=poule_id,
+            season_id=season_id,
+            force_refresh=force_refresh,
         )
     except Exception as e:
         raise handle_api_error(e) from e
@@ -886,6 +954,24 @@ async def ffbb_team_summary(
             description="Numéro d'équipe dans la catégorie (ex: 1, 2).",
         ),
     ] = 1,
+    competition_id: Annotated[
+        int | str | None,
+        Field(description="ID FFBB de la compétition pour désambiguïser."),
+    ] = None,
+    competition_type: Annotated[
+        str | None,
+        Field(
+            description="Type de compétition ('PLAT', 'COUPE', etc.) pour désambiguïser."
+        ),
+    ] = None,
+    poule_id: Annotated[
+        int | str | None,
+        Field(description="ID FFBB de la poule pour désambiguïser."),
+    ] = None,
+    season_id: Annotated[
+        int | str | None,
+        Field(description="ID de la saison FFBB (optionnel)."),
+    ] = None,
     force_refresh: Annotated[
         bool,
         Field(description="Si True, force un rafraichissement des donnees"),
@@ -923,7 +1009,15 @@ async def ffbb_team_summary(
             organisme_id=organisme_id,
             categorie=effective_cat,
             numero_equipe=numero_equipe,
+            competition_id=competition_id,
+            competition_type=competition_type,
+            poule_id=poule_id,
+            season_id=season_id,
+            force_refresh=force_refresh,
         )
+
+        if resolve_result.get("status") in ("ambiguous", "not_found"):
+            return resolve_result
 
         resolved_team = resolve_result.get("team")
         club_resolu = resolve_result.get("club_resolu")
@@ -955,6 +1049,11 @@ async def ffbb_team_summary(
             club_name=None,
             organisme_id=effective_org_id,
             categorie=effective_cat or categorie,
+            competition_id=competition_id,
+            competition_type=competition_type,
+            poule_id=poule_id,
+            season_id=season_id,
+            force_refresh=force_refresh,
         )
 
         if effective_org_id and categorie:
@@ -962,11 +1061,21 @@ async def ffbb_team_summary(
                 organisme_id=effective_org_id,
                 categorie=categorie,
                 numero_equipe=resolved_num,
+                competition_id=competition_id,
+                competition_type=competition_type,
+                poule_id=poule_id,
+                season_id=season_id,
+                force_refresh=force_refresh,
             )
             next_coro = ffbb_next_match_service(
                 organisme_id=effective_org_id,
                 categorie=categorie,
                 numero_equipe=resolved_num,
+                competition_id=competition_id,
+                competition_type=competition_type,
+                poule_id=poule_id,
+                season_id=season_id,
+                force_refresh=force_refresh,
             )
             raw_bilan, raw_last, raw_next = await asyncio.gather(
                 bilan_coro, last_coro, next_coro, return_exceptions=True
@@ -1067,6 +1176,24 @@ async def ffbb_last_result(
             description="Numéro d'équipe dans la catégorie. Résoudre avec ffbb_resolve_team si ambigu."
         ),
     ] = 1,
+    competition_id: Annotated[
+        int | str | None,
+        Field(description="ID FFBB de la compétition pour désambiguïser."),
+    ] = None,
+    competition_type: Annotated[
+        str | None,
+        Field(
+            description="Type de compétition ('PLAT', 'COUPE', etc.) pour désambiguïser."
+        ),
+    ] = None,
+    poule_id: Annotated[
+        int | str | None,
+        Field(description="ID FFBB de la poule pour désambiguïser."),
+    ] = None,
+    season_id: Annotated[
+        int | str | None,
+        Field(description="ID de la saison FFBB (optionnel)."),
+    ] = None,
     force_refresh: Annotated[
         bool,
         Field(description="Si True, force un rafraichissement des donnees de poule"),
@@ -1092,6 +1219,10 @@ async def ffbb_last_result(
             organisme_id=organisme_id,
             categorie=categorie,
             numero_equipe=numero_equipe,
+            competition_id=competition_id,
+            competition_type=competition_type,
+            poule_id=poule_id,
+            season_id=season_id,
             force_refresh=effective_refresh,
         )
     except Exception as e:
@@ -1132,6 +1263,24 @@ async def ffbb_next_match(
             description="Numéro d'équipe dans la catégorie. Résoudre avec ffbb_resolve_team si ambigu."
         ),
     ] = 1,
+    competition_id: Annotated[
+        int | str | None,
+        Field(description="ID FFBB de la compétition pour désambiguïser."),
+    ] = None,
+    competition_type: Annotated[
+        str | None,
+        Field(
+            description="Type de compétition ('PLAT', 'COUPE', etc.) pour désambiguïser."
+        ),
+    ] = None,
+    poule_id: Annotated[
+        int | str | None,
+        Field(description="ID FFBB de la poule pour désambiguïser."),
+    ] = None,
+    season_id: Annotated[
+        int | str | None,
+        Field(description="ID de la saison FFBB (optionnel)."),
+    ] = None,
     force_refresh: Annotated[
         bool,
         Field(description="Si True, force un rafraichissement des donnees de poule"),
@@ -1164,6 +1313,10 @@ async def ffbb_next_match(
             organisme_id=organisme_id,
             categorie=categorie,
             numero_equipe=numero_equipe,
+            competition_id=competition_id,
+            competition_type=competition_type,
+            poule_id=poule_id,
+            season_id=season_id,
             force_refresh=force_refresh,
         )
     except Exception as e:
@@ -1208,6 +1361,24 @@ async def ffbb_bilan_saison(
             )
         ),
     ] = 1,
+    competition_id: Annotated[
+        int | str | None,
+        Field(description="ID FFBB de la compétition pour désambiguïser."),
+    ] = None,
+    competition_type: Annotated[
+        str | None,
+        Field(
+            description="Type de compétition ('PLAT', 'COUPE', etc.) pour désambiguïser."
+        ),
+    ] = None,
+    poule_id: Annotated[
+        int | str | None,
+        Field(description="ID FFBB de la poule pour désambiguïser."),
+    ] = None,
+    season_id: Annotated[
+        int | str | None,
+        Field(description="ID de la saison FFBB (optionnel)."),
+    ] = None,
     force_refresh: Annotated[
         bool,
         Field(
@@ -1248,6 +1419,10 @@ async def ffbb_bilan_saison(
             organisme_id=organisme_id,
             categorie=effective_cat,
             numero_equipe=effective_num,
+            competition_id=competition_id,
+            competition_type=competition_type,
+            poule_id=poule_id,
+            season_id=season_id,
             force_refresh=effective_refresh,
         )
         await _safe_report_progress(ctx, 1, total=1, message="Bilan saison prêt.")
@@ -1313,6 +1488,24 @@ async def ffbb_head_to_head(
             description="Alias pour organisme_id_b : ID FFBB du second club / adversaire."
         ),
     ] = None,
+    competition_id: Annotated[
+        int | str | None,
+        Field(description="ID FFBB de la compétition pour désambiguïser."),
+    ] = None,
+    competition_type: Annotated[
+        str | None,
+        Field(
+            description="Type de compétition ('PLAT', 'COUPE', etc.) pour désambiguïser."
+        ),
+    ] = None,
+    poule_id: Annotated[
+        int | str | None,
+        Field(description="ID FFBB de la poule pour désambiguïser."),
+    ] = None,
+    season_id: Annotated[
+        int | str | None,
+        Field(description="ID de la saison FFBB (optionnel)."),
+    ] = None,
     force_refresh: Annotated[
         bool,
         Field(description="Si True, force le rafraîchissement des données"),
@@ -1342,6 +1535,10 @@ async def ffbb_head_to_head(
             club_b=eff_club_b,
             organisme_id_b=eff_org_b,
             categorie=categorie,
+            competition_id=competition_id,
+            competition_type=competition_type,
+            poule_id=poule_id,
+            season_id=season_id,
             force_refresh=force_refresh,
         )
         await _safe_report_progress(ctx, 2, total=2, message="Face-à-face prêt.")

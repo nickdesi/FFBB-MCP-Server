@@ -744,8 +744,9 @@ async def _dedupe_inflight(
     make_coro,
     cache_name: str,
     swr_ttl: float | None = None,
+    force_refresh: bool = False,
 ) -> Any:
-    if cache is not None:
+    if cache is not None and not force_refresh:
         cached = _cache_get(cache, cache_key, cache_name)
         if cached is not None:
             # Stale-While-Revalidate : on sert l'entrée valide mais stale
@@ -755,7 +756,7 @@ async def _dedupe_inflight(
             return cached
 
     async with _get_inflight_lock(inflight_map):
-        if cache is not None:
+        if cache is not None and not force_refresh:
             cached = _cache_get(cache, cache_key, cache_name, record_miss=False)
             if cached is not None:
                 return cached

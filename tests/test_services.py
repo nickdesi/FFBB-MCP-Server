@@ -980,7 +980,7 @@ class TestTruncationMeta:
     def test_add_truncation_meta_with_total(self):
         result = [{"nom": "A", "_total_hits": 50}, {"nom": "B"}]
         out = _add_truncation_meta(result)
-        assert out[0]["_meta"] is True
+        assert bool(out[0]["_meta"]) is True
         assert out[0]["total"] == 50
         assert out[0]["returned"] == 2
         assert out[0]["truncated"] is True
@@ -1049,7 +1049,7 @@ class TestTruncationMeta:
         mock_client.multi_search_async = AsyncMock(return_value=mock_res)
 
         result = await ffbb_search_service(query="test", type="all", limit=10)
-        assert result[0]["_meta"] is True
+        assert bool(result[0]["_meta"]) is True
         assert result[0]["total"] == 50
         assert result[0]["truncated"] is True
         assert len(result) == 11  # _meta + 10 results
