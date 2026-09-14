@@ -31,6 +31,7 @@ dev = [
     "pytest-cov>=4.1.0",
     "ruff>=0.15.12",
     "mypy>=1.15.0",
+    "pyright>=1.1.414",
     "radon>=6.0.1",
     "types-cachetools>=7.0.0.20260503",
     "types-setuptools",
