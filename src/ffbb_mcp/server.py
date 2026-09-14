@@ -656,7 +656,9 @@ async def ffbb_club(
                     }
                 ]
             result = await ffbb_equipes_club_service(
-                organisme_id=target_org_id, filtre=effective_filtre
+                organisme_id=target_org_id,
+                filtre=effective_filtre,
+                force_refresh=force_refresh,
             )
             if not result:
                 return [
