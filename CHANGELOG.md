@@ -5,19 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.11.0] - 2026-09-14
 
 ### Added
-- **Gestion optimisée du démarrage de saison 2026-2027 (0 match disputé)** : Neutralisation des faux classements d'attaque/défense dans `analytics.py` et statut explicite en ouverture de saison.
-- **Enrichissement des catégories & formats FFBB** : Support de `U7` (Baby Basket), `U9` (Mini Basket), `U20` (Juniors), `U21` (Espoirs), formats 3x3 (`Superleague`, `Juniorleague`, `Open Plus`, `Open Start`) et codes jeunes régionaux/départementaux (`RM18`, `RF18`, `DM15`, `DF13`, `RM20`, `DM20`).
-- **Couverture intégrale des Ressources MCP (URI `ffbb://`)** : Enregistrement de `ffbb://rencontre/{id}`, `ffbb://salle/{id}`, `ffbb://officiel/{id}`, `ffbb://entraineur/{id}` et support étendu de `type="salle"` dans `ffbb_get`.
-- **Résolution précise des clubs et ententes** : Boost de score 2.0 pour égalité exacte de nom de club et support de `force_refresh` sur l'ensemble de la chaîne de recherche.
-- **Formatage standardisé de `result` (MCP)** : Sérialisation des listes d'objets de données en un tableau JSON unique `[...]` au lieu de blocs NDJSON sans crochets (`apply_fastmcp_json_formatting_patch`).
-- **Support du paramètre `categorie` dans `ffbb_club`** : `categorie` est désormais accepté comme alias direct de `filtre`, permettant d'obtenir le classement complet en 1 étape fluide via `club_name` + `categorie`.
+- **Audit GLM 5.3 & Robustesse des Divisions (`ffbb_bilan_saison`)** :
+  - Support précis des divisions seniors et régionales (`NM3`, `NF1`, `RM2`, `DM1`) sans décaler le `numero_equipe` par défaut (`SEM1`).
+  - Déduplication stricte des poules et phases amicales de pré-saison par `poule_id` (résout le doublon de statistiques dans `bilan_total`).
+- **Polymorphisme & Alias (`ffbb_head_to_head`)** :
+  - Prise en charge transparente des alias d'arguments : `club_name` / `club_a`, `adversaire` / `club_b`, `organisme_id` / `organisme_id_a`, `adversaire_id` / `organisme_id_b`.
+- **Filtrage Strict des Rencontres en Direct (`ffbb_lives`)** :
+  - Filtre natif `_is_live_match` assurant le retour d'un tableau vide `[]` lorsqu'aucun match n'est en cours (exclusion des matchs `SCHEDULED` 0-0).
+  - Nouveau paramètre optionnel `include_scheduled: bool = False` pour inspecter la grille complète des matchs programmés du jour.
+- **Indicateur de Fiabilité des Horaires (`horaire_renseigne`)** :
+  - Ajout du flag booléen `horaire_renseigne: bool` sur `ffbb_next_match`, `ffbb_last_result` et `ffbb_club(action="calendrier")` pour neutraliser les placeholders `"0"` / `"00:00:00"`.
+- **Enrichissement des Catégories & Formats FFBB** :
+  - Support de `U7` (Baby Basket), `U9` (Mini Basket), `U20` (Juniors), `U21` (Espoirs), formats 3x3 (`Superleague`, `Juniorleague`, `Open Plus`, `Open Start`) et codes jeunes régionaux/départementaux (`RM18`, `RF18`, `DM15`, `DF13`, `RM20`, `DM20`).
+- **Couverture Intégrale des Ressources MCP (URI `ffbb://`)** :
+  - Enregistrement de `ffbb://rencontre/{id}`, `ffbb://salle/{id}`, `ffbb://officiel/{id}`, `ffbb://entraineur/{id}` et support étendu de `type="salle"` dans `ffbb_get`.
+- **Formatage JSON Standardisé & Alias `categorie`** :
+  - Sérialisation des listes d'objets en tableau JSON unique `[...]`.
+  - Acceptation de `categorie` comme alias direct de `filtre` dans `ffbb_club`.
 
 ### Changed & Performance
-- **Tri numérique natif des classements** : Normalisation et tri ascendant strict sur la position entière (`int(position)`), garantissant l'ordre `1, 2, ..., 10, 11...` au lieu de l'ordre lexicographique.
-- **Épuration chirurgicale du payload `ffbb_team_summary`** : Suppression de la triple répétition de `club_resolu`, `team` et `_meta` dans `last_match` et `next_match` (gain de 40 à 50% de tokens).
+- **Isolation Hermétique des Linters & Dépendances** :
+  - Déclaration explicite de `pyright>=1.1.414` dans les dépendances `dev` de `pyproject.toml` et mise à niveau complète du lockfile `uv.lock`.
+- **Tri Numérique Natif des Classements** : Tri ascendant strict sur la position entière (`int(position)`).
+- **Épuration Chirurgicale du Payload `ffbb_team_summary`** : Suppression des redondances dans `last_match` et `next_match` (-40 à 50% de tokens).
+
 
 
 ## [1.10.0] - 2026-09-06

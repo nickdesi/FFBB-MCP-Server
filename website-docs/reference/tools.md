@@ -1,8 +1,21 @@
 # 📚 Référence Complète des Outils FFBB MCP
 
-> Version courante : **1.10.0**
+> Version courante : **1.11.0**
 
 Ce document fournit une documentation technique exhaustive pour les outils exposés par le serveur FFBB MCP. Il est destiné aux développeurs et aux agents IA pour comprendre les capacités et les schémas de données du serveur.
+
+## ✨ Nouveautés v1.11.0
+
+| # | Amélioration | Impact |
+| --- | --- | --- |
+| 1 | **Résolution divisions seniors & régionales (`NM3`, `NF1`, `RM2`, `DM1`)** — Parsing robuste dans `parse_categorie` pour reconnaître les niveaux de divisions sans altérer le numéro d'équipe. | `ffbb_bilan_saison`, `ffbb_resolve_team`, `ffbb_club` |
+| 2 | **Déduplication des poules amicales/tournois** — Déduplication stricte par `poule_id` pour éliminer les doublons de statistiques dans `bilan_total`. | `ffbb_bilan_saison` |
+| 3 | **Filtrage strict des rencontres en direct (`ffbb_lives`)** — Prédicat `_is_live_match` retournant `[]` en l'absence de match en cours + option `include_scheduled`. | `ffbb_lives` |
+| 4 | **Indicateur de fiabilité horaire (`horaire_renseigne`)** — Flag booléen pour détecter et neutraliser les faux horaires (`"0"`, `"00:00:00"`). | `ffbb_next_match`, `ffbb_last_result`, `ffbb_club` |
+| 5 | **Polymorphisme des alias H2H** — Support de `club_name` / `adversaire` et `organisme_id` / `adversaire_id`. | `ffbb_head_to_head` |
+| 6 | **Herméticité des Linters (`pyright>=1.1.414`)** — Dépendance dev verrouillée, éliminant les warnings de version. | Environnement Dev & CI |
+
+---
 
 ## ✨ Nouveautés v1.0.0
 
@@ -359,9 +372,10 @@ la logique de désambiguïsation (U11M1, U13F-2, etc.).
 
 ### `ffbb_lives`
 
-**Description** : Récupère instantanément tous les matchs en cours (Live Stats). Les scores sont rafraîchis toutes les 30 secondes.
+**Description** : Récupère instantanément tous les matchs en cours (Live Stats). Par défaut, retourne uniquement les matchs actuellement actifs en direct (`[]` si aucun match en jeu). Les scores sont rafraîchis toutes les 30 secondes.
 
-- **Arguments** : Aucun.
+- **Arguments** :
+  - `include_scheduled` (boolean, défaut: `false`) : Si `true`, inclut l'intégralité des matchs programmés du jour même s'ils ne sont pas encore commencés.
 
 ### `ffbb_saisons`
 
@@ -380,7 +394,7 @@ la logique de désambiguïsation (U11M1, U13F-2, etc.).
 
   ```jsonc
   {
-    "package_version": "1.10.0",       // version du package ffbb-mcp
+    "package_version": "1.11.0",       // version du package ffbb-mcp
     "mcp_sdk_version": "1.27.0",      // version du SDK MCP Python installé
     "python_version": "3.12.9",       // version de l'interpréteur Python
     "transport": "streamable-http",   // "streamable-http" ou "stdio"
@@ -656,3 +670,29 @@ Il agrège toutes les phases (toutes poules) de la saison FFBB pour l'équipe id
   ]
 }
 ```
+
+---
+
+## 🥊 Outil de Face-à-Face & Comparaison (H2H)
+
+### `ffbb_head_to_head`
+
+**Description** : Compare deux équipes et analyse leurs confrontations directes (H2H) sur la saison.
+
+Fournit une analyse tactique complète et narrative pour préparer un avant-match ou analyser une rivalité sportive.
+
+**Arguments** :
+
+- `club_a` ou `club_name` (string, optionnel) : Nom du premier club (ex: `"Stade Clermontois"`).
+- `organisme_id_a` ou `organisme_id` (integer|string, optionnel) : ID FFBB du premier club.
+- `club_b` ou `adversaire` (string, optionnel) : Nom du second club / adversaire (ex: `"Vichy"`).
+- `organisme_id_b` ou `adversaire_id` (integer|string, optionnel) : ID FFBB du second club / adversaire.
+- `categorie` (string, optionnel) : Catégorie d'équipe commune à comparer (ex: `"SEM1"`, `"U18M"`, `"Senior"`).
+- `force_refresh` (boolean, défaut: `false`) : Force le rafraîchissement des caches poules.
+
+**Retour** : un objet JSON structuré comprenant :
+- Bilan historique des confrontations directes de la saison (victoires A vs B, scores, écarts)
+- Forme récente respective de chaque équipe (`V-D-V-V...`) et séries en cours
+- Duel statistique des styles : Attaque vs Défense, ratio de victoires domicile/extérieur
+- Points clés narratifs synthétiques prêts pour les LLMs
+
