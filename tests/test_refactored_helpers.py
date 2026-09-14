@@ -380,7 +380,7 @@ class TestFormatPouleResponse:
             ],
         }
         result = await format_poule_response(poule_data)
-        assert result["id"] == 42
+        assert str(result["id"]) == "42"
         assert result["nom"] == "Poule A"
         assert result["classements"][0]["equipe"] == "CSB REVARD"
         assert "api.ffbb.com/assets/abc123" in result["classements"][0]["logo_url"]

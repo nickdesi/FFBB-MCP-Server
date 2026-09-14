@@ -290,9 +290,21 @@ async def format_poule_response(poule_data: dict) -> dict[str, Any]:
 
     await _enrich_matches_with_salle_details(formatted_rencontres)
 
+    # Synthèse robuste du nom de poule : l'API FFBB renvoie parfois libelle=None
+    # avant J1 (ex: U13M2). On reconstruit depuis competition/poule_id pour
+    # éviter "Salle non encore renseignée" côté agent.
+    poule_libelle = (
+        poule_data.get("libelle")
+        or poule_data.get("nom")
+        or poule_data.get("competition")
+        or ""
+    )
+    if not poule_libelle:
+        pid = poule_data.get("id")
+        poule_libelle = f"Poule {pid}" if pid else "Poule"
     res: dict[str, Any] = {
-        "id": poule_data.get("id"),
-        "nom": poule_data.get("libelle"),
+        "id": str(poule_data.get("id")) if poule_data.get("id") is not None else None,
+        "nom": poule_libelle,
         "classements": formatted_classements,
         "rencontres": formatted_rencontres,
         "_meta": _freshness_meta(
