@@ -544,9 +544,9 @@ class TestCalendrierClubService:
 
         result_2 = await get_calendrier_club_service(club_name="club fantome")
 
-        # _build_calendar_matches now returns an error dict instead of []
-        assert isinstance(result_1, list) and len(result_1) == 1
-        assert "error" in result_1[0]
+        # _build_calendar_matches returns a dict with error
+        assert isinstance(result_1, dict)
+        assert "error" in result_1
         assert result_1 == result_2
         # The second call should be served from cache — no additional API calls.
         assert mock_client.search_organismes_async.await_count == call_count_after_first
@@ -559,10 +559,10 @@ class TestCalendrierClubService:
         mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
 
         result = await get_calendrier_club_service(organisme_id=123)
-        assert len(result) == 1
-        assert "warning" in result[0]
-        assert "équipes engagées" in result[0]["warning"]
-        assert result[0]["equipes"] == []
+        assert isinstance(result, dict)
+        assert "warning" in result
+        assert "équipes engagées" in result["warning"]
+        assert result["items"] == []
 
     @pytest.mark.asyncio
     async def test_full_workflow(self, patch_get_client, mock_client):
@@ -613,11 +613,15 @@ class TestCalendrierClubService:
         mock_client.get_salle_async = AsyncMock(return_value=salle_mock)
 
         result = await get_calendrier_club_service(organisme_id=123)
-        assert len(result) == 1
-        assert result[0]["equipe1"] == "CLERMONT"
-        assert result[0]["score_equipe1"] == 50
-        assert result[0]["salle_details"]["id"] == "s1"
-        assert result[0]["adresse_salle"] == "2 avenue du Sport Riom"
+        assert isinstance(result, dict)
+        assert len(result["items"]) == 1
+        item = result["items"][0]
+        assert item["equipe1"] == "CLERMONT"
+        assert item["score_equipe1"] == 50
+        assert item["salle_details"]["id"] == "s1"
+        assert item["adresse_salle"] == "2 avenue du Sport Riom"
+        assert result["_meta"]["total"] == 1
+        assert result["_meta"]["sort"] == "scheduled_at:asc"
 
     @pytest.mark.asyncio
     async def test_deduplicates_poule_fetches(self, patch_get_client, mock_client):
@@ -682,7 +686,8 @@ class TestCalendrierClubService:
 
         result = await get_calendrier_club_service(organisme_id=123)
 
-        assert len(result) == 2
+        assert isinstance(result, dict)
+        assert len(result["items"]) == 2
         assert mock_client.get_poule_async.await_count == 1
 
     @pytest.mark.asyncio
@@ -740,8 +745,9 @@ class TestCalendrierClubService:
 
         result = await get_calendrier_club_service(organisme_id=123)
 
-        assert len(result) == 1
-        assert result[0]["id"] == "m2"
+        assert isinstance(result, dict)
+        assert len(result["items"]) == 1
+        assert result["items"][0]["id"] == "m2"
 
     @pytest.mark.asyncio
     async def test_truncates_when_too_many_matches(
@@ -800,18 +806,17 @@ class TestCalendrierClubService:
 
         result = await get_calendrier_club_service(organisme_id=123, categorie="U13F")
 
-        # On doit avoir 3 matchs + 1 warning
-        assert len(result) == 4
-        matches = result[:-1]
-        warning = result[-1]
+        # On doit avoir 3 matchs retournés et un total de 10
+        assert isinstance(result, dict)
+        assert len(result["items"]) == 3
+        assert result["_meta"]["total"] == 10
+        assert result["_meta"]["returned"] == 3
+        assert result["_meta"]["has_more"] is True
+        assert result["_meta"]["truncated"] is True
 
-        # Vérifie que seuls les 3 plus récents (dates les plus grandes) sont présents
-        dates = [m["date"] for m in matches]
-        assert dates == sorted(dates, reverse=True)
-        assert len(matches) == 3
-
-        assert "warning" in warning
-        assert "Résultat tronqué" in warning["warning"]
+        # Vérifie le tri ascendant
+        dates = [m["date"] for m in result["items"]]
+        assert dates == sorted(dates)
 
     @pytest.mark.asyncio
     async def test_calendrier_filters_matches_to_club_team_only(
@@ -872,9 +877,10 @@ class TestCalendrierClubService:
             organisme_id=9326, categorie="SEM", numero_equipe=1
         )
 
-        assert len(result) == 1
-        assert result[0]["id"] == "match_our_team"
-        assert result[0]["equipe2"] == "STADE CLERMONTOIS - 1"
+        assert isinstance(result, dict)
+        assert len(result["items"]) == 1
+        assert result["items"][0]["id"] == "match_our_team"
+        assert result["items"][0]["equipe2"] == "STADE CLERMONTOIS - 1"
 
 
 # ---------------------------------------------------------------------------
@@ -980,26 +986,36 @@ class TestTruncationMeta:
     def test_add_truncation_meta_with_total(self):
         result = [{"nom": "A", "_total_hits": 50}, {"nom": "B"}]
         out = _add_truncation_meta(result)
-        assert bool(out[0]["_meta"]) is True
-        assert out[0]["total"] == 50
-        assert out[0]["returned"] == 2
-        assert out[0]["truncated"] is True
-        assert "_total_hits" not in out[0]
-        assert "_total_hits" not in out[1]
+        assert isinstance(out, dict)
+        assert "items" in out
+        assert "_meta" in out
+        assert out["_meta"]["total"] == 50
+        assert out["_meta"]["returned"] == 2
+        assert out["_meta"]["truncated"] is True
+        assert len(out["items"]) == 2
+        assert "_total_hits" not in out["items"][0]
+        assert "_total_hits" not in out["items"][1]
 
     def test_add_truncation_meta_no_truncation(self):
         result = [{"nom": "A"}, {"nom": "B"}]
         out = _add_truncation_meta(result)
-        assert len(out) == 2
-        assert "_meta" not in out[0]
+        assert isinstance(out, dict)
+        assert len(out["items"]) == 2
+        assert out["_meta"]["total"] == 2
+        assert out["_meta"]["has_more"] is False
 
     def test_add_truncation_meta_empty(self):
-        assert _add_truncation_meta([]) == []
+        out = _add_truncation_meta([])
+        assert isinstance(out, dict)
+        assert out["items"] == []
+        assert out["_meta"]["total"] == 0
+        assert out["_meta"]["has_more"] is False
 
     def test_add_truncation_meta_strips_total_hits(self):
         result = [{"nom": "A", "_total_hits": 10}, {"nom": "B", "_total_hits": 10}]
         out = _add_truncation_meta(result)
-        for item in out:
+        assert isinstance(out, dict)
+        for item in out["items"]:
             assert "_total_hits" not in item
 
     @pytest.mark.asyncio
@@ -1049,10 +1065,10 @@ class TestTruncationMeta:
         mock_client.multi_search_async = AsyncMock(return_value=mock_res)
 
         result = await ffbb_search_service(query="test", type="all", limit=10)
-        assert bool(result[0]["_meta"]) is True
-        assert result[0]["total"] == 50
-        assert result[0]["truncated"] is True
-        assert len(result) == 11  # _meta + 10 results
+        assert isinstance(result, dict)
+        assert result["_meta"]["total"] == 50
+        assert result["_meta"]["truncated"] is True
+        assert len(result["items"]) == 10
 
 
 class TestGetPouleService:
@@ -2437,7 +2453,7 @@ class TestServicesRobustness:
         res = await get_calendrier_club_service(
             "TEST CLUB", 123, "RM1", 1, extra_param="ignored"
         )
-        assert isinstance(res, list)
+        assert isinstance(res, dict)
 
     @pytest.mark.asyncio
     async def test_get_classement_service_fallback_rencontres(

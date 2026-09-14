@@ -845,43 +845,49 @@ def _add_truncation_meta(
     result: list[dict[str, Any]],
     limit: int = 20,
     offset: int = 0,
-) -> list[dict[str, Any]]:
-    """Ajoute un objet _meta en tête de liste pour documenter le total et la pagination."""
+) -> dict[str, Any]:
+    """Enveloppe le résultat de recherche avec des métadonnées de pagination.
+
+    Retourne un dict ``{"items": [...], "_meta": {...}}`` au lieu d'une liste brute.
+    """
     if not result:
-        return result
+        return {
+            "items": [],
+            "_meta": {
+                "total": 0,
+                "returned": 0,
+                "limit": limit,
+                "offset": offset,
+                "has_more": False,
+            },
+        }
+
     total = result[0].pop("_total_hits", None)
     result_offset = result[0].pop("_offset", offset)
     for item in result[1:]:
         item.pop("_total_hits", None)
         item.pop("_offset", None)
 
-    if total is not None and total > len(result):
-        has_more = (result_offset + len(result)) < total
-        next_offset = (result_offset + len(result)) if has_more else None
-        meta_dict = {
-            "total": total,
-            "returned": len(result),
-            "limit": limit,
-            "offset": result_offset,
-            "has_more": has_more,
-            "next_offset": next_offset,
-            "truncated": True,
-            "message": f"{total} résultat(s) au total, {len(result)} retourné(s) (offset={result_offset}).",
-        }
-        result.insert(
-            0,
-            {
-                "_meta": meta_dict,
-                "total": total,
-                "returned": len(result),
-                "limit": limit,
-                "offset": result_offset,
-                "has_more": has_more,
-                "next_offset": next_offset,
-                "truncated": True,
-            },
-        )
-    return result
+    effective_total = total if total is not None else len(result)
+    has_more = (result_offset + len(result)) < effective_total
+    next_offset = (result_offset + len(result)) if has_more else None
+
+    meta: dict[str, Any] = {
+        "total": effective_total,
+        "returned": len(result),
+        "limit": limit,
+        "offset": result_offset,
+        "has_more": has_more,
+    }
+    if next_offset is not None:
+        meta["next_offset"] = next_offset
+    if has_more:
+        meta["truncated"] = True
+
+    return {
+        "items": result,
+        "_meta": meta,
+    }
 
 
 async def ffbb_search_service(
@@ -893,7 +899,7 @@ async def ffbb_search_service(
     filter_by: str | None = None,
     sort: list[str] | None = None,
     force_refresh: bool = False,
-) -> list[dict[str, Any]]:
+) -> dict[str, Any] | list[dict[str, Any]]:
     """Service de recherche FFBB unifié avec support complet de limit et offset.
 
     Recherche dans les données FFBB (organismes, compétitions, rencontres, salles, tournois...).

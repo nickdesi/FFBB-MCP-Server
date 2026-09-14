@@ -141,15 +141,11 @@ async def test_search_pagination_respects_limit_and_offset(mock_client) -> None:
         offset=0,
         force_refresh=True,
     )
-    assert isinstance(res_page1, list)
-    # Vérification des métadonnées de pagination
-    meta_items = [
-        item
-        for item in res_page1
-        if "_meta" in item and isinstance(item["_meta"], dict)
-    ]
-    assert len(meta_items) == 1
-    meta = meta_items[0]["_meta"]
+    assert isinstance(res_page1, dict)
+    assert "items" in res_page1
+    assert "_meta" in res_page1
+    assert len(res_page1["items"]) == 10
+    meta = res_page1["_meta"]
     assert meta["limit"] == 10
     assert meta["offset"] == 0
     assert meta["returned"] == 10
@@ -165,17 +161,15 @@ async def test_search_pagination_respects_limit_and_offset(mock_client) -> None:
         offset=10,
         force_refresh=True,
     )
-    meta2 = next(
-        item["_meta"]
-        for item in res_page2
-        if "_meta" in item and isinstance(item["_meta"], dict)
-    )
+    assert isinstance(res_page2, dict)
+    assert len(res_page2["items"]) == 10
+    meta2 = res_page2["_meta"]
     assert meta2["offset"] == 10
     assert meta2["returned"] == 10
 
     # Vérification de l'absence de collision entre les items de la page 1 et de la page 2
-    ids_p1 = {item["id"] for item in res_page1 if "id" in item}
-    ids_p2 = {item["id"] for item in res_page2 if "id" in item}
+    ids_p1 = {item["id"] for item in res_page1["items"] if "id" in item}
+    ids_p2 = {item["id"] for item in res_page2["items"] if "id" in item}
     assert ids_p1.isdisjoint(ids_p2)
 
 

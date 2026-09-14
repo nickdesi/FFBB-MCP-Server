@@ -333,7 +333,7 @@ async def ffbb_search(
         bool,
         Field(description="Si True, force le rafraîchissement des données."),
     ] = False,
-) -> list[dict[str, Any]]:
+) -> dict[str, Any] | list[dict[str, Any]]:
     """Recherche FFBB — clubs, compétitions, matchs, salles, tournois, etc.
 
     - type='all' → recherche globale (meilleur point d'entrée).
@@ -619,7 +619,21 @@ async def ffbb_club(
             description="Catégorie, division ou filtre d'équipe (alias pour 'filtre', ex: 'NM3', 'U15M', 'Senior').",
         ),
     ] = None,
-) -> list[dict[str, Any]] | list[CalendrierMatch]:
+    competition_id: Annotated[
+        int | str | None,
+        Field(description="ID FFBB de la compétition pour désambiguïser."),
+    ] = None,
+    competition_type: Annotated[
+        str | None,
+        Field(
+            description="Type de compétition ('PLAT', 'COUPE', etc.) pour désambiguïser."
+        ),
+    ] = None,
+    season_id: Annotated[
+        int | str | None,
+        Field(description="ID de la saison FFBB (optionnel)."),
+    ] = None,
+) -> list[dict[str, Any]] | list[CalendrierMatch] | dict[str, Any]:
     """Outils agrégés club : calendrier (matchs pluriels), équipes engagées ou classement.
 
     Outil de référence pour toute demande au pluriel : matchs restants, calendrier complet.
@@ -650,6 +664,12 @@ async def ffbb_club(
                 kwargs["date_fin"] = date_fin
             if limit is not None:
                 kwargs["limit"] = limit
+            if competition_id is not None:
+                kwargs["competition_id"] = competition_id
+            if competition_type is not None:
+                kwargs["competition_type"] = competition_type
+            if season_id is not None:
+                kwargs["season_id"] = season_id
             return await get_calendrier_club_service(**kwargs)
 
         # Actions equipes / classement : pré-résolution nécessaire

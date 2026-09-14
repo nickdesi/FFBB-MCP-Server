@@ -1632,7 +1632,10 @@ async def _build_calendar_matches(
     date_debut: str | None,
     date_fin: str | None,
     limit: int | None,
-) -> list[dict]:
+    competition_id: int | str | None = None,
+    competition_type: str | None = None,
+    season_id: int | str | None = None,
+) -> dict[str, Any]:
     """Construit la liste des matchs (calendrier complet) pour un club / catégorie.
 
     Extrait de la closure `_fetch` historiquement définie dans
@@ -1647,12 +1650,19 @@ async def _build_calendar_matches(
     )
 
     if not resolved_clubs:
-        return [
-            {
-                "error": f"Aucun club trouvé pour '{club_name or organisme_id}'. "
-                "Vérifie l'orthographe ou utilise ffbb_search.",
-            }
-        ]
+        return {
+            "items": [],
+            "_meta": {
+                "total": 0,
+                "returned": 0,
+                "sort": "scheduled_at:asc",
+                "generated_at": datetime.now(_PARIS_TZ).isoformat(),
+            },
+            "error": (
+                f"Aucun club trouvé pour '{club_name or organisme_id}'. "
+                "Vérifie l'orthographe ou utilise ffbb_search."
+            ),
+        }
 
     if len(resolved_clubs) > 1 and not organisme_id:
         candidates = [
@@ -1664,13 +1674,20 @@ async def _build_calendar_matches(
             for c in resolved_clubs
             if isinstance(c, dict)
         ]
-        return [
-            {
-                "error": f"Plusieurs clubs correspondent à '{club_name}'. "
-                "Précise l'organisme_id ou un nom plus exact.",
-                "candidates": candidates,
-            }
-        ]
+        return {
+            "items": [],
+            "_meta": {
+                "total": 0,
+                "returned": 0,
+                "sort": "scheduled_at:asc",
+                "generated_at": datetime.now(_PARIS_TZ).isoformat(),
+            },
+            "error": (
+                f"Plusieurs clubs correspondent à '{club_name}'. "
+                "Précise l'organisme_id ou un nom plus exact."
+            ),
+            "candidates": candidates,
+        }
 
     target_org_ids = [str(c["organisme_id"]) for c in resolved_clubs]
     target_org_ids = list(dict.fromkeys(oid for oid in target_org_ids if oid))
@@ -1703,16 +1720,50 @@ async def _build_calendar_matches(
         ]
 
     if not equipes:
-        return [
-            {
-                "warning": (
-                    f"Aucune équipe active pour '{club_name or organisme_id}' "
-                    f"(catégorie: '{categorie or 'toutes'}'). "
-                    "Le club existe mais n'a pas d'équipes engagées."
-                ),
-                "equipes": [],
-            }
+        return {
+            "items": [],
+            "_meta": {
+                "total": 0,
+                "returned": 0,
+                "sort": "scheduled_at:asc",
+                "generated_at": datetime.now(_PARIS_TZ).isoformat(),
+            },
+            "warning": (
+                f"Aucune équipe active pour '{club_name or organisme_id}' "
+                f"(catégorie: '{categorie or 'toutes'}'). "
+                "Le club existe mais n'a pas d'équipes engagées."
+            ),
+        }
+
+    # Application des filtres de désambiguïsation sur les équipes
+    if competition_id is not None:
+        target_comp = str(competition_id).strip()
+        equipes = [
+            e
+            for e in equipes
+            if str(e.get("competition_id") or "").strip() == target_comp
         ]
+    if competition_type is not None:
+        target_type = str(competition_type).strip().upper()
+        equipes = [
+            e
+            for e in equipes
+            if str(e.get("competition_type") or "").strip().upper() == target_type
+        ]
+    if not equipes:
+        return {
+            "items": [],
+            "_meta": {
+                "total": 0,
+                "returned": 0,
+                "sort": "scheduled_at:asc",
+                "generated_at": datetime.now(_PARIS_TZ).isoformat(),
+            },
+            "warning": (
+                f"Aucun engagement ne correspond aux critères de compétition spécifiés "
+                f"(competition_id={competition_id}, competition_type={competition_type})."
+            ),
+        }
 
     equipes = _dedup_equipes_by_engagement(equipes)
 
@@ -1772,7 +1823,7 @@ async def _build_calendar_matches(
             if not isinstance(match, dict):
                 continue
             match_id = match.get("id")
-            if not match_id or match_id in seen_match_ids:
+            if match_id is None or match_id == "" or match_id in seen_match_ids:
                 continue
 
             eng1 = match.get("idEngagementEquipe1")
@@ -1979,11 +2030,7 @@ async def _build_calendar_matches(
             )
         ]
 
-    all_matches.sort(key=lambda x: (x["_dt"] is None, x["_dt"] or now), reverse=True)
-
-    # Limitation optionnelle
-    if limit is not None:
-        all_matches = all_matches[:limit]
+    all_matches.sort(key=lambda x: (x["_dt"] is None, x["_dt"] or now))
 
     played_indices: list[int] = []
     future_indices: list[int] = []
@@ -2008,26 +2055,15 @@ async def _build_calendar_matches(
     effective = all_matches
 
     max_matches = _get_max_calendar_matches()
-    if len(effective) > max_matches:
-        truncated = effective[:max_matches]
-        warning = {
-            "warning": (
-                "Résultat tronqué côté MCP: trop de matchs pour ce club/catégorie. "
-                "Affichage limité pour protéger les performances. "
-                "Affinez votre requête (catégorie précise, équipe 1/2, phase, etc.)."
-            ),
-            "total_initial": len(all_matches),
-            "limite_appliquee": max_matches,
-        }
-        # Validation stricte via Pydantic
-        validated_trunc = []
-        for m in truncated:
-            if "warning" in m:
-                validated_trunc.append(m)
-            else:
-                validated_trunc.append(CalendrierMatch(**m).model_dump(by_alias=True))
-        validated_trunc.append(warning)
-        return validated_trunc
+    total_before_limit = len(effective)
+
+    # Limitation optionnelle par l'utilisateur
+    applied_limit = limit
+    if limit is not None:
+        effective = effective[:limit]
+    elif len(effective) > max_matches:
+        effective = effective[:max_matches]
+        applied_limit = max_matches
 
     # Validation stricte via Pydantic
     validated_matches = []
@@ -2036,7 +2072,24 @@ async def _build_calendar_matches(
             validated_matches.append(m)
         else:
             validated_matches.append(CalendrierMatch(**m).model_dump(by_alias=True))
-    return validated_matches
+
+    has_more = len(validated_matches) < total_before_limit
+    meta: dict[str, Any] = {
+        "total": total_before_limit,
+        "returned": len(validated_matches),
+        "sort": "scheduled_at:asc",
+        "has_more": has_more,
+        "generated_at": datetime.now(tz).isoformat(),
+    }
+    if applied_limit is not None:
+        meta["limit"] = applied_limit
+    if has_more:
+        meta["truncated"] = True
+
+    return {
+        "items": validated_matches,
+        "_meta": meta,
+    }
 
 
 async def get_calendrier_club_service(
@@ -2049,10 +2102,13 @@ async def get_calendrier_club_service(
     date_debut: str | None = None,
     date_fin: str | None = None,
     limit: int | None = None,
+    competition_id: int | str | None = None,
+    competition_type: str | None = None,
+    season_id: int | str | None = None,
     force_refresh: bool = False,
     **kwargs: Any,
-) -> list[dict]:
-    cache_key = f"calendrier:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}:{numero_equipe or ''}:{_normalize_name(adversaire or '')}:{date_debut or ''}:{date_fin or ''}:{limit or ''}"
+) -> dict[str, Any]:
+    cache_key = f"calendrier:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}:{numero_equipe or ''}:{_normalize_name(adversaire or '')}:{date_debut or ''}:{date_fin or ''}:{limit or ''}:{competition_id or ''}:{competition_type or ''}"
 
     if force_refresh and state.cache_calendrier is not None:
         state.cache_calendrier.pop(cache_key, None)
@@ -2070,6 +2126,9 @@ async def get_calendrier_club_service(
             date_debut,
             date_fin,
             limit,
+            competition_id=competition_id,
+            competition_type=competition_type,
+            season_id=season_id,
         ),
         cache_name="calendrier",
     )
@@ -2343,6 +2402,66 @@ async def ffbb_head_to_head_service(
         not_found_status="not_found_b",
         force_refresh=force_refresh,
     )
+
+    # Fallback par poule : si l'équipe B n'est pas résolue via engagements,
+    # chercher l'adversaire par nom dans la poule de l'équipe A.
+    # Cas courant : ententes, CTC, clubs dont l'engagement est rattaché
+    # à une entité différente de l'organisme recherché.
+    fallback_warning: str | None = None
+    if err_b and eq_a:
+        poules_a = {str(e["poule_id"]) for e in eq_a if e.get("poule_id")}
+        if poules_a and (eff_club_b or eff_org_id_b):
+            from .poule import get_poule_service
+
+            opponent_name_norm = _normalize_name(eff_club_b or "")
+            for pid in poules_a:
+                poule_data = await get_poule_service(pid, force_refresh=force_refresh)
+                if not isinstance(poule_data, dict):
+                    continue
+                rencontres = poule_data.get("rencontres") or []
+                # Chercher l'adversaire par nom dans les rencontres
+                found_eng_id: str | None = None
+                found_name: str | None = None
+                for r in rencontres:
+                    if not isinstance(r, dict):
+                        continue
+                    for key_n, key_e in [
+                        ("nomEquipe1", "idEngagementEquipe1"),
+                        ("nomEquipe2", "idEngagementEquipe2"),
+                    ]:
+                        raw_name = str(r.get(key_n) or "")
+                        if opponent_name_norm and opponent_name_norm in _normalize_name(
+                            raw_name
+                        ):
+                            eng_raw = r.get(key_e)
+                            eid = str(
+                                eng_raw.get("id")
+                                if isinstance(eng_raw, dict)
+                                else (eng_raw or "")
+                            )
+                            if eid:
+                                found_eng_id = eid
+                                found_name = raw_name
+                                break
+                    if found_eng_id:
+                        break
+                if found_eng_id:
+                    # Construire un engagement synthétique
+                    eq_b = [
+                        {
+                            "engagement_id": found_eng_id,
+                            "poule_id": pid,
+                            "nom_equipe": found_name or eff_club_b,
+                        }
+                    ]
+                    club_res_b = {"nom": found_name or eff_club_b, "_synthetic": True}
+                    err_b = None
+                    fallback_warning = (
+                        f"L'équipe '{eff_club_b}' n'a pas pu être résolue via ses engagements club "
+                        f"(possible entente/CTC). Identification par son nom dans la poule {pid}."
+                    )
+                    break
+
     if err_b:
         return {
             "error": f"Équipe B ({eff_club_b or eff_org_id_b}) introuvable",
@@ -2437,7 +2556,7 @@ async def ffbb_head_to_head_service(
             f"Début de saison : première confrontation officielle de la saison entre {nom_a} et {nom_b}."
         )
 
-    return {
+    result = {
         "status": "ok",
         "equipe_a": {
             "nom": nom_a,
@@ -2455,3 +2574,6 @@ async def ffbb_head_to_head_service(
         "points_cles_llm": narrative_points,
         "_meta": _freshness_meta(cache="poule", force_refresh_supported=True),
     }
+    if fallback_warning:
+        result["warning"] = fallback_warning
+    return result
