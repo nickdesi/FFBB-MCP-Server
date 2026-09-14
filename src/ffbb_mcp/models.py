@@ -262,6 +262,10 @@ class CalendrierMatch(BaseModel):
     is_next_match: bool = Field(
         default=False, description="Indique s'il s'agit du prochain match à venir."
     )
+    statut: str | None = Field(
+        default=None,
+        description="Statut normalisé : scheduled, in_progress, final, official, postponed, cancelled, forfeit.",
+    )
 
     @field_validator("score_equipe1", "score_equipe2", "joue", mode="before")
     @classmethod

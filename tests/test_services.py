@@ -765,7 +765,7 @@ class TestCalendrierClubService:
 
         # 1. Mock ffbb_equipes_club_service pour renvoyer une equipe valable
         async def _fake_equipes_club_service(
-            organisme_id: int | str, filtre: str | None = None
+            organisme_id: int | str, filtre: str | None = None, *args, **kwargs
         ):
             return [
                 {

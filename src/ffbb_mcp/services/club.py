@@ -54,6 +54,7 @@ from .common import (
     _BILAN_STAT_FIELDS,
     _NUMERIC_EXTRACT_PATTERN,
     _PARIS_TZ,
+    _compute_match_statut,
     _dedupe_inflight,
     _detect_phase_type,
     _extract_and_accumulate_bilan,
@@ -325,6 +326,7 @@ async def ffbb_equipes_club_service(
     filtre: str | None = None,
     org_data: dict | None = None,
     force_refresh: bool = False,
+    season_id: int | str | None = None,
 ) -> list[dict[str, Any]]:
     from .poule import get_organisme_service
 
@@ -341,7 +343,7 @@ async def ffbb_equipes_club_service(
     # pour un même club+catégorie). Évite de reconstruire les team_info et de
     # re-interroger l'organisme à chaque appel de la session.
     _eq_key = (
-        f"equipes:{organisme_id}:{_normalize_name(filtre or '')}"
+        f"equipes:{organisme_id}:{_normalize_name(filtre or '')}:{season_id or ''}"
         if organisme_id is not None and org_data is None
         else None
     )
@@ -394,6 +396,11 @@ async def ffbb_equipes_club_service(
         comp_id_raw = comp.get("id")
         poule_id_raw = poule.get("id")
 
+        saison_raw = (
+            (comp.get("saison") or {}).get("id")
+            if isinstance(comp.get("saison"), dict)
+            else None
+        )
         team_info = {
             "team_id": team_id_str,
             "engagement_id": team_id_str,
@@ -407,11 +414,32 @@ async def ffbb_equipes_club_service(
             "competition_origine_nom": comp_orig,
             "competition_id": str(comp_id_raw) if comp_id_raw is not None else None,
             "poule_id": str(poule_id_raw) if poule_id_raw is not None else None,
+            "season_id": str(saison_raw) if saison_raw is not None else None,
             "sexe": comp.get("sexe", ""),
             "categorie": categorie_code,
             "niveau": comp.get("competition_origine_niveau"),
         }
         all_teams.append(team_info)
+
+    # Filtrage saison si demandé (cohérence FFBB-API : idCompetition.saison.id)
+    if season_id is not None:
+        sid = str(season_id).strip()
+        original_for_season = list(all_teams)
+        all_teams = [
+            t for t in all_teams if str(t.get("season_id") or "").strip() == sid
+        ]
+        if not all_teams:
+            if _eq_key is not None:
+                state.cache_equipes[_eq_key] = []
+            return [
+                {
+                    "error": f"Aucune équipe pour la saison '{season_id}' trouvée pour '{club_nom}'.",
+                    "suggested_teams": sorted(
+                        list({t["team_label"] for t in original_for_season})
+                    ),
+                    "hint": "Vérifie le season_id via ffbb_saisons.",
+                }
+            ]
 
     if not filtre:
         if _eq_key is not None:
@@ -572,6 +600,7 @@ async def _resolve_team_equipes(
     competition_id: int | str | None = None,
     competition_type: str | None = None,
     poule_id: int | str | None = None,
+    season_id: int | str | None = None,
     not_found_status: str = "not_found",
     force_refresh: bool = False,
 ) -> tuple[dict | None, list[dict], dict | None]:
@@ -628,7 +657,10 @@ async def _resolve_team_equipes(
                 continue
             try:
                 rc_teams = await svc.ffbb_equipes_club_service(
-                    organisme_id=rc_id, filtre=categorie, force_refresh=force_refresh
+                    organisme_id=rc_id,
+                    filtre=categorie,
+                    force_refresh=force_refresh,
+                    season_id=season_id,
                 )
             except Exception:
                 rc_teams = []
@@ -677,6 +709,7 @@ async def _resolve_team_equipes(
             filtre=categorie,
             org_data=org_data,
             force_refresh=force_refresh,
+            season_id=season_id,
         )
 
     if not equipes or (
@@ -735,6 +768,12 @@ async def _resolve_team_equipes(
             if str(e.get("competition_type") or "").strip().upper() == target_type
         ]
 
+    if season_id is not None:
+        target_season = str(season_id).strip()
+        equipes = [
+            e for e in equipes if str(e.get("season_id") or "").strip() == target_season
+        ]
+
     if numero_equipe is not None:
         want = str(numero_equipe)
         filtered = [
@@ -786,6 +825,7 @@ async def _resolve_team_equipes(
         and competition_id is None
         and competition_type is None
         and poule_id is None
+        and season_id is None
     ):
         return (
             {
@@ -1121,6 +1161,7 @@ async def ffbb_next_match_service(
             "scheduled_at": scheduled_at,
             "time_confirmed": time_confirmed,
             "horaire_renseigne": time_confirmed,
+            "statut": _compute_match_statut(next_match, next_dt),
             "adversaire": adversaire,
             "domicile": domicile,
             "equipe1": eq1_name,
@@ -1340,7 +1381,10 @@ async def _build_bilan_payload(
         pass_org = org_data if is_target else None
         eq_tasks.append(
             ffbb_equipes_club_service(
-                organisme_id=oid, filtre=categorie, org_data=pass_org
+                organisme_id=oid,
+                filtre=categorie,
+                org_data=pass_org,
+                season_id=season_id,
             )
         )
     eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
@@ -1774,7 +1818,9 @@ async def _build_calendar_matches(
     import ffbb_mcp.services as svc
 
     eq_tasks = [
-        svc.ffbb_equipes_club_service(organisme_id=oid, filtre=categorie)
+        svc.ffbb_equipes_club_service(
+            organisme_id=oid, filtre=categorie, season_id=season_id
+        )
         for oid in target_org_ids
     ]
     eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
@@ -2009,6 +2055,7 @@ async def _build_calendar_matches(
                 "scheduled_at": scheduled_at,
                 "time_confirmed": time_confirmed,
                 "horaire_renseigne": time_confirmed,
+                "statut": _compute_match_statut(match, dt_parsed),
                 "joue": joue,
                 "equipe1": eq1,
                 "equipe2": eq2,
@@ -2483,6 +2530,7 @@ async def ffbb_last_result_service(
         "scheduled_at": scheduled_at_last,
         "time_confirmed": time_confirmed_last,
         "horaire_renseigne": time_confirmed_last,
+        "statut": _compute_match_statut(dernier, dt_last),
         "journee": dernier.get("numeroJournee"),
         "competition": competition_name,
         "competition_id": str(source_eq.get("competition_id"))

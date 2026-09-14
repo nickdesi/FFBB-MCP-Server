@@ -90,6 +90,9 @@ def _freshness_meta(
     cache: str | None = None,
     ttl_seconds: int | None = None,
     force_refresh_supported: bool = False,
+    cache_hit: bool | None = None,
+    stale: bool | None = None,
+    cache_age_seconds: int | None = None,
 ) -> dict[str, Any]:
     meta: dict[str, Any] = {
         "source": source,
@@ -102,6 +105,19 @@ def _freshness_meta(
         meta["ttl_seconds"] = ttl_seconds
     if force_refresh_supported:
         meta["force_refresh_supported"] = True
+    # Champs mineurs pour audit : toujours présents pour cohérence
+    if cache_hit is not None:
+        meta["cache_hit"] = cache_hit
+    else:
+        meta["cache_hit"] = False
+    if stale is not None:
+        meta["stale"] = stale
+    else:
+        meta["stale"] = False
+    if cache_age_seconds is not None:
+        meta["cache_age_seconds"] = cache_age_seconds
+    else:
+        meta["cache_age_seconds"] = 0
     return meta
 
 
@@ -226,6 +242,38 @@ def _parse_dt(raw: str | None) -> datetime | None:
         return dt.astimezone(tz)
     except ValueError:
         return None
+
+
+def _compute_match_statut(
+    match: dict[str, Any] | None, dt: datetime | None = None
+) -> str:
+    """Statut normalisé du match pour l'audit mineur : scheduled/in_progress/final/postponed/cancelled/forfeit/official."""
+    if not isinstance(match, dict):
+        return "scheduled"
+    # Forfait / défaut
+    statut_raw = str(
+        match.get("statut")
+        or match.get("status")
+        or match.get("statut_rencontre")
+        or ""
+    ).lower()
+    if "forfait" in statut_raw or "forfeit" in statut_raw:
+        return "forfeit"
+    if "report" in statut_raw:
+        return "postponed"
+    if "annul" in statut_raw or "cancel" in statut_raw:
+        return "cancelled"
+    # En cours : si lives indique in_progress ou si joue==1 mais score live ?
+    # On considère joue==0 et date future = scheduled, joue==1 = final
+    joue = match.get("joue")
+    if joue in (1, "1", True):
+        # Si match joué et statut official ? On simplifie en final/official
+        if "officiel" in statut_raw or "official" in statut_raw:
+            return "official"
+        return "final"
+    # Vérifie si le match est en cours via heure et date proche (fenêtre live)
+    # Pour le calendrier, on ne dispose pas du signal live ici → scheduled par défaut
+    return "scheduled"
 
 
 def _is_horaire_renseigne(match: dict[str, Any], dt: datetime | None = None) -> bool:
