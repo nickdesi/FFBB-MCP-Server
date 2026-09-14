@@ -24,12 +24,20 @@ async def test_ffbb_club_equipes_auto_resolution():
         patch("ffbb_mcp.server.ffbb_equipes_club_service", mock_equipes),
     ):
         # Appel sans organisme_id mais avec club_name
-        result = await ffbb_club(action="equipes", club_name="Stade Clermontois")
+        result = await ffbb_club(
+            action="equipes",
+            club_name="Stade Clermontois",
+            force_refresh=True,
+        )
 
         mock_resolve.assert_called_once_with(
             club_name="Stade Clermontois", organisme_id=None, categorie=None, limit=3
         )
-        mock_equipes.assert_called_once_with(organisme_id=123, filtre=None)
+        mock_equipes.assert_called_once_with(
+            organisme_id=123,
+            filtre=None,
+            force_refresh=True,
+        )
         assert result == [{"id": "team1", "nom": "U11M1"}]
 
     mock_resolve = _make_resolve_mock(
