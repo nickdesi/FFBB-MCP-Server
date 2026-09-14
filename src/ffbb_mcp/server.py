@@ -314,7 +314,12 @@ async def ffbb_search(
     ] = 20,
     filter_by: Annotated[
         str | None,
-        Field(description="Filtre Meilisearch natif (ex: 'codePostal = \"63000\"')."),
+        Field(
+            description=(
+                "Filtre Meilisearch natif (ex: 'codePostal = \"63000\"', "
+                '\'codePostal IN ["63000", "63100"]\', \'departement = "Puy-de-Dôme"\').'
+            )
+        ),
     ] = None,
     sort: Annotated[
         list[str] | None,
@@ -323,9 +328,12 @@ async def ffbb_search(
 ) -> list[dict[str, Any]]:
     """Recherche FFBB — clubs, compétitions, matchs, salles, tournois, etc.
 
-    type='all' → recherche globale (meilleur point d'entrée).
-    type='organismes' → clubs uniquement.
-    type='competitions' → compétitions uniquement.
+    - type='all' → recherche globale (meilleur point d'entrée).
+    - type='organismes' → clubs uniquement.
+    - type='competitions' → compétitions uniquement.
+    - type='salles' → salles / gymnases.
+    - filter_by='codePostal = "63000"' → filtrage par code postal ou critères Meilisearch.
+
     Résultats contiennent un 'id' à utiliser avec ffbb_get ou ffbb_club.
     """
     try:
@@ -750,10 +758,20 @@ async def ffbb_club(
 )
 @track_tool_usage("ffbb_lives")
 @zipai_surgical
-async def ffbb_get_lives() -> list[dict[str, Any]]:
+async def ffbb_get_lives(
+    include_scheduled: Annotated[
+        bool,
+        Field(
+            description=(
+                "Si True, inclut aussi les matchs programmés à venir (statut SCHEDULED). "
+                "Par défaut (False), ne retourne que les matchs réellement en cours de jeu."
+            )
+        ),
+    ] = False,
+) -> list[dict[str, Any]]:
     """Matchs en cours (scores live, cache 30s). Retourne [] si aucun match."""
     try:
-        return await get_lives_service()
+        return await get_lives_service(include_scheduled=include_scheduled)
     except Exception as e:
         raise handle_api_error(e) from e
 
@@ -1261,16 +1279,38 @@ async def ffbb_head_to_head(
     ] = None,
     club_b: Annotated[
         str | None,
-        Field(description="Nom du second club (ex: 'Vichy', 'Roanne')."),
+        Field(description="Nom du second club / adversaire (ex: 'Vichy', 'Roanne')."),
     ] = None,
     organisme_id_b: Annotated[
         int | str | None,
-        Field(description="ID FFBB du second club."),
+        Field(description="ID FFBB du second club / adversaire."),
     ] = None,
     categorie: Annotated[
         str | None,
         Field(
             description="Catégorie d'équipe commune à comparer (ex: 'SEM1', 'U18M', 'Senior').",
+        ),
+    ] = None,
+    club_name: Annotated[
+        str | None,
+        Field(
+            description="Alias pour club_a : nom du premier club (ex: 'Stade Clermontois')."
+        ),
+    ] = None,
+    organisme_id: Annotated[
+        int | str | None,
+        Field(description="Alias pour organisme_id_a : ID FFBB du premier club."),
+    ] = None,
+    adversaire: Annotated[
+        str | None,
+        Field(
+            description="Alias pour club_b : nom du second club / adversaire (ex: 'Vichy')."
+        ),
+    ] = None,
+    adversaire_id: Annotated[
+        int | str | None,
+        Field(
+            description="Alias pour organisme_id_b : ID FFBB du second club / adversaire."
         ),
     ] = None,
     force_refresh: Annotated[
@@ -1291,11 +1331,16 @@ async def ffbb_head_to_head(
         await _safe_report_progress(
             ctx, 0, total=2, message="Analyse du face-à-face..."
         )
+        eff_club_a = club_a or club_name
+        eff_org_a = organisme_id_a or organisme_id
+        eff_club_b = club_b or adversaire
+        eff_org_b = organisme_id_b or adversaire_id
+
         result = await ffbb_head_to_head_service(
-            club_a=club_a,
-            organisme_id_a=organisme_id_a,
-            club_b=club_b,
-            organisme_id_b=organisme_id_b,
+            club_a=eff_club_a,
+            organisme_id_a=eff_org_a,
+            club_b=eff_club_b,
+            organisme_id_b=eff_org_b,
             categorie=categorie,
             force_refresh=force_refresh,
         )

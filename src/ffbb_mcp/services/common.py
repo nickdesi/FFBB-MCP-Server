@@ -228,6 +228,28 @@ def _parse_dt(raw: str | None) -> datetime | None:
         return None
 
 
+def _is_horaire_renseigne(match: dict[str, Any], dt: datetime | None = None) -> bool:
+    """Détermine si l'horaire d'un match est explicitement fixé ou s'il s'agit d'un placeholder ('0' / 00:00:00)."""
+    if not isinstance(match, dict):
+        return False
+    raw_horaire = str(match.get("horaire") or "").strip()
+    if raw_horaire in ("0", "00:00", "00h00", ""):
+        raw_date = str(
+            match.get("date_rencontre")
+            or match.get("date")
+            or match.get("date_reelle")
+            or ""
+        ).strip()
+        if " " in raw_date:
+            time_part = raw_date.split(" ")[1]
+            if time_part not in ("00:00:00", "00:00", "0"):
+                return True
+        if dt is not None:
+            return dt.hour != 0 or dt.minute != 0
+        return False
+    return True
+
+
 def _notify_cache_hit(cache_name: str) -> None:
     import ffbb_mcp.services
 

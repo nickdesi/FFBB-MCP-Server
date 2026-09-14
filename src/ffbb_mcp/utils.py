@@ -81,14 +81,17 @@ _3X3_CLEANUP_PATTERN = re.compile(r"\b3[\s_-]?X[\s_-]?3\b")
 _VETERAN_PATTERN = re.compile(
     r"\b(VETERANS?|VÉTÉRANS?|VET|V35|V40|V45|V50)\b",
 )
+_DIVISION_PATTERN = re.compile(
+    r"\b(?:([NRD])([MF]?)(\d+)|([NRD])(\d+)([MF]?)|PN[MF]|PR[MF]|PRE[\s_-]?NAT(?:IONALE?)?|PRÉ[\s_-]?NAT(?:IONALE?)?|PRE[\s_-]?REG(?:IONALE?)?|PRÉ[\s_-]?RÉG(?:IONALE?)?|PRO[\s_-]?[AB]|BETCLIC(?:[\s_-]?ELITE)?|LF[B12]|ELITE)\b"
+)
 _SENIOR_PATTERN = re.compile(
     r"\b(SENIORS?|SEN|SE|SEM\d?|SEF\d?|SM\d?|SF\d?|[RDN][MF]\d?|PN[MF]\d?|PR[MF]\d?|[RDN]\d[MF]|PRE[\s-]?NAT(IONALE?)?|PRÉ[\s-]?NAT(IONALE?)?|PRE[\s-]?REG(IONALE?)?|PRÉ[\s-]?RÉG(IONALE?)?|REGION(AL|ALE|ALES|AUX)?|RÉGION(AL|ALE|ALES|AUX)?|DEPARTEMENT(AL|ALE|ALES|AUX)?|DÉPARTEMENT(AL|ALE|ALES|AUX)?|NATION(AL|ALE|ALES|AUX)?|ELITE|ÉLITE)\b",
 )
 _M_PATTERN = re.compile(
-    r"\bM\b|U\d{1,2}M|\b[RDN]M\d?\b|\bPNM\d?\b|\bPRM\d?\b|\bR\dM\b|\bD\dM\b|\bN\dM\b|\bSEM\d?\b|\bSM\d?\b|\bM\d\b|\b(MASC|MASCULIN|MASCULINS|MASCULINE|HOMMES?|GARS|GARCONS?|GARÇONS?|MESSIEURS|CADETS?|BENJAMINS?|POUSSINS?)\b",
+    r"\bM\b|U\d{1,2}M|\b[RDN]M\d?\b|\bPNM\d?\b|\bPRM\d?\b|\bR\dM\b|\bD\dM\b|\bN\dM\b|\bSEM\d?\b|\bSM\d?\b|\bM\d\b|\bPRO[\s_-]?[AB]\b|\bBETCLIC\b|\b(MASC|MASCULIN|MASCULINS|MASCULINE|HOMMES?|GARS|GARCONS?|GARÇONS?|MESSIEURS|CADETS?|BENJAMINS?|POUSSINS?)\b",
 )
 _F_PATTERN = re.compile(
-    r"\bF\b|U\d{1,2}F|\b[RDN]F\d?\b|\bPNF\d?\b|\bPRF\d?\b|\bR\dF\b|\bD\dF\b|\bN\dF\b|\bSEF\d?\b|\bSF\d?\b|\bF\d\b|\b(FÉM|FEM|FEMININ|FÉMININ|FEMININE|FÉMININE|FEMININES|FÉMININES|FILLES?|FEMMES?|DAMES?|CADETTES?|BENJAMINES?|POUSSINES?)\b",
+    r"\bF\b|U\d{1,2}F|\b[RDN]F\d?\b|\bPNF\d?\b|\bPRF\d?\b|\bR\dF\b|\bD\dF\b|\bN\dF\b|\bSEF\d?\b|\bSF\d?\b|\bF\d\b|\bLF[B12]\b|\b(FÉM|FEM|FEMININ|FÉMININ|FEMININE|FÉMININE|FEMININES|FÉMININES|FILLES?|FEMMES?|DAMES?|CADETTES?|BENJAMINES?|POUSSINES?)\b",
 )
 _NUM_PATTERN = re.compile(r"(\d+)")
 
@@ -99,8 +102,8 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
 
     La logique est volontairement tolérante (espaces, casse, tirets) pour
     accepter des entrées utilisateur comme "u11m1", "U11 M 1", "u11-f-2",
-    "RM1", "RF2", "DM1", "PNM", "Senior F", "Benjamines 2", "Baby Basket",
-    "RM18", "DM15", "3x3", etc.
+    "NM3", "NM3 2", "RM1", "RF2", "DM1", "PNM", "Senior F", "Benjamines 2",
+    "Baby Basket", "RM18", "DM15", "3x3", etc.
     """
 
     if not raw:
@@ -114,9 +117,10 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
     # le besoin de re.IGNORECASE sur les expressions régulières.
     s_upper = s.upper()
 
-    # 1) Catégorie type Uxx, jeunes nommés, vétérans, 3x3 ou SENIOR
+    # 1) Catégorie type Uxx, jeunes nommés, vétérans, 3x3, division ou SENIOR
     cat_match = _CAT_PATTERN.search(s_upper) if "U" in s_upper else None
     shorthand_match = None
+    div_match = None
     matched_pat = None
     categorie: str | None = None
     sexe: str | None = None
@@ -141,13 +145,18 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
                 if vet_match:
                     categorie = "VETERAN"
                     matched_pat = vet_match
-                elif _SENIOR_PATTERN.search(s_upper):
-                    categorie = "SENIOR"
                 else:
-                    match_3x3 = _3X3_PATTERN.search(s_upper)
-                    if match_3x3:
-                        categorie = "3X3"
-                        matched_pat = match_3x3
+                    div_match = _DIVISION_PATTERN.search(s_upper)
+                    if div_match:
+                        categorie = "SENIOR"
+                        matched_pat = div_match
+                    elif _SENIOR_PATTERN.search(s_upper):
+                        categorie = "SENIOR"
+                    else:
+                        match_3x3 = _3X3_PATTERN.search(s_upper)
+                        if match_3x3:
+                            categorie = "3X3"
+                            matched_pat = match_3x3
 
     # 2) Sexe (M/F) si non déjà défini par le shorthand jeune
     if sexe is None:
@@ -157,7 +166,7 @@ def parse_categorie(raw: str | None) -> ParsedCategorie:
         elif _F_PATTERN.search(s_upper):
             sexe = "F"
 
-    # 3) Numéro d'équipe (chiffre final non lié à Uxx / Vxx / shorthand / 3x3)
+    # 3) Numéro d'équipe (chiffre final non lié à Uxx / Vxx / division / shorthand / 3x3)
     numero_equipe: int | None = None
     remainder = s_upper
     if cat_match:

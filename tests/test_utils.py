@@ -190,28 +190,19 @@ class TestParseCategorie:
 
     def test_parse_regional_departemental_national_divisions(self):
         # RM1, RF2, DM1, DF3, NM2, NF1
-        r_m1 = parse_categorie("RM1")
-        assert r_m1 == ("SENIOR", "M", 1)
-
-        r_f2 = parse_categorie("RF2")
-        assert r_f2 == ("SENIOR", "F", 2)
-
-        d_m1 = parse_categorie("DM1")
-        assert d_m1 == ("SENIOR", "M", 1)
-
-        d_f3 = parse_categorie("DF3")
-        assert d_f3 == ("SENIOR", "F", 3)
-
-        n_m2 = parse_categorie("NM2")
-        assert n_m2 == ("SENIOR", "M", 2)
-
-        n_f1 = parse_categorie("NF1")
-        assert n_f1 == ("SENIOR", "F", 1)
+        assert parse_categorie("RM1") == ("SENIOR", "M", None)
+        assert parse_categorie("RM1 2") == ("SENIOR", "M", 2)
+        assert parse_categorie("RF2") == ("SENIOR", "F", None)
+        assert parse_categorie("DM1") == ("SENIOR", "M", None)
+        assert parse_categorie("DF3") == ("SENIOR", "F", None)
+        assert parse_categorie("NM2") == ("SENIOR", "M", None)
+        assert parse_categorie("NM2 - 1") == ("SENIOR", "M", 1)
+        assert parse_categorie("NF1") == ("SENIOR", "F", None)
 
         # Formats inversés : R1M, D2F, N3M
-        assert parse_categorie("R1M") == ("SENIOR", "M", 1)
-        assert parse_categorie("D2F") == ("SENIOR", "F", 2)
-        assert parse_categorie("N3M") == ("SENIOR", "M", 3)
+        assert parse_categorie("R1M") == ("SENIOR", "M", None)
+        assert parse_categorie("D2F") == ("SENIOR", "F", None)
+        assert parse_categorie("N3M") == ("SENIOR", "M", None)
 
     def test_parse_prenationale_preregionale(self):
         # PNM, PNF, PRM, PRF
@@ -267,6 +258,23 @@ class TestParseCategorie:
     def test_parse_veterans(self):
         assert parse_categorie("Vétérans M 1") == ("VETERAN", "M", 1)
         assert parse_categorie("V35 F") == ("VETERAN", "F", None)
+
+    def test_parse_senior_divisions(self):
+        # NM1, NM2, NM3, NF1, RM1, RM2, DM1, PNM, PRM, PROB, LF2
+        assert parse_categorie("NM3") == ("SENIOR", "M", None)
+        assert parse_categorie("NM3 2") == ("SENIOR", "M", 2)
+        assert parse_categorie("NM3 - 2") == ("SENIOR", "M", 2)
+        assert parse_categorie("N3M") == ("SENIOR", "M", None)
+        assert parse_categorie("NF1") == ("SENIOR", "F", None)
+        assert parse_categorie("RM2") == ("SENIOR", "M", None)
+        assert parse_categorie("DM1") == ("SENIOR", "M", None)
+        assert parse_categorie("PNM") == ("SENIOR", "M", None)
+        assert parse_categorie("PRM") == ("SENIOR", "M", None)
+        assert parse_categorie("PROB") == ("SENIOR", "M", None)
+        assert parse_categorie("LF2") == ("SENIOR", "F", None)
+        assert parse_categorie("LFB") == ("SENIOR", "F", None)
+        assert parse_categorie("SEM1") == ("SENIOR", "M", 1)
+        assert parse_categorie("SEM2") == ("SENIOR", "M", 2)
 
     def test_parse_edge_cases(self):
         assert parse_categorie("") == (None, None, None)

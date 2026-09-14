@@ -59,6 +59,7 @@ from .common import (
     _detect_phase_type,
     _extract_and_accumulate_bilan,
     _freshness_meta,
+    _is_horaire_renseigne,
     _new_bilan_totals,
     _normalize_name,
     _parse_dt,
@@ -528,8 +529,13 @@ async def _resolve_team_equipes(
 ) -> tuple[dict | None, list[dict], dict | None]:
 
     if not club_name and not organisme_id:
+        side_hint = (
+            "club_a (ou club_name) / organisme_id_a"
+            if "a" in not_found_status.lower()
+            else "club_b (ou adversaire) / organisme_id_b"
+        )
         return (
-            {"status": "error", "message": "Fournir club_name ou organisme_id"},
+            {"status": "error", "message": f"Fournir {side_hint}"},
             [],
             None,
         )
@@ -939,6 +945,7 @@ async def ffbb_next_match_service(
             "poule_id": source_team.get("poule_id"),
             "match_id": next_match.get("id"),
             "date": next_dt.isoformat(),
+            "horaire_renseigne": _is_horaire_renseigne(next_match, next_dt),
             "adversaire": adversaire,
             "domicile": domicile,
             "equipe1": eq1_name,
@@ -1060,11 +1067,18 @@ async def ffbb_saison_bilan_service(
 
     for pid, poule_data in poules_map.items():
         classements = poule_data.get("classements", []) or []
+        poule_phase_added = False
         for entry in classements:
             eng = entry.get("id_engagement", {}) or {}
             entry_eng_id = str(eng.get("id", ""))
             if entry_eng_id not in eng_ids:
                 continue
+
+            if poule_phase_added:
+                # Évite d'ajouter plusieurs fois la même phase et de doubler les totaux
+                # si l'API FFBB renvoie des doublons d'engagement dans la même poule
+                continue
+            poule_phase_added = True
 
             stats = _extract_and_accumulate_bilan(entry, totaux)
             phases.append(
@@ -1677,6 +1691,7 @@ async def _build_calendar_matches(
             calendar_match = {
                 "id": match_id,
                 "date": date_match,
+                "horaire_renseigne": _is_horaire_renseigne(match),
                 "joue": joue,
                 "equipe1": eq1,
                 "equipe2": eq2,
@@ -2064,6 +2079,7 @@ async def ffbb_last_result_service(
         "status": "ok",
         "club_resolu": club_resolu,
         "date": dernier.get("date_rencontre", ""),
+        "horaire_renseigne": _is_horaire_renseigne(dernier),
         "journee": dernier.get("numeroJournee"),
         "competition": competition_name,
         "competition_id": source_eq.get("competition_id"),

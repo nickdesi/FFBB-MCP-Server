@@ -52,9 +52,62 @@ async def _fetch_lives() -> list[dict]:
     return result
 
 
-async def get_lives_service() -> list[dict]:
+def _is_live_match(m: dict[str, Any]) -> bool:
+    """Détermine si un match de l'API FFBB Live est réellement en cours de jeu."""
+    if not isinstance(m, dict):
+        return False
+    status = str(m.get("match_status") or m.get("status") or "").upper().strip()
+    cur_status = str(m.get("current_status") or "").upper().strip()
+    period = m.get("current_period")
+    clock = m.get("clock")
+
+    # Matchs programmés futurs ou terminés/annulés
+    if status in (
+        "SCHEDULED",
+        "COMPLETE",
+        "FINISHED",
+        "TERMINE",
+        "TERMINEE",
+        "ABANDONED",
+        "ANNULE",
+        "REPORTE",
+    ):
+        return status == "SCHEDULED" and (
+            period is not None or cur_status in ("LIVE", "IN_PROGRESS", "EN_COURS")
+        )
+
+    if status in (
+        "LIVE",
+        "IN_PROGRESS",
+        "EN_COURS",
+        "LIVE_STREAMING",
+    ) or cur_status in (
+        "LIVE",
+        "IN_PROGRESS",
+        "EN_COURS",
+    ):
+        return True
+
+    if (
+        status.startswith("QUARTER")
+        or status.startswith("PERIOD")
+        or "TIME" in status
+        or "TEMPS" in status
+        or "OVERTIME" in status
+    ):
+        return True
+
+    return period is not None or (
+        clock is not None and str(clock).strip() not in ("", "00:00")
+    )
+
+
+async def get_lives_service(include_scheduled: bool = False) -> list[dict]:
     ttl = _read_positive_int_env("FFBB_CACHE_TTL_LIVES", get_static_ttl("lives"))
-    return await _swr_serve(state.cache_lives, "lives", "lives", ttl, _fetch_lives)
+    raw_lives = await _swr_serve(state.cache_lives, "lives", "lives", ttl, _fetch_lives)
+    if include_scheduled or not raw_lives:
+        return raw_lives
+    return [m for m in raw_lives if _is_live_match(m)]
 
 
 _SAISONS_FIELDS = ["id", "libelle", "code", "actif", "debut", "fin", "enCours"]

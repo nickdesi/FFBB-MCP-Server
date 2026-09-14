@@ -178,7 +178,7 @@ async def test_ffbb_lives_via_call_tool():
         return_value=fake_matches,
     ) as mock_svc:
         result = await mcp.call_tool("ffbb_lives", {})
-        mock_svc.assert_called_once_with()
+        mock_svc.assert_called_once_with(include_scheduled=False)
         # result = (content_list, structured_dict) en mode JSON.
         content_list, _structured = result
         assert content_list, "FastMCP doit renvoyer au moins un TextContent"
@@ -188,6 +188,40 @@ async def test_ffbb_lives_via_call_tool():
         first = items[0]
         assert first["id"] == "rx1"
         assert first["score_domicile"] == 42
+
+
+@pytest.mark.asyncio
+async def test_ffbb_head_to_head_via_call_tool_with_aliases():
+    """Couvre ffbb_head_to_head avec les alias club_name et adversaire."""
+    from unittest.mock import AsyncMock, patch
+
+    fake_h2h = {
+        "status": "ok",
+        "confrontations": [],
+        "club_a": "Stade",
+        "club_b": "Vichy",
+    }
+    with patch(
+        "ffbb_mcp.server.ffbb_head_to_head_service",
+        new_callable=AsyncMock,
+        return_value=fake_h2h,
+    ) as mock_svc:
+        await mcp.call_tool(
+            "ffbb_head_to_head",
+            {
+                "club_name": "Stade Clermontois",
+                "adversaire": "Vichy",
+                "categorie": "SEM1",
+            },
+        )
+        mock_svc.assert_called_once_with(
+            club_a="Stade Clermontois",
+            organisme_id_a=None,
+            club_b="Vichy",
+            organisme_id_b=None,
+            categorie="SEM1",
+            force_refresh=False,
+        )
 
 
 @pytest.mark.asyncio
