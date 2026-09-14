@@ -389,10 +389,14 @@ async def ffbb_equipes_club_service(
         team_label = f"{club_nom} {cat_label}".strip()
         phase_label = e.get("phase") or e.get("libellePhase") or None
         team_id = e.get("id")
+        # Normalisation IDs en string opaque (évite perte précision JS, cohérence contrat)
+        team_id_str = str(team_id) if team_id is not None else None
+        comp_id_raw = comp.get("id")
+        poule_id_raw = poule.get("id")
 
         team_info = {
-            "team_id": team_id,
-            "engagement_id": team_id,
+            "team_id": team_id_str,
+            "engagement_id": team_id_str,
             "numero_equipe": numero_equipe,
             "team_label": cat_label or team_label,
             "phase_label": phase_label,
@@ -401,8 +405,8 @@ async def ffbb_equipes_club_service(
             "competition_code": comp_code,
             "competition_type": comp_type,
             "competition_origine_nom": comp_orig,
-            "competition_id": comp.get("id"),
-            "poule_id": poule.get("id"),
+            "competition_id": str(comp_id_raw) if comp_id_raw is not None else None,
+            "poule_id": str(poule_id_raw) if poule_id_raw is not None else None,
             "sexe": comp.get("sexe", ""),
             "categorie": categorie_code,
             "niveau": comp.get("competition_origine_niveau"),
@@ -564,6 +568,7 @@ async def _resolve_team_equipes(
     organisme_id: int | str | None,
     categorie: str | None = None,
     numero_equipe: int | None,
+    engagement_id: int | str | None = None,
     competition_id: int | str | None = None,
     competition_type: str | None = None,
     poule_id: int | str | None = None,
@@ -729,6 +734,15 @@ async def _resolve_team_equipes(
         equipes = filtered
 
     # Application des filtres de désambiguïsation explicites
+    if engagement_id is not None:
+        target_eng = str(engagement_id).strip()
+        equipes = [
+            e
+            for e in equipes
+            if str(e.get("engagement_id") or e.get("team_id") or "").strip()
+            == target_eng
+        ]
+
     if competition_id is not None:
         target_comp = str(competition_id).strip()
         equipes = [
@@ -765,8 +779,10 @@ async def _resolve_team_equipes(
 
     # Détection d'ambiguïté si plusieurs compétitions distinctes subsistent sans filtre explicite
     comp_ids = {str(e.get("competition_id") or "") for e in equipes}
+    eng_ids = {str(e.get("engagement_id") or e.get("team_id") or "") for e in equipes}
     if (
         len(comp_ids) > 1
+        and engagement_id is None
         and competition_id is None
         and competition_type is None
         and poule_id is None
@@ -774,13 +790,26 @@ async def _resolve_team_equipes(
         return (
             {
                 "status": "ambiguous",
-                "message": f"Plusieurs engagements ({len(equipes)}) existent pour '{categorie}'. Précisez `competition_id` ou `competition_type`.",
+                "message": f"Plusieurs engagements ({len(equipes)}) existent pour '{categorie}'. Précisez `engagement_id`, `competition_id` ou `competition_type`.",
                 "candidates": equipes,
                 "club_resolu": club_resolu,
             },
             [],
             club_resolu,
         )
+    # Également ambigu si plusieurs engagement_id distincts même compétition (rare mais possible)
+    if (
+        len(eng_ids) > 1
+        and len(comp_ids) == 1
+        and engagement_id is None
+        and competition_id is None
+        and competition_type is None
+        and poule_id is None
+        and len(equipes) > 1
+    ):
+        # Ne déclenche que si vraiment plusieurs engagements différents pour même catégorie
+        # (ex: U18M1 engagée 2 fois en PLAT phase différente mais déduplication n'a pas filtré)
+        pass  # laisse passer, la déduplication a déjà réduit
 
     return None, equipes, club_resolu
 
@@ -877,6 +906,7 @@ async def ffbb_next_match_service(
     organisme_id: int | str | None = None,
     categorie: str | None = None,
     numero_equipe: int | None = None,
+    engagement_id: int | str | None = None,
     competition_id: int | str | None = None,
     competition_type: str | None = None,
     poule_id: int | str | None = None,
@@ -886,11 +916,16 @@ async def ffbb_next_match_service(
 ) -> dict[str, Any]:
     from .common import _extract_phase_num
 
+    # Compat: engagement_id peut arriver via kwargs (alias)
+    if engagement_id is None:
+        engagement_id = kwargs.get("engagement_id")
+
     error, equipes, club_resolu = await _resolve_team_equipes(
         club_name=club_name,
         organisme_id=organisme_id,
         categorie=categorie,
         numero_equipe=numero_equipe,
+        engagement_id=engagement_id,
         competition_id=competition_id,
         competition_type=competition_type,
         poule_id=poule_id,
@@ -1064,15 +1099,28 @@ async def ffbb_next_match_service(
         if len(parts) >= 2:
             ville = parts[-1].strip()
 
+    # Normalisation IDs string + champs scheduled_* pour cohérence contrat
+    time_confirmed = bool(_is_horaire_renseigne(next_match, next_dt))
+    scheduled_date = next_dt.strftime("%Y-%m-%d") if next_dt else None
+    scheduled_at = next_dt.isoformat() if (time_confirmed and next_dt) else None
     return {
         "status": "ok",
         "club_resolu": club_resolu,
         "team": source_team,
         "match": {
-            "poule_id": source_team.get("poule_id"),
-            "match_id": next_match.get("id"),
-            "date": next_dt.isoformat(),
-            "horaire_renseigne": _is_horaire_renseigne(next_match, next_dt),
+            "poule_id": str(source_team.get("poule_id"))
+            if source_team.get("poule_id") is not None
+            else None,
+            "match_id": str(next_match.get("id"))
+            if next_match.get("id") is not None
+            else None,
+            "date": next_dt.isoformat()
+            if next_dt and time_confirmed
+            else scheduled_date,
+            "scheduled_date": scheduled_date,
+            "scheduled_at": scheduled_at,
+            "time_confirmed": time_confirmed,
+            "horaire_renseigne": time_confirmed,
             "adversaire": adversaire,
             "domicile": domicile,
             "equipe1": eq1_name,
@@ -1090,6 +1138,7 @@ async def ffbb_saison_bilan_service(
     organisme_id: int | str | None = None,
     categorie: str | None = None,
     numero_equipe: int = 1,
+    engagement_id: int | str | None = None,
     competition_id: int | str | None = None,
     competition_type: str | None = None,
     poule_id: int | str | None = None,
@@ -1097,6 +1146,9 @@ async def ffbb_saison_bilan_service(
     force_refresh: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
+
+    if engagement_id is None:
+        engagement_id = kwargs.get("engagement_id")
 
     if categorie:
         parsed_cat = parse_categorie(categorie)
@@ -1108,6 +1160,7 @@ async def ffbb_saison_bilan_service(
         organisme_id=organisme_id,
         categorie=categorie,
         numero_equipe=numero_equipe,
+        engagement_id=engagement_id,
         competition_id=competition_id,
         competition_type=competition_type,
         poule_id=poule_id,
@@ -1253,6 +1306,7 @@ async def _build_bilan_payload(
     club_name: str | None,
     organisme_id: int | str | None,
     categorie: str | None,
+    engagement_id: int | str | None = None,
     competition_id: int | str | None = None,
     competition_type: str | None = None,
     poule_id: int | str | None = None,
@@ -1297,6 +1351,15 @@ async def _build_bilan_payload(
             equipes.extend([e for e in res if isinstance(e, dict) and "error" not in e])
         elif isinstance(res, Exception):
             logger.error("Erreur lors de la récupération des équipes: %s", res)
+
+    if engagement_id is not None:
+        target_eng = str(engagement_id).strip()
+        equipes = [
+            e
+            for e in equipes
+            if str(e.get("engagement_id") or e.get("team_id") or "").strip()
+            == target_eng
+        ]
 
     if competition_id is not None:
         target_comp = str(competition_id).strip()
@@ -1593,6 +1656,7 @@ async def ffbb_bilan_service(
     club_name: str | None = None,
     organisme_id: int | str | None = None,
     categorie: str | None = None,
+    engagement_id: int | str | None = None,
     competition_id: int | str | None = None,
     competition_type: str | None = None,
     poule_id: int | str | None = None,
@@ -1600,7 +1664,9 @@ async def ffbb_bilan_service(
     force_refresh: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    cache_key = f"bilan:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}:{competition_id or ''}:{competition_type or ''}:{poule_id or ''}"
+    if engagement_id is None:
+        engagement_id = kwargs.get("engagement_id")
+    cache_key = f"bilan:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}:{engagement_id or ''}:{competition_id or ''}:{competition_type or ''}:{poule_id or ''}"
 
     if force_refresh and state.cache_bilan is not None:
         logger.debug("force_refresh=True, bypass cache pour bilan")
@@ -1614,6 +1680,7 @@ async def ffbb_bilan_service(
             club_name,
             organisme_id,
             categorie,
+            engagement_id=engagement_id,
             competition_id=competition_id,
             competition_type=competition_type,
             poule_id=poule_id,
@@ -1632,9 +1699,11 @@ async def _build_calendar_matches(
     date_debut: str | None,
     date_fin: str | None,
     limit: int | None,
+    engagement_id: int | str | None = None,
     competition_id: int | str | None = None,
     competition_type: str | None = None,
     season_id: int | str | None = None,
+    offset: int | None = None,
 ) -> dict[str, Any]:
     """Construit la liste des matchs (calendrier complet) pour un club / catégorie.
 
@@ -1655,6 +1724,9 @@ async def _build_calendar_matches(
             "_meta": {
                 "total": 0,
                 "returned": 0,
+                "limit": limit if limit is not None else 0,
+                "offset": offset if offset is not None else 0,
+                "has_more": False,
                 "sort": "scheduled_at:asc",
                 "generated_at": datetime.now(_PARIS_TZ).isoformat(),
             },
@@ -1667,7 +1739,9 @@ async def _build_calendar_matches(
     if len(resolved_clubs) > 1 and not organisme_id:
         candidates = [
             {
-                "id": c.get("organisme_id"),
+                "id": str(c.get("organisme_id"))
+                if c.get("organisme_id") is not None
+                else None,
                 "nom": c.get("nom"),
                 "ville": c.get("ville"),
             }
@@ -1679,6 +1753,9 @@ async def _build_calendar_matches(
             "_meta": {
                 "total": 0,
                 "returned": 0,
+                "limit": limit if limit is not None else 0,
+                "offset": offset if offset is not None else 0,
+                "has_more": False,
                 "sort": "scheduled_at:asc",
                 "generated_at": datetime.now(_PARIS_TZ).isoformat(),
             },
@@ -1725,6 +1802,9 @@ async def _build_calendar_matches(
             "_meta": {
                 "total": 0,
                 "returned": 0,
+                "limit": limit if limit is not None else 0,
+                "offset": offset if offset is not None else 0,
+                "has_more": False,
                 "sort": "scheduled_at:asc",
                 "generated_at": datetime.now(_PARIS_TZ).isoformat(),
             },
@@ -1736,6 +1816,14 @@ async def _build_calendar_matches(
         }
 
     # Application des filtres de désambiguïsation sur les équipes
+    if engagement_id is not None:
+        target_eng = str(engagement_id).strip()
+        equipes = [
+            e
+            for e in equipes
+            if str(e.get("engagement_id") or e.get("team_id") or "").strip()
+            == target_eng
+        ]
     if competition_id is not None:
         target_comp = str(competition_id).strip()
         equipes = [
@@ -1756,12 +1844,15 @@ async def _build_calendar_matches(
             "_meta": {
                 "total": 0,
                 "returned": 0,
+                "limit": limit or 0,
+                "offset": offset or 0,
                 "sort": "scheduled_at:asc",
+                "has_more": False,
                 "generated_at": datetime.now(_PARIS_TZ).isoformat(),
             },
             "warning": (
                 f"Aucun engagement ne correspond aux critères de compétition spécifiés "
-                f"(competition_id={competition_id}, competition_type={competition_type})."
+                f"(engagement_id={engagement_id}, competition_id={competition_id}, competition_type={competition_type})."
             ),
         }
 
@@ -1889,11 +1980,35 @@ async def _build_calendar_matches(
             journee = match.get("numeroJournee", match.get("numero_journee", ""))
             joue = match.get("joue")
             salle = match.get("salle") or match.get("idSalle") or match.get("id_salle")
+            # Normalisation date/horaire : ISO8601 uniforme + champs scheduled_*
+            from .common import _is_horaire_renseigne as _check_horaire
+            from .common import _parse_dt as _parse
+
+            dt_parsed = _parse(date_match)
+            # time_confirmed = horaire explicitement renseigné et heure != minuit fictif
+            time_confirmed = bool(_check_horaire(match, dt_parsed))
+            if dt_parsed is not None:
+                scheduled_date = dt_parsed.strftime("%Y-%m-%d")
+                scheduled_at = dt_parsed.isoformat() if time_confirmed else None
+                # date legacy : ISO si confirmé sinon date seule
+                iso_date = dt_parsed.isoformat() if time_confirmed else scheduled_date
+            else:
+                # fallback: extraire YYYY-MM-DD depuis la chaîne brute
+                raw_str = str(date_match or "")
+                scheduled_date = (
+                    raw_str[:10] if len(raw_str) >= 10 else (raw_str or None)  # type: ignore[assignment]
+                )
+                scheduled_at = None
+                iso_date = scheduled_date
+                time_confirmed = False
 
             calendar_match = {
-                "id": match_id,
-                "date": date_match,
-                "horaire_renseigne": _is_horaire_renseigne(match),
+                "id": str(match_id),
+                "date": iso_date,
+                "scheduled_date": scheduled_date,
+                "scheduled_at": scheduled_at,
+                "time_confirmed": time_confirmed,
+                "horaire_renseigne": time_confirmed,
                 "joue": joue,
                 "equipe1": eq1,
                 "equipe2": eq2,
@@ -1904,7 +2019,9 @@ async def _build_calendar_matches(
                 "num_journee": journee,
             }
             if salle:
-                calendar_match["salle"] = salle
+                calendar_match["salle"] = (
+                    str(salle) if not isinstance(salle, dict) else salle
+                )
             all_matches.append(calendar_match)
 
     # Enrichissement bulk des salle_ids via list_rencontres_async par poule
@@ -2057,13 +2174,38 @@ async def _build_calendar_matches(
     max_matches = _get_max_calendar_matches()
     total_before_limit = len(effective)
 
-    # Limitation optionnelle par l'utilisateur
-    applied_limit = limit
+    # Pagination uniforme limit/offset (1 <= limit <=100, offset >=0)
+    effective_offset = max(0, offset) if offset is not None else 0
+    # Validation limit
     if limit is not None:
-        effective = effective[:limit]
+        limit = max(1, min(100, limit))
+        applied_limit: int | None = limit
+        paginated = effective[effective_offset : effective_offset + limit]
     elif len(effective) > max_matches:
-        effective = effective[:max_matches]
         applied_limit = max_matches
+        # Si offset fourni sans limit, on paginas quand même par max_matches
+        if offset is not None:
+            paginated = effective[effective_offset : effective_offset + max_matches]
+        else:
+            paginated = effective[:max_matches]
+            effective_offset = 0
+    else:
+        applied_limit = limit
+        if offset is not None:
+            paginated = effective[effective_offset : effective_offset + (limit or 100)]
+            if limit is None:
+                applied_limit = 100
+        else:
+            paginated = effective
+            effective_offset = 0
+            if limit is None:
+                applied_limit = None
+
+    # Si pagination offset dépasse total, applied paginated peut être vide
+    if offset is not None and effective_offset >= total_before_limit:
+        paginated = []
+
+    effective = paginated
 
     # Validation stricte via Pydantic
     validated_matches = []
@@ -2073,16 +2215,22 @@ async def _build_calendar_matches(
         else:
             validated_matches.append(CalendrierMatch(**m).model_dump(by_alias=True))
 
-    has_more = len(validated_matches) < total_before_limit
+    # Calcul has_more et next_offset basé sur offset + returned vs total
+    has_more = (effective_offset + len(validated_matches)) < total_before_limit
+    next_offset = (effective_offset + len(validated_matches)) if has_more else None
     meta: dict[str, Any] = {
         "total": total_before_limit,
         "returned": len(validated_matches),
-        "sort": "scheduled_at:asc",
+        "limit": applied_limit
+        if applied_limit is not None
+        else (limit or total_before_limit),
+        "offset": effective_offset,
         "has_more": has_more,
+        "sort": "scheduled_at:asc",
         "generated_at": datetime.now(tz).isoformat(),
     }
-    if applied_limit is not None:
-        meta["limit"] = applied_limit
+    if next_offset is not None:
+        meta["next_offset"] = next_offset
     if has_more:
         meta["truncated"] = True
 
@@ -2102,13 +2250,24 @@ async def get_calendrier_club_service(
     date_debut: str | None = None,
     date_fin: str | None = None,
     limit: int | None = None,
+    offset: int | None = None,
+    engagement_id: int | str | None = None,
     competition_id: int | str | None = None,
     competition_type: str | None = None,
     season_id: int | str | None = None,
     force_refresh: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    cache_key = f"calendrier:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}:{numero_equipe or ''}:{_normalize_name(adversaire or '')}:{date_debut or ''}:{date_fin or ''}:{limit or ''}:{competition_id or ''}:{competition_type or ''}"
+    if engagement_id is None:
+        engagement_id = kwargs.get("engagement_id")
+    if offset is None:
+        offset = kwargs.get("offset")
+    # Normalisation pagination
+    if limit is not None:
+        limit = max(1, min(100, limit))
+    if offset is not None:
+        offset = max(0, offset)
+    cache_key = f"calendrier:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}:{numero_equipe or ''}:{_normalize_name(adversaire or '')}:{date_debut or ''}:{date_fin or ''}:{limit or ''}:{offset or ''}:{engagement_id or ''}:{competition_id or ''}:{competition_type or ''}"
 
     if force_refresh and state.cache_calendrier is not None:
         state.cache_calendrier.pop(cache_key, None)
@@ -2126,9 +2285,11 @@ async def get_calendrier_club_service(
             date_debut,
             date_fin,
             limit,
+            engagement_id=engagement_id,
             competition_id=competition_id,
             competition_type=competition_type,
             season_id=season_id,
+            offset=offset,
         ),
         cache_name="calendrier",
     )
@@ -2139,6 +2300,7 @@ async def ffbb_last_result_service(
     organisme_id: int | str | None = None,
     categorie: str | None = None,
     numero_equipe: int = 1,
+    engagement_id: int | str | None = None,
     competition_id: int | str | None = None,
     competition_type: str | None = None,
     poule_id: int | str | None = None,
@@ -2146,11 +2308,14 @@ async def ffbb_last_result_service(
     force_refresh: bool = False,
     **kwargs: Any,
 ) -> dict:
+    if engagement_id is None:
+        engagement_id = kwargs.get("engagement_id")
     error, equipes, club_resolu = await _resolve_team_equipes(
         club_name=club_name,
         organisme_id=organisme_id,
         categorie=categorie,
         numero_equipe=numero_equipe,
+        engagement_id=engagement_id,
         competition_id=competition_id,
         competition_type=competition_type,
         poule_id=poule_id,
@@ -2292,15 +2457,37 @@ async def ffbb_last_result_service(
 
     competition_name = source_eq.get("competition", "")
     phase_label = source_eq.get("phase_label")
+    # Normalisation date ISO8601 + scheduled_* pour cohérence
+    raw_date = dernier.get("date_rencontre", "") or dernier.get("date", "")
+    dt_last = _parse_dt(raw_date)
+    time_confirmed_last = bool(_is_horaire_renseigne(dernier, dt_last))
+    scheduled_date_last = (
+        dt_last.strftime("%Y-%m-%d")
+        if dt_last
+        else (str(raw_date)[:10] if raw_date else None)
+    )
+    scheduled_at_last = (
+        dt_last.isoformat() if (time_confirmed_last and dt_last) else None
+    )
+    iso_date_last = (
+        dt_last.isoformat()
+        if (time_confirmed_last and dt_last)
+        else scheduled_date_last
+    )
 
     return {
         "status": "ok",
         "club_resolu": club_resolu,
-        "date": dernier.get("date_rencontre", ""),
-        "horaire_renseigne": _is_horaire_renseigne(dernier),
+        "date": iso_date_last,
+        "scheduled_date": scheduled_date_last,
+        "scheduled_at": scheduled_at_last,
+        "time_confirmed": time_confirmed_last,
+        "horaire_renseigne": time_confirmed_last,
         "journee": dernier.get("numeroJournee"),
         "competition": competition_name,
-        "competition_id": source_eq.get("competition_id"),
+        "competition_id": str(source_eq.get("competition_id"))
+        if source_eq.get("competition_id") is not None
+        else None,
         "phase_type": _detect_phase_type(competition_name),
         "phase_label": phase_label,
         "domicile": format_team_name(dernier.get("nomEquipe1", ""), num1),
@@ -2321,6 +2508,9 @@ async def ffbb_head_to_head_service(
     club_b: str | None = None,
     organisme_id_b: int | str | None = None,
     categorie: str | None = None,
+    engagement_id: int | str | None = None,
+    engagement_id_a: int | str | None = None,
+    engagement_id_b: int | str | None = None,
     competition_id: int | str | None = None,
     competition_type: str | None = None,
     poule_id: int | str | None = None,
@@ -2372,6 +2562,13 @@ async def ffbb_head_to_head_service(
     eff_comp_id = competition_id or kwargs.get("competition_id")
     eff_comp_type = competition_type or kwargs.get("competition_type")
     eff_poule_id = poule_id or kwargs.get("poule_id")
+    eff_eng_a = (
+        engagement_id_a
+        or engagement_id
+        or kwargs.get("engagement_id")
+        or kwargs.get("engagement_id_a")
+    )
+    eff_eng_b = engagement_id_b or engagement_id or kwargs.get("engagement_id_b")
 
     # 1. Résolution des équipes A et B
     err_a, eq_a, club_res_a = await _resolve_team_equipes(
@@ -2379,6 +2576,7 @@ async def ffbb_head_to_head_service(
         organisme_id=eff_org_id_a,
         categorie=categorie,
         numero_equipe=eff_num_a,
+        engagement_id=eff_eng_a,
         competition_id=eff_comp_id,
         competition_type=eff_comp_type,
         poule_id=eff_poule_id,
@@ -2396,6 +2594,7 @@ async def ffbb_head_to_head_service(
         organisme_id=eff_org_id_b,
         categorie=categorie,
         numero_equipe=eff_num_b,
+        engagement_id=eff_eng_b,
         competition_id=eff_comp_id,
         competition_type=eff_comp_type,
         poule_id=eff_poule_id,

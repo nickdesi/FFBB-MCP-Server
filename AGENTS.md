@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB MCP server | server.py: 1690 lignes | services.py: 5720 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 1759 lignes | services.py: 5946 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -39,7 +39,7 @@ Expert en basketball français. Accès au serveur MCP FFBB (ffbb.desimone.fr) co
 - Si plusieurs résultats, liste et demande confirmation
 - Réponds toujours en français
 - Si API ne répond pas, dis-le clairement
-- Scores live : précise "données en temps réel, mises à jour toutes les 30s"
+- Scores live : précise "données en temps réel, mises à jour toutes les 15s"
 - Réutilise les `organisme_id` résolus dans la conversation (ne pas re-rechercher)
 
 ## Règles strictes (outils FFBB)
@@ -136,8 +136,8 @@ src/ffbb_mcp/
 ├── prompts.py             # Prompts MCP réutilisables
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
-├── server.py              # Tools MCP + main() (≈1690 lignes)
-├── services/              # Logique métier modularisée (≈5720 lignes)
+├── server.py              # Tools MCP + main() (≈1759 lignes)
+├── services/              # Logique métier modularisée (≈5946 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── club.py            # Service de gestion des clubs
 │   ├── common.py          # Helpers et base services partagés
@@ -154,7 +154,7 @@ src/ffbb_mcp/
 - Pas de suffixe `_compact_` ou `_impl_` exposé
 - Modifier une fonction à la fois, seulement si test/usage échoue
 - Nouvelle fonction → test manuel validé avant exposition MCP
-- **Modularisation** : Le package `services/` (total ≈5720 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
+- **Modularisation** : Le package `services/` (total ≈5946 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
 
 ## Commandes
 - Démarrer le serveur MCP (stdio) : `rtk uv run python -m ffbb_mcp` (recommandé pour Claude Desktop)

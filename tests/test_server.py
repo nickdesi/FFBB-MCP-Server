@@ -220,6 +220,9 @@ async def test_ffbb_head_to_head_via_call_tool_with_aliases():
             club_b="Vichy",
             organisme_id_b=None,
             categorie="SEM1",
+            engagement_id=None,
+            engagement_id_a=None,
+            engagement_id_b=None,
             competition_id=None,
             competition_type=None,
             poule_id=None,
@@ -407,6 +410,7 @@ async def test_team_summary_resolves_team_with_numero_equipe():
             organisme_id=9326,
             categorie="SEM1",
             numero_equipe=1,
+            engagement_id=None,
             competition_id=None,
             competition_type=None,
             poule_id=None,
@@ -444,6 +448,7 @@ async def test_ffbb_bilan_saison_extracts_numero_equipe():
             organisme_id=9326,
             categorie="SEM2",
             numero_equipe=2,
+            engagement_id=None,
             competition_id=None,
             competition_type=None,
             poule_id=None,
@@ -478,6 +483,7 @@ async def test_ffbb_bilan_saison_supports_club_name():
             organisme_id=None,
             categorie="U11M",
             numero_equipe=1,
+            engagement_id=None,
             competition_id=None,
             competition_type=None,
             poule_id=None,
@@ -525,10 +531,10 @@ async def test_tool_schemas_conformance_and_token_budget():
             f"outputSchema inattendu sur {tool.name}"
         )
 
-    # 4. Vérification du budget token
+    # 4. Vérification du budget token (seuil ajusté après ajout engagement_id + offset)
     total_tools_chars = sum(len(json.dumps(t.model_dump())) for t in tools)
-    assert total_tools_chars < 32000, (
-        f"Payload tools trop lourd ({total_tools_chars} chars, attendu < 32000)"
+    assert total_tools_chars < 35000, (
+        f"Payload tools trop lourd ({total_tools_chars} chars, attendu < 35000)"
     )
 
     instructions_len = len(mcp.instructions or "")

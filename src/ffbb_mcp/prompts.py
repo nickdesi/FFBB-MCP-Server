@@ -370,7 +370,7 @@ _WORKFLOW = """\
 | Classement automagique (sans phase précise) | `ffbb_club(action='classement')` |
 | Dernier score joué | `ffbb_last_result` |
 | Prochain match | `ffbb_next_match` |
-| Scores en cours (live) | `ffbb_lives` — actualisation 30 s |
+| Scores en cours (live) | `ffbb_lives` — actualisation 15 s |
 
 ### 🥈 Tier 2 — Outils ciblés (si Tier 1 insuffisant)
 
@@ -578,7 +578,7 @@ def bilan_equipe(club_name: str, categorie: str, numero_equipe: int = 1) -> str:
 def scores_live(club_name: str = "") -> str:
     """Consulte les scores des matchs en cours, avec filtre optionnel par club."""
     filtre = f" pour '{club_name.strip()}'" if club_name.strip() else " (tous clubs)"
-    steps = ["`ffbb_lives` → tous les matchs actifs (actualisation 30 s)."]
+    steps = ["`ffbb_lives` → tous les matchs actifs (actualisation 15 s)."]
     if club_name.strip():
         steps.append(f"Filtrer les résultats pour '{club_name.strip()}' côté client.")
     return "\n\n".join(

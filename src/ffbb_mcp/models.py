@@ -190,9 +190,27 @@ class BilanResponse(BaseModel):
 class CalendrierMatch(BaseModel):
     """Structure de données typée représentant un match de calendrier."""
 
+    model_config = {"extra": "allow"}
+
     id: int | str = Field(description="ID unique de la rencontre.")
     date: str | None = Field(
         default=None, description="Date et heure du match en ISO format."
+    )
+    scheduled_date: str | None = Field(
+        default=None,
+        description="Date planifiée YYYY-MM-DD (toujours renseignée).",
+    )
+    scheduled_at: str | None = Field(
+        default=None,
+        description="Date-heure ISO8601 avec fuseau si horaire confirmé, sinon null.",
+    )
+    time_confirmed: bool | None = Field(
+        default=None,
+        description="True si l'horaire est officiellement confirmé, False si à fixer.",
+    )
+    horaire_renseigne: bool | None = Field(
+        default=None,
+        description="Alias legacy de time_confirmed (rétro-compat).",
     )
     joue: int | bool | None = Field(
         default=None,

@@ -796,40 +796,56 @@ async def _execute_multi_search_with_self_healing(
 async def multi_search_service(
     nom: str,
     limit: int = 20,
+    offset: int = 0,
     force_refresh: bool = False,
 ) -> list[dict[str, Any]]:
     normalized_query = normalize_query(nom)
-    cache_key = f"multi_search:{normalized_query}:{limit}"
+    cache_key = f"multi_search:{normalized_query}:{limit}:{offset}"
 
     async def _fetch() -> list[dict[str, Any]]:
         client = await get_client_async()
+        # Pour supporter l'offset, on fetch offset+limit puis on slice côté MCP
+        fetch_limit = offset + limit if offset else limit
         raw = await _execute_multi_search_with_self_healing(
             client=client,
             nom=nom,
             normalized_query=normalized_query,
-            limit=limit,
+            limit=fetch_limit,
         )
 
         if not getattr(raw, "results", None):
             return []
 
         output: list[dict[str, Any]] = []
-        total_hits = 0
+        total_hits: int | None = None
         for res in raw.results:
             category = res.index_uid
             est = getattr(res, "estimated_total_hits", None)
-            if est is not None:
-                total_hits += est
+            # Ne comptabiliser que les vrais entiers (évite MagicMock en test)
+            if isinstance(est, int):
+                total_hits = (total_hits or 0) + est
+            elif isinstance(est, float):
+                total_hits = int((total_hits or 0) + est)
             for hit in res.hits:
                 item = serialize_model(hit)
                 item["_type"] = category
                 output.append(item)
-                if len(output) >= limit:
-                    if total_hits > len(output):
-                        for out_item in output:
-                            out_item["_total_hits"] = total_hits
-                    return output
-        return output
+                if len(output) >= fetch_limit:
+                    break
+            if len(output) >= fetch_limit:
+                break
+        # Slice pour pagination offset
+        sliced = output[offset : offset + limit] if offset else output[:limit]
+        if total_hits is not None and total_hits > len(sliced):
+            for out_item in sliced:
+                out_item["_total_hits"] = total_hits
+                out_item["_offset"] = offset
+        elif offset:
+            for out_item in sliced:
+                out_item["_offset"] = offset
+                if total_hits is not None and total_hits:
+                    out_item["_total_hits"] = total_hits
+        return sliced
 
     return await _dedupe_inflight(
         cache=state.cache_search,
@@ -909,10 +925,11 @@ async def ffbb_search_service(
 
     if type == "all":
         result = await multi_search_service(
-            nom=query, limit=limit, force_refresh=force_refresh
+            nom=query, limit=limit, offset=offset, force_refresh=force_refresh
         )
         if not isinstance(result, list):
             return []
+        # multi_search_service déjà slice, mais on garde offset meta cohérente
         return _add_truncation_meta(result, limit=limit, offset=offset)
 
     if type == "organismes":
@@ -951,6 +968,7 @@ async def ffbb_resolve_team_service(
     organisme_id: int | str | None = None,
     categorie: str | None = None,
     numero_equipe: int | str | None = None,
+    engagement_id: int | str | None = None,
     competition_id: int | str | None = None,
     competition_type: str | None = None,
     poule_id: int | str | None = None,
@@ -1124,6 +1142,15 @@ async def ffbb_resolve_team_service(
         candidates = matched
 
     # 3.5) Application des filtres explicites de désambiguïsation
+    if engagement_id is not None:
+        target_eng_id = str(engagement_id).strip()
+        candidates = [
+            c
+            for c in candidates
+            if str(c.get("engagement_id") or c.get("team_id") or "").strip()
+            == target_eng_id
+        ]
+
     if competition_id is not None:
         target_comp_id = str(competition_id).strip()
         candidates = [
