@@ -374,6 +374,10 @@ Règle de temps verbal :
 - 📍 Format d'adresse standardisé : `[Nom de la Salle] - [Adresse Postale], [Ville]` (gérer proprement les valeurs manquantes sans séparateurs orphelins)
 
 ## Alignement Strict FFBB Data Client & MCP
+- **Machine à états stricte (Zéro résolution d'équipe ambiguë silencieuse)** : Ne JAMAIS renvoyer `status="resolved"` si plusieurs engagements actifs correspondent au club + catégorie (ex: Championnat [PLAT] vs Coupe [COUPE]). Renvoyer obligatoirement `status="ambiguous"`, la liste exhaustive `candidates`, et un `clarification_prompt` prêt pour le LLM. Propager systématiquement les filtres `competition_id`, `competition_type`, `poule_id`, `season_id`, `force_refresh` sur tous les outils d'équipe.
+- **Contrat de pagination `_meta` (Recherche FFBB)** : Respect strict de `1 <= limit <= 100` et `offset >= 0` sur `ffbb_search`. Insérer obligatoirement l'enveloppe `_meta` (`total`, `returned`, `limit`, `offset`, `has_more`, `next_offset`, `truncated`).
+- **Dispatching dynamique des mocks inter-services** : Dans l'architecture modulaire `services/`, utiliser systématiquement le pattern de résolution dynamique (`getter = getattr(svc, 'func_name', func_local)`) pour garantir l'herméticité et la compatibilité totale avec les mocks de tests unitaires.
+- **Calcul objectif des statuts de saison** : Évaluer `enCours` et `within_date_range` par comparaison temporelle stricte (`debut <= today <= fin`) pour pallier les états non mis à jour par l'amont Directus.
 - **Parité des index Meilisearch** : Le serveur MCP interroge exclusivement les 6 index Meilisearch réels et actifs (`organismes`, `competitions`, `rencontres`, `salles`, `terrains`, `tournois`).
 - **Élévation de niveau / Fallback** : Si Directus renvoie `classements: []` (avant 1ère journée), le MCP reconstruit la liste des équipes engagées depuis les `rencontres` (`status: non_commence`).
 - **Allègement des payloads** : Préférer `get_organisme_for_search_async()` pour la résolution de club afin de minimiser le transfert réseau.
