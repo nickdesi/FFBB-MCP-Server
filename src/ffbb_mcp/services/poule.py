@@ -455,15 +455,45 @@ async def ffbb_get_classement_service(
 
         # Fallback si aucun classement calculé (avant début de saison) : extraire les équipes des rencontres
         if not flat and data.get("rencontres"):
+            # Récupération du nom du club cible pour matching par nom (robuste pré-saison)
+            target_nom = None
+            if target_org_str:
+                try:
+                    _org_data = await get_organisme_service(target_org_str)
+                    target_nom = (
+                        _org_data.get("nom", "")
+                        if isinstance(_org_data, dict)
+                        else None
+                    )
+                except Exception:
+                    target_nom = None
             seen_teams: set[str] = set()
             pos = 1
-            for r in data.get("rencontres", []):
+            for r in data.get("rencontres", []) or []:
                 for eq_key in ("nomEquipe1", "nomEquipe2"):
                     eq_name = r.get(eq_key)
                     if eq_name and eq_name not in seen_teams:
                         seen_teams.add(eq_name)
                         is_target = False
-                        if target_org_str and str(target_org_str) in str(
+                        if target_nom and _normalize_name(
+                            target_nom
+                        ) in _normalize_name(eq_name):
+                            # Vérifie aussi le numéro si fourni
+                            if target_num_str:
+                                # Extrait le numéro de l'équipe depuis eq_name
+                                from ffbb_mcp.services.club import _match_team_name
+
+                                if _match_team_name(
+                                    eq_name,
+                                    target_nom,
+                                    int(target_num_str)
+                                    if target_num_str.isdigit()
+                                    else None,
+                                ):
+                                    is_target = True
+                            else:
+                                is_target = True
+                        elif target_org_str and str(target_org_str) in str(
                             r.get("idOrganisme", "")
                         ):
                             is_target = True

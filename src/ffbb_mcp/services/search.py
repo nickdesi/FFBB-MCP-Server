@@ -861,11 +861,13 @@ def _add_truncation_meta(
     result: list[dict[str, Any]],
     limit: int = 20,
     offset: int = 0,
+    sort: list[str] | None = None,
 ) -> dict[str, Any]:
     """Enveloppe le résultat de recherche avec des métadonnées de pagination.
 
     Retourne un dict ``{"items": [...], "_meta": {...}}`` au lieu d'une liste brute.
     """
+    sort_str = ",".join(sort) if sort else "relevance:desc"
     if not result:
         return {
             "items": [],
@@ -875,6 +877,7 @@ def _add_truncation_meta(
                 "limit": limit,
                 "offset": offset,
                 "has_more": False,
+                "sort": sort_str,
             },
         }
 
@@ -894,6 +897,7 @@ def _add_truncation_meta(
         "limit": limit,
         "offset": result_offset,
         "has_more": has_more,
+        "sort": sort_str,
     }
     if next_offset is not None:
         meta["next_offset"] = next_offset
@@ -930,7 +934,7 @@ async def ffbb_search_service(
         if not isinstance(result, list):
             return []
         # multi_search_service déjà slice, mais on garde offset meta cohérente
-        return _add_truncation_meta(result, limit=limit, offset=offset)
+        return _add_truncation_meta(result, limit=limit, offset=offset, sort=sort)
 
     if type == "organismes":
         result = await search_organismes_service(
@@ -941,7 +945,7 @@ async def ffbb_search_service(
             sort=sort,
             force_refresh=force_refresh,
         )
-        return _add_truncation_meta(result, limit=limit, offset=offset)
+        return _add_truncation_meta(result, limit=limit, offset=offset, sort=sort)
 
     if type in _SEARCH_INDEX_MAP:
         result = await _search_generic(
@@ -953,7 +957,7 @@ async def ffbb_search_service(
             sort=sort,
             force_refresh=force_refresh,
         )
-        return _add_truncation_meta(result, limit=limit, offset=offset)
+        return _add_truncation_meta(result, limit=limit, offset=offset, sort=sort)
 
     raise McpError(
         error=ErrorData(
