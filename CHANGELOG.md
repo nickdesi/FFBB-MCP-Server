@@ -5,7 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
 ## [1.14.0] - 2026-09-15
+
+### Added
+- `glama.json` a la racine pour claim Glama et completion de profil (fix `A A C` maintenance) - `maintainers: ["nickdesi"]`
+
+### Fixed
+- **TDQS 17/17 A** - amelioration des descriptions pour passer le seuil `A >=3.5` sur tous les outils (overall A 3.9, definition quality A 3.9, coherence A 4.0) :
+  - `ffbb_saisons` - ajout Behavior (cache SWR TTL~24h, response shape `list[dict]` `{season_id, label, debut, fin, enCours}`) et Usage (`ffbb_bilan`/`ffbb_club` vs `ffbb_saisons`)
+  - `ffbb_explain_tiebreak_rules` - ajout Usage explicite avec `ffbb_search_regulations`, `ffbb_get_regulation_article`, `ffbb_list_regulations` + Behavior (cache SWR)
+  - `ffbb_list_regulations` - enrichissement complet (response `documents[]`, Usage vs `ffbb_search_regulations`/`ffbb_get_regulation_article`/`ffbb_explain_tiebreak_rules`)
+  - `ffbb_get_regulation_article` - ajout verbiage retour `{document_id, article_number, titre, contenu}` + Usage vs siblings
+  - `ffbb_search_regulations` - ajout retour `extraits[]` + Usage vs siblings
+  - `ffbb_version` - ajout retour `{package_version, mcp_sdk_version, python_version, transport, cache_ttls}` + Usage diagnostic vs donnees basket
+- Synchronisation version `1.14.0` sur README, docs et website (sync_version.py)
+
+
+## [1.13.0] - 2026-09-14
 
 ### Added
 - **Résolution Déterministe d'Équipe & Machine à États Stricte (Axe 1)** :
