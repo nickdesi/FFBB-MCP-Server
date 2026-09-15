@@ -258,8 +258,14 @@ mcp: FastMCP = FastMCP(
 async def ffbb_version() -> dict[str, Any]:
     """Informations de version et configuration runtime du serveur FFBB MCP.
 
-    Retourne une structure compacte et strictement typée, pratique pour les
-    agents et les outils de supervision.
+    Retourne `dict` compact et typé `{package_version, mcp_sdk_version,
+    python_version, transport, cache_ttls}` ; lecture seule, idempotent, sans
+    appel réseau externe ni effet de bord, <10ms.
+
+    Utilise cet outil pour diagnostiquer la version déployée, vérifier le transport
+    (`stdio` vs `streamable-http`) ou inspecter les TTL avant de debugger un autre
+    outil. Ne pas utiliser pour obtenir des données basket — utilise `ffbb_search`,
+    `ffbb_club` ou `ffbb_bilan` à la place ; pour la santé live, préfère `/health`.
     """
     mode = os.environ.get("MCP_MODE", "stdio").lower()
     return {
@@ -1724,6 +1730,15 @@ async def ffbb_search_regulations(
 
     Permet de retrouver les articles pertinents sur les qualifications, montées/descentes,
     brassages jeunes, règles techniques (durée, ballons, zone), forfaits et brûlage.
+    Retourne `dict` avec `extraits[]` (`document_id`, `article_number`, `score`, `extrait`)
+    triés par pertinence ; lecture seule, idempotent, cache SWR.
+
+    Utilise cet outil quand tu ne connais pas le numéro d'article et que tu cherches par
+    mots-clés. Ne pas utiliser pour récupérer un article précis — utilise
+    `ffbb_get_regulation_article` à la place ; pour lister les documents — utilise
+    `ffbb_list_regulations` ; pour expliquer un départage — utilise
+    `ffbb_explain_tiebreak_rules` au lieu de chercher le texte. Affûte avec `level`,
+    `organizer`, `category` et `limit` pour réduire le bruit.
     """
     try:
         await _safe_report_progress(
@@ -1779,7 +1794,18 @@ async def ffbb_get_regulation_article(
     ] = "2026-2027",
     ctx: Context[Any, Any, Any] | None = None,
 ) -> dict[str, Any]:
-    """Récupère le texte intégral et exact d'un article spécifique de règlement sans troncature."""
+    """Récupère le texte intégral et exact d'un article spécifique de règlement sans troncature.
+
+    Retourne `dict` avec `document_id`, `article_number`, `titre`, `contenu` et
+    `saison` ; lecture seule, idempotent, sans effet de bord, cache SWR.
+    Utilise cet outil quand tu connais le numéro d'article et le document (obtenu via
+    `ffbb_list_regulations` ou `ffbb_search_regulations`) et que tu veux le contenu
+    verbatim. Ne pas utiliser pour rechercher par mot-clé — utilise
+    `ffbb_search_regulations` à la place ; pour lister les documents disponibles —
+    utilise `ffbb_list_regulations` ; pour expliquer un départage — utilise
+    `ffbb_explain_tiebreak_rules`. Si `document_id` est omis, précise `organizer`
+    et `season` pour lever l'ambiguïté.
+    """
     try:
         await _safe_report_progress(
             ctx, 1, total=2, message="Extraction de l'article..."
@@ -1865,8 +1891,20 @@ async def ffbb_list_regulations(
     ctx: Context[Any, Any, Any] | None = None,
 ) -> dict[str, Any]:
     """Liste l'ensemble des textes réglementaires fédéraux (RSG, RSP Élite, NM1-NM3, LF2-NF3),
+    régionaux (Ligues IDF, Hauts-de-France, AURA...) et départementaux
+    (Comités Paris, Nord, Rhône, Puy-de-Dôme...) indexés.
 
-    régionaux (Ligues IDF, Hauts-de-France, AURA...) et départementaux (Comités Paris, Nord, Rhône, Puy-de-Dôme...) indexés.
+    Retourne l'inventaire complet sous forme `dict` avec `documents[]`
+    (`document_id`, `titre`, `organizer`, `level`, `season`) trié par juridiction.
+    Lecture seule, idempotent, sans effet de bord ; cache SWR (TTL ≈24h).
+
+    Utilise cet outil pour découvrir les `document_id` disponibles avant d'appeler
+    `ffbb_get_regulation_article` ou pour choisir un périmètre avant
+    `ffbb_search_regulations`. Ne pas utiliser pour rechercher un extrait textuel —
+    utilise `ffbb_search_regulations` à la place ; pour obtenir le texte d'un article
+    précis — utilise `ffbb_get_regulation_article` ; pour expliquer un départage —
+    utilise `ffbb_explain_tiebreak_rules`. Avec `season`, filtre l'inventaire à la
+    saison ciblée (défaut `2026-2027`).
     """
     try:
         await _safe_report_progress(
