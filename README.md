@@ -149,7 +149,7 @@ Configurez directement l'URL distante dans `mcp_config.json` via la directive na
 | `ffbb_search_regulations` | Recherche plein texte déterministe dans les règlements officiels FFBB, régionaux et départementaux. |
 | `ffbb_get_regulation_article` | Récupère le texte intégral et exact d'un article spécifique de règlement sans troncature. |
 | `ffbb_explain_tiebreak_rules` | Fournit les règles officielles de départage en cas d'égalité (Article 28 du RSG FFBB). |
-| `ffbb_list_regulations` | Liste l'ensemble des textes réglementaires fédéraux (RSG, RSP Élite, NM1-NM3, LF2-NF3),. |
+| `ffbb_list_regulations` | Liste l'ensemble des textes réglementaires fédéraux (RSG, RSP Élite, NM1-NM3, LF2-NF3). |
 
 > [!NOTE]
 > Référence complète des paramètres : [`docs/TOOLS_REFERENCE.md`](docs/TOOLS_REFERENCE.md).
