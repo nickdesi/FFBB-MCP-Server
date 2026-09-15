@@ -29,7 +29,13 @@ async def get_client_async(*args, **kwargs):
     return await ffbb_mcp.client.get_client_async(*args, **kwargs)
 
 
-from ffbb_mcp.utils import ParsedCategorie, format_team_name, parse_categorie
+from ffbb_mcp.utils import (
+    _EMPTY_DICT,
+    _EMPTY_LIST,
+    ParsedCategorie,
+    format_team_name,
+    parse_categorie,
+)
 
 from .bilan import (
     _build_bilan_payload,  # noqa: F401
@@ -122,7 +128,7 @@ async def ffbb_equipes_club_service(
         if _cached_equipes is not None:
             return [t.copy() for t in _cached_equipes]
 
-    raw = data.get("engagements", []) if isinstance(data, dict) else []
+    raw = data.get("engagements", _EMPTY_LIST) if isinstance(data, dict) else []
     all_teams: list[dict[str, Any]] = []
     club_nom = data.get("nom", "")
 
@@ -131,9 +137,9 @@ async def ffbb_equipes_club_service(
     for e in raw:
         if not isinstance(e, dict):
             continue
-        comp = e.get("idCompetition", {}) or {}
-        poule = e.get("idPoule", {}) or {}
-        cat = comp.get("categorie", {}) or {}
+        comp = e.get("idCompetition", _EMPTY_DICT) or {}
+        poule = e.get("idPoule", _EMPTY_DICT) or {}
+        cat = comp.get("categorie", _EMPTY_DICT) or {}
         nom_comp = comp.get("nom", "")
         comp_code = (comp.get("code") or "").strip()
         comp_type = (comp.get("typeCompetition") or "").strip()
@@ -655,7 +661,7 @@ async def _fetch_poule_matches(
 
         poule = await poule_getter(pid, force_refresh=force_refresh)
         matches: list[tuple[dict, dict]] = []
-        for m in poule.get("rencontres", []) or []:
+        for m in poule.get("rencontres", _EMPTY_LIST) or []:
             eng1 = m.get("idEngagementEquipe1")
             eng2 = m.get("idEngagementEquipe2")
             id_eng1 = str(eng1.get("id") if isinstance(eng1, dict) else eng1)
@@ -1336,7 +1342,7 @@ async def ffbb_head_to_head_service(
         return_exceptions=True,
     )
     poules_list = [p for p in poules_raw if isinstance(p, dict)]
-    all_rencontres = [r for p in poules_list for r in (p.get("rencontres", []) or [])]
+    all_rencontres = [r for p in poules_list for r in (p.get("rencontres", _EMPTY_LIST) or [])]
 
     eng_ids_a = {str(e["engagement_id"]) for e in eq_a if e.get("engagement_id")}
     eng_ids_b = {str(e["engagement_id"]) for e in eq_b if e.get("engagement_id")}
@@ -1379,14 +1385,14 @@ async def ffbb_head_to_head_service(
         narrative_points.append(h2h_data["bilan_h2h"])
     if dynamique_a.get("forme_str"):
         label_a = (
-            dynamique_a.get("serie_actuelle", {}).get("label") or ""  # type: ignore[union-attr]
+            dynamique_a.get("serie_actuelle", _EMPTY_DICT).get("label") or ""  # type: ignore[union-attr]
         )
         narrative_points.append(
             f"Forme {nom_a} (5 derniers) : {dynamique_a['forme_str']} ({label_a})"
         )
     if dynamique_b.get("forme_str"):
         label_b = (
-            dynamique_b.get("serie_actuelle", {}).get("label") or ""  # type: ignore[union-attr]
+            dynamique_b.get("serie_actuelle", _EMPTY_DICT).get("label") or ""  # type: ignore[union-attr]
         )
         narrative_points.append(
             f"Forme {nom_b} (5 derniers) : {dynamique_b['forme_str']} ({label_b})"

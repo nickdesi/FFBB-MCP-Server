@@ -10,6 +10,10 @@ from starlette.responses import JSONResponse
 
 type JSONValue = Any
 
+_EMPTY_LIST = []  # type: ignore
+_EMPTY_DICT = {}  # type: ignore
+
+
 _DIACRITICS = {
     i: None
     for i in range(sys.maxunicode)

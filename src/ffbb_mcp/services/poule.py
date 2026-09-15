@@ -17,7 +17,7 @@ async def get_client_async(*args, **kwargs):
     return await ffbb_mcp.client.get_client_async(*args, **kwargs)
 
 
-from ffbb_mcp.utils import format_team_name, serialize_model
+from ffbb_mcp.utils import _EMPTY_DICT, _EMPTY_LIST, format_team_name, serialize_model
 
 from .common import (
     _cache_set,
@@ -206,7 +206,7 @@ async def get_poule_service(
         )
         data = serialize_model(poule) or {}
 
-        rencontres = data.get("rencontres", []) or []
+        rencontres = data.get("rencontres", _EMPTY_LIST) or []
         restantes_par_equipe: dict[str, list[dict]] = {}
         for r in rencontres:
             if r.get("joue") not in (0, "0"):
@@ -242,7 +242,7 @@ async def get_poule_service(
     )
 
     if isinstance(result, dict) and "data" in result:
-        rencontres = result["data"].get("rencontres", [])
+        rencontres = result["data"].get("rencontres", _EMPTY_LIST)
         if rencontres:
             result["data"]["rencontres"] = sorted(
                 rencontres,
@@ -260,10 +260,10 @@ async def get_poule_service(
 
 
 async def format_poule_response(poule_data: dict) -> dict[str, Any]:
-    classements = poule_data.get("classements", [])
+    classements = poule_data.get("classements", _EMPTY_LIST)
     formatted_classements = []
     for c in classements or []:
-        eng = c.get("id_engagement", {}) or {}
+        eng = c.get("id_engagement", _EMPTY_DICT) or {}
         nom = eng.get("nom", "")
         num = eng.get("numero_equipe")
         c["equipe"] = format_team_name(nom, num)
@@ -275,11 +275,11 @@ async def format_poule_response(poule_data: dict) -> dict[str, Any]:
         )
         formatted_classements.append(c)
 
-    rencontres = poule_data.get("rencontres", [])
+    rencontres = poule_data.get("rencontres", _EMPTY_LIST)
     formatted_rencontres = []
     for m in rencontres or []:
-        eng1 = m.get("idEngagementEquipe1", {}) or {}
-        eng2 = m.get("idEngagementEquipe2", {}) or {}
+        eng1 = m.get("idEngagementEquipe1", _EMPTY_DICT) or {}
+        eng2 = m.get("idEngagementEquipe2", _EMPTY_DICT) or {}
         num1 = eng1.get("numeroEquipe") if isinstance(eng1, dict) else None
         num2 = eng2.get("numeroEquipe") if isinstance(eng2, dict) else None
         m["nomEquipe1"] = format_team_name(m.get("nomEquipe1", ""), num1)
@@ -397,7 +397,7 @@ async def ffbb_get_classement_service(
         if not poule:
             return {"_ttl": ttl, "data": []}
         data = serialize_model(poule)
-        raw = data.get("classements", data.get("classement", [])) or []
+        raw = data.get("classements", data.get("classement", _EMPTY_LIST)) or []
         if not isinstance(raw, list):
             raw = []
 
@@ -408,7 +408,7 @@ async def ffbb_get_classement_service(
         for c in raw:
             if not isinstance(c, dict):
                 continue
-            eng = c.get("id_engagement", {}) or {}
+            eng = c.get("id_engagement", _EMPTY_DICT) or {}
             nom_equipe = eng.get("nom", "")
             num_equipe = eng.get("numero_equipe")
             org_id = str(c.get("organisme_id") or eng.get("organisme_id") or "")
@@ -469,7 +469,7 @@ async def ffbb_get_classement_service(
                     target_nom = None
             seen_teams: set[str] = set()
             pos = 1
-            for r in data.get("rencontres", []) or []:
+            for r in data.get("rencontres", _EMPTY_LIST) or []:
                 for eq_key in ("nomEquipe1", "nomEquipe2"):
                     eq_name = r.get(eq_key)
                     if eq_name and eq_name not in seen_teams:
@@ -594,7 +594,7 @@ async def find_team_poule_service(
 
     # 1. Fast-path : vérification directe dans les engagements du club
     if org_data and isinstance(org_data, dict):
-        for eng in org_data.get("engagements", []):
+        for eng in org_data.get("engagements", _EMPTY_LIST):
             if not isinstance(eng, dict):
                 continue
             comp = eng.get("idCompetition") or {}
@@ -604,7 +604,7 @@ async def find_team_poule_service(
                 poule_nom = poule.get("nom")
                 if not poule_nom:
                     comp_data = await get_competition_service(comp_id_str)
-                    for p in comp_data.get("poules", []):
+                    for p in comp_data.get("poules", _EMPTY_LIST):
                         if str(p.get("id")) == poule_id:
                             poule_nom = p.get("nom")
                             break
@@ -627,14 +627,14 @@ async def find_team_poule_service(
     # 2. Fallback : inspection des classements de chaque poule de la compétition
     comp_data = await get_competition_service(comp_id_str)
     comp_nom = comp_data.get("nom", "")
-    poules = comp_data.get("poules", [])
+    poules = comp_data.get("poules", _EMPTY_LIST)
 
     for p in poules:
         p_id = p.get("id")
         if not p_id:
             continue
         poule_data = await get_poule_service(p_id)
-        for c in poule_data.get("classements", []):
+        for c in poule_data.get("classements", _EMPTY_LIST):
             c_org_id = str(c.get("organisme_id") or "")
             c_eng = c.get("id_engagement") or {}
             c_name = _normalize_name(c_eng.get("nom") or c.get("organisme_nom") or "")
@@ -655,7 +655,7 @@ async def find_team_poule_service(
 
         # Fallback si les classements sont vides (ex: pré-saison avant la 1ère journée)
         if not poule_data.get("classements"):
-            for r in poule_data.get("rencontres", []):
+            for r in poule_data.get("rencontres", _EMPTY_LIST):
                 eq1 = _normalize_name(r.get("nomEquipe1") or "")
                 eq2 = _normalize_name(r.get("nomEquipe2") or "")
                 target_norm = _normalize_name(club_nom)

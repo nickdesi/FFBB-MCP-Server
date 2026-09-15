@@ -6,6 +6,8 @@ import contextlib
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from ffbb_mcp.utils import _EMPTY_DICT, _EMPTY_LIST
+
 from .services.common import _normalize_name
 
 _PARIS_TZ = ZoneInfo("Europe/Paris")
@@ -25,8 +27,8 @@ def compute_poule_advanced_stats(
     - Indice Clutch (performance dans les matchs à <= 5 points d'écart)
     - Style de jeu détecté
     """
-    classements = poule_data.get("classements", []) or []
-    rencontres = poule_data.get("rencontres", []) or []
+    classements = poule_data.get("classements", _EMPTY_LIST) or []
+    rencontres = poule_data.get("rencontres", _EMPTY_LIST) or []
     total_equipes = len(classements)
 
     # 1. Rangs d'attaque et défense depuis le classement
@@ -39,7 +41,7 @@ def compute_poule_advanced_stats(
     for c in classements:
         if not isinstance(c, dict):
             continue
-        eng = c.get("id_engagement", {}) or {}
+        eng = c.get("id_engagement", _EMPTY_DICT) or {}
         eid = str(eng.get("id", "")) if isinstance(eng, dict) else str(eng or "")
         nom_eq = str(c.get("nom_equipe") or eng.get("nom", "") or "")
         mj = int(c.get("match_joues") or c.get("joues") or 0)
