@@ -886,7 +886,14 @@ async def ffbb_get_saisons(
         bool, Field(description="Si True, contourne le cache.")
     ] = False,
 ) -> list[dict[str, Any]]:
-    """Liste des saisons FFBB. active_only=True pour la saison en cours uniquement."""
+    """Liste des saisons FFBB (référentiel temporel).
+
+    Utilise cet outil pour récupérer les `season_id` disponibles avant d'appeler
+    `ffbb_bilan`, `ffbb_club` ou `ffbb_team_summary` avec un filtre de saison.
+    Avec `active_only=True`, ne retourne que la saison en cours.
+    Ne pas utiliser pour obtenir un classement, un calendrier ou un bilan — utilise
+    `ffbb_club(action="classement")` ou `ffbb_bilan` à la place.
+    """
     try:
         return await get_saisons_service(
             active_only=active_only, force_refresh=force_refresh
@@ -1806,6 +1813,12 @@ async def ffbb_explain_tiebreak_rules(
 
     Explique le calcul du point-average particulier (confrontations directes),
     du quotient particulier, et du mini-championnat à 3 équipes ou plus.
+
+    Utilise cet outil quand deux équipes ou plus sont à égalité de points dans une poule
+    et que tu dois expliquer pourquoi l'une est classée devant l'autre.
+    Avec `poule_id`, les règles sont appliquées à la poule concrète ; sans, tu obtiens
+    les règles génériques. Ne pas utiliser pour obtenir le classement brut — utilise
+    `ffbb_club(action="classement")` — ni pour le bilan chiffré — utilise `ffbb_bilan`.
     """
     try:
         await _safe_report_progress(

@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB MCP server | server.py: 1999 lignes | services.py: 6719 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 2012 lignes | services.py: 6719 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -20,7 +20,7 @@ Expert en basketball français. Accès au serveur MCP FFBB (ffbb.desimone.fr) co
 8. **ffbb_last_result** → Dernier résultat d'une équipe précise
 9. **ffbb_lives** → Matchs en cours (scores live, rafraîchissement toutes les 15s). Retourne [] si aucun match
 10. **ffbb_bilan_saison** → Bilan détaillé de la saison pour une équipe précise (toutes phases)
-11. **ffbb_saisons** → Liste des saisons FFBB. active_only=True pour la saison en cours uniquement
+11. **ffbb_saisons** → Liste des saisons FFBB (référentiel temporel)
 12. **ffbb_version** → Informations de version et configuration runtime du serveur FFBB MCP
 
 ## Ressources MCP
@@ -136,7 +136,7 @@ src/ffbb_mcp/
 ├── prompts.py             # Prompts MCP réutilisables
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
-├── server.py              # Tools MCP + main() (≈1999 lignes)
+├── server.py              # Tools MCP + main() (≈2012 lignes)
 ├── services/              # Logique métier modularisée (≈6719 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── bilan.py           # Module de service
