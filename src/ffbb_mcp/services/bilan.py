@@ -24,7 +24,7 @@ from pydantic import ValidationError
 
 from ffbb_mcp._state import state
 from ffbb_mcp.models import BilanResponse
-from ffbb_mcp.utils import _EMPTY_DICT, _EMPTY_LIST, parse_categorie
+from ffbb_mcp.utils import parse_categorie
 
 from .common import (
     _BILAN_STAT_FIELDS,
@@ -52,7 +52,7 @@ def _compute_bilan_from_rencontres(
     """Calcule le bilan d'une équipe depuis les rencontres quand les classements sont vides."""
     from .common import _normalize_name as _norm
 
-    rencontres = poule_data.get("rencontres", _EMPTY_LIST) or []
+    rencontres = poule_data.get("rencontres") or []
     if not rencontres:
         return None
 
@@ -223,10 +223,10 @@ async def ffbb_saison_bilan_service(
             poule_to_comp[pid] = e["competition"]
 
     for pid, poule_data in poules_map.items():
-        classements = poule_data.get("classements", _EMPTY_LIST) or []
+        classements = poule_data.get("classements") or []
         poule_phase_added = False
         for entry in classements:
-            eng = entry.get("id_engagement", _EMPTY_DICT) or {}
+            eng = entry.get("id_engagement") or {}
             entry_eng_id = str(eng.get("id", ""))
             if entry_eng_id not in eng_ids:
                 continue
@@ -283,7 +283,7 @@ async def ffbb_saison_bilan_service(
         r
         for pd in poules_map.values()
         if isinstance(pd, dict)
-        for r in (pd.get("rencontres", _EMPTY_LIST) or [])
+        for r in (pd.get("rencontres") or [])
     ]
     from ..dynamique import compute_team_dynamique
 
@@ -479,11 +479,11 @@ async def _build_bilan_payload(
         if not isinstance(poule_data, dict):
             continue
         eng_ids_here = poule_to_eng.get(pid, _EMPTY_SET)
-        classements = poule_data.get("classements", _EMPTY_LIST) or []
+        classements = poule_data.get("classements") or []
         for entry in classements:
             if not isinstance(entry, dict):
                 continue
-            eng = entry.get("id_engagement", _EMPTY_DICT) or {}
+            eng = entry.get("id_engagement") or {}
             entry_eng_id = str(eng.get("id", ""))
             entry_org_id = str(entry.get("organisme_id", ""))
 
@@ -608,7 +608,7 @@ async def _build_bilan_payload(
         r
         for pd in poules_map.values()
         if isinstance(pd, dict)
-        for r in (pd.get("rencontres", _EMPTY_LIST) or [])
+        for r in (pd.get("rencontres") or [])
     ]
     from ..dynamique import compute_team_dynamique
 

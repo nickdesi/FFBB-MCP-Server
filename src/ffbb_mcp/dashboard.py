@@ -3,8 +3,6 @@
 import datetime
 import math
 
-from ffbb_mcp.utils import _EMPTY_DICT
-
 from . import __version__ as _PACKAGE_VERSION
 from .metrics import get_snapshot
 
@@ -34,8 +32,8 @@ def _build_dashboard_html() -> str:
     error_rate = snap["api_error_rate"]
     avg_lat_ms = snap["api_avg_latency_seconds"] * 1000
     inflight = snap["api_inflight_requests"]
-    cache_stats = snap.get("cache", _EMPTY_DICT)
-    tool_calls = snap.get("tool_calls", _EMPTY_DICT)
+    cache_stats = snap.get("cache") or {}
+    tool_calls = snap.get("tool_calls") or {}
     hits = sum(s["hits"] for s in cache_stats.values())
     misses = sum(s["misses"] for s in cache_stats.values())
     cache_total = hits + misses

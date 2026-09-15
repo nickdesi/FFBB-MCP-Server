@@ -26,7 +26,6 @@ from ffbb_mcp.aliases import (
     normalize_query,
 )
 from ffbb_mcp.utils import (
-    _EMPTY_LIST,
     jaro_winkler_similarity,
     parse_categorie,
     serialize_model,
@@ -726,7 +725,7 @@ async def _execute_multi_search_with_self_healing(
             from ffbb_data_client.data import load_discovery_artefact
 
             disc = load_discovery_artefact("indexes.json")
-            available = set(disc.get("available_indexes", _EMPTY_LIST))
+            available = set(disc.get("available_indexes") or [])
             if available:
                 state.active_search_indexes = [
                     idx for idx in _ALL_CANDIDATE_SEARCH_INDEXES if idx in available

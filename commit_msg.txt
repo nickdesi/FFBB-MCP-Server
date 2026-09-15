@@ -1,0 +1,3 @@
+⚡ Bolt: [performance improvement] optimize dict.get defaults safely
+
+Replaces the inline creation of empty lists and dicts as default fallback arguments in `.get()` calls inside loops (e.g. `dict.get("key", [])`) with the idiomatic and safe pattern `dict.get("key") or []` (and `{}`). This avoids unnecessary allocations of throwaway objects during iterative operations on each falsy evaluation, without introducing global mutable defaults.

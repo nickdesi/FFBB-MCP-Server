@@ -11,8 +11,6 @@ from pathlib import Path
 from threading import Lock
 from typing import TYPE_CHECKING, Any
 
-from ffbb_mcp.utils import _EMPTY_DICT
-
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
@@ -322,7 +320,7 @@ def generate_prometheus_metrics() -> str:
             ],
         )
 
-    tool_calls: dict[str, int] = snap.get("tool_calls", _EMPTY_DICT)
+    tool_calls: dict[str, int] = snap.get("tool_calls") or {}
     if tool_calls:
         lines += _prom_block(
             "ffbb_mcp_tool_calls_total",
@@ -361,7 +359,7 @@ def generate_prometheus_metrics() -> str:
 def summarize_health(snapshot: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Construit un résumé compact de santé à partir d'un snapshot métriques."""
     snap = dict(snapshot) if snapshot is not None else get_snapshot()
-    cache = snap.get("cache", _EMPTY_DICT)
+    cache = snap.get("cache") or {}
     cache_hits = sum(stat["hits"] for stat in cache.values())
     cache_misses = sum(stat["misses"] for stat in cache.values())
     cache_total = cache_hits + cache_misses
@@ -519,16 +517,16 @@ def load_metrics() -> None:
             _latency_sum = data.get("latency_sum", 0.0)
             _latency_count = data.get("latency_count", 0)
 
-            _cache_hits.update(data.get("cache_hits", _EMPTY_DICT))
-            _cache_misses.update(data.get("cache_misses", _EMPTY_DICT))
+            _cache_hits.update(data.get("cache_hits") or {})
+            _cache_misses.update(data.get("cache_misses") or {})
 
-            reasons = data.get("cache_miss_reasons", _EMPTY_DICT)
+            reasons = data.get("cache_miss_reasons") or {}
             for k_str, v in reasons.items():
                 if "|" in k_str:
                     parts = k_str.split("|", 1)
                     _cache_miss_reasons[(parts[0], parts[1])] = v
 
-            _tool_calls.update(data.get("tool_calls", _EMPTY_DICT))
+            _tool_calls.update(data.get("tool_calls") or {})
 
             _swr_active = int(data.get("swr_active", 0))
             _swr_total = int(data.get("swr_total", 0))

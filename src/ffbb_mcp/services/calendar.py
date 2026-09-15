@@ -21,7 +21,7 @@ from pydantic import ValidationError
 
 from ffbb_mcp._state import state
 from ffbb_mcp.models import CalendrierMatch
-from ffbb_mcp.utils import _EMPTY_LIST, format_team_name
+from ffbb_mcp.utils import format_team_name
 
 from .common import _PARIS_TZ as _TZ
 from .common import (
@@ -309,7 +309,7 @@ async def _build_calendar_matches(
         except (ValueError, TypeError):
             eq_num = numero_equipe
 
-        for match in poule_data.get("rencontres", _EMPTY_LIST) or []:
+        for match in poule_data.get("rencontres") or []:
             if not isinstance(match, dict):
                 continue
             match_id = match.get("id")
