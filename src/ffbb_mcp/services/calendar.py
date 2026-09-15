@@ -309,7 +309,7 @@ async def _build_calendar_matches(
         except (ValueError, TypeError):
             eq_num = numero_equipe
 
-        for match in poule_data.get("rencontres", []) or []:
+        for match in poule_data.get("rencontres") or []:
             if not isinstance(match, dict):
                 continue
             match_id = match.get("id")

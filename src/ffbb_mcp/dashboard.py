@@ -32,8 +32,8 @@ def _build_dashboard_html() -> str:
     error_rate = snap["api_error_rate"]
     avg_lat_ms = snap["api_avg_latency_seconds"] * 1000
     inflight = snap["api_inflight_requests"]
-    cache_stats = snap.get("cache", {})
-    tool_calls = snap.get("tool_calls", {})
+    cache_stats = snap.get("cache") or {}
+    tool_calls = snap.get("tool_calls") or {}
     hits = sum(s["hits"] for s in cache_stats.values())
     misses = sum(s["misses"] for s in cache_stats.values())
     cache_total = hits + misses
