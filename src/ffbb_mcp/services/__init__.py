@@ -37,6 +37,12 @@ from .poule import (
     get_poule_service,
     get_saisons_service,
 )
+from .regulations import (
+    explain_tiebreak_rules_service,
+    get_regulation_article_service,
+    list_regulations_service,
+    search_regulations_service,
+)
 from .salle import get_salle_service
 from .search import (
     _extract_club_key_word,
@@ -65,6 +71,7 @@ __all__ = [
     "_prioritize_phase",
     "_read_positive_int_env",
     "_resolve_team_equipes",
+    "explain_tiebreak_rules_service",
     "ffbb_bilan_service",
     "ffbb_equipes_club_service",
     "ffbb_get_classement_service",
@@ -85,14 +92,17 @@ __all__ = [
     "get_officiel_service",
     "get_organisme_service",
     "get_poule_service",
+    "get_regulation_article_service",
     "get_rencontre_service",
     "get_saisons_service",
     "get_salle_service",
     "get_static_ttl",
     "handle_api_error",
+    "list_regulations_service",
     "multi_search_service",
     "resolve_club_and_org",
     "resolve_poule_id_service",
     "search_organismes_service",
+    "search_regulations_service",
     "warmup_cache_service",
 ]

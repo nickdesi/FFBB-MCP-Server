@@ -25,7 +25,11 @@ external/antigravity-awesome-skills/
 tools/skill_router/
 
 # Runtime data
-data/
+data/*
+!data/regulations/
+!data/regulations/**
+
+
 
 # Acronyms cache (runtime writes to ~/.cache/ffbb-mcp/acronyms_cache.json;
 # the tracked copy in src/ffbb_mcp/ is a one-off seed, not read by code)

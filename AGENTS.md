@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB MCP server | server.py: 1792 lignes | services.py: 6569 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 1999 lignes | services.py: 6719 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -136,8 +136,8 @@ src/ffbb_mcp/
 ├── prompts.py             # Prompts MCP réutilisables
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
-├── server.py              # Tools MCP + main() (≈1792 lignes)
-├── services/              # Logique métier modularisée (≈6569 lignes)
+├── server.py              # Tools MCP + main() (≈1999 lignes)
+├── services/              # Logique métier modularisée (≈6719 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── bilan.py           # Module de service
 │   ├── calendar.py        # Module de service
@@ -146,6 +146,7 @@ src/ffbb_mcp/
 │   ├── division.py        # Module de service
 │   ├── http_api.py        # Module de service
 │   ├── poule.py           # Service de gestion des poules
+│   ├── regulations.py     # Module de service
 │   ├── salle.py           # Service de gestion des salles
 │   ├── search.py          # Service de recherche multicritère
 │   └── warmup.py          # Service de préchauffage du cache
@@ -158,7 +159,7 @@ src/ffbb_mcp/
 - Pas de suffixe `_compact_` ou `_impl_` exposé
 - Modifier une fonction à la fois, seulement si test/usage échoue
 - Nouvelle fonction → test manuel validé avant exposition MCP
-- **Modularisation** : Le package `services/` (total ≈6569 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
+- **Modularisation** : Le package `services/` (total ≈6719 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
 
 ## Commandes
 - Démarrer le serveur MCP (stdio) : `rtk uv run python -m ffbb_mcp` (recommandé pour Claude Desktop)

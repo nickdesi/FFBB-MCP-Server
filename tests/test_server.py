@@ -536,10 +536,10 @@ async def test_tool_schemas_conformance_and_token_budget():
             f"outputSchema inattendu sur {tool.name}"
         )
 
-    # 4. Vérification du budget token (seuil ajusté après ajout engagement_id + offset)
+    # 4. Vérification du budget token (seuil ajusté après ajout des 4 outils de règlements FFBB - 25 outils)
     total_tools_chars = sum(len(json.dumps(t.model_dump())) for t in tools)
-    assert total_tools_chars < 35000, (
-        f"Payload tools trop lourd ({total_tools_chars} chars, attendu < 35000)"
+    assert total_tools_chars < 45000, (
+        f"Payload tools trop lourd ({total_tools_chars} chars, attendu < 45000)"
     )
 
     instructions_len = len(mcp.instructions or "")
