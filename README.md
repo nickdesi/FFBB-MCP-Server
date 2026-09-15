@@ -19,7 +19,6 @@ Serveur [MCP](https://modelcontextprotocol.io) pour consulter calendriers, class
 [![Python](https://img.shields.io/badge/Python-3.14%2B-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org)
 [![CI](https://img.shields.io/github/actions/workflow/status/nickdesi/FFBB-MCP-Server/ci.yml?label=CI&style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/actions/workflows/ci.yml)
 [![MCP](https://img.shields.io/badge/MCP-Ready-00ADD8?style=for-the-badge&logo=modelcontextprotocol&logoColor=white)](https://modelcontextprotocol.io)
-[![Smithery](https://smithery.ai/badge/@nickdesi/FFBB-MCP-Server)](https://smithery.ai/server/@nickdesi/FFBB-MCP-Server)
 [![Glama](https://glama.ai/mcp/servers/nickdesi/FFBB-MCP-Server/badges/score.svg)](https://glama.ai/mcp/servers/nickdesi/FFBB-MCP-Server)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue?style=for-the-badge)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/nickdesi/FFBB-MCP-Server?style=social)](https://github.com/nickdesi/FFBB-MCP-Server/stargazers)
@@ -65,12 +64,6 @@ Puis posez vos questions en langage naturel :
 ---
 
 ## 🚀 Installation
-
-### Smithery CLI (Installation automatique en 1 commande)
-
-```bash
-npx -y @smithery/cli install @nickdesi/FFBB-MCP-Server --client claude
-```
 
 ### VS Code / GitHub Copilot
 
@@ -159,7 +152,7 @@ Configurez directement l'URL distante dans `mcp_config.json` via la directive na
 | `ffbb_search_regulations` | Recherche plein texte déterministe dans les règlements officiels FFBB, régionaux et départementaux. |
 | `ffbb_get_regulation_article` | Récupère le texte intégral et exact d'un article spécifique de règlement sans troncature. |
 | `ffbb_explain_tiebreak_rules` | Fournit les règles officielles de départage en cas d'égalité (Article 28 du RSG FFBB). |
-| `ffbb_list_regulations` | Liste l'ensemble des textes réglementaires fédéraux (RSG, RSP Élite, NM1-NM3, LF2-NF3). |
+| `ffbb_list_regulations` | Liste l'ensemble des textes réglementaires fédéraux (RSG, RSP Élite, NM1-NM3, LF2-NF3),. |
 
 > [!NOTE]
 > Référence complète des paramètres : [`docs/TOOLS_REFERENCE.md`](docs/TOOLS_REFERENCE.md).
