@@ -888,11 +888,18 @@ async def ffbb_get_saisons(
 ) -> list[dict[str, Any]]:
     """Liste des saisons FFBB (référentiel temporel).
 
+    Retourne la liste complète des saisons FFBB sous forme `list[dict]` triée
+    chronologiquement, chaque entrée contenant `season_id`, `label`, `debut`, `fin`,
+    `enCours` (calculé via `debut <= today <= fin`). Lecture seule, idempotent,
+    sans effet de bord ni écriture. Cache SWR avec TTL long (≈24h) ;
+    `force_refresh=True` contourne le cache pour données fraîches et
+    `active_only=True` filtre côté serveur pour ne garder que la saison active.
+
     Utilise cet outil pour récupérer les `season_id` disponibles avant d'appeler
     `ffbb_bilan`, `ffbb_club` ou `ffbb_team_summary` avec un filtre de saison.
-    Avec `active_only=True`, ne retourne que la saison en cours.
     Ne pas utiliser pour obtenir un classement, un calendrier ou un bilan — utilise
-    `ffbb_club(action="classement")` ou `ffbb_bilan` à la place.
+    `ffbb_club(action="classement")` ou `ffbb_bilan` à la place ; pour la version
+    du serveur, utilise `ffbb_version`.
     """
     try:
         return await get_saisons_service(
@@ -1813,12 +1820,19 @@ async def ffbb_explain_tiebreak_rules(
 
     Explique le calcul du point-average particulier (confrontations directes),
     du quotient particulier, et du mini-championnat à 3 équipes ou plus.
+    Lecture seule, idempotent, sans effet de bord ; cache SWR court.
 
-    Utilise cet outil quand deux équipes ou plus sont à égalité de points dans une poule
-    et que tu dois expliquer pourquoi l'une est classée devant l'autre.
+    Utilise cet outil uniquement quand deux équipes ou plus sont à égalité de points
+    dans une poule et que tu dois expliquer pourquoi l'une est classée devant l'autre.
     Avec `poule_id`, les règles sont appliquées à la poule concrète ; sans, tu obtiens
-    les règles génériques. Ne pas utiliser pour obtenir le classement brut — utilise
-    `ffbb_club(action="classement")` — ni pour le bilan chiffré — utilise `ffbb_bilan`.
+    les règles génériques. Ne pas utiliser pour rechercher un extrait réglementaire —
+    utilise `ffbb_search_regulations` à la place ; pour récupérer le texte d'un article
+    précis — utilise `ffbb_get_regulation_article` ; pour lister les règlements
+    disponibles — utilise `ffbb_list_regulations`. Ne pas utiliser non plus pour
+    obtenir le classement brut — utilise `ffbb_club(action="classement")` — ni pour
+    le bilan chiffré — utilise `ffbb_bilan`. Utilise `ffbb_explain_tiebreak_rules`
+    au lieu de `ffbb_search_regulations` quand la question porte sur le départage
+    et non sur le texte réglementaire.
     """
     try:
         await _safe_report_progress(
