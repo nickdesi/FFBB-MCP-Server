@@ -9,6 +9,32 @@ description = "MCP Server for FFBB (Fédération Française de Basketball) data"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
+keywords = [
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "ffbb",
+    "basketball",
+    "france",
+    "open-data",
+    "ai-agents",
+    "claude",
+    "cursor",
+    "copilot",
+    "fastmcp",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "mcp[cli]>=1.28.1,<2.0.0",
     "ffbb-data-client>=2.4.6,<3.0.0",
@@ -22,8 +48,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/nickdesi/FFBB-MCP-Server"
+Homepage = "https://ffbb.desimone.fr"
+Documentation = "https://ffbb.desimone.fr/#tools"
 Repository = "https://github.com/nickdesi/FFBB-MCP-Server"
+Issues = "https://github.com/nickdesi/FFBB-MCP-Server/issues"
 
 [project.optional-dependencies]
 dev = [

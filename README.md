@@ -4,7 +4,9 @@
 
 **Le basket français officiel, directement dans vos assistants IA.**
 
-Serveur [MCP](https://modelcontextprotocol.io) pour consulter calendriers, classements, bilans, résultats et scores live de la FFBB.
+Serveur [MCP](https://modelcontextprotocol.io) pour consulter calendriers, classements, bilans, résultats, scores live et règlements officiels de la FFBB (Fédération Française de Basketball).
+
+> 🇺🇸 **English Summary**: Official Model Context Protocol (MCP) server for French Basketball (FFBB). Connect your AI assistants (Claude, Cursor, Copilot, ChatGPT, Antigravity) to live French basketball schedules, standings, scores, team records, club directories, and official federal regulations via Streamable HTTP or Stdio.
 
 [🌐 Site](https://ffbb.desimone.fr) ·
 [🧩 Extension VS Code](https://github.com/nickdesi/FFBB-MCP-Server/releases/latest) ·
@@ -17,7 +19,9 @@ Serveur [MCP](https://modelcontextprotocol.io) pour consulter calendriers, class
 [![Python](https://img.shields.io/badge/Python-3.14%2B-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org)
 [![CI](https://img.shields.io/github/actions/workflow/status/nickdesi/FFBB-MCP-Server/ci.yml?label=CI&style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/actions/workflows/ci.yml)
 [![MCP](https://img.shields.io/badge/MCP-Ready-00ADD8?style=for-the-badge&logo=modelcontextprotocol&logoColor=white)](https://modelcontextprotocol.io)
+[![Smithery](https://smithery.ai/badge/@nickdesi/FFBB-MCP-Server)](https://smithery.ai/server/@nickdesi/FFBB-MCP-Server)
 [![Glama](https://glama.ai/mcp/servers/nickdesi/FFBB-MCP-Server/badges/score.svg)](https://glama.ai/mcp/servers/nickdesi/FFBB-MCP-Server)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue?style=for-the-badge)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/nickdesi/FFBB-MCP-Server?style=social)](https://github.com/nickdesi/FFBB-MCP-Server/stargazers)
 
 </div>
@@ -61,6 +65,12 @@ Puis posez vos questions en langage naturel :
 ---
 
 ## 🚀 Installation
+
+### Smithery CLI (Installation automatique en 1 commande)
+
+```bash
+npx -y @smithery/cli install @nickdesi/FFBB-MCP-Server --client claude
+```
 
 ### VS Code / GitHub Copilot
 
