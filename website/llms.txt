@@ -1,5 +1,5 @@
 # FFBB MCP Server — Serveur Model Context Protocol pour le Basket Français
-> Serveur FastMCP public et open-source exposant 13 outils d'agrégation spécialisés pour interroger les données officielles de la Fédération Française de BasketBall (FFBB) depuis n'importe quel client MCP (Claude Desktop, Cursor, VS Code Copilot, ChatGPT, Antigravity, OpenCode).
+> Serveur FastMCP public et open-source exposant 17 outils d'agrégation et de recherche réglementaire pour interroger les données officielles et règlements de la Fédération Française de BasketBall (FFBB) depuis n'importe quel client MCP (Claude Desktop, Cursor, VS Code Copilot, ChatGPT, Antigravity, OpenCode).
 > Propulsé par le SDK Python officiel et l'API REST `ffbb-data-client` (https://ffbb-api.desimone.fr).
 
 ## Endpoints Publics & Ressources
@@ -12,7 +12,7 @@
 - SDK Python (ffbb-data-client) : https://nickdesi.github.io/ffbb-data-client/
 - Package PyPI : https://pypi.org/project/ffbb-data-client/
 
-## 13 Outils MCP Disponibles
+## 17 Outils MCP Disponibles
 1. `ffbb_team_summary` : Synthèse complète en un seul appel (bilan, position au classement, dernier match joué, prochain match).
 2. `ffbb_lives` : Scores en direct, statut et temps forts des rencontres du week-end sur toutes les divisions françaises.
 3. `ffbb_bilan` : Bilan victoires / défaites exhaustif, points marqués/encaissés et goal-average d'une équipe.
@@ -21,10 +21,15 @@
 6. `ffbb_next_match` : Prochaine rencontre programmée (date, heure, adversaire, adresse du gymnase).
 7. `ffbb_last_result` : Dernier résultat et score officiel enregistré pour une équipe.
 8. `ffbb_bilan_saison` : Bilan approfondi d'une équipe sur l'ensemble des phases d'une saison sportive.
-9. `ffbb_resolve_team` : Pivot central de désambiguïsation pour identifier une équipe unique à partir d'un nom ou d'un club.
-10. `ffbb_get` : Récupération brute d'une ressource FFBB par son identifiant unique.
-11. `ffbb_saisons` : Liste des saisons sportives disponibles (historique et saison en cours).
-12. `ffbb_version` : Informations de version, configuration runtime et santé du serveur.
+9. `ffbb_head_to_head` : Face-à-face et analyse historique des confrontations directes entre deux clubs ou équipes.
+10. `ffbb_resolve_team` : Pivot central de désambiguïsation pour identifier une équipe unique à partir d'un nom ou d'un club.
+11. `ffbb_get` : Récupération brute d'une ressource FFBB par son identifiant unique.
+12. `ffbb_saisons` : Liste des saisons sportives disponibles (historique et saison en cours).
+13. `ffbb_version` : Informations de version, configuration runtime et santé du serveur.
+14. `ffbb_search_regulations` : Recherche plein texte déterministe (FTS5) dans les règlements officiels FFBB (RSG, règlements particuliers, ligues et comités avec fallback fédéral).
+15. `ffbb_get_regulation_article` : Récupération intégrale et exacte du texte d'un article réglementaire sans troncature.
+16. `ffbb_explain_tiebreak_rules` : Explication et calcul officiel des règles de départage en cas d'égalité (Article 28 du RSG FFBB).
+17. `ffbb_list_regulations` : Catalogue complet des textes réglementaires fédéraux, régionaux et comités disponibles.
 
 ## Configuration pour Clients IA
 

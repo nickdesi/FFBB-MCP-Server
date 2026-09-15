@@ -14,7 +14,7 @@
 
 ---
 
-### Outils MCP disponibles et leur rôle réel (12 outils)
+### Outils MCP disponibles et leur rôle réel (17 outils)
 
 | Outil                        | Rôle                                       | Fiabilité multi-équipes        |
 |------------------------------|--------------------------------------------|--------------------------------|
@@ -27,9 +27,14 @@
 | `ffbb_last_result`           | Dernier résultat d'une équipe précise      | ⚠️ 1 seul match retourné |
 | `ffbb_next_match`            | Prochain match programmé d'une équipe      | ⚠️ 1 seul match retourné |
 | `ffbb_bilan_saison`          | Bilan complet saison par phase et goal-average | ✅ Fiable |
+| `ffbb_head_to_head`          | Face-à-face et analyse historique confrontations directes | ✅ Fiable |
 | `ffbb_lives`                 | Scores live et statut par quart-temps       | ✅ Temps réel (cache 15s) |
 | `ffbb_saisons`               | Liste des saisons sportives disponibles     | ✅ Historique FFBB |
 | `ffbb_version`               | Diagnostics, SDK, transport et TTLs runtime | ✅ Diagnostics |
+| `ffbb_search_regulations`    | Recherche FTS5 plein texte dans les règlements officiels FFBB | ✅ Source juridique |
+| `ffbb_get_regulation_article`| Extraction intégrale et textuelle d'un article réglementaire | ✅ Source de vérité |
+| `ffbb_explain_tiebreak_rules`| Calcul et explication des règles officielles de départage (Art. 28) | ✅ Certifié RSG |
+| `ffbb_list_regulations`      | Index complet des règlements et comités indexés | ✅ Catalogue |
 
 ### Cache TTL — impact opérationnel
 

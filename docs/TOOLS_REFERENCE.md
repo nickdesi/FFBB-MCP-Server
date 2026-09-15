@@ -2,9 +2,18 @@
 
 > Version courante : **1.13.0**
 
-Ce document fournit une documentation technique exhaustive pour les outils exposés par le serveur FFBB MCP. Il est destiné aux développeurs et aux agents IA pour comprendre les capacités et les schémas de données du serveur.
+Ce document fournit une documentation technique exhaustive pour les 17 outils exposés par le serveur FFBB MCP. Il est destiné aux développeurs et aux agents IA pour comprendre les capacités et les schémas de données du serveur.
 
-## ✨ Nouveautés v1.11.0
+## ✨ Nouveautés v1.13.0
+
+| # | Amélioration | Impact |
+| --- | --- | --- |
+| 1 | **Moteur de recherche réglementaire SQLite FTS5** — Indexation plein texte et multilingue (`unicode61`) des Règlements Sportifs Généraux FFBB (RSG 2026-2027), règlements particuliers et comités. | `ffbb_search_regulations` |
+| 2 | **Consultation d'articles intégraux** — Extraction exacte et textuelle d'articles officiels (Art. 28, Art. 51...) sans troncature. | `ffbb_get_regulation_article` |
+| 3 | **Assistant de calcul des départages d'égalité** — Implémentation certifiée de l'Article 28 du RSG FFBB (goal-average particulier, quotient général). | `ffbb_explain_tiebreak_rules` |
+| 4 | **Catalogue hiérarchique & Fallback fédéral universel** — Couverture des 96 départements français avec fallback automatique vers le socle RSG FFBB. | `ffbb_list_regulations`, `ffbb_search_regulations` |
+
+---
 
 | # | Amélioration | Impact |
 | --- | --- | --- |
@@ -695,4 +704,131 @@ Fournit une analyse tactique complète et narrative pour préparer un avant-matc
 - Forme récente respective de chaque équipe (`V-D-V-V...`) et séries en cours
 - Duel statistique des styles : Attaque vs Défense, ratio de victoires domicile/extérieur
 - Points clés narratifs synthétiques prêts pour les LLMs
+
+---
+
+## 📜 Outils de Règlements Officiels & Textes Fédéraux (v1.14.0)
+
+Cette suite d'outils s'appuie sur le moteur réglementaire SQLite FTS5 (`src/ffbb_mcp/regulations/`) pour indexer et interroger les textes officiels 2026-2027 : Règlements Sportifs Généraux FFBB (RSG), règlements particuliers nationaux (NM1-NM3, LF2-NF3, U15/U18 Élite), règlements régionaux (IDF, HDF, AURA) et règlements départementaux (75, 59, 69, 63, 03). Pour les comités non encore numérisés, un mécanisme de fallback fédéral universel garantit une réponse conforme au socle national.
+
+### 1. `ffbb_search_regulations`
+
+**Description** : Recherche plein texte déterministe (FTS5) dans l'ensemble des textes réglementaires officiels.
+
+**Arguments** :
+- `query` (string, requis) : Mots-clés de recherche (ex: `"brûlage"`, `"forfait"`, `"qualification"`, `"temps de jeu"`, `"licence"`).
+- `level` (string, optionnel) : Filtre de niveau hiérarchique (`"federal"`, `"regional"`, `"departmental"`).
+- `comite_code` (string, optionnel) : Code départemental à 2 chiffres (ex: `"63"`, `"75"`, `"03"`). Si le comité n'a pas de spécificité locale, le moteur bascule automatiquement sur le socle RSG fédéral.
+- `ligue_code` (string, optionnel) : Code de la ligue régionale (ex: `"AURA"`, `"IDF"`, `"HDF"`).
+- `limit` (integer, défaut `5`) : Nombre maximum de résultats (borné entre 1 et 20).
+
+**Retour** :
+```jsonc
+{
+  "status": "ok",
+  "total_results": 2,
+  "results": [
+    {
+      "article_id": "RSG_ART_28",
+      "doc_id": "rsg_ffbb_2026_2027",
+      "doc_title": "Règlements Sportifs Généraux FFBB (2026-2027)",
+      "level": "federal",
+      "article_number": "28",
+      "article_title": "Classement et départage des égalités",
+      "snippet": "En cas d'égalité de points entre deux équipes, le classement s'établit par le goal-average particulier...",
+      "score": -4.82
+    }
+  ]
+}
+```
+
+---
+
+### 2. `ffbb_get_regulation_article`
+
+**Description** : Récupère le texte intégral et exact d'un article réglementaire sans troncature, garantissant une citation juridique et sportive incontestable.
+
+**Arguments** :
+- `article_id` (string, optionnel) : Identifiant canonique de l'article (ex: `"RSG_ART_28"`, `"DEP63_ART_14"`).
+- `doc_id` (string, optionnel) : Identifiant du document source (ex: `"rsg_ffbb_2026_2027"`, `"reglement_departemental_63"`).
+- `article_number` (string, optionnel) : Numéro officiel de l'article (ex: `"28"`, `"51"`).
+
+**Retour** :
+```jsonc
+{
+  "status": "ok",
+  "article": {
+    "article_id": "RSG_ART_28",
+    "doc_id": "rsg_ffbb_2026_2027",
+    "doc_title": "Règlements Sportifs Généraux FFBB (2026-2027)",
+    "level": "federal",
+    "article_number": "28",
+    "article_title": "Classement et départage des égalités",
+    "content": "Texte intégral de l'article avec alinéas et dispositions officielles..."
+  }
+}
+```
+
+---
+
+### 3. `ffbb_explain_tiebreak_rules`
+
+**Description** : Fournit une explication certifiée des règles officielles de départage en cas d'égalité selon l'Article 28 du RSG FFBB 2026-2027.
+
+**Arguments** :
+- `context` (string, défaut `"general"`) : Contexte spécifique de la demande (`"general"`, `"two_teams"`, `"three_or_more_teams"`, `"forfeit_impact"`).
+- `level` (string, optionnel) : Niveau de la compétition (`"federal"`, `"regional"`, `"departmental"`).
+- `comite_code` (string, optionnel) : Code départemental éventuel.
+
+**Retour** :
+```jsonc
+{
+  "status": "ok",
+  "rule_reference": "Article 28 du RSG FFBB (2026-2027)",
+  "context": "two_teams",
+  "steps": [
+    "1. Goal-average particulier : points marqués / encaissés lors des confrontations directes entre les deux équipes.",
+    "2. Goal-average général (quotient) : total des points marqués divisé par le total des points encaissés sur l'ensemble de la poule.",
+    "3. Meilleure attaque générale : total des points marqués sur la poule."
+  ],
+  "forfeit_rule": "Tout forfait entraîne zéro point et l'exclusion du calcul de goal-average particulier."
+}
+```
+
+---
+
+### 4. `ffbb_list_regulations`
+
+**Description** : Catalogue exhaustif de l'ensemble des textes réglementaires indexés dans le moteur avec leurs métadonnées.
+
+**Arguments** :
+- `level` (string, optionnel) : Filtre par niveau (`"federal"`, `"regional"`, `"departmental"`).
+- `comite_code` (string, optionnel) : Filtre par code de comité départemental.
+- `ligue_code` (string, optionnel) : Filtre par code de ligue régionale.
+
+**Retour** :
+```jsonc
+{
+  "status": "ok",
+  "total_documents": 9,
+  "documents": [
+    {
+      "doc_id": "rsg_ffbb_2026_2027",
+      "title": "Règlements Sportifs Généraux FFBB (2026-2027)",
+      "level": "federal",
+      "season": "2026-2027",
+      "articles_count": 6
+    },
+    {
+      "doc_id": "reglement_departemental_63",
+      "title": "Règlement Sportif Départemental — Comité du Puy-de-Dôme (63)",
+      "level": "departmental",
+      "comite_code": "63",
+      "season": "2026-2027",
+      "articles_count": 5
+    }
+  ]
+}
+```
+
 

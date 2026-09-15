@@ -25,21 +25,28 @@ Cette couche modulaire fait le pont entre les outils MCP et le client API FFBB (
   - `services/poule.py` : Classements, bilans `ffbb_bilan`, calculs de goal-average et rencontres.
   - `services/salle.py` : Recherche et géolocalisation des salles et terrains.
   - `services/search.py` : Recherche multi-index unifiée Directus / Meilisearch.
+  - `services/regulations.py` : Façade de service pour l'interrogation du corpus et des règles officielles.
   - `services/warmup.py` : Préchauffage proactif au démarrage et réchauffement asynchrone.
   - `services/common.py` : Cache SWR (Stale-While-Revalidate) et helpers partagés.
+- **Moteur Réglementaire FTS5 (`src/ffbb_mcp/regulations/`)** :
+  - `indexer.py` : Indexation SQLite FTS5 in-memory avec tokenizer `unicode61` (support des accents, cédilles et apostrophes).
+  - `engine.py` : Scoring BM25, filtrage par facettes (`level`, `comite_code`, `ligue_code`) et fallback fédéral universel.
+  - `models.py` : Modèles Pydantic v2 stricts (`Article`, `RegulationDocument`, `SearchResult`, `TiebreakExplanation`).
+  - `corpus.py` : Chargeur de corpus Markdown basé sur le manifeste officiel `manifest.yaml`.
 - **Normalisation & Token Optimization** : Transforme les payloads bruts en JSON ultra-compacts pour réduire l'empreinte de contexte des LLMs.
 
 ## 🏗️ Surface MCP actuelle
 
-Le serveur expose **12 outils MCP** en lecture seule. Les quatre outils généralistes (`ffbb_search`, `ffbb_get`, `ffbb_club`, `ffbb_bilan`) couvrent les workflows les plus fréquents, et les outils spécialisés réduisent les appels nécessaires pour les questions courtes.
+Le serveur expose **17 outils MCP** en lecture seule. Les quatre outils généralistes (`ffbb_search`, `ffbb_get`, `ffbb_club`, `ffbb_bilan`) et les quatre outils de règlements (`ffbb_search_regulations`, `ffbb_get_regulation_article`, `ffbb_explain_tiebreak_rules`, `ffbb_list_regulations`) couvrent les workflows les plus fréquents.
 
 | Famille | Outils | Usage |
 | --- | --- | --- |
 | Diagnostic | `ffbb_version` | Version, transport et TTL de cache runtime. |
 | Recherche & lecture | `ffbb_search`, `ffbb_get` | Recherche multi-index puis chargement par identifiant. |
 | Club & équipe | `ffbb_club`, `ffbb_resolve_team`, `ffbb_team_summary` | Navigation club → équipes → poules, résumé agent-friendly. |
-| Résultats | `ffbb_bilan`, `ffbb_last_result`, `ffbb_next_match`, `ffbb_bilan_saison` | Bilan saison, dernier résultat et prochain match. |
+| Résultats & H2H | `ffbb_bilan`, `ffbb_last_result`, `ffbb_next_match`, `ffbb_bilan_saison`, `ffbb_head_to_head` | Bilan saison, face-à-face, dernier résultat et prochain match. |
 | Temps réel | `ffbb_lives`, `ffbb_saisons` | Scores live et saisons disponibles. |
+| Règlements officiels | `ffbb_search_regulations`, `ffbb_get_regulation_article`, `ffbb_explain_tiebreak_rules`, `ffbb_list_regulations` | Recherche plein texte FTS5, articles exacts, départage d'égalité (Art. 28) et catalogue. |
 
 Ce découpage garde des points d'entrée simples pour les LLM tout en évitant un outil unique trop complexe.
 

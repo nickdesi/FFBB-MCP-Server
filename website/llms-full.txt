@@ -1,11 +1,12 @@
 # FFBB MCP Server & API Basket — Documentation Complète pour IA & Développeurs
 
 ## 1. Vue d'ensemble & Architecture
-Le serveur **FFBB MCP Server** est une passerelle officielle et haute performance connectant les modèles de langage (Claude, Cursor, GitHub Copilot, ChatGPT, Antigravity) et les applications aux bases de données officielles de la Fédération Française de BasketBall (FFBB).
+Le serveur **FFBB MCP Server** est une passerelle officielle et haute performance connectant les modèles de langage (Claude, Cursor, GitHub Copilot, ChatGPT, Antigravity) et les applications aux bases de données officielles et aux règlements de la Fédération Française de BasketBall (FFBB).
 
-Il repose sur une architecture à deux niveaux :
-1. **Couche Métier MCP (FastMCP / Starlette / Uvicorn)** : Expose 13 outils haut niveau optimisés pour les LLMs (agrégation "one-shot", cache TTL adaptatif, gestion proactive du token).
-2. **Couche Moteur Python (`ffbb-data-client`)** : SDK Python asynchrone (Pydantic v2, HTTPX, Hishel SQLite cache, Directus REST API + Meilisearch).
+Il repose sur une architecture modulaire :
+1. **Couche Métier MCP (FastMCP / Starlette / Uvicorn)** : Expose 17 outils haut niveau optimisés pour les LLMs (agrégation "one-shot", cache TTL adaptatif, gestion proactive du token).
+2. **Moteur Réglementaire FTS5 (`src/ffbb_mcp/regulations/`)** : Index SQLite FTS5 plein texte intégrant les Règlements Sportifs Généraux (RSG 2026-2027), les règlements particuliers (NM1-NM3, LF2-NF3, U15/U18 Élite), les ligues régionales (IDF, HDF, AURA) et les comités départementaux (75, 59, 69, 63, 03) avec mécanisme de fallback fédéral universel.
+3. **Couche Moteur Données Python (`ffbb-data-client`)** : SDK Python asynchrone (Pydantic v2, HTTPX, Hishel SQLite cache, Directus REST API + Meilisearch).
 
 ### Endpoints Publics
 - Endpoint MCP (Streamable HTTP) : `https://ffbb.desimone.fr/mcp`
@@ -15,80 +16,123 @@ Il repose sur une architecture à deux niveaux :
 
 ---
 
-## 2. Spécification Détaillée des 13 Outils MCP
+## 2. Spécification Détaillée des 17 Outils MCP
 
 ### `ffbb_team_summary`
 - **Description** : Résumé tout-en-un d'une équipe (position au classement, victoires/défaites, dernier match et prochain match).
 - **Paramètres** :
-  - `organisme_id` (str) : Identifiant de l'organisme/club FFBB.
-  - `equipe_id` (str, optionnel) : Identifiant spécifique de l'équipe (par défaut équipe 1).
-  - `saison_id` (str, optionnel) : Identifiant de la saison sportive.
+  - `club_name` (str, optionnel) : Nom du club.
+  - `organisme_id` (str|int, optionnel) : Identifiant FFBB du club.
+  - `categorie` (str, optionnel) : Catégorie d'équipe (ex: `"U13M"`, `"SeniorM"`).
+  - `numero_equipe` (int, optionnel) : Numéro d'équipe.
 
 ### `ffbb_lives`
-- **Description** : Liste en temps réel de toutes les rencontres en cours avec scores par quart-temps et temps forts (cache 30s).
+- **Description** : Liste en temps réel de toutes les rencontres en cours avec scores par quart-temps et temps forts (cache 15s).
 - **Paramètres** : Aucun.
 
 ### `ffbb_bilan`
 - **Description** : Bilan victoires, défaites, points marqués, points encaissés et goal-average toutes phases confondues.
 - **Paramètres** :
-  - `organisme_id` (str) : Identifiant du club/organisme.
-  - `saison_id` (str, optionnel).
-
+  - `club_name` (str, optionnel).
+  - `organisme_id` (str|int, optionnel).
+  - `categorie` (str, optionnel).
+  - `numero_equipe` (int, optionnel).
 
 ### `ffbb_head_to_head`
-- **Description** : Analyse des confrontations directes entre deux équipes.
+- **Description** : Analyse approfondie des confrontations directes (H2H), forme récente et comparaison statistique entre deux équipes.
 - **Paramètres** :
-  - `club1` (str) : Nom ou identifiant du premier club.
-  - `club2` (str) : Nom ou identifiant du second club.
+  - `club_a` / `club_name` (str, optionnel) : Premier club.
+  - `club_b` / `adversaire` (str, optionnel) : Second club / adversaire.
+  - `categorie` (str, optionnel) : Catégorie d'équipe.
 
 ### `ffbb_club`
-- **Description** : Informations complètes sur un club (coordonnées, liste des équipes, gymnases rattachés, calendrier).
+- **Description** : Informations complètes sur un club (coordonnées, liste des équipes, gymnases rattachés, calendrier complet des matchs).
 - **Paramètres** :
-  - `organisme_id` (str) : Identifiant du club.
+  - `organisme_id` (str|int, optionnel).
+  - `club_name` (str, optionnel).
+  - `action` (str, défaut `"details"`) : `"details"`, `"equipes"`, `"salles"`, `"calendrier"`.
 
 ### `ffbb_search`
-- **Description** : Recherche plein texte Meilisearch multi-index.
+- **Description** : Recherche plein texte Meilisearch multi-index (clubs, compétitions, salles, matchs, tournois 3x3).
 - **Paramètres** :
-  - `query` (str) : Terme de recherche (nom de club, ville, nom de compétition, gymnase).
-  - `limit` (int, défaut 10) : Nombre maximum de résultats.
+  - `query` (str) : Terme de recherche.
+  - `type` (str, défaut `"all"`) : `"all"`, `"organismes"`, `"competitions"`, `"rencontres"`, `"salles"`.
 
 ### `ffbb_next_match`
-- **Description** : Détails précis du prochain match programmé pour une équipe.
+- **Description** : Détails précis du prochain match programmé pour une équipe (date, heure, adversaire, salle avec adresse).
 - **Paramètres** :
-  - `organisme_id` (str) : Identifiant du club.
-  - `equipe_id` (str, optionnel).
+  - `club_name` (str, optionnel).
+  - `organisme_id` (str|int, optionnel).
+  - `categorie` (str, optionnel).
+  - `numero_equipe` (int, optionnel).
 
 ### `ffbb_last_result`
 - **Description** : Feuille de match et score du dernier match disputé.
 - **Paramètres** :
-  - `organisme_id` (str) : Identifiant du club.
-  - `equipe_id` (str, optionnel).
+  - `club_name` (str, optionnel).
+  - `organisme_id` (str|int, optionnel).
+  - `categorie` (str, optionnel).
+  - `numero_equipe` (int, optionnel).
 
 ### `ffbb_bilan_saison`
-- **Description** : Synthèse de parcours complète sur une saison pour une équipe.
+- **Description** : Synthèse de parcours complète sur une saison pour une équipe avec détail par phase.
 - **Paramètres** :
-  - `organisme_id` (str).
-  - `saison_id` (str, optionnel).
+  - `organisme_id` (str|int, requis).
+  - `categorie` (str, requis).
+  - `numero_equipe` (int, requis).
 
 ### `ffbb_resolve_team`
-- **Description** : Identifie de manière univoque une équipe (utile pour désambiguïser U13, U15, Seniors, etc.).
+- **Description** : Identifie de manière univoque une équipe et sa poule (utile pour désambiguïser U13, U15, Seniors, etc.).
 - **Paramètres** :
-  - `query` (str) : Nom d'équipe ou désignation.
+  - `club_name` (str, optionnel).
+  - `organisme_id` (str|int, optionnel).
+  - `categorie` (str, optionnel).
+  - `numero_equipe` (int, optionnel).
 
 ### `ffbb_get`
 - **Description** : Récupère une ressource brute Directus par ID.
 - **Paramètres** :
-  - `resource_type` (str) : Type de ressource (organisme, competition, poule, rencontre, salle).
-  - `resource_id` (str) : Identifiant.
+  - `type` (str) : `"organisme"`, `"competition"`, `"poule"`, `"rencontre"`, `"salle"`.
+  - `id` (str|int) : Identifiant FFBB.
 
 ### `ffbb_saisons`
-- **Description** : Liste les saisons sportives.
+- **Description** : Liste les saisons sportives FFBB disponibles.
 - **Paramètres** :
-  - `active_only` (bool, défaut False) : Restreint à la saison courante.
+  - `active_only` (bool, défaut `false`) : Restreint à la saison courante.
 
 ### `ffbb_version`
-- **Description** : Affiche les informations de version et de runtime.
+- **Description** : Affiche les informations de version, transport, métriques et santé du runtime.
 - **Paramètres** : Aucun.
+
+### `ffbb_search_regulations`
+- **Description** : Recherche plein texte déterministe (FTS5) dans l'ensemble des textes réglementaires officiels (RSG fédéral, règlements particuliers, ligues et comités).
+- **Paramètres** :
+  - `query` (str, requis) : Mots-clés de recherche (ex: `"brûlage"`, `"forfait"`, `"qualification"`).
+  - `level` (str, optionnel) : Filtre de niveau (`"federal"`, `"regional"`, `"departmental"`).
+  - `comite_code` (str, optionnel) : Code départemental à 2 chiffres (ex: `"63"`, `"75"`, `"03"`). Fallback automatique sur le RSG fédéral si non spécifique.
+  - `ligue_code` (str, optionnel) : Code ligue régionale (ex: `"AURA"`, `"IDF"`, `"HDF"`).
+  - `limit` (int, défaut 5) : Nombre maximum de résultats (1 à 20).
+
+### `ffbb_get_regulation_article`
+- **Description** : Récupère le texte intégral et exact d'un article réglementaire sans troncature (ex: Article 28, Article 51).
+- **Paramètres** :
+  - `article_id` (str, optionnel) : Identifiant canonique (ex: `"RSG_ART_28"`, `"DEP63_ART_14"`).
+  - `doc_id` (str, optionnel) : Identifiant du document (ex: `"rsg_ffbb_2026_2027"`).
+  - `article_number` (str, optionnel) : Numéro d'article (ex: `"28"`, `"51"`).
+
+### `ffbb_explain_tiebreak_rules`
+- **Description** : Fournit les règles officielles de départage en cas d'égalité au classement (Article 28 du RSG FFBB 2026-2027).
+- **Paramètres** :
+  - `context` (str, défaut `"general"`) : Contexte de la question (`"general"`, `"two_teams"`, `"three_or_more_teams"`, `"forfeit_impact"`).
+  - `level` (str, optionnel) : Niveau de compétition (`"federal"`, `"regional"`, `"departmental"`).
+  - `comite_code` (str, optionnel) : Code départemental éventuel.
+
+### `ffbb_list_regulations`
+- **Description** : Liste l'ensemble des textes réglementaires officiels indexés dans le moteur avec leurs métadonnées.
+- **Paramètres** :
+  - `level` (str, optionnel) : Filtre de niveau (`"federal"`, `"regional"`, `"departmental"`).
+  - `comite_code` (str, optionnel) : Code départemental.
+  - `ligue_code` (str, optionnel) : Code ligue régionale.
 
 ---
 

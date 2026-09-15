@@ -147,3 +147,32 @@ Ce document fournit des exemples de bout en bout pour aider les agents IA à sui
 - Utiliser `ffbb_club(action="calendrier")` pour une liste de matchs filtrée club/équipe/catégorie avec `is_last_match` et `is_next_match`.
 - Pour les matchs restants ou prochaines journées, filtrer `played == false` et trier par date croissante.
 - Si `_meta.generated_at`, `_meta.timezone` ou `_meta.cache` est présent, s'en servir pour qualifier la fraîcheur sans polluer la réponse.
+
+---
+
+## 7. Règlements officiels et règles de départage
+
+### Exemple A : Résolution d'égalité et goal-average
+**Question utilisateur**  
+> "Comment départager deux équipes à égalité de points en poule U13 dans le Puy-de-Dôme ?"
+
+**Workflow attendu** :
+1. Appeler l'outil spécialisé de départage :
+   - `ffbb_explain_tiebreak_rules(context="two_teams", comite_code="63")`
+2. Expliquer clairement la règle officielle de l'Article 28 du RSG FFBB :
+   - **1er critère** : Goal-average particulier sur les confrontations directes entre les deux équipes (points marqués / points encaissés).
+   - **2ème critère** : En cas de nouvelle égalité, quotient général (points marqués / points encaissés sur l'ensemble de la poule).
+   - **3ème critère** : Meilleure attaque générale sur la poule.
+   - Mentionner qu'un forfait entraîne 0 point et exclut l'équipe du départage direct.
+
+### Exemple B : Recherche thématique et citation textuelle exacte
+**Question utilisateur**  
+> "Quelles sont les règles de brûlage et de qualification en championnat de France ?"
+
+**Workflow attendu** :
+1. Rechercher les articles pertinents dans le moteur FTS5 :
+   - `ffbb_search_regulations(query="brûlage qualification équipe supérieure", limit=3)`
+2. Récupérer le texte intégral de l'article officiel identifié (ex. Art. 51 ou Art. 60) :
+   - `ffbb_get_regulation_article(article_number="51", doc_id="rsg_ffbb_2026_2027")`
+3. Restituer fidèlement le texte officiel sans extrapolation ni troncature.
+

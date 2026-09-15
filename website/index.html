@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="TuCtfpsMfaMi13jU8fbz5LFA1vxzqeLZMHc74ulWRig" />
-    <title>FFBB MCP Server • Données Basket Français pour Assistants IA</title>
-    <meta name="description" content="Serveur MCP officiel pour connecter vos assistants IA (Cursor, Claude, Copilot) aux données en direct du basket français : scores live, classements et clubs.">
-    <meta name="keywords" content="FFBB MCP Server, Model Context Protocol, Claude MCP, Cursor MCP, GitHub Copilot Basketball, Scores Live Basket, Classement FFBB IA, ffbb-data-client, Basket France IA">
+    <title>FFBB MCP Server • Données Basket Français & Règlements Officiels pour IA</title>
+    <meta name="description" content="Serveur MCP officiel pour connecter vos assistants IA (Cursor, Claude, Copilot) aux données en direct et aux règlements officiels du basket français : scores live, classements, départages et textes fédéraux.">
+    <meta name="keywords" content="FFBB MCP Server, Model Context Protocol, Claude MCP, Cursor MCP, GitHub Copilot Basketball, Règlements FFBB IA, Départage Basket Égalité, RSG FFBB, Scores Live Basket, Classement FFBB IA, ffbb-data-client, Basket France IA">
     <meta name="author" content="Nicolas De Simone">
     <meta name="robots" content="index, follow, max-image-preview:large">
     <link rel="canonical" href="https://ffbb.desimone.fr/" />
@@ -16,16 +16,16 @@
     <!-- Open Graph / Social Media -->
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="FFBB MCP Server">
-    <meta property="og:title" content="FFBB MCP Server : Données Officielles du Basket Français pour Assistants IA">
-    <meta property="og:description" content="Calendriers, classements, bilans, résultats et scores live FFBB accessibles directement depuis Claude, Cursor, Copilot, VS Code et Google Antigravity.">
+    <meta property="og:title" content="FFBB MCP Server : Données Officielles & Règlements du Basket Français pour Assistants IA">
+    <meta property="og:description" content="Calendriers, classements, bilans, scores live et règlements officiels FFBB (RSG, départages, textes régionaux et départementaux) accessibles directement depuis Claude, Cursor, Copilot, VS Code et Google Antigravity.">
     <meta property="og:url" content="https://ffbb.desimone.fr/">
     <meta property="og:image" content="https://ffbb.desimone.fr/apple-touch-icon.png">
     <meta property="og:locale" content="fr_FR">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="FFBB MCP Server : Données Officielles du Basket Français pour Assistants IA">
-    <meta name="twitter:description" content="Connectez vos assistants IA aux données du basket français en 1 clic via le Model Context Protocol (Streamable HTTP).">
+    <meta name="twitter:title" content="FFBB MCP Server : Données Officielles & Règlements du Basket Français pour Assistants IA">
+    <meta name="twitter:description" content="Connectez vos assistants IA aux données et règlements officiels du basket français en 1 clic via le Model Context Protocol (Streamable HTTP).">
     <meta name="twitter:image" content="https://ffbb.desimone.fr/apple-touch-icon.png">
 
     <!-- Favicons for Google, Apple and Browsers -->
@@ -52,7 +52,7 @@
                 "url": "https://ffbb.desimone.fr/",
                 "name": "FFBB MCP Server",
                 "alternateName": ["FFBB MCP", "ffbb-mcp", "Serveur MCP Basket FFBB"],
-                "description": "Serveur MCP public connectant les assistants IA aux données officielles de la Fédération Française de BasketBall.",
+                "description": "Serveur MCP public connectant les assistants IA aux données officielles et aux règlements de la Fédération Française de BasketBall.",
                 "inLanguage": "fr-FR",
                 "publisher": { "@id": "https://ffbb.desimone.fr/#person" }
             },
@@ -63,12 +63,12 @@
                 "alternateName": ["FFBB Model Context Protocol Server", "ffbb-mcp"],
                 "applicationCategory": "DeveloperApplication, SportsApplication",
                 "operatingSystem": "macOS, Windows, Linux",
-                "description": "Serveur MCP standardisé pour accéder aux données officielles de la Fédération Française de BasketBall depuis un assistant IA.",
+                "description": "Serveur MCP standardisé pour accéder aux données officielles et aux règlements de la Fédération Française de BasketBall depuis un assistant IA.",
                 "url": "https://ffbb.desimone.fr",
                 "image": "https://ffbb.desimone.fr/logo.webp",
                 "softwareVersion": "1.13.0",
                 "datePublished": "2025-01-01T00:00:00Z",
-                "dateModified": "2026-09-14T20:03:00Z",
+                "dateModified": "2026-09-15T19:00:00Z",
                 "featureList": [
                     "ffbb_team_summary : Synthèse complète d'une équipe (bilan, classement, dernier & prochain match)",
                     "ffbb_lives : Scores en direct et temps forts de tous les championnats de basketball",
@@ -76,7 +76,11 @@
                     "ffbb_club : Fiches complètes des clubs, gymnases et coordonnées",
                     "ffbb_search : Recherche universelle multi-index Meilisearch",
                     "ffbb_next_match : Prochaine rencontre officielle programmée",
-                    "ffbb_last_result : Dernier résultat officiel validé"
+                    "ffbb_last_result : Dernier résultat officiel validé",
+                    "ffbb_search_regulations : Recherche FTS5 dans les règlements officiels FFBB, régionaux et départementaux",
+                    "ffbb_get_regulation_article : Consultation intégrale d'un article de règlement officiel",
+                    "ffbb_explain_tiebreak_rules : Règles officielles de départage en cas d'égalité (Article 28 RSG)",
+                    "ffbb_list_regulations : Catalogue des textes réglementaires fédéraux, régionaux et départementaux"
                 ],
                 "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
                 "author": { "@id": "https://ffbb.desimone.fr/#person" },
@@ -102,7 +106,7 @@
                         "name": "Comment connecter mon assistant IA au basket français ?",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "Il suffit d'ajouter l'endpoint Streamable HTTP https://ffbb.desimone.fr/mcp dans votre client MCP préféré (Cursor, Claude Desktop, VS Code Copilot, Google Antigravity). Votre IA saura alors automatiquement interroger les calendriers, classements et scores de la FFBB."
+                            "text": "Il suffit d'ajouter l'endpoint Streamable HTTP https://ffbb.desimone.fr/mcp dans votre client MCP préféré (Cursor, Claude Desktop, VS Code Copilot, Google Antigravity). Votre IA saura alors automatiquement interroger les calendriers, classements, scores et règlements officiels de la FFBB."
                         }
                     },
                     {
@@ -110,7 +114,7 @@
                         "name": "Quelle est la différence entre ffbb.desimone.fr (MCP) et ffbb-api.desimone.fr (API REST) ?",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "ffbb.desimone.fr est le serveur MCP dédié aux intelligences artificielles (Claude, Cursor, Copilot) avec 13 outils spécialisés et optimisés en tokens. ffbb-api.desimone.fr est l'API REST FastAPI indépendante et le SDK Python (ffbb-data-client sur PyPI) destinés aux applications web (comme SCBA Bénévolat), sites de clubs et scripts personnalisés."
+                            "text": "ffbb.desimone.fr est le serveur MCP dédié aux intelligences artificielles (Claude, Cursor, Copilot) avec 17 outils spécialisés et optimisés en tokens (dont le moteur de règlements FTS5). ffbb-api.desimone.fr est l'API REST FastAPI indépendante et le SDK Python (ffbb-data-client sur PyPI) destinés aux applications web (comme SCBA Bénévolat), sites de clubs et scripts personnalisés."
                         }
                     },
                     {
@@ -159,7 +163,7 @@
             </a>
             <nav class="main-nav">
                 <a href="#demo">Démo</a>
-                <a href="#outils">13 Outils IA</a>
+                <a href="#outils">17 Outils IA</a>
                 <a href="#integration">Intégration MCP</a>
                 <a href="#architecture">Architecture & API</a>
                 <a href="#dashboard">Dashboard</a>
@@ -179,7 +183,7 @@
         <div class="mobile-nav-drawer" id="mobileDrawer">
             <ul class="mobile-nav-links">
                 <li><a href="#demo" onclick="closeMobileMenu()">🎯 Démo en direct</a></li>
-                <li><a href="#outils" onclick="closeMobileMenu()">⚡ 13 Outils IA Spécialisés</a></li>
+                <li><a href="#outils" onclick="closeMobileMenu()">⚡ 17 Outils IA Spécialisés</a></li>
                 <li><a href="#integration" onclick="closeMobileMenu()">🚀 Intégration 1 Clic (Cursor, Claude, Copilot)</a></li>
                 <li><a href="#architecture" onclick="closeMobileMenu()">🏗️ Architecture & API REST</a></li>
                 <li><a href="#dashboard" onclick="closeMobileMenu()">📊 Dashboard & Santé du Service</a></li>
@@ -206,11 +210,11 @@
                         Donnez à vos assistants IA la connaissance du <span class="text-gradient">basket français</span>.
                     </h1>
                     <p class="hero-lead">
-                        Résultats, calendriers, classements de poules, fiches de clubs et scores en direct : tout le basket français (<strong>5x5 classique</strong> et <strong>3x3</strong>, du niveau <strong>départemental</strong> jusqu'à l'<strong>Élite</strong>) accessible en langage naturel depuis vos éditeurs et assistants IA (Cursor, Claude Desktop, VS Code Copilot, Google Antigravity).
+                        Résultats, calendriers, classements de poules, fiches de clubs, scores en direct et <strong>règlements officiels FFBB</strong> (RSG, calculs de départage, textes fédéraux, régionaux et comités) : tout le basket français (<strong>5x5 classique</strong> et <strong>3x3</strong>, du niveau <strong>départemental</strong> jusqu'à l'<strong>Élite</strong>) accessible en langage naturel depuis vos éditeurs et assistants IA (Cursor, Claude Desktop, VS Code Copilot, Google Antigravity).
                     </p>
                     <div class="hero-actions">
                         <a href="#integration" class="btn btn-primary btn-lg">🚀 Connecter l'IA en 1 Clic</a>
-                        <a href="#outils" class="btn btn-surface btn-lg">⚡ Découvrir les 13 Outils IA</a>
+                        <a href="#outils" class="btn btn-surface btn-lg">⚡ Découvrir les 17 Outils IA</a>
                     </div>
                     <div style="margin-top: 1.25rem;">
                         <a href="https://ffbb-api.desimone.fr" target="_blank" rel="noopener" class="chip chip-indigo" style="text-decoration: none; padding: 0.5rem 1rem; display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.82rem;">
@@ -219,7 +223,7 @@
                     </div>
                     <div class="hero-badges-row">
                         <div class="hero-badge-item">
-                            <span class="hero-badge-val">13 Outils IA</span>
+                            <span class="hero-badge-val">17 Outils IA</span>
                             <span class="hero-badge-lbl">Spécialisés Basket</span>
                         </div>
                         <div class="hero-badge-item">
@@ -227,8 +231,8 @@
                             <span class="hero-badge-lbl">Du Dép. à l'Élite</span>
                         </div>
                         <div class="hero-badge-item">
-                            <span class="hero-badge-val">Scores & Lives</span>
-                            <span class="hero-badge-lbl">Toutes Poules FFBB</span>
+                            <span class="hero-badge-val">Scores & Règlements</span>
+                            <span class="hero-badge-lbl">Toutes Poules & RSG</span>
                         </div>
                         <div class="hero-badge-item">
                             <span class="hero-badge-val">0 Config</span>
@@ -243,6 +247,7 @@
                         <button class="prompt-tab active" onclick="switchPrompt('equipe')">🏀 Résumé d'Équipe</button>
                         <button class="prompt-tab" onclick="switchPrompt('live')">🔴 Scores en Direct</button>
                         <button class="prompt-tab" onclick="switchPrompt('club')">📍 Club & Gymnase</button>
+                        <button class="prompt-tab" onclick="switchPrompt('reglement')">📜 Règlements & Égalité</button>
                     </div>
 
                     <div id="demo-equipe" class="demo-pane">
@@ -283,16 +288,30 @@
                             • <strong>Équipes engagées :</strong> 14 équipes du baby basket aux seniors
                         </div>
                     </div>
+
+                    <div id="demo-reglement" class="demo-pane" style="display: none;">
+                        <div class="prompt-bubble">
+                            <strong>💬 Votre question à l'IA :</strong><br>
+                            « Comment départager deux équipes à égalité en poule U13 ? »
+                        </div>
+                        <div class="response-card">
+                            📜 <strong>Réponse générée via <code>ffbb_explain_tiebreak_rules</code> :</strong><br>
+                            • <strong>Texte de référence :</strong> Article 28 du RSG FFBB (2026-2027)<br>
+                            • <strong>1. Égalité à deux équipes :</strong> Priorité aux points marqués dans les rencontres directes (goal-average particulier).<br>
+                            • <strong>2. En cas de nouvelle égalité :</strong> Meilleur quotient (points marqués / points encaissés) sur l'ensemble de la poule.<br>
+                            • <strong>Précision :</strong> Aucun tirage au sort tant que le goal-average général n'a pas été appliqué.
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <!-- 12 Tools Overview -->
+        <!-- 17 Tools Overview -->
         <section id="outils">
             <div class="container">
                 <div class="section-head">
                     <span class="chip chip-orange">OUTILS IA</span>
-                    <h2>13 Outils pour explorer tout le basket français</h2>
+                    <h2>17 Outils pour explorer tout le basket français & ses règlements</h2>
                     <p>Votre assistant IA sélectionne automatiquement le meilleur outil pour vous répondre avec une précision totale.</p>
                 </div>
 
@@ -373,6 +392,30 @@
                         <div class="tool-icon">⚙️</div>
                         <h3><code>ffbb_version</code></h3>
                         <p>Informations sur la version active du serveur MCP, le transport et l'état de l'infrastructure.</p>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-icon">📜</div>
+                        <h3><code>ffbb_search_regulations</code></h3>
+                        <p>Recherche plein texte déterministe (FTS5) dans les règlements officiels FFBB (RSG), règlements particuliers, ligues et comités avec fallback fédéral.</p>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-icon">📖</div>
+                        <h3><code>ffbb_get_regulation_article</code></h3>
+                        <p>Récupération intégrale et exacte du texte d'un article spécifique (Art. 28, Art. 51, etc.) pour une citation réglementaire sans troncature.</p>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-icon">⚖️</div>
+                        <h3><code>ffbb_explain_tiebreak_rules</code></h3>
+                        <p>Calcul et explication des règles officielles de départage en cas d'égalité selon l'Article 28 du RSG FFBB (goal-average particulier et quotient).</p>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-icon">📚</div>
+                        <h3><code>ffbb_list_regulations</code></h3>
+                        <p>Catalogue exhaustif de tous les textes réglementaires fédéraux (RSG, NM1-NM3, LF2-NF3, U15/U18 Élite), ligues régionales et comités départementaux.</p>
                     </div>
                 </div>
             </div>
@@ -469,12 +512,12 @@
                         </div>
                         <h3 style="font-size: 1.3rem; margin-bottom: 0.5rem; color: #fff;">FFBB MCP Server</h3>
                         <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5; margin-bottom: 1rem;">
-                            Dédié exclusivement aux <strong>assistants IA & LLMs</strong> (Claude, Cursor, VS Code Copilot, Antigravity). Expose 13 outils standardisés avec agrégation intelligente pour minimiser la consommation de tokens.
+                            Dédié exclusivement aux <strong>assistants IA & LLMs</strong> (Claude, Cursor, VS Code Copilot, Antigravity). Expose 17 outils standardisés avec agrégation intelligente et un moteur de recherche réglementaire SQLite FTS5.
                         </p>
                         <ul style="color: var(--text-secondary); font-size: 0.85rem; space-y: 0.5rem; padding-left: 1.2rem; margin-bottom: 1.5rem;">
                             <li>Protocole Streamable HTTP / SSE standard</li>
-                            <li>Zéro clé d'API requise pour les utilisateurs</li>
-                            <li>Résolution automatique des identifiants et poules</li>
+                            <li>Scores live, calendriers, classements & bilans</li>
+                            <li>Règlements officiels FFBB, régionaux et comités</li>
                         </ul>
                         <a href="#integration" class="btn btn-surface btn-sm" style="width: 100%; text-align: center;">⚡ Configurer dans votre IA</a>
                     </div>
@@ -576,7 +619,17 @@ lives = client.<span style="color: #d2a8ff;">get_lives</span>()
                             <span class="faq-plus">+</span>
                         </div>
                         <div class="faq-answer-row">
-                            <p>Il suffit d'ajouter l'URL <code>https://ffbb.desimone.fr/mcp</code> dans votre client MCP (Cursor, Claude Desktop, Copilot, Antigravity). Votre IA saura automatiquement utiliser les 13 outils spécialisés pour vous répondre.</p>
+                            <p>Il suffit d'ajouter l'URL <code>https://ffbb.desimone.fr/mcp</code> dans votre client MCP (Cursor, Claude Desktop, Copilot, Antigravity). Votre IA saura automatiquement utiliser les 17 outils spécialisés pour vous répondre.</p>
+                        </div>
+                    </div>
+
+                    <div class="faq-box" onclick="toggleFaqBox(this)">
+                        <div class="faq-question-row">
+                            <span>L'IA peut-elle expliquer les règles et calculs de départage en cas d'égalité ?</span>
+                            <span class="faq-plus">+</span>
+                        </div>
+                        <div class="faq-answer-row">
+                            <p>Oui ! Le serveur intègre un moteur réglementaire FTS5 complet (saison 2026-2027) couvrant les Règlements Sportifs Généraux (RSG), les règlements particuliers (NM1-NM3, LF2-NF3, U15/U18 Élite), les ligues régionales (IDF, HDF, AURA) et les comités départementaux (75, 59, 69, 63, 03). L'outil <code>ffbb_explain_tiebreak_rules</code> applique rigoureusement l'Article 28 du RSG pour résoudre les égalités.</p>
                         </div>
                     </div>
 
