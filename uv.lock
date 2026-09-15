@@ -3,8 +3,8 @@ revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.15' and sys_platform == 'win32'",
-    "python_full_version == '3.14.*' and sys_platform == 'win32'",
     "python_full_version >= '3.15' and sys_platform != 'win32'",
+    "python_full_version == '3.14.*' and sys_platform == 'win32'",
     "python_full_version == '3.14.*' and sys_platform != 'win32'",
     "python_full_version < '3.14' and sys_platform == 'win32'",
     "python_full_version < '3.14' and sys_platform != 'win32'",
@@ -569,7 +569,7 @@ wheels = [
 
 [[package]]
 name = "ffbb-data-client"
-version = "2.4.15"
+version = "2.4.16"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "hishel", extra = ["async"] },
@@ -578,9 +578,9 @@ dependencies = [
     { name = "python-dateutil" },
     { name = "python-dotenv" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3b/ed/313baffbcdd3f5c91e411bad1d0b192681d4711056e65265561636566317/ffbb_data_client-2.4.15.tar.gz", hash = "sha256:15c5870cf0f468219f24a36525189e09f45ad475070fea295c55fb08be39b247", size = 659068, upload-time = "2026-09-14T16:21:09.906Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/79/01/f2d23db375f893baee4d0245c0c9ef0a053a16c172f148ad31c8a53cdce7/ffbb_data_client-2.4.16.tar.gz", hash = "sha256:2f2e939050a6c2eda14232ed08db3e3cdf63b0a8273f9ab10b30e090ba377bde", size = 660814, upload-time = "2026-09-15T14:51:59.244Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/f9/52a2c1e9d6a018bbd9349c14c2595d1f54251df2035a7579d971172c1820/ffbb_data_client-2.4.15-py3-none-any.whl", hash = "sha256:fd286612b07fdf8e025df359f695ae6b75828f5f336ed3a3848c4cc886ccbf28", size = 248108, upload-time = "2026-09-14T16:21:08.506Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/82/e2f5f8e9b033b08c50be9d8164325bac1cf6d94df5e3108068421cf324d9/ffbb_data_client-2.4.16-py3-none-any.whl", hash = "sha256:9f7dbec93afdc19d4f6e84b9a812c068f12b90854124ace9c5cceb560fe1056e", size = 249489, upload-time = "2026-09-15T14:51:57.653Z" },
 ]
 
 [[package]]
