@@ -126,6 +126,17 @@ def test_search_regulations_national_coverage(memory_engine: RegulationsEngine):
     assert len(res_rhone) > 0
     assert any("Rhône" in r.article.organizer for r in res_rhone)
 
+    # 6. Départemental Allier (Basket 03)
+    res_allier = memory_engine.search(
+        query="brassages Allier U13",
+        organizer="Comité 03",
+    )
+    assert len(res_allier) > 0
+    assert any(
+        "03" in r.article.organizer or "Allier" in r.article.organizer
+        for r in res_allier
+    )
+
 
 def test_search_regulations_fallback_to_federal(memory_engine: RegulationsEngine):
     """Vérifie le fallback automatique sur le RSG fédéral si un comité non indexé est demandé."""

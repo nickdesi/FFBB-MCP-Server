@@ -208,6 +208,26 @@ documents:
       - "zone_interdite_u13"
       - "brulage_69"
 
+  - id: "reglement_comite_03_2026_2027"
+    level: "departmental"
+    organizer: "Comité 03"
+    title: "Règlement Départemental 5x5 et Livret Jeunes - Comité de l'Allier"
+    source_url: "https://comite03basket.fr"
+    categories: ["U9", "U11", "U13", "U15", "U18", "U21", "seniors", "DM2", "DM3", "DF2", "DF3", "PRM", "PRF"]
+    file: "departmental/comite_03/reglement_departemental_03.md"
+    topics:
+      - "allier"
+      - "basket03"
+      - "brassages_allier"
+      - "poule_haute"
+      - "d1"
+      - "d2"
+      - "d3"
+      - "zone_interdite_u13"
+      - "temps_jeu"
+      - "ballons"
+      - "brulage_03"
+
   - id: "reglement_comite_63_2026_2027"
     level: "departmental"
     organizer: "Comité 63"
@@ -228,3 +248,4 @@ documents:
       - "ballons"
       - "paniers"
       - "brulage_departemental"
+
