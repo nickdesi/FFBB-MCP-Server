@@ -44,8 +44,8 @@ https://ffbb.desimone.fr/mcp
 
 Puis posez vos questions en langage naturel :
 
-> _« Quel est le prochain match des U15 de mon club ? »_
-> _« Donne-moi le classement de la poule et le dernier résultat. »_
+> _« Quel est le prochain match des U15 de mon club (nommer le club) ? »_
+> _« Donne-moi le classement de la poule des U15M2 du Stade Clermontois et le dernier résultat. »_
 > _« Y a-t-il des matchs en direct ce soir ? »_
 
 👉 Voir la section [Installation](#-installation) pour brancher l'endpoint sur VS Code, Claude, Cursor, etc.
