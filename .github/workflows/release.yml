@@ -54,7 +54,7 @@ jobs:
           npm run package
 
       - name: Publish to PyPI
-        run: uv publish --trusted-publishing automatic
+        run: uv publish --trusted-publishing automatic --check-url https://pypi.org/simple/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
