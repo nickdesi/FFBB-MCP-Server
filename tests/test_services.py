@@ -2494,3 +2494,36 @@ class TestServicesRobustness:
         assert all(r["match_joues"] == 0 for r in res)
         team_a = next(r for r in res if r["equipe"] == "TEAM A")
         assert team_a["is_target"] is True
+
+
+class TestDirectSearchParameterResolution:
+    """Vérifie la compatibilité de signature pour les méthodes de recherche directes."""
+
+    @pytest.mark.asyncio
+    async def test_search_organismes_direct_with_name_param(
+        self, patch_get_client, mock_client
+    ):
+        from ffbb_mcp.services.search import _search_generic
+
+        mock_hit = MagicMock()
+        mock_hit.id = 9999
+        mock_hit.nom = "TEST CLUB"
+
+        # Simuler exactement la signature réelle de ffbb-data-client : (self, name: str | None = None)
+        async def fake_search_organismes_async(name: str | None = None):
+            res = MagicMock()
+            res.hits = [
+                {"id": 9999, "nom": "TEST CLUB", "code": "AUV0001", "type": "CLUB"}
+            ]
+            return res
+
+        mock_client.search_organismes_async = fake_search_organismes_async
+
+        results = await _search_generic(
+            type_name="organismes",
+            query="test",
+            limit=10,
+            force_refresh=True,
+        )
+        assert len(results) >= 1
+        assert results[0]["id"] == 9999

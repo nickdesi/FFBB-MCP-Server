@@ -560,14 +560,29 @@ async def _search_generic(
         direct_method: Any = getattr(client, method_name, None) if method_name else None
         if direct_method and callable(direct_method):
             try:
+                import inspect
+
+                sig = inspect.signature(direct_method)
+                params = sig.parameters
+                call_kwargs: dict[str, Any] = {}
+
+                if "name" in params:
+                    call_kwargs["name"] = query
+                elif "nom" in params:
+                    call_kwargs["nom"] = query
+                elif len(params) > 0:
+                    first_param = next(iter(params.values()))
+                    if first_param.kind in (
+                        inspect.Parameter.POSITIONAL_ONLY,
+                        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    ):
+                        call_kwargs[first_param.name] = query
+
+                if "limit" in params:
+                    call_kwargs["limit"] = limit
 
                 async def _invoke_direct() -> Any:
-                    import inspect
-
-                    try:
-                        res: Any = direct_method(query, limit=limit)
-                    except TypeError:
-                        res = direct_method(nom=query, limit=limit)
+                    res: Any = direct_method(**call_kwargs)
                     if inspect.isawaitable(res):
                         return await res  # type: ignore[no-any-return]
                     return res
