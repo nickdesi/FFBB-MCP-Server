@@ -43,9 +43,7 @@ def apply_sse_reconnect_patch() -> None:
             GET_STREAM_KEY,
             LAST_EVENT_ID_HEADER,
             MCP_SESSION_ID_HEADER,
-            REQUEST_STREAM_BUFFER_SIZE,
             EventMessage,
-            SSEEvent,
             StreamableHTTPServerTransport,
         )
     except ImportError:  # pragma: no cover - robustness
@@ -107,11 +105,9 @@ def apply_sse_reconnect_patch() -> None:
 
         # Create SSE stream
         sse_stream_writer, sse_stream_reader = anyio.create_memory_object_stream[
-            SSEEvent
+            dict[str, Any]
         ](0)
-        stream_pair = anyio.create_memory_object_stream[EventMessage](
-            REQUEST_STREAM_BUFFER_SIZE
-        )
+        stream_pair = anyio.create_memory_object_stream[EventMessage](0)
 
         async def standalone_sse_writer() -> None:
             try:

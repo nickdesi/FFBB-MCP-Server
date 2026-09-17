@@ -1628,14 +1628,38 @@ class TestResolveClubAndOrgEntente:
                 {"id": 1002, "nom": "ENT. GERZAT / JULES VERNE", "code": ""},
             ]
 
-        org_mock = MagicMock()
-        org_mock.nom = "GERZAT BASKET"
-        org_mock.id = 1001
-        org_mock.code = ""
-        org_mock.model_dump = MagicMock(
-            return_value={"nom": "GERZAT BASKET", "id": 1001, "code": ""}
-        )
-        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+        def mock_get_org(organisme_id, **kwargs):
+            m = MagicMock()
+            if str(organisme_id) == "1002":
+                m.nom = "ENT. GERZAT / JULES VERNE"
+                m.id = 1002
+                m.code = ""
+                m.model_dump = MagicMock(
+                    return_value={
+                        "nom": "ENT. GERZAT / JULES VERNE",
+                        "id": 1002,
+                        "code": "",
+                        "engagements": [
+                            {
+                                "id": 55,
+                                "idCompetition": {
+                                    "nom": "U18M",
+                                    "categorie": {"code": "U18"},
+                                },
+                            }
+                        ],
+                    }
+                )
+            else:
+                m.nom = "GERZAT BASKET"
+                m.id = 1001
+                m.code = ""
+                m.model_dump = MagicMock(
+                    return_value={"nom": "GERZAT BASKET", "id": 1001, "code": ""}
+                )
+            return m
+
+        mock_client.get_organisme_async = AsyncMock(side_effect=mock_get_org)
 
         import ffbb_mcp.services as svc
 
@@ -1652,10 +1676,70 @@ class TestResolveClubAndOrgEntente:
 
         org_ids = [str(r["organisme_id"]) for r in resolved]
         assert "1001" in org_ids, "Main club should be resolved"
-        assert "1002" in org_ids, "Entente ENT. GERZAT / JULES VERNE should be included"
+        assert "1002" in org_ids, (
+            "Active entente ENT. GERZAT / JULES VERNE should be included"
+        )
         assert call_count["n"] == 2, (
             "Both primary and secondary searches should be called"
         )
+
+    @pytest.mark.asyncio
+    async def test_inactive_entente_purged_from_resolved(
+        self, patch_get_client, mock_client
+    ):
+        """Une entente sans équipe active (0 engagement) doit être exclue des clubs résolus."""
+        from ffbb_mcp.services import resolve_club_and_org
+
+        async def mock_search(nom, limit=20):
+            nom_up = nom.upper()
+            if "BASKET" in nom_up:
+                return [{"id": 1001, "nom": "GERZAT BASKET", "code": ""}]
+            return [
+                {"id": 1001, "nom": "GERZAT BASKET", "code": ""},
+                {"id": 1002, "nom": "ENT. GERZAT / JULES VERNE", "code": ""},
+            ]
+
+        def mock_get_org(organisme_id, **kwargs):
+            m = MagicMock()
+            if str(organisme_id) == "1002":
+                m.nom = "ENT. GERZAT / JULES VERNE"
+                m.id = 1002
+                m.code = ""
+                m.model_dump = MagicMock(
+                    return_value={
+                        "nom": "ENT. GERZAT / JULES VERNE",
+                        "id": 1002,
+                        "code": "",
+                        "engagements": [],  # Coquille vide : 0 équipe
+                    }
+                )
+            else:
+                m.nom = "GERZAT BASKET"
+                m.id = 1001
+                m.code = ""
+                m.model_dump = MagicMock(
+                    return_value={"nom": "GERZAT BASKET", "id": 1001, "code": ""}
+                )
+            return m
+
+        mock_client.get_organisme_async = AsyncMock(side_effect=mock_get_org)
+
+        import ffbb_mcp.services as svc
+
+        original = svc.search_organismes_service
+        svc.search_organismes_service = mock_search
+        try:
+            resolved, _ = await resolve_club_and_org(
+                club_name="Gerzat Basket",
+                organisme_id=None,
+                categorie=None,
+            )
+        finally:
+            svc.search_organismes_service = original
+
+        org_ids = [str(r["organisme_id"]) for r in resolved]
+        assert "1001" in org_ids, "Main club must be resolved"
+        assert "1002" not in org_ids, "Inactive entente with 0 teams must be purged"
 
     @pytest.mark.asyncio
     async def test_non_entente_excluded_from_secondary(
@@ -2527,3 +2611,124 @@ class TestDirectSearchParameterResolution:
         )
         assert len(results) >= 1
         assert results[0]["id"] == 9999
+
+
+class TestFilterInactiveEntentes:
+    """Tests unitaires pour l'exclusion automatique des ententes inactives (0 équipe engagée)."""
+
+    @pytest.mark.asyncio
+    async def test_filter_preserves_normal_clubs_without_extra_calls(self):
+        """Les clubs normaux (non-ententes) doivent être conservés immédiatement sans appel API."""
+        from ffbb_mcp.services.search import filter_inactive_ententes
+
+        items = [
+            {"id": "1", "nom": "PARIS BASKETBALL"},
+            {"organisme_id": "2", "nom": "ASVEL BASKET"},
+        ]
+        res = await filter_inactive_ententes(items)
+        assert len(res) == 2
+        assert res[0]["nom"] == "PARIS BASKETBALL"
+        assert res[1]["nom"] == "ASVEL BASKET"
+
+    @pytest.mark.asyncio
+    async def test_filter_purges_inactive_entente(self, patch_get_client, mock_client):
+        """Une entente n'ayant aucune équipe doit être filtrée."""
+        from ffbb_mcp.services.search import filter_inactive_ententes
+
+        items = [
+            {"id": "100", "nom": "GERZAT BASKET"},
+            {"id": "200", "nom": "ENT. GERZAT / JULES VERNE"},
+        ]
+
+        # Simuler organisme 200 sans engagement (0 équipe)
+        org_mock = MagicMock()
+        org_mock.nom = "ENT. GERZAT / JULES VERNE"
+        org_mock.id = 200
+        org_mock.model_dump = MagicMock(
+            return_value={
+                "nom": "ENT. GERZAT / JULES VERNE",
+                "id": 200,
+                "engagements": [],
+            }
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        res = await filter_inactive_ententes(items)
+        assert len(res) == 1
+        assert res[0]["id"] == "100"
+        assert res[0]["nom"] == "GERZAT BASKET"
+
+    @pytest.mark.asyncio
+    async def test_filter_keeps_active_entente(self, patch_get_client, mock_client):
+        """Une entente ayant au moins une équipe active doit être conservée."""
+        from ffbb_mcp.services.search import filter_inactive_ententes
+
+        items = [
+            {"id": "100", "nom": "GERZAT BASKET"},
+            {"id": "200", "nom": "ENT. SALANQUE BC"},
+        ]
+
+        org_mock = MagicMock()
+        org_mock.nom = "ENT. SALANQUE BC"
+        org_mock.id = 200
+        org_mock.model_dump = MagicMock(
+            return_value={
+                "nom": "ENT. SALANQUE BC",
+                "id": 200,
+                "engagements": [
+                    {
+                        "id": 10,
+                        "idCompetition": {"nom": "U15M", "categorie": {"code": "U15"}},
+                    }
+                ],
+            }
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        res = await filter_inactive_ententes(items)
+        assert len(res) == 2
+        names = [r["nom"] for r in res]
+        assert "GERZAT BASKET" in names
+        assert "ENT. SALANQUE BC" in names
+
+    @pytest.mark.asyncio
+    async def test_search_organismes_purges_inactive_ententes(
+        self, patch_get_client, mock_client
+    ):
+        """search_organismes_service doit automatiquement purger les ententes sans équipe de la liste brute."""
+        from ffbb_mcp.services import search_organismes_service
+
+        async def fake_search_organismes_async(name: str | None = None):
+            res = MagicMock()
+            res.hits = [
+                {
+                    "id": 200001,
+                    "nom": "ENT. INACTIVE / TEST",
+                    "code": "",
+                    "type": "CLUB",
+                },
+                {"id": 9282, "nom": "GERZAT BASKET", "code": "", "type": "CLUB"},
+            ]
+            return res
+
+        mock_client.search_organismes_async = fake_search_organismes_async
+
+        # L'organisme 200001 renvoie 0 engagement
+        org_mock = MagicMock()
+        org_mock.nom = "ENT. INACTIVE / TEST"
+        org_mock.id = 200001
+        org_mock.model_dump = MagicMock(
+            return_value={
+                "nom": "ENT. INACTIVE / TEST",
+                "id": 200001,
+                "engagements": [],
+            }
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        results = await search_organismes_service(
+            "Gerzat", limit=10, force_refresh=True
+        )
+        assert len(results) == 1
+        assert results[0]["id"] == 9282
+        assert results[0]["nom"] == "GERZAT BASKET"

@@ -36,6 +36,7 @@ from .common import (
     _coerce_numeric_id,
     _dedupe_inflight,
     _extract_phase_num,
+    _is_entente_name,
     _normalize_name,
     _safe_call_with_inflight,
     _with_ffbb_semaphore,
@@ -309,12 +310,11 @@ def _resolve_ententes(
         oid = str(ent_org.get("id", ""))
         if not oid or oid in existing_ids:
             continue
-        nom_norm = _normalize_name(str(ent_org.get("nom", "")))
-        # Inclure uniquement les ententes (nom commençant par "ENT.")
+        nom = ent_org.get("nom", "")
+        nom_norm = _normalize_name(str(nom))
+        # Inclure uniquement les ententes (nom désignant une entente / CTC)
         # qui contiennent le mot-clé distinctif du club recherché.
-        is_entente = nom_norm.startswith("ENT.") or nom_norm.startswith("ENT ")
-        if is_entente and key_word_norm in nom_norm:
-            nom = ent_org.get("nom", "")
+        if _is_entente_name(nom) and key_word_norm in nom_norm:
             additions.append(_build_club_candidate(ent_org, nom))
             existing_ids.add(oid)
             logger.debug(
@@ -325,6 +325,75 @@ def _resolve_ententes(
             )
 
     return additions
+
+
+async def filter_inactive_ententes(
+    items: list[dict[str, Any]],
+    force_refresh: bool = False,
+) -> list[dict[str, Any]]:
+    """Exclut les ententes ou CTC n'ayant aucune équipe engagée dans la saison en cours.
+
+    Préserve immédiatement les clubs normaux (non-ententes) sans coût réseau.
+    Pour les ententes détectées (_is_entente_name), vérifie asynchronement
+    l'existence d'équipes actives via ffbb_equipes_club_service.
+    """
+    if not items:
+        return items
+
+    entente_oids: set[str] = set()
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        nom = str(item.get("nom") or item.get("libelle") or "")
+        if _is_entente_name(nom):
+            oid = str(item.get("organisme_id") or item.get("id") or "").strip()
+            if oid:
+                entente_oids.add(oid)
+
+    if not entente_oids:
+        return items
+
+    from .club import ffbb_equipes_club_service
+
+    async def _check_active(oid: str) -> tuple[str, bool]:
+        try:
+            equipes = await ffbb_equipes_club_service(
+                organisme_id=oid,
+                force_refresh=force_refresh,
+            )
+            is_active = bool(
+                equipes
+                and isinstance(equipes, list)
+                and not (len(equipes) == 1 and equipes[0].get("error"))
+            )
+            return oid, is_active
+        except Exception:
+            logger.debug(
+                "Erreur lors de la vérification des équipes de l'entente %s",
+                oid,
+                exc_info=True,
+            )
+            return oid, False
+
+    results = await asyncio.gather(*[_check_active(oid) for oid in entente_oids])
+    active_map = dict(results)
+
+    filtered: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        nom = str(item.get("nom") or item.get("libelle") or "")
+        oid = str(item.get("organisme_id") or item.get("id") or "").strip()
+        if _is_entente_name(nom) and not active_map.get(oid, False):
+            logger.info(
+                "Entente inactive exclue (0 équipe engagée): %s (id=%s)",
+                nom,
+                oid,
+            )
+            continue
+        filtered.append(item)
+
+    return filtered
 
 
 def _resolve_team_number(
@@ -455,6 +524,13 @@ async def resolve_club_and_org(
             if categorie:
                 ententes = _filter_orgs_by_gender(ententes, categorie, club_name)
             resolved.extend(ententes)
+
+        # Filtrage automatique des ententes inactives (0 équipe active engagée cette saison)
+        # pour éliminer d'office les coquilles vides fantômes des candidats et suggestions.
+        if any(_is_entente_name(c.get("nom")) for c in resolved):
+            resolved = await filter_inactive_ententes(
+                resolved, force_refresh=force_refresh
+            )
 
         # Jaro-Winkler Sorting Optimization avec priorité absolue au match exact
         if len(resolved) > 1 and club_name:
@@ -694,7 +770,7 @@ async def search_organismes_service(
     sort: list[str] | None = None,
     force_refresh: bool = False,
 ) -> list[dict[str, Any]]:
-    return await _search_generic(
+    results = await _search_generic(
         "organismes",
         nom,
         limit=limit,
@@ -703,6 +779,9 @@ async def search_organismes_service(
         sort=sort,
         force_refresh=force_refresh,
     )
+    if results and any(_is_entente_name(o.get("nom")) for o in results):
+        results = await filter_inactive_ententes(results, force_refresh=force_refresh)
+    return results
 
 
 def _build_multi_search_queries(
@@ -849,6 +928,26 @@ async def multi_search_service(
                     break
             if len(output) >= fetch_limit:
                 break
+
+        # Filtrage automatique des ententes inactives parmi les hits d'organismes
+        if any(
+            item.get("_type") == "organismes" and _is_entente_name(item.get("nom"))
+            for item in output
+        ):
+            org_items = [item for item in output if item.get("_type") == "organismes"]
+            active_orgs = await filter_inactive_ententes(
+                org_items, force_refresh=force_refresh
+            )
+            active_ids = {
+                str(o.get("id") or o.get("organisme_id")) for o in active_orgs
+            }
+            output = [
+                item
+                for item in output
+                if item.get("_type") != "organismes"
+                or str(item.get("id") or item.get("organisme_id")) in active_ids
+            ]
+
         # Slice pour pagination offset
         sliced = output[offset : offset + limit] if offset else output[:limit]
         if total_hits is not None and total_hits > len(sliced):

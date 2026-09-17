@@ -643,7 +643,7 @@ async def get_calendrier_club_service(
         engagement_id = kwargs.get("engagement_id")
     if offset is None:
         offset = kwargs.get("offset")
-    limit = max(1, min(100, limit)) if limit is not None else 100
+    limit = max(1, min(100, limit)) if limit is not None else None
     if offset is not None:
         offset = max(0, offset)
     # Clé de cache sans limit/offset pour maximiser le hit ratio.

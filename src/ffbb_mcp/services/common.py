@@ -165,39 +165,24 @@ def is_real_ambiguity(
 
     Retourne False (pas d'ambiguïté) si :
     - 0 ou 1 club dans la liste.
-    - Le premier club est un match exact ou quasi-exact avec le nom recherché (ex: 'GERZAT BASKET' vs 'Gerzat Basket').
-    - Tous les autres candidats sauf un sont des ententes secondaires (ENT. ...) issues de la recherche élargie.
     - Un seul club principal non-entente existe parmi les candidats.
+    - L'un des clubs principaux correspond exactement au nom recherché.
     """
     if not club_name or len(resolved_clubs) <= 1:
         return False
 
     norm_query = _normalize_name(club_name)
 
-    # 1. Match exact ou quasi-exact sur le premier candidat
-    first_nom = _normalize_name(resolved_clubs[0].get("nom", ""))
-    if (
-        first_nom == norm_query
-        or first_nom == f"{norm_query} BASKET"
-        or norm_query == f"{first_nom} BASKET"
-        or (
-            len(norm_query) >= 4
-            and first_nom.startswith(norm_query)
-            and " " not in norm_query
-        )
-    ):
-        return False
-
-    # 2. Filtrer les ententes pour isoler les clubs principaux
+    # 1. Filtrer les ententes pour isoler les clubs principaux
     primary_clubs = [
         c for c in resolved_clubs if not _is_entente_name(c.get("nom", ""))
     ]
 
-    # S'il n'y a qu'un seul club principal non-entente, pas d'ambiguïté sur le club
-    if len(primary_clubs) == 1:
+    # S'il n'y a qu'un seul club principal non-entente (ou aucun), pas d'ambiguïté sur le club
+    if len(primary_clubs) <= 1:
         return False
 
-    # 3. Match exact sur l'un des clubs principaux
+    # 2. Match exact ou quasi-exact sur l'un des clubs principaux
     for c in primary_clubs:
         c_nom = _normalize_name(c.get("nom", ""))
         if (
