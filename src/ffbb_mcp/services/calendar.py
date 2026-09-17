@@ -135,7 +135,9 @@ async def _build_calendar_matches(
             ),
         }
 
-    if len(resolved_clubs) > 1 and not organisme_id:
+    from .common import get_primary_club, is_real_ambiguity
+
+    if is_real_ambiguity(resolved_clubs, club_name) and not organisme_id:
         candidates = [
             {
                 "id": str(c.get("organisme_id"))
@@ -168,7 +170,12 @@ async def _build_calendar_matches(
     target_org_ids = [str(c["organisme_id"]) for c in resolved_clubs]
     target_org_ids = list(dict.fromkeys(oid for oid in target_org_ids if oid))
 
-    club_nom_resolu = resolved_clubs[0].get("nom", "") if resolved_clubs else ""
+    primary_c = get_primary_club(resolved_clubs, club_name)
+    club_nom_resolu = (
+        primary_c.get("nom", "")
+        if primary_c
+        else (resolved_clubs[0].get("nom", "") if resolved_clubs else "")
+    )
     import ffbb_mcp.services as svc
 
     eq_tasks = [

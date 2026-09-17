@@ -729,8 +729,10 @@ async def ffbb_club(
                     }
                 ]
 
-            if len(resolved_clubs) > 1:
-                # Ambiguïté détectée : plusieurs candidats
+            from ffbb_mcp.services.common import get_primary_club, is_real_ambiguity
+
+            if is_real_ambiguity(resolved_clubs, club_name):
+                # Ambiguïté réelle détectée : plusieurs vrais clubs distincts
                 candidates = [
                     {
                         "id": c.get("organisme_id"),
@@ -750,7 +752,12 @@ async def ffbb_club(
                     }
                 ]
 
-            target_org_id = resolved_clubs[0].get("organisme_id")
+            primary_club = get_primary_club(resolved_clubs, club_name)
+            target_org_id = (
+                primary_club.get("organisme_id")
+                if primary_club
+                else resolved_clubs[0].get("organisme_id")
+            )
 
         if action == "equipes":
             if not target_org_id:

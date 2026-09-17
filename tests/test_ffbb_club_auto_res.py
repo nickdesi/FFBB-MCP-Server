@@ -208,3 +208,44 @@ async def test_ffbb_club_ambiguity_includes_ville_genre():
         by_id = {c["id"]: c for c in cands}
         assert by_id["9269"]["genre"] == "F"
         assert by_id["9326"]["genre"] is None
+
+
+@pytest.mark.asyncio
+async def test_ffbb_club_no_ambiguity_when_exact_match_and_ententes():
+    """Vérifie que ffbb_club ne déclenche pas d'erreur d'ambiguïté quand il y a
+    un match exact et que les autres candidats sont uniquement des ententes (ENT.)."""
+
+    gerzat_candidate = {
+        "organisme_id": "9282",
+        "nom": "GERZAT BASKET",
+        "code": "0063001",
+        "ville": "GERZAT",
+    }
+    entente_1 = {
+        "organisme_id": "200000002679118",
+        "nom": "ENT. GERZAT / JULES VERNE",
+        "code": "",
+        "ville": "GERZAT",
+    }
+    entente_2 = {
+        "organisme_id": "200000002678912",
+        "nom": "ENT. ROMAGNAT / GERZAT",
+        "code": "",
+        "ville": "ROMAGNAT",
+    }
+    mock_resolve = _make_resolve_mock([gerzat_candidate, entente_1, entente_2])
+    mock_equipes = AsyncMock(return_value=[{"id": "team_u18", "nom": "U18M1"}])
+
+    with (
+        patch("ffbb_mcp.server.resolve_club_and_org", mock_resolve),
+        patch("ffbb_mcp.server.ffbb_equipes_club_service", mock_equipes),
+    ):
+        result = await ffbb_club(action="equipes", club_name="Gerzat Basket")
+
+        # Doit résoudre directement vers l'organisme principal 9282
+        assert result == [{"id": "team_u18", "nom": "U18M1"}]
+        mock_equipes.assert_called_once_with(
+            organisme_id="9282",
+            filtre=None,
+            force_refresh=False,
+        )

@@ -407,19 +407,10 @@ async def _resolve_team_equipes(
             None,
         )
 
-    if len(resolved_clubs) > 1 and not organisme_id and club_name:
-        norm_name = _normalize_name(club_name)
-        if _normalize_name(resolved_clubs[0].get("nom", "")) == norm_name:
-            second_norm = (
-                _normalize_name(resolved_clubs[1].get("nom", ""))
-                if len(resolved_clubs) > 1
-                else ""
-            )
-            if second_norm != norm_name:
-                resolved_clubs = [resolved_clubs[0]]
+    from .common import get_primary_club, is_real_ambiguity
 
     equipes: list[dict[str, Any]] | None = None
-    if len(resolved_clubs) > 1 and not organisme_id and categorie:
+    if is_real_ambiguity(resolved_clubs, club_name) and not organisme_id and categorie:
         matching_clubs: list[tuple[dict[str, Any], list[dict[str, Any]]]] = []
         for rc in resolved_clubs:
             rc_id = rc.get("organisme_id")
@@ -444,7 +435,7 @@ async def _resolve_team_equipes(
             resolved_clubs = [matching_clubs[0][0]]
             equipes = matching_clubs[0][1]
 
-    if len(resolved_clubs) > 1 and not organisme_id:
+    if is_real_ambiguity(resolved_clubs, club_name) and not organisme_id:
         return (
             {
                 "status": "ambiguous",
@@ -456,7 +447,7 @@ async def _resolve_team_equipes(
             None,
         )
 
-    club_resolu = resolved_clubs[0]
+    club_resolu = get_primary_club(resolved_clubs, club_name) or resolved_clubs[0]
     target_org_id = str(club_resolu["organisme_id"])
 
     if equipes is None:

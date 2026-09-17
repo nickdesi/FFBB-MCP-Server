@@ -1032,8 +1032,10 @@ async def ffbb_resolve_team_service(
             "club_resolu": None,
         }
 
-    # Si ambiguïté club
-    if len(resolved_clubs) > 1 and not organisme_id:
+    from .common import get_primary_club, is_real_ambiguity
+
+    # Si ambiguïté club réelle
+    if is_real_ambiguity(resolved_clubs, club_name) and not organisme_id:
         if categorie:
             matching_clubs: list[tuple[dict[str, Any], list[dict[str, Any]]]] = []
             for rc in resolved_clubs:
@@ -1072,7 +1074,7 @@ async def ffbb_resolve_team_service(
                 "club_resolu": None,
             }
     else:
-        club_resolu = resolved_clubs[0]
+        club_resolu = get_primary_club(resolved_clubs, club_name) or resolved_clubs[0]
         target_org_id = str(club_resolu["organisme_id"])
         equipes = None
 

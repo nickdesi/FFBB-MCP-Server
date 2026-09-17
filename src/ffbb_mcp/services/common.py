@@ -144,6 +144,102 @@ def _normalize_name(value: str) -> str:
     return unicodedata.normalize("NFD", s).translate(_DIACRITICS)
 
 
+def _is_entente_name(nom: str | None) -> bool:
+    """Vérifie si le nom désigne une entente ou une CTC (ex: ENT. GERZAT / JULES VERNE)."""
+    if not nom:
+        return False
+    norm = _normalize_name(nom)
+    return (
+        norm.startswith("ENT.")
+        or norm.startswith("ENT ")
+        or norm.startswith("ENTENTE ")
+        or norm.startswith("CTC ")
+        or norm.startswith("CTC.")
+    )
+
+
+def is_real_ambiguity(
+    resolved_clubs: list[dict[str, Any]], club_name: str | None
+) -> bool:
+    """Détermine si les clubs résolus présentent une réelle ambiguïté nécessitant clarification.
+
+    Retourne False (pas d'ambiguïté) si :
+    - 0 ou 1 club dans la liste.
+    - Le premier club est un match exact ou quasi-exact avec le nom recherché (ex: 'GERZAT BASKET' vs 'Gerzat Basket').
+    - Tous les autres candidats sauf un sont des ententes secondaires (ENT. ...) issues de la recherche élargie.
+    - Un seul club principal non-entente existe parmi les candidats.
+    """
+    if not club_name or len(resolved_clubs) <= 1:
+        return False
+
+    norm_query = _normalize_name(club_name)
+
+    # 1. Match exact ou quasi-exact sur le premier candidat
+    first_nom = _normalize_name(resolved_clubs[0].get("nom", ""))
+    if (
+        first_nom == norm_query
+        or first_nom == f"{norm_query} BASKET"
+        or norm_query == f"{first_nom} BASKET"
+        or (
+            len(norm_query) >= 4
+            and first_nom.startswith(norm_query)
+            and " " not in norm_query
+        )
+    ):
+        return False
+
+    # 2. Filtrer les ententes pour isoler les clubs principaux
+    primary_clubs = [
+        c for c in resolved_clubs if not _is_entente_name(c.get("nom", ""))
+    ]
+
+    # S'il n'y a qu'un seul club principal non-entente, pas d'ambiguïté sur le club
+    if len(primary_clubs) == 1:
+        return False
+
+    # 3. Match exact sur l'un des clubs principaux
+    for c in primary_clubs:
+        c_nom = _normalize_name(c.get("nom", ""))
+        if (
+            c_nom == norm_query
+            or c_nom == f"{norm_query} BASKET"
+            or norm_query == f"{c_nom} BASKET"
+        ):
+            return False
+
+    return True
+
+
+def get_primary_club(
+    resolved_clubs: list[dict[str, Any]], club_name: str | None = None
+) -> dict[str, Any] | None:
+    """Extrait le club principal cible parmi les candidats résolus."""
+    if not resolved_clubs:
+        return None
+    if len(resolved_clubs) == 1:
+        return resolved_clubs[0]
+
+    norm_query = _normalize_name(club_name) if club_name else ""
+
+    # Match exact en priorité absolue
+    if norm_query:
+        for c in resolved_clubs:
+            c_nom = _normalize_name(c.get("nom", ""))
+            if (
+                c_nom == norm_query
+                or c_nom == f"{norm_query} BASKET"
+                or norm_query == f"{c_nom} BASKET"
+            ):
+                return c
+
+    # Premier club non-entente
+    for c in resolved_clubs:
+        if not _is_entente_name(c.get("nom", "")):
+            return c
+
+    return resolved_clubs[0]
+
+
 def _coerce_numeric_id(value: int | str, label: str) -> int:
     """Convertit un identifiant en entier avec message d'erreur explicite."""
     try:
