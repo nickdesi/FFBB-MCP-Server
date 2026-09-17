@@ -25,6 +25,9 @@ _LATENCY_BUCKETS: tuple[float, ...] = (0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0
 _calls_success: int = 0
 _calls_error: int = 0
 
+# Compteurs d'erreurs par type (pour diagnostic Prometheus)
+_error_types: dict[str, int] = {}
+
 # Histogram de latence : bucket_counts[i] = nb observations <= _LATENCY_BUCKETS[i]
 # Index len(_LATENCY_BUCKETS) = +Inf bucket
 _latency_bucket_counts: list[int] = [0] * (len(_LATENCY_BUCKETS) + 1)
@@ -55,12 +58,19 @@ _metrics_lock = Lock()
 # ---------------------------------------------------------------------------
 
 
-def record_call(latency: float, is_error: bool) -> None:
-    """Enregistre un appel API FFBB (latence + statut)."""
+def record_call(
+    latency: float,
+    is_error: bool,
+    *,
+    error_type: str | None = None,
+) -> None:
+    """Enregistre un appel API FFBB (latence + statut + type d'erreur optionnel)."""
     global _calls_success, _calls_error, _latency_sum, _latency_count
     with _metrics_lock:
         if is_error:
             _calls_error += 1
+            if error_type:
+                _error_types[error_type] = _error_types.get(error_type, 0) + 1
         else:
             _calls_success += 1
         _latency_sum += latency
@@ -190,6 +200,7 @@ def get_snapshot() -> dict[str, Any]:
         misses = dict(_cache_misses)
         miss_reasons = dict(_cache_miss_reasons)
         tool_calls = dict(_tool_calls)
+        error_types = dict(_error_types)
 
     calls = success + errors
     error_rate = errors / calls if calls > 0 else 0.0
@@ -223,6 +234,7 @@ def get_snapshot() -> dict[str, Any]:
         "cache": cache_stats,
         "cache_miss_reasons": miss_reasons,
         "tool_calls": tool_calls,
+        "error_types": error_types,
     }
 
 
@@ -260,6 +272,19 @@ def generate_prometheus_metrics() -> str:
             "counter",
             f'ffbb_api_calls_total{{status="success"}} {snap["api_calls_success"]}',
             f'ffbb_api_calls_total{{status="error"}} {snap["api_calls_error"]}',
+        )
+        + (
+            _prom_block(
+                "ffbb_api_errors_by_type_total",
+                "Erreurs API FFBB ventilées par type d'erreur",
+                "counter",
+                *[
+                    f'ffbb_api_errors_by_type_total{{error_type="{et}"}} {c}'
+                    for et, c in snap["error_types"].items()
+                ],
+            )
+            if snap["error_types"]
+            else []
         )
         + [
             "# HELP ffbb_api_latency_seconds Latence des appels API FFBB",

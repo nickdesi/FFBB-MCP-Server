@@ -616,7 +616,12 @@ async def _safe_call(
             logger.debug("Succès: %s (attempt %d)", operation_name, attempt)
             return result
         except Exception as e:
-            record_call(time.perf_counter() - t0, is_error=True)
+            et = type(e).__name__
+            if isinstance(e, HTTPStatusError):
+                et = f"HTTP_{e.response.status_code}"
+            elif "timeout" in et.lower() or "timeout" in str(e).lower():
+                et = "Timeout"
+            record_call(time.perf_counter() - t0, is_error=True, error_type=et)
             last_exc = e
 
             retriable = _is_retriable_error(e)

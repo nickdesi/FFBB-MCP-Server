@@ -636,11 +636,12 @@ async def get_calendrier_club_service(
         engagement_id = kwargs.get("engagement_id")
     if offset is None:
         offset = kwargs.get("offset")
-    if limit is not None:
-        limit = max(1, min(100, limit))
+    limit = max(1, min(100, limit)) if limit is not None else 100
     if offset is not None:
         offset = max(0, offset)
-    cache_key = f"calendrier:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}:{numero_equipe or ''}:{_normalize_name(adversaire or '')}:{date_debut or ''}:{date_fin or ''}:{limit or ''}:{offset or ''}:{engagement_id or ''}:{competition_id or ''}:{competition_type or ''}"
+    # Clé de cache sans limit/offset pour maximiser le hit ratio.
+    # La pagination est appliquée en aval sur le résultat complet.
+    cache_key = f"calendrier:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}:{numero_equipe or ''}:{_normalize_name(adversaire or '')}:{date_debut or ''}:{date_fin or ''}:{engagement_id or ''}:{competition_id or ''}:{competition_type or ''}"
 
     if force_refresh and state.cache_calendrier is not None:
         state.cache_calendrier.pop(cache_key, None)
