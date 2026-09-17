@@ -337,10 +337,13 @@ def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
 
             cleaned_v = prune_payload(v, depth + 1)
             # Post-pruning check
-            if cleaned_v is not None:
-                cvt = type(cleaned_v)
-                if cleaned_v or (cvt is not list and cvt is not dict):
-                    cleaned[k] = cleaned_v
+            # ⚡ Bolt: Fast-path logic relies on short-circuiting truthiness (evaluates True for
+            # everything except empty string, 0, False, empty list/dict) to avoid evaluating type()
+            # for the vast majority of items, significantly accelerating recursive pruning.
+            if cleaned_v is not None and (
+                cleaned_v or ((cvt := type(cleaned_v)) is not list and cvt is not dict)
+            ):
+                cleaned[k] = cleaned_v
 
         # 2. Élagage chirurgical si trop de clés
         if len(cleaned) > _PRUNE_LIMIT:
@@ -385,10 +388,12 @@ def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
 
             cleaned_item = prune_payload(item, depth + 1)
             # Post-pruning check
-            if cleaned_item is not None:
-                cit = type(cleaned_item)
-                if cleaned_item or (cit is not list and cit is not dict):
-                    final_list.append(cleaned_item)
+            # ⚡ Bolt: Fast-path short-circuiting to avoid type() overhead for truthy items
+            if cleaned_item is not None and (
+                cleaned_item
+                or ((cit := type(cleaned_item)) is not list and cit is not dict)
+            ):
+                final_list.append(cleaned_item)
 
         if len(obj) > limit:
             # On ajoute un champ _omitted_count à la fin de la liste pour prévenir l'agent
