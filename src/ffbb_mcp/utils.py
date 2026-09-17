@@ -390,7 +390,8 @@ def prune_payload(obj: Any, depth: int = 0) -> JSONValue:
             # Post-pruning check
             # ⚡ Bolt: Fast-path short-circuiting to avoid type() overhead for truthy items
             if cleaned_item is not None and (
-                cleaned_item or ((cit := type(cleaned_item)) is not list and cit is not dict)
+                cleaned_item
+                or ((cit := type(cleaned_item)) is not list and cit is not dict)
             ):
                 final_list.append(cleaned_item)
 
