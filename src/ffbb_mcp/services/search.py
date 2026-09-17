@@ -1131,51 +1131,34 @@ async def ffbb_resolve_team_service(
             "club_resolu": None,
         }
 
-    from .common import get_primary_club, is_real_ambiguity
+    from .common import (
+        disambiguate_clubs_by_category,
+        get_primary_club,
+        is_real_ambiguity,
+    )
+
+    equipes: list[dict[str, Any]] | None = None
+    if not organisme_id and categorie:
+        resolved_clubs, equipes = await disambiguate_clubs_by_category(
+            resolved_clubs,
+            categorie=categorie,
+            club_name=club_name,
+            force_refresh=force_refresh,
+        )
 
     # Si ambiguïté club réelle
     if is_real_ambiguity(resolved_clubs, club_name) and not organisme_id:
-        if categorie:
-            matching_clubs: list[tuple[dict[str, Any], list[dict[str, Any]]]] = []
-            for rc in resolved_clubs:
-                rc_id = rc.get("organisme_id")
-                if not rc_id:
-                    continue
-                rc_teams = await ffbb_mcp.services.ffbb_equipes_club_service(
-                    organisme_id=rc_id, filtre=categorie, force_refresh=force_refresh
-                )
-                if rc_teams and not (
-                    isinstance(rc_teams, list)
-                    and len(rc_teams) == 1
-                    and "error" in rc_teams[0]
-                ):
-                    matching_clubs.append((rc, rc_teams))
-            if len(matching_clubs) == 1:
-                club_resolu = matching_clubs[0][0]
-                equipes = matching_clubs[0][1]
-                target_org_id = str(club_resolu["organisme_id"])
-            else:
-                return {
-                    "status": "ambiguous",
-                    "team": None,
-                    "candidates": resolved_clubs,
-                    "ambiguity": f"Plusieurs clubs correspondent à '{club_name}'.",
-                    "clarification_prompt": f"Plusieurs clubs correspondent à '{club_name}'. Précisez organisme_id.",
-                    "club_resolu": None,
-                }
-        else:
-            return {
-                "status": "ambiguous",
-                "team": None,
-                "candidates": resolved_clubs,
-                "ambiguity": f"Plusieurs clubs correspondent à '{club_name}'.",
-                "clarification_prompt": f"Plusieurs clubs correspondent à '{club_name}'. Précisez organisme_id.",
-                "club_resolu": None,
-            }
-    else:
-        club_resolu = get_primary_club(resolved_clubs, club_name) or resolved_clubs[0]
-        target_org_id = str(club_resolu["organisme_id"])
-        equipes = None
+        return {
+            "status": "ambiguous",
+            "team": None,
+            "candidates": resolved_clubs,
+            "ambiguity": f"Plusieurs clubs correspondent à '{club_name}'.",
+            "clarification_prompt": f"Plusieurs clubs correspondent à '{club_name}'. Précisez organisme_id.",
+            "club_resolu": None,
+        }
+
+    club_resolu = get_primary_club(resolved_clubs, club_name) or resolved_clubs[0]
+    target_org_id = str(club_resolu["organisme_id"])
 
     # 2) Récupérer toutes les équipes candidates
     if not categorie:

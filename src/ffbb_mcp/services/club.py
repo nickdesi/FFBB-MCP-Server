@@ -407,33 +407,21 @@ async def _resolve_team_equipes(
             None,
         )
 
-    from .common import get_primary_club, is_real_ambiguity
+    from .common import (
+        disambiguate_clubs_by_category,
+        get_primary_club,
+        is_real_ambiguity,
+    )
 
     equipes: list[dict[str, Any]] | None = None
-    if is_real_ambiguity(resolved_clubs, club_name) and not organisme_id and categorie:
-        matching_clubs: list[tuple[dict[str, Any], list[dict[str, Any]]]] = []
-        for rc in resolved_clubs:
-            rc_id = rc.get("organisme_id")
-            if not rc_id:
-                continue
-            try:
-                rc_teams = await svc.ffbb_equipes_club_service(
-                    organisme_id=rc_id,
-                    filtre=categorie,
-                    force_refresh=force_refresh,
-                    season_id=season_id,
-                )
-            except Exception:
-                rc_teams = []
-            if rc_teams and not (
-                isinstance(rc_teams, list)
-                and len(rc_teams) == 1
-                and "error" in rc_teams[0]
-            ):
-                matching_clubs.append((rc, rc_teams))
-        if len(matching_clubs) == 1:
-            resolved_clubs = [matching_clubs[0][0]]
-            equipes = matching_clubs[0][1]
+    if not organisme_id and categorie:
+        resolved_clubs, equipes = await disambiguate_clubs_by_category(
+            resolved_clubs,
+            categorie=categorie,
+            club_name=club_name,
+            force_refresh=force_refresh,
+            season_id=season_id,
+        )
 
     if is_real_ambiguity(resolved_clubs, club_name) and not organisme_id:
         return (

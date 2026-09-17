@@ -338,6 +338,17 @@ async def _build_bilan_payload(
     resolved_clubs, org_data = await resolve_club_and_org(
         club_name=club_name, organisme_id=organisme_id, categorie=categorie
     )
+
+    from .common import disambiguate_clubs_by_category
+
+    if not organisme_id and categorie:
+        resolved_clubs, _ = await disambiguate_clubs_by_category(
+            resolved_clubs,
+            categorie=categorie,
+            club_name=club_name,
+            season_id=season_id,
+        )
+
     target_org_ids = [str(c["organisme_id"]) for c in resolved_clubs]
     club_nom = resolved_clubs[0]["nom"] if resolved_clubs else (club_name or "")
 

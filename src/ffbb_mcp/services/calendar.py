@@ -135,7 +135,19 @@ async def _build_calendar_matches(
             ),
         }
 
-    from .common import get_primary_club, is_real_ambiguity
+    from .common import (
+        disambiguate_clubs_by_category,
+        get_primary_club,
+        is_real_ambiguity,
+    )
+
+    if not organisme_id and categorie:
+        resolved_clubs, _ = await disambiguate_clubs_by_category(
+            resolved_clubs,
+            categorie=categorie,
+            club_name=club_name,
+            season_id=season_id,
+        )
 
     if is_real_ambiguity(resolved_clubs, club_name) and not organisme_id:
         candidates = [

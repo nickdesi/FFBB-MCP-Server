@@ -249,3 +249,249 @@ async def test_ffbb_club_no_ambiguity_when_exact_match_and_ententes():
             filtre=None,
             force_refresh=False,
         )
+
+
+@pytest.mark.asyncio
+async def test_disambiguate_clubs_by_category_unit():
+    """Vérifie le comportement unitaire de disambiguate_clubs_by_category."""
+    from ffbb_mcp.services.common import disambiguate_clubs_by_category
+
+    sayat = {
+        "organisme_id": "200000002677671",
+        "nom": "ETOILE DE CHAMALIERES SAYAT",
+        "ville": "CHAMALIERES",
+    }
+    bdf = {
+        "organisme_id": "9266",
+        "nom": "AS BANQUE DE FRANCE CHAMALIERES",
+        "ville": "CHAMALIERES",
+    }
+    candidates = [sayat, bdf]
+
+    # Cas 1 : Exactement un club possède des équipes dans la catégorie
+    async def mock_eq_1(organisme_id, filtre=None, **kwargs):
+        if str(organisme_id) == "200000002677671":
+            return [{"id": "team_u13", "nom": "U13M1"}]
+        return []
+
+    with patch("ffbb_mcp.services.ffbb_equipes_club_service", side_effect=mock_eq_1):
+        resolved, teams = await disambiguate_clubs_by_category(
+            candidates, categorie="U13M", club_name="Chamaliere"
+        )
+        assert len(resolved) == 1
+        assert resolved[0]["organisme_id"] == "200000002677671"
+        assert teams is not None and len(teams) == 1
+
+    # Cas 2 : Deux clubs possèdent des équipes -> liste restreinte sans résolution unique
+    async def mock_eq_both(organisme_id, filtre=None, **kwargs):
+        return [{"id": f"team_{organisme_id}", "nom": "U13M"}]
+
+    with patch("ffbb_mcp.services.ffbb_equipes_club_service", side_effect=mock_eq_both):
+        resolved, teams = await disambiguate_clubs_by_category(
+            candidates, categorie="U13M", club_name="Chamaliere"
+        )
+        assert len(resolved) == 2
+        assert teams is None
+
+    # Cas 3 : Aucun club ne possède d'équipe -> candidats préservés
+    async def mock_eq_none(organisme_id, filtre=None, **kwargs):
+        return []
+
+    with patch("ffbb_mcp.services.ffbb_equipes_club_service", side_effect=mock_eq_none):
+        resolved, teams = await disambiguate_clubs_by_category(
+            candidates, categorie="U13M", club_name="Chamaliere"
+        )
+        assert len(resolved) == 2
+        assert teams is None
+
+
+@pytest.mark.asyncio
+async def test_ffbb_club_auto_disambiguate_chamaliere_u13m():
+    """Vérifie que ffbb_club(action='equipes') lève automatiquement l'ambiguïté
+    entre Sayat et Banque de France lorsque filtre='U13M'."""
+    sayat = {
+        "organisme_id": "200000002677671",
+        "nom": "ETOILE DE CHAMALIERES SAYAT",
+        "ville": "CHAMALIERES",
+        "code_postal": "63400",
+        "departement": "Puy-de-dôme",
+        "genre": None,
+    }
+    bdf = {
+        "organisme_id": "9266",
+        "nom": "AS BANQUE DE FRANCE CHAMALIERES",
+        "ville": "CHAMALIERES",
+        "code_postal": "63400",
+        "departement": "Puy-de-dôme",
+        "genre": "M",
+    }
+    mock_resolve = _make_resolve_mock([sayat, bdf])
+
+    async def mock_equipes_call(organisme_id, filtre=None, **kwargs):
+        if str(organisme_id) == "200000002677671":
+            return [{"id": "u13_1", "nom": "U13M-1"}]
+        return []
+
+    with (
+        patch("ffbb_mcp.server.resolve_club_and_org", mock_resolve),
+        patch(
+            "ffbb_mcp.services.ffbb_equipes_club_service", side_effect=mock_equipes_call
+        ),
+        patch(
+            "ffbb_mcp.server.ffbb_equipes_club_service", side_effect=mock_equipes_call
+        ),
+    ):
+        result = await ffbb_club(
+            action="equipes", club_name="Chamaliere", filtre="U13M"
+        )
+
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0].get("id") == "u13_1"
+        assert result[0].get("nom") == "U13M-1"
+
+
+@pytest.mark.asyncio
+async def test_get_calendrier_club_auto_disambiguate():
+    """Vérifie que le service de calendrier lève l'ambiguïté sur un club candidat ayant l'équipe."""
+    from ffbb_mcp.services.calendar import get_calendrier_club_service
+
+    sayat = {
+        "organisme_id": "200000002677671",
+        "nom": "ETOILE DE CHAMALIERES SAYAT",
+        "ville": "CHAMALIERES",
+    }
+    bdf = {
+        "organisme_id": "9266",
+        "nom": "AS BANQUE DE FRANCE CHAMALIERES",
+        "ville": "CHAMALIERES",
+    }
+    mock_resolve = _make_resolve_mock([sayat, bdf])
+
+    async def mock_eq_call(organisme_id, filtre=None, **kwargs):
+        if str(organisme_id) == "200000002677671":
+            return [
+                {
+                    "id": "u13_1",
+                    "nom": "U13M-1",
+                    "poule_id": "poule_1",
+                    "engagement_id": "eng_1",
+                }
+            ]
+        return []
+
+    mock_poule = AsyncMock(
+        return_value={
+            "id": "poule_1",
+            "nom": "Poule A",
+            "rencontres": [
+                {
+                    "id": "m1",
+                    "date": "2026-03-20",
+                    "idEngagementEquipe1": {"id": "eng_1"},
+                    "nomEquipe1": "ETOILE DE CHAMALIERES SAYAT - 1",
+                    "nomEquipe2": "ADVERSAIRE",
+                }
+            ],
+        }
+    )
+
+    with (
+        patch("ffbb_mcp.services.search.resolve_club_and_org", mock_resolve),
+        patch("ffbb_mcp.services.ffbb_equipes_club_service", side_effect=mock_eq_call),
+        patch(
+            "ffbb_mcp.services.club.ffbb_equipes_club_service", side_effect=mock_eq_call
+        ),
+        patch("ffbb_mcp.services.poule.get_poule_service", mock_poule),
+    ):
+        result = await get_calendrier_club_service(
+            club_name="Chamaliere", categorie="U13M"
+        )
+
+        assert "error" not in result
+        assert "items" in result
+        assert len(result["items"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_resolve_team_service_auto_disambiguate_category():
+    """Vérifie que ffbb_resolve_team_service lève l'ambiguïté sur Sayat avec categorie='U13M'."""
+    from ffbb_mcp.services.search import ffbb_resolve_team_service
+
+    sayat = {
+        "organisme_id": "200000002677671",
+        "nom": "ETOILE DE CHAMALIERES SAYAT",
+        "ville": "CHAMALIERES",
+    }
+    bdf = {
+        "organisme_id": "9266",
+        "nom": "AS BANQUE DE FRANCE CHAMALIERES",
+        "ville": "CHAMALIERES",
+    }
+    mock_resolve = _make_resolve_mock([sayat, bdf])
+
+    async def mock_eq_call(organisme_id, filtre=None, **kwargs):
+        if str(organisme_id) == "200000002677671":
+            return [{"id": "u13_1", "nom": "U13M-1", "poule_id": "poule_1"}]
+        return []
+
+    with (
+        patch("ffbb_mcp.services.search.resolve_club_and_org", mock_resolve),
+        patch("ffbb_mcp.services.ffbb_equipes_club_service", side_effect=mock_eq_call),
+        patch(
+            "ffbb_mcp.services.club.ffbb_equipes_club_service", side_effect=mock_eq_call
+        ),
+    ):
+        result = await ffbb_resolve_team_service(
+            club_name="Chamaliere", categorie="U13M"
+        )
+
+        assert result.get("status") == "resolved"
+        assert result.get("team") is not None
+        assert result["team"]["id"] == "u13_1"
+        assert result.get("club_resolu", {}).get("organisme_id") == "200000002677671"
+
+
+@pytest.mark.asyncio
+async def test_resolve_team_equipes_auto_disambiguate_category():
+    """Vérifie que _resolve_team_equipes dans club.py lève l'ambiguïté sur Sayat avec categorie='U13M'."""
+    from ffbb_mcp.services.club import _resolve_team_equipes
+
+    sayat = {
+        "organisme_id": "200000002677671",
+        "nom": "ETOILE DE CHAMALIERES SAYAT",
+        "ville": "CHAMALIERES",
+    }
+    bdf = {
+        "organisme_id": "9266",
+        "nom": "AS BANQUE DE FRANCE CHAMALIERES",
+        "ville": "CHAMALIERES",
+    }
+    mock_resolve = _make_resolve_mock([sayat, bdf])
+
+    async def mock_eq_call(organisme_id, filtre=None, **kwargs):
+        if str(organisme_id) == "200000002677671":
+            return [{"id": "u13_1", "nom": "U13M-1", "poule_id": "poule_1"}]
+        return []
+
+    with (
+        patch("ffbb_mcp.services.resolve_club_and_org", mock_resolve),
+        patch("ffbb_mcp.services.search.resolve_club_and_org", mock_resolve),
+        patch("ffbb_mcp.services.ffbb_equipes_club_service", side_effect=mock_eq_call),
+        patch(
+            "ffbb_mcp.services.club.ffbb_equipes_club_service", side_effect=mock_eq_call
+        ),
+    ):
+        error, equipes, club_resolu = await _resolve_team_equipes(
+            club_name="Chamaliere",
+            organisme_id=None,
+            numero_equipe=None,
+            categorie="U13M",
+        )
+
+        assert error is None
+        assert equipes is not None
+        assert len(equipes) == 1
+        assert equipes[0]["id"] == "u13_1"
+        assert club_resolu is not None
+        assert club_resolu.get("organisme_id") == "200000002677671"

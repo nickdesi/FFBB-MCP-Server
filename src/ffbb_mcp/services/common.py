@@ -195,6 +195,81 @@ def is_real_ambiguity(
     return True
 
 
+async def disambiguate_clubs_by_category(
+    resolved_clubs: list[dict[str, Any]],
+    categorie: str | None,
+    club_name: str | None = None,
+    force_refresh: bool = False,
+    season_id: int | str | None = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]] | None]:
+    """Lève automatiquement l'ambiguïté entre plusieurs clubs candidats si un filtre catégorie est fourni.
+
+    Vérifie en parallèle (via asyncio.gather) quels clubs possèdent réellement des équipes
+    engagées dans la catégorie spécifiée pour la saison en cours.
+    - Si un seul club possède des équipes dans cette catégorie : l'ambiguïté est résolue sur ce club.
+    - Si plusieurs clubs possèdent des équipes : la liste des candidats est restreinte à ces clubs.
+    - Si aucun club ne possède d'équipe : conserve les candidats initiaux.
+    """
+    if not categorie or not is_real_ambiguity(resolved_clubs, club_name):
+        return resolved_clubs, None
+
+    import ffbb_mcp.services as svc
+
+    async def _fetch_teams(
+        club: dict[str, Any],
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        org_id = club.get("organisme_id")
+        if not org_id:
+            return club, []
+        try:
+            teams = await svc.ffbb_equipes_club_service(
+                organisme_id=org_id,
+                filtre=categorie,
+                force_refresh=force_refresh,
+                season_id=season_id,
+            )
+            if teams and not (
+                isinstance(teams, list)
+                and len(teams) == 1
+                and isinstance(teams[0], dict)
+                and "error" in teams[0]
+            ):
+                return club, teams if isinstance(teams, list) else []
+        except Exception:
+            logger.debug(
+                "Échec fetch équipes pour désambiguïsation club %s",
+                org_id,
+                exc_info=True,
+            )
+        return club, []
+
+    results = await asyncio.gather(
+        *[_fetch_teams(c) for c in resolved_clubs], return_exceptions=False
+    )
+    matching_clubs = [(club, teams) for club, teams in results if teams]
+
+    if len(matching_clubs) == 1:
+        logger.info(
+            "Désambiguïsation automatique réussie pour '%s' (catégorie %s) -> %s (ID %s)",
+            club_name,
+            categorie,
+            matching_clubs[0][0].get("nom"),
+            matching_clubs[0][0].get("organisme_id"),
+        )
+        return [matching_clubs[0][0]], matching_clubs[0][1]
+
+    if len(matching_clubs) > 1:
+        logger.info(
+            "Désambiguïsation partielle pour '%s' (catégorie %s) : restreint à %d clubs candidats",
+            club_name,
+            categorie,
+            len(matching_clubs),
+        )
+        return [c for c, _ in matching_clubs], None
+
+    return resolved_clubs, None
+
+
 def get_primary_club(
     resolved_clubs: list[dict[str, Any]], club_name: str | None = None
 ) -> dict[str, Any] | None:

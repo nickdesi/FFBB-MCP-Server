@@ -729,7 +729,19 @@ async def ffbb_club(
                     }
                 ]
 
-            from ffbb_mcp.services.common import get_primary_club, is_real_ambiguity
+            from ffbb_mcp.services.common import (
+                disambiguate_clubs_by_category,
+                get_primary_club,
+                is_real_ambiguity,
+            )
+
+            if effective_filtre:
+                resolved_clubs, _ = await disambiguate_clubs_by_category(
+                    resolved_clubs,
+                    categorie=effective_filtre,
+                    club_name=club_name,
+                    season_id=season_id,
+                )
 
             if is_real_ambiguity(resolved_clubs, club_name):
                 # Ambiguïté réelle détectée : plusieurs vrais clubs distincts
