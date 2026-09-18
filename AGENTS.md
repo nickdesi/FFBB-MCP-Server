@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB MCP server | server.py: 2083 lignes | services.py: 7021 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 2084 lignes | services.py: 7102 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -136,8 +136,8 @@ src/ffbb_mcp/
 ├── prompts.py             # Prompts MCP réutilisables
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
-├── server.py              # Tools MCP + main() (≈2083 lignes)
-├── services/              # Logique métier modularisée (≈7021 lignes)
+├── server.py              # Tools MCP + main() (≈2084 lignes)
+├── services/              # Logique métier modularisée (≈7102 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── bilan.py           # Module de service
 │   ├── calendar.py        # Module de service
@@ -159,7 +159,7 @@ src/ffbb_mcp/
 - Pas de suffixe `_compact_` ou `_impl_` exposé
 - Modifier une fonction à la fois, seulement si test/usage échoue
 - Nouvelle fonction → test manuel validé avant exposition MCP
-- **Modularisation** : Le package `services/` (total ≈7021 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
+- **Modularisation** : Le package `services/` (total ≈7102 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
 
 ## Commandes
 - Démarrer le serveur MCP (stdio) : `rtk uv run python -m ffbb_mcp` (recommandé pour Claude Desktop)
@@ -199,6 +199,8 @@ Avant push/tag/release :
 | `FFBB_CACHE_BACKEND` | `sqlite` | Choix du backend de cache HTTP (`sqlite` ou `redis`) |
 | `FFBB_SERVICE_CACHE_PERSIST` | `1` | Activer la persistance des caches service sur disque (SQLite) entre redémarrages |
 | `FFBB_KNOWN_CLUB_IDS` | `` | Override JSON de la liste d'organisme_id connus pour les prompts MCP (fallback : _DEFAULT_KNOWN_CLUB_IDS) |
+| `FFBB_REGULATIONS_MANIFEST` | `` | Chemin explicite vers le fichier manifest.yaml des règlements sportifs |
+| `FFBB_DATA_DIR` | `` | Répertoire racine contenant les données statiques (ex: regulations, cache) |
 | `FFBB_WARMUP_API_KEY` | `` | Clé d'API secrète requise pour déclencher le warmup via l'endpoint HTTP `/warmup` |
 | `FFBB_WARMUP_MAX_ORGANISMES` | `50` | Nombre maximum d'organismes à charger lors d'un cycle de warmup |
 | `PUBLIC_URL` | `https://ffbb.desimone.fr` | URL publique pour liens/sitemap |

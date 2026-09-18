@@ -233,3 +233,34 @@ async def test_ffbb_head_to_head_service_polymorphic_kwargs():
         assert res["status"] == "ok"
         assert res["face_a_face"]["confrontations_count"] == 0
         assert any("Début de saison" in p for p in res["points_cles_llm"])
+
+
+@pytest.mark.asyncio
+async def test_ffbb_head_to_head_service_engagement_ids_only():
+    """Vérifie que H2H fonctionne en fournissant uniquement engagement_id_a et engagement_id_b."""
+    with (
+        patch("ffbb_mcp.services.club._resolve_team_equipes") as mock_resolve,
+        patch(
+            "ffbb_mcp.services.poule.get_poule_service", new_callable=AsyncMock
+        ) as mock_poule,
+    ):
+        mock_resolve.side_effect = [
+            (None, [{"poule_id": "P1", "engagement_id": "ENG_A"}], {"nom": "CLUB A"}),
+            (None, [{"poule_id": "P1", "engagement_id": "ENG_B"}], {"nom": "CLUB B"}),
+        ]
+        mock_poule.return_value = {
+            "classements": [],
+            "rencontres": [],
+        }
+
+        res = await ffbb_head_to_head_service(
+            engagement_id_a="ENG_A",
+            engagement_id_b="ENG_B",
+            categorie="SEM1",
+        )
+        assert res["status"] == "ok"
+        assert res["equipe_a"]["nom"] == "CLUB A"
+        assert res["equipe_b"]["nom"] == "CLUB B"
+        # Vérifier que mock_resolve a bien été appelé avec les bons engagement_id
+        assert mock_resolve.call_args_list[0].kwargs["engagement_id"] == "ENG_A"
+        assert mock_resolve.call_args_list[1].kwargs["engagement_id"] == "ENG_B"

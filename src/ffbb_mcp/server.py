@@ -1666,7 +1666,7 @@ async def ffbb_head_to_head(
         eff_club_b = club_b or adversaire
         eff_org_b = organisme_id_b or adversaire_id
         eff_eng_a = engagement_id_a or engagement_id
-        eff_eng_b = engagement_id_b or engagement_id
+        eff_eng_b = engagement_id_b
 
         result = await ffbb_head_to_head_service(
             club_a=eff_club_a,
@@ -1988,7 +1988,7 @@ def _optimize_tool_schemas(mcp_instance: FastMCP) -> None:
             {"required": ["competition_id"]},
         ]
 
-    # ffbb_head_to_head accepte soit club_a/organisme_id_a/club_name/organisme_id/engagement_id
+    # ffbb_head_to_head accepte soit club_a/organisme_id_a/club_name/organisme_id/engagement_id/engagement_id_a/engagement_id_b
     h2h_tool = tools_map.get("ffbb_head_to_head")
     if (
         h2h_tool
@@ -2001,6 +2001,7 @@ def _optimize_tool_schemas(mcp_instance: FastMCP) -> None:
             {"required": ["club_name"]},
             {"required": ["organisme_id"]},
             {"required": ["engagement_id_a"]},
+            {"required": ["engagement_id_b"]},
             {"required": ["engagement_id"]},
             {"required": ["poule_id"]},
         ]

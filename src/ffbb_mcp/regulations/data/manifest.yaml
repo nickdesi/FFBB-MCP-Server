@@ -1,0 +1,251 @@
+season: "2026-2027"
+version: "1.1.0"
+documents:
+  # =========================================================================
+  # NIVEAU FÉDÉRAL (National - 100% du territoire français)
+  # =========================================================================
+  - id: "rsg_ffbb_2026_2027"
+    level: "federal"
+    organizer: "FFBB"
+    title: "Règlements Sportifs Généraux FFBB"
+    source_url: "https://www.ffbb.com/reglements"
+    categories: ["toutes"]
+    file: "federal/rsg_ffbb_2026_2027.md"
+    topics:
+      - "qualifications"
+      - "licences"
+      - "forfaits"
+      - "departages"
+      - "point_average"
+      - "brulage"
+      - "terrains"
+      - "reclamations"
+
+  - id: "rsp_nm1_nm2_nm3_2026_2027"
+    level: "federal"
+    organizer: "FFBB"
+    title: "RSP Championnats de France Nationaux Seniors Masculins (NM1, NM2, NM3)"
+    source_url: "https://www.ffbb.com/reglements"
+    categories: ["seniors", "NM1", "NM2", "NM3", "nationale"]
+    file: "federal/rsp_nm1_nm2_nm3.md"
+    topics:
+      - "nm1"
+      - "nm2"
+      - "nm3"
+      - "accession_pro_b"
+      - "playoffs_nm1"
+      - "relegation_nm3"
+      - "formule_nm1"
+
+  - id: "rsp_lf2_nf1_nf2_nf3_2026_2027"
+    level: "federal"
+    organizer: "FFBB"
+    title: "RSP Championnats de France Nationaux Seniors Féminins (LF2, NF1, NF2, NF3)"
+    source_url: "https://www.ffbb.com/reglements"
+    categories: ["seniors", "LF2", "NF1", "NF2", "NF3", "feminines", "nationale"]
+    file: "federal/rsp_lf2_nf1_nf2_nf3.md"
+    topics:
+      - "lf2"
+      - "nf1"
+      - "nf2"
+      - "nf3"
+      - "accession_lfb"
+      - "playoffs_lf2"
+      - "relegation_nf3"
+
+  - id: "rsp_u15_elite_2026_2027"
+    level: "federal"
+    organizer: "FFBB"
+    title: "RSP Championnat de France U15 Élite Masculin et Féminin"
+    source_url: "https://www.ffbb.com/reglements"
+    categories: ["U15", "elite"]
+    file: "federal/rsp_u15_elite.md"
+    topics:
+      - "u15"
+      - "elite"
+      - "phase_1"
+      - "phase_2"
+      - "groupe_a"
+      - "groupe_b"
+      - "finale_a_4"
+      - "titre"
+
+  - id: "rsp_u18_elite_2026_2027"
+    level: "federal"
+    organizer: "FFBB"
+    title: "RSP Championnat de France U18 Élite Masculin et Féminin"
+    source_url: "https://www.ffbb.com/reglements"
+    categories: ["U18", "elite"]
+    file: "federal/rsp_u18_elite.md"
+    topics:
+      - "u18"
+      - "elite"
+      - "phase_1"
+      - "phase_2"
+      - "groupe_a"
+      - "groupe_b"
+      - "playoffs"
+      - "finales"
+
+  # =========================================================================
+  # NIVEAU RÉGIONAL (Ligues Régionales de Basketball)
+  # =========================================================================
+  - id: "reglement_idf_2026_2027"
+    level: "regional"
+    organizer: "Ligue Île-de-France"
+    title: "Règlement Sportif Régional 5x5 - Ligue Île-de-France (LIFBB)"
+    source_url: "https://basketidf.com"
+    categories: ["seniors", "jeunes", "U13", "U15", "U18", "U20", "PNM", "RM2", "RM3", "PNF", "RF2", "RF3"]
+    file: "regional/idf/reglement_sportif_idf.md"
+    topics:
+      - "idf"
+      - "pnm"
+      - "rm2"
+      - "rm3"
+      - "pnf"
+      - "rf2"
+      - "rf3"
+      - "brassages_idf"
+      - "r1"
+      - "r2"
+      - "r3"
+      - "accession"
+      - "relegation"
+
+  - id: "reglement_aura_2026_2027"
+    level: "regional"
+    organizer: "Ligue AURA"
+    title: "Règlement Sportif Régional 5x5 Auvergne-Rhône-Alpes"
+    source_url: "https://aurabasketball.org"
+    categories: ["seniors", "jeunes", "U13", "U15", "U18", "U20", "PNM", "RM2", "RM3", "PNF", "RF2", "RF3"]
+    file: "regional/aura/reglement_sportif_aura.md"
+    topics:
+      - "pnm"
+      - "rm2"
+      - "rm3"
+      - "pnf"
+      - "rf2"
+      - "rf3"
+      - "brassages_regionaux"
+      - "r1"
+      - "r2"
+      - "barrages"
+      - "accession"
+      - "relegation"
+
+  - id: "reglement_hdf_2026_2027"
+    level: "regional"
+    organizer: "Ligue Hauts-de-France"
+    title: "Règlement Sportif Régional 5x5 - Ligue des Hauts-de-France"
+    source_url: "https://hautsdefrancebasketball.org"
+    categories: ["seniors", "jeunes", "U13", "U15", "U18", "PNM", "RM2", "RM3", "PNF", "RF2", "RF3"]
+    file: "regional/hdf/reglement_sportif_hdf.md"
+    topics:
+      - "hdf"
+      - "pnm"
+      - "rm2"
+      - "rm3"
+      - "pnf"
+      - "rf2"
+      - "rf3"
+      - "brassages_hdf"
+      - "accession"
+      - "relegation"
+
+  # =========================================================================
+  # NIVEAU DÉPARTEMENTAL (Comités Départementaux)
+  # =========================================================================
+  - id: "reglement_comite_75_2026_2027"
+    level: "departmental"
+    organizer: "Comité Paris (Basket 75)"
+    title: "Règlement Départemental 5x5 - Comité de Paris"
+    source_url: "https://basket75.com"
+    categories: ["U9", "U11", "U13", "U15", "U17", "U20", "seniors", "DM2", "DM3", "DF2", "DF3", "PRM", "PRF"]
+    file: "departmental/comite_75/reglement_departemental_75.md"
+    topics:
+      - "paris"
+      - "basket75"
+      - "brassages_paris"
+      - "poule_haute"
+      - "d1"
+      - "d2"
+      - "d3"
+      - "zone_interdite"
+      - "temps_jeu"
+
+  - id: "reglement_comite_59_2026_2027"
+    level: "departmental"
+    organizer: "Comité Nord (Basket 59)"
+    title: "Règlement Départemental 5x5 - Comité du Nord"
+    source_url: "https://basket59.com"
+    categories: ["U9", "U11", "U13", "U15", "U18", "seniors", "DM2", "DM3", "DF2", "DF3", "PRM", "PRF"]
+    file: "departmental/comite_59/reglement_departemental_59.md"
+    topics:
+      - "nord"
+      - "basket59"
+      - "brassages_nord"
+      - "d1"
+      - "d2"
+      - "d3"
+      - "zone_interdite"
+      - "brulage_59"
+
+  - id: "reglement_comite_69_2026_2027"
+    level: "departmental"
+    organizer: "Comité Rhône et Métropole de Lyon (Basket 69)"
+    title: "Règlement Départemental 5x5 - Comité du Rhône et Métropole de Lyon"
+    source_url: "https://basketrhone.com"
+    categories: ["U9", "U11", "U13", "U15", "U18", "seniors", "DM2", "DM3", "DF2", "DF3", "PRM", "PRF"]
+    file: "departmental/comite_69/reglement_departemental_69.md"
+    topics:
+      - "rhone"
+      - "lyon"
+      - "basket69"
+      - "brassages_rhone"
+      - "d1"
+      - "d2"
+      - "d3"
+      - "zone_interdite_u13"
+      - "brulage_69"
+
+  - id: "reglement_comite_03_2026_2027"
+    level: "departmental"
+    organizer: "Comité 03"
+    title: "Règlement Départemental 5x5 et Livret Jeunes - Comité de l'Allier"
+    source_url: "https://comite03basket.fr"
+    categories: ["U9", "U11", "U13", "U15", "U18", "U21", "seniors", "DM2", "DM3", "DF2", "DF3", "PRM", "PRF"]
+    file: "departmental/comite_03/reglement_departemental_03.md"
+    topics:
+      - "allier"
+      - "basket03"
+      - "brassages_allier"
+      - "poule_haute"
+      - "d1"
+      - "d2"
+      - "d3"
+      - "zone_interdite_u13"
+      - "temps_jeu"
+      - "ballons"
+      - "brulage_03"
+
+  - id: "reglement_comite_63_2026_2027"
+    level: "departmental"
+    organizer: "Comité 63"
+    title: "Règlement Départemental 5x5 et Livret Jeunes Puy-de-Dôme"
+    source_url: "https://www.basket63.com"
+    categories: ["U9", "U11", "U13", "U15", "U18", "U21", "seniors", "DM2", "DM3", "DF2", "DF3", "PRM", "PRF"]
+    file: "departmental/comite_63/reglement_departemental_63.md"
+    topics:
+      - "brassages"
+      - "poule_haute"
+      - "poule_basse"
+      - "consolante"
+      - "d1"
+      - "d2"
+      - "d3"
+      - "zone_interdite"
+      - "temps_jeu"
+      - "ballons"
+      - "paniers"
+      - "brulage_departemental"
+

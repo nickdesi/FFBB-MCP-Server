@@ -81,6 +81,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "*" = ["website/*", "website/css/*"]
+"ffbb_mcp.regulations" = ["data/*.yaml", "data/**/*.md", "data/**/*.yaml"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

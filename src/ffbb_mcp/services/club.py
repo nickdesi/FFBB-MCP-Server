@@ -376,16 +376,47 @@ async def _resolve_team_equipes(
 ) -> tuple[dict | None, list[dict], dict | None]:
 
     if not club_name and not organisme_id:
-        side_hint = (
-            "club_a (ou club_name) / organisme_id_a"
-            if "a" in not_found_status.lower()
-            else "club_b (ou adversaire) / organisme_id_b"
-        )
-        return (
-            {"status": "error", "message": f"Fournir {side_hint}"},
-            [],
-            None,
-        )
+        if engagement_id:
+            from ..client import FFBBClientFactory
+
+            client = await FFBBClientFactory.get_client_async()
+            try:
+                eng_data = await client.get_engagement_async(str(engagement_id).strip())
+            except Exception as e:
+                logger.error(
+                    "Erreur lors de la récupération de l'engagement %s: %s",
+                    engagement_id,
+                    e,
+                )
+                eng_data = None
+
+            if eng_data and eng_data.idOrganisme:
+                organisme_id = str(eng_data.idOrganisme)
+                if competition_id is None and eng_data.idCompetition:
+                    competition_id = eng_data.idCompetition
+                if poule_id is None and eng_data.idPoule:
+                    poule_id = eng_data.idPoule
+            else:
+                return (
+                    {
+                        "status": not_found_status,
+                        "message": f"Engagement '{engagement_id}' introuvable sur les serveurs FFBB.",
+                        "club_resolu": None,
+                    },
+                    [],
+                    None,
+                )
+        else:
+            side_hint = (
+                "club_a (ou club_name) / organisme_id_a / engagement_id_a"
+                if "a" in not_found_status.lower()
+                else "club_b (ou adversaire) / organisme_id_b / engagement_id_b"
+            )
+            return (
+                {"status": "error", "message": f"Fournir {side_hint}"},
+                [],
+                None,
+            )
 
     import ffbb_mcp.services as svc
 
@@ -495,13 +526,13 @@ async def _resolve_team_equipes(
             == target_eng
         ]
 
-    if poule_id is not None:
+    if len(equipes) > 1 and poule_id is not None:
         target_poule = str(poule_id).strip()
         equipes = [
             e for e in equipes if str(e.get("poule_id") or "").strip() == target_poule
         ]
 
-    if competition_id is not None:
+    if len(equipes) > 1 and competition_id is not None:
         target_comp = str(competition_id).strip()
         equipes = [
             e
@@ -509,7 +540,7 @@ async def _resolve_team_equipes(
             if str(e.get("competition_id") or "").strip() == target_comp
         ]
 
-    if competition_type is not None:
+    if len(equipes) > 1 and competition_type is not None:
         target_type = str(competition_type).strip().upper()
         equipes = [
             e
@@ -517,13 +548,13 @@ async def _resolve_team_equipes(
             if str(e.get("competition_type") or "").strip().upper() == target_type
         ]
 
-    if season_id is not None:
+    if len(equipes) > 1 and season_id is not None:
         target_season = str(season_id).strip()
         equipes = [
             e for e in equipes if str(e.get("season_id") or "").strip() == target_season
         ]
 
-    if numero_equipe is not None:
+    if len(equipes) > 1 and numero_equipe is not None:
         want = str(numero_equipe)
         filtered = [
             e for e in equipes if (e.get("numero_equipe") or "").strip() == want
@@ -1197,7 +1228,11 @@ async def ffbb_head_to_head_service(
         or kwargs.get("engagement_id")
         or kwargs.get("engagement_id_a")
     )
-    eff_eng_b = engagement_id_b or engagement_id or kwargs.get("engagement_id_b")
+    eff_eng_b = (
+        engagement_id_b
+        or kwargs.get("engagement_id_b")
+        or kwargs.get("adversaire_engagement_id")
+    )
 
     # 1. Résolution des équipes A et B
     err_a, eq_a, club_res_a = await _resolve_team_equipes(
@@ -1214,7 +1249,7 @@ async def ffbb_head_to_head_service(
     )
     if err_a:
         return {
-            "error": f"Équipe A ({eff_club_a or eff_org_id_a}) introuvable",
+            "error": f"Équipe A ({eff_club_a or eff_org_id_a or eff_eng_a}) introuvable",
             "details": err_a,
         }
 
@@ -1292,7 +1327,7 @@ async def ffbb_head_to_head_service(
 
     if err_b:
         return {
-            "error": f"Équipe B ({eff_club_b or eff_org_id_b}) introuvable",
+            "error": f"Équipe B ({eff_club_b or eff_org_id_b or eff_eng_b}) introuvable",
             "details": err_b,
         }
 

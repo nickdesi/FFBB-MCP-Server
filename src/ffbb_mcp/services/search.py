@@ -1112,12 +1112,43 @@ async def ffbb_resolve_team_service(
     import ffbb_mcp.services
 
     if not club_name and not organisme_id:
-        raise McpError(
-            error=ErrorData(
-                code=INTERNAL_ERROR,
-                message="Fournir club_name ou organisme_id",
+        if engagement_id:
+            from ffbb_mcp.client import FFBBClientFactory
+
+            client = await FFBBClientFactory.get_client_async()
+            try:
+                eng_data = await client.get_engagement_async(str(engagement_id).strip())
+            except Exception as e:
+                logger.error("Erreur résolution engagement %s: %s", engagement_id, e)
+                eng_data = None
+
+            if eng_data and eng_data.idOrganisme:
+                organisme_id = str(eng_data.idOrganisme)
+                if (
+                    numero_equipe is None
+                    and eng_data.numeroEquipe
+                    and str(eng_data.numeroEquipe).isdigit()
+                ):
+                    numero_equipe = int(eng_data.numeroEquipe)
+                if competition_id is None and eng_data.idCompetition:
+                    competition_id = eng_data.idCompetition
+                if poule_id is None and eng_data.idPoule:
+                    poule_id = eng_data.idPoule
+            else:
+                return {
+                    "status": "not_found",
+                    "team": None,
+                    "candidates": [],
+                    "ambiguity": f"Engagement '{engagement_id}' introuvable sur les serveurs FFBB",
+                    "clarification_prompt": None,
+                }
+        else:
+            raise McpError(
+                error=ErrorData(
+                    code=INTERNAL_ERROR,
+                    message="Fournir club_name ou organisme_id (ou engagement_id)",
+                )
             )
-        )
 
     # 1) Résoudre l'organisme avec métadonnées
     resolved_clubs, _ = await resolve_club_and_org(

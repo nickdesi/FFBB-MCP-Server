@@ -238,3 +238,26 @@ async def test_mcp_regulation_tools():
     # Test ffbb_list_regulations
     res_list = await ffbb_list_regulations(season="2026-2027")
     assert res_list.get("total_documents", 0) >= 7
+
+
+def test_missing_manifest_engine_initialization(tmp_path: Path):
+    """Vérifie que RegulationsEngine crée le schéma sans crasher même sans manifeste."""
+    fake_manifest = tmp_path / "non_existent_manifest.yaml"
+    engine = RegulationsEngine(manifest_path=fake_manifest)
+    try:
+        # La table doit exister sans lever d'OperationalError
+        assert engine.search("départage") == []
+        assert engine.get_article("rsg", "Article 28") is None
+        assert engine.list_available_documents() == []
+    finally:
+        engine.close()
+
+
+def test_find_default_manifest_path():
+    """Vérifie que la découverte automatique trouve le manifeste embarqué ou racine."""
+    from ffbb_mcp.regulations.engine import find_default_manifest_path
+
+    manifest = find_default_manifest_path()
+    assert manifest is not None
+    assert manifest.exists()
+    assert manifest.name == "manifest.yaml"

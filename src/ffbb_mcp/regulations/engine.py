@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import os
 import re
 import sqlite3
 from pathlib import Path
@@ -14,6 +15,46 @@ from .indexer import index_manifest
 from .models import RegulationArticle, RegulationSearchResult
 
 logger = logging.getLogger(__name__)
+
+
+def find_default_manifest_path() -> Path | None:
+    """Recherche le fichier manifest.yaml des règlements selon plusieurs emplacements ordonnés."""
+    # 1. Variable d'environnement explicite
+    if env_manifest := os.environ.get("FFBB_REGULATIONS_MANIFEST"):
+        p = Path(env_manifest)
+        if p.exists():
+            return p
+
+    # 2. Données embarquées dans le package (src/ffbb_mcp/regulations/data/manifest.yaml)
+    pkg_manifest = Path(__file__).parent / "data" / "manifest.yaml"
+    if pkg_manifest.exists():
+        return pkg_manifest
+
+    # 3. Répertoire de données spécifié par variable d'environnement
+    if data_dir := os.environ.get("FFBB_DATA_DIR"):
+        p = Path(data_dir) / "regulations" / "manifest.yaml"
+        if p.exists():
+            return p
+
+    # 4. Emplacement standard Docker (/app/data/regulations/manifest.yaml)
+    docker_manifest = Path("/app/data/regulations/manifest.yaml")
+    if docker_manifest.exists():
+        return docker_manifest
+
+    # 5. Racine du dépôt Git en environnement de dev
+    try:
+        repo_manifest = (
+            Path(__file__).resolve().parents[3]
+            / "data"
+            / "regulations"
+            / "manifest.yaml"
+        )
+        if repo_manifest.exists():
+            return repo_manifest
+    except IndexError:
+        pass
+
+    return None
 
 
 def _sanitize_fts5_query(raw_query: str) -> str:
@@ -37,34 +78,47 @@ class RegulationsEngine:
 
     def __init__(self, db_path: Path | None = None, manifest_path: Path | None = None):
         self.db_path = db_path
-        self.manifest_path = manifest_path or (
-            Path(__file__).parent.parent.parent.parent
-            / "data"
-            / "regulations"
-            / "manifest.yaml"
-        )
+        self.manifest_path = manifest_path or find_default_manifest_path()
         self._conn: sqlite3.Connection | None = None
         self._ensure_initialized()
 
     def _ensure_initialized(self) -> None:
-        """Initialise la connexion SQLite et indexe le corpus si nécessaire."""
+        """Initialise la connexion SQLite, garantit le schéma et indexe le corpus si nécessaire."""
         if self._conn is not None:
             return
 
-        if self.db_path and self.db_path.exists():
-            self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
-            self._conn.row_factory = sqlite3.Row
-        else:
-            # Base SQLite en mémoire ou fichier
-            if self.db_path:
-                self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
-            else:
-                self._conn = sqlite3.connect(":memory:", check_same_thread=False)
-            self._conn.row_factory = sqlite3.Row
+        from .indexer import init_sqlite_schema
 
-            # Indexer le manifeste si présent
-            if self.manifest_path and self.manifest_path.exists():
-                index_manifest(self.manifest_path, conn=self._conn)
+        if self.db_path:
+            self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        else:
+            self._conn = sqlite3.connect(":memory:", check_same_thread=False)
+        self._conn.row_factory = sqlite3.Row
+
+        # Toujours initialiser les tables (regulation_articles, regulations_fts) pour parer aux 'no such table'
+        init_sqlite_schema(self._conn)
+
+        # Vérifier si la table contient déjà des articles. Si vide et qu'un manifeste existe, indexer.
+        needs_indexing = False
+        try:
+            cursor = self._conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM regulation_articles")
+            row = cursor.fetchone()
+            if row and row[0] == 0:
+                needs_indexing = True
+        except Exception:
+            needs_indexing = True
+
+        if needs_indexing and self.manifest_path and self.manifest_path.exists():
+            try:
+                indexed = index_manifest(self.manifest_path, conn=self._conn)
+                logger.info(
+                    "Manifeste règlements indexé : %s articles chargés.", indexed
+                )
+            except Exception as e:
+                logger.error(
+                    "Erreur lors de l'indexation du manifeste de règlements : %s", e
+                )
 
     def search(
         self,
@@ -224,8 +278,12 @@ class RegulationsEngine:
                 ELSE 4
             END, organizer
         """
-        cursor.execute(sql, (season,))
-        rows = cursor.fetchall()
+        try:
+            cursor.execute(sql, (season,))
+            rows = cursor.fetchall()
+        except sqlite3.OperationalError as e:
+            logger.error(f"Erreur SQL list_available_documents: {e}")
+            return []
         return [
             {
                 "document_id": r["document_id"],
@@ -272,8 +330,12 @@ class RegulationsEngine:
             params.append(f"%{article_number}%")
 
         sql += " LIMIT 1"
-        cursor.execute(sql, params)
-        row = cursor.fetchone()
+        try:
+            cursor.execute(sql, params)
+            row = cursor.fetchone()
+        except sqlite3.OperationalError as e:
+            logger.error(f"Erreur SQL get_article: {e}")
+            return None
         if not row:
             return None
 

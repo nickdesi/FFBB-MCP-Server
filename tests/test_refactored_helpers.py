@@ -1,6 +1,6 @@
 """Tests for refactored shared helpers: _resolve_team_equipes, _fetch_poule_matches, format_poule_response."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -122,6 +122,51 @@ class TestResolveTeamEquipes:
         assert error["status"] == "error"
         assert equipes == []
         assert club is None
+
+    @pytest.mark.asyncio
+    async def test_resolves_via_engagement_id_when_no_club_name_or_org(self):
+        fake_eng = MagicMock(
+            idOrganisme="7834",
+            numeroEquipe="1",
+            idCompetition="COMP1",
+            idPoule="POULE1",
+        )
+        fake_client = AsyncMock()
+        fake_client.get_engagement_async = AsyncMock(return_value=fake_eng)
+
+        with (
+            patch(
+                "ffbb_mcp.client.FFBBClientFactory.get_client_async",
+                new_callable=AsyncMock,
+                return_value=fake_client,
+            ),
+            patch(
+                "ffbb_mcp.services.resolve_club_and_org",
+                new_callable=AsyncMock,
+                return_value=([{"organisme_id": "7834", "nom": "TAIN"}], None),
+            ),
+            patch(
+                "ffbb_mcp.services.club.ffbb_equipes_club_service",
+                new_callable=AsyncMock,
+                return_value=[
+                    {
+                        "engagement_id": "ENG123",
+                        "poule_id": "POULE1",
+                        "team_id": "ENG123",
+                    }
+                ],
+            ),
+        ):
+            error, equipes, club = await _resolve_team_equipes(
+                club_name=None,
+                organisme_id=None,
+                engagement_id="ENG123",
+                numero_equipe=None,
+            )
+        assert error is None
+        assert len(equipes) == 1
+        assert equipes[0]["engagement_id"] == "ENG123"
+        assert club["nom"] == "TAIN"
 
     @pytest.mark.asyncio
     async def test_returns_not_found_when_club_unknown(self):
