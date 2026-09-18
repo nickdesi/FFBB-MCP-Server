@@ -219,7 +219,6 @@ Avant push/tag/release :
 | `FFBB_WARMUP_ORGANISMES` | `` | Liste d'organisme_id séparés par des virgules à préchauffer au démarrage |
 | `FFBB_WARMUP_CONCURRENCY` | `5` | Concurrence maximale lors du préchauffage du cache |
 | `FFBB_ENABLE_BENCHMARK` | — | Activer endpoint `/benchmark/run` (sécurité) |
-| `FFBB_MCP_PRUNE_LIMIT` | — | Limite troncature payload |
 | `FFBB_POULE_FETCH_CONCURRENCY` | — | Concurrence max fetch poules |
 | `FFBB_CACHE_TTL_*` | — | TTL par type de cache (voir cache_strategy.py) |
 | `FFBB_REDIS_URL` | — | URL de connexion à l'instance Redis si backend=redis |

@@ -202,7 +202,6 @@ ENV_DESCRIPTIONS = {
     "FFBB_LOG_LEVEL": "Niveau de log",
     "MAX_CONCURRENT_FFBB": "Concurrence max appels API FFBB",
     "FFBB_ENABLE_BENCHMARK": "Activer endpoint `/benchmark/run` (sécurité)",
-    "FFBB_MCP_PRUNE_LIMIT": "Limite troncature payload",
     "FFBB_MAX_CALENDAR_MATCHES": "Max rencontres retournées",
     "FFBB_POULE_FETCH_CONCURRENCY": "Concurrence max fetch poules",
     "FFBB_CACHE_TTL_*": "TTL par type de cache (voir cache_strategy.py)",
