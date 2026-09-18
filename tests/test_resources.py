@@ -29,7 +29,7 @@ def registered_resources():
 
 
 @pytest.mark.asyncio
-async def test_resources_return_pruned_json(registered_resources, monkeypatch):
+async def test_resources_return_json(registered_resources, monkeypatch):
     get_saisons = AsyncMock(return_value={"date": date(2026, 5, 10)})
     get_competition = AsyncMock(return_value={"id": 11, "empty": None})
     get_poule = AsyncMock(return_value={"id": 22, "items": [None, {"ok": True}]})
@@ -68,8 +68,8 @@ async def test_resources_return_pruned_json(registered_resources, monkeypatch):
     )
 
     assert saisons == {"date": "2026-05-10"}
-    assert competition == {"id": 11}
-    assert poule == {"id": 22, "items": [{"ok": True}]}
+    assert competition == {"id": 11, "empty": None}
+    assert poule == {"id": 22, "items": [None, {"ok": True}]}
     assert organisme == {"id": 33, "name": "Club"}
     assert rencontre == {"id": 44, "score_a": 80}
     assert salle == {"id": 55, "libelle": "Gymnase"}

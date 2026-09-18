@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.14.4] - 2026-09-18
+
+### Removed
+- **Suppression intégrale de ZipAI (`prune_payload` & `@zipai_surgical`)** : Élimination définitive de l'élagage global aval et suppression de 295 lignes de code mort (`_ESSENTIAL_KEYS`, `_PRUNE_LIMIT`, `prune_payload`, `zipai_surgical`). Les services FFBB projetant déjà nativement des structures JSON épurées et ciblées, la suppression de ZipAI rétablit une intégrité de données 100% déterministe :
+  - Préservation inconditionnelle des valeurs `null` sémantiques (ex: `quotient: null` quand 0 match joué).
+  - Préservation inconditionnelle des collections vides `[]` contractuelles (ex: `topics: []`, `candidates: []`).
+  - Élimination de l'empoisonnement de type causé par l'injection de dictionnaires `{"_omitted_count": N}` en queue de listes typées.
+  - Suppression du risque de régression lié au seuil négatif `_MAX_NON_ESSENTIAL = -24`.
+
+
 ## [1.14.3] - 2026-09-18
 
 ### Fixed

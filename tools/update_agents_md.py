@@ -152,7 +152,7 @@ def extract_architecture() -> str:
         "routes.py": "Routes HTTP (health, metrics, dashboard, docs, etc.)",
         "server.py": "Tools MCP + main()",
         "services/": "Logique métier modularisée",
-        "utils.py": "serialize_model, parse_categorie, prune_payload",
+        "utils.py": "serialize_model, parse_categorie, normalize_query",
     }
     lines = ["src/ffbb_mcp/"]
     keys = sorted(descriptions.keys())

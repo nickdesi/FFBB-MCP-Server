@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB MCP server | server.py: 2084 lignes | services.py: 7134 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 2048 lignes | services.py: 7134 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -136,7 +136,7 @@ src/ffbb_mcp/
 ├── prompts.py             # Prompts MCP réutilisables
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
-├── server.py              # Tools MCP + main() (≈2084 lignes)
+├── server.py              # Tools MCP + main() (≈2048 lignes)
 ├── services/              # Logique métier modularisée (≈7134 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── bilan.py           # Module de service
@@ -150,7 +150,7 @@ src/ffbb_mcp/
 │   ├── salle.py           # Service de gestion des salles
 │   ├── search.py          # Service de recherche multicritère
 │   └── warmup.py          # Service de préchauffage du cache
-└── utils.py               # serialize_model, parse_categorie, prune_payload
+└── utils.py               # serialize_model, parse_categorie, normalize_query
 ```
 
 ## Conventions de code
@@ -218,8 +218,8 @@ Avant push/tag/release :
 | `FFBB_SWR_MAX_TASKS` | `32` | Nombre max de tâches SWR concurrentes (défaut : 32) |
 | `FFBB_WARMUP_ORGANISMES` | `` | Liste d'organisme_id séparés par des virgules à préchauffer au démarrage |
 | `FFBB_WARMUP_CONCURRENCY` | `5` | Concurrence maximale lors du préchauffage du cache |
-| `FFBB_MCP_PRUNE_LIMIT` | `50` | Limite troncature payload |
 | `FFBB_ENABLE_BENCHMARK` | — | Activer endpoint `/benchmark/run` (sécurité) |
+| `FFBB_MCP_PRUNE_LIMIT` | — | Limite troncature payload |
 | `FFBB_POULE_FETCH_CONCURRENCY` | — | Concurrence max fetch poules |
 | `FFBB_CACHE_TTL_*` | — | TTL par type de cache (voir cache_strategy.py) |
 | `FFBB_REDIS_URL` | — | URL de connexion à l'instance Redis si backend=redis |

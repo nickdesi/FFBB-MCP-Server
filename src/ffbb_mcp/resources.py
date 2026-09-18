@@ -3,8 +3,6 @@
 import json
 from typing import Any
 
-from .utils import prune_payload
-
 
 async def _resource_to_json(service_coro) -> str:
     """Exécute un service et retourne son JSON pruné avec gestion d'erreurs."""
@@ -12,7 +10,7 @@ async def _resource_to_json(service_coro) -> str:
 
     try:
         data = await service_coro
-        return json.dumps(prune_payload(data), default=str)
+        return json.dumps(data, default=str)
     except Exception as e:
         raise handle_api_error(e) from e
 

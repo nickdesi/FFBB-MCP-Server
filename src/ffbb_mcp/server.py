@@ -57,26 +57,7 @@ from .services import (
     search_regulations_service,
 )
 from .sse_patch import apply_fastmcp_json_formatting_patch
-from .utils import parse_categorie, prune_payload
-
-
-def zipai_surgical(func: Any) -> Any:
-    """Élague le payload retourné (la directive ZipAI est passée en instruction globale)."""
-
-    @wraps(func)
-    async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        res = await func(*args, **kwargs)
-        if res is None:
-            return []
-        if isinstance(res, (str, int, float, bool)):
-            return [] if res == "" else res
-        if isinstance(res, list) and len(res) <= 5:
-            return res
-        if isinstance(res, dict) and len(res) <= 5:
-            return res
-        return prune_payload(res)
-
-    return wrapper
+from .utils import parse_categorie
 
 
 def track_tool_usage(tool_name: str):
@@ -231,7 +212,7 @@ mcp: FastMCP = FastMCP(
     "FFBB MCP Server",
     instructions=(
         ROUTING_PROMPT
-        + "\n[ZIPAI: Données FFBB live. Format tableau classement strict (Rang, Équipe, PTS, J, G, P, M, E, Diff). Obligation formelle : repérer l'équipe ciblée (is_target=True) et mettre son nom en GRAS avec 🎯 : | Rang | **Nom Équipe** 🎯 | PTS | ... |. Pas de recalcul.]"
+        + "\n[Données FFBB live. Format tableau classement strict (Rang, Équipe, PTS, J, G, P, M, E, Diff). Obligation formelle : repérer l'équipe ciblée (is_target=True) et mettre son nom en GRAS avec 🎯 : | Rang | **Nom Équipe** 🎯 | PTS | ... |. Pas de recalcul.]"
     ),
     dependencies=["mcp", "ffbb-data-client"],
     # Streamable HTTP transport (MCP spec 2025-11-25)
@@ -254,7 +235,6 @@ mcp: FastMCP = FastMCP(
     annotations=_READONLY_ANNOTATIONS,
 )
 @track_tool_usage("ffbb_version")
-@zipai_surgical
 async def ffbb_version() -> dict[str, Any]:
     """Informations de version et configuration runtime du serveur FFBB MCP.
 
@@ -290,7 +270,6 @@ async def ffbb_version() -> dict[str, Any]:
     annotations=_READONLY_ANNOTATIONS,
 )
 @track_tool_usage("ffbb_search")
-@zipai_surgical
 async def ffbb_search(
     query: Annotated[
         str,
@@ -383,7 +362,6 @@ async def ffbb_search(
     annotations=_READONLY_ANNOTATIONS,
 )
 @track_tool_usage("ffbb_bilan")
-@zipai_surgical
 async def ffbb_bilan(
     organisme_id: Annotated[
         int | str | None,
@@ -477,7 +455,6 @@ async def ffbb_bilan(
     annotations=_READONLY_ANNOTATIONS,
 )
 @track_tool_usage("ffbb_get")
-@zipai_surgical
 async def ffbb_get(
     id: Annotated[
         int | str,
@@ -568,7 +545,6 @@ async def ffbb_get(
     name="ffbb_club", title="Outils agrégés club", annotations=_READONLY_ANNOTATIONS
 )
 @track_tool_usage("ffbb_club")
-@zipai_surgical
 async def ffbb_club(
     action: Annotated[
         Literal[
@@ -872,7 +848,6 @@ async def ffbb_club(
     name="ffbb_lives", title="Scores en direct", annotations=_READONLY_ANNOTATIONS
 )
 @track_tool_usage("ffbb_lives")
-@zipai_surgical
 async def ffbb_get_lives(
     include_scheduled: Annotated[
         bool,
@@ -902,7 +877,6 @@ async def ffbb_get_lives(
     annotations=_READONLY_ANNOTATIONS,
 )
 @track_tool_usage("ffbb_saisons")
-@zipai_surgical
 async def ffbb_get_saisons(
     active_only: Annotated[
         bool, Field(description="True = saison active uniquement.")
@@ -945,7 +919,6 @@ async def ffbb_get_saisons(
     annotations=_READONLY_ANNOTATIONS,
 )
 @track_tool_usage("ffbb_resolve_team")
-@zipai_surgical
 async def ffbb_resolve_team(
     organisme_id: Annotated[
         int | str | None,
@@ -1030,7 +1003,6 @@ async def ffbb_resolve_team(
     annotations=_READONLY_ANNOTATIONS,
 )
 @track_tool_usage("ffbb_team_summary")
-@zipai_surgical
 async def ffbb_team_summary(
     organisme_id: Annotated[
         int | str | None,
@@ -1259,7 +1231,6 @@ async def ffbb_team_summary(
     annotations=_READONLY_ANNOTATIONS,
 )
 @track_tool_usage("ffbb_last_result")
-@zipai_surgical
 async def ffbb_last_result(
     organisme_id: Annotated[
         int | str | None,
@@ -1352,7 +1323,6 @@ async def ffbb_last_result(
     annotations=_READONLY_ANNOTATIONS,
 )
 @track_tool_usage("ffbb_next_match")
-@zipai_surgical
 async def ffbb_next_match(
     organisme_id: Annotated[
         int | str | None,
@@ -1452,7 +1422,6 @@ async def ffbb_next_match(
     annotations=_READONLY_ANNOTATIONS,
 )
 @track_tool_usage("ffbb_bilan_saison")
-@zipai_surgical
 async def ffbb_bilan_saison(
     organisme_id: Annotated[
         int | str | None,
@@ -1565,7 +1534,6 @@ async def ffbb_bilan_saison(
     annotations=_READONLY_ANNOTATIONS,
 )
 @track_tool_usage("ffbb_head_to_head")
-@zipai_surgical
 async def ffbb_head_to_head(
     club_a: Annotated[
         str | None,
@@ -1695,7 +1663,6 @@ async def ffbb_head_to_head(
     annotations=_READONLY_ANNOTATIONS,
 )
 @track_tool_usage("ffbb_search_regulations")
-@zipai_surgical
 async def ffbb_search_regulations(
     query: Annotated[
         str,
@@ -1784,7 +1751,6 @@ async def ffbb_search_regulations(
     annotations=_READONLY_ANNOTATIONS,
 )
 @track_tool_usage("ffbb_get_regulation_article")
-@zipai_surgical
 async def ffbb_get_regulation_article(
     article_number: Annotated[
         str,
@@ -1847,7 +1813,6 @@ async def ffbb_get_regulation_article(
     annotations=_READONLY_ANNOTATIONS,
 )
 @track_tool_usage("ffbb_explain_tiebreak_rules")
-@zipai_surgical
 async def ffbb_explain_tiebreak_rules(
     poule_id: Annotated[
         int | None,
@@ -1901,7 +1866,6 @@ async def ffbb_explain_tiebreak_rules(
     annotations=_READONLY_ANNOTATIONS,
 )
 @track_tool_usage("ffbb_list_regulations")
-@zipai_surgical
 async def ffbb_list_regulations(
     season: Annotated[
         str,
