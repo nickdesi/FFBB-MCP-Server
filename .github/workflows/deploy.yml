@@ -26,6 +26,7 @@ jobs:
           echo "🚀 Déclenchement manuel du webhook de déploiement Dokploy..."
           response=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
             -H "Content-Type: application/json" \
+            -H "X-GitHub-Event: push" \
             -d '{"ref": "refs/heads/main"}' \
             "$DOKPLOY_DEPLOY_WEBHOOK")
 
