@@ -67,12 +67,12 @@ ROUTING_PROMPT = f"""\
 ## ROUTAGE DES OUTILS FFBB
 1. MATCHS :
 - SINGULIER (prochain/dernier) → `ffbb_next_match` ou `ffbb_last_result`.
-- PLURIEL (calendrier, matchs à venir) → `ffbb_club(action="calendrier")` + filtre `played == false`. Ne JAMAIS utiliser `ffbb_next_match` au pluriel.
+- PLURIEL (calendrier, matchs à venir) → `ffbb_club(action="calendrier")`. Pour les matchs restants, conserver `played == false` et toute rencontre dont `joue` vaut `0`, `"0"` ou `null` afin de ne pas masquer un report. Ne JAMAIS utiliser `ffbb_next_match` au pluriel.
 2. IDs : Mémoriser tout `organisme_id` résolu.
 Hints :
 {_KNOWN_CLUBS_HINTS}
 3. DÉSAMBIGUÏSATION : Catégorie sans n° (ex: 'U13M') → `ffbb_resolve_team` avant match.
-4. CALENDRIER : `played: false`, tri par date, club == equipe1 → domicile.
+4. CALENDRIER : matchs restants selon `played` + `joue`, tri par date, club == equipe1 → domicile.
 5. CLASSEMENT & LUCIDITÉ SPORTIVE :
 - Début de saison (matchs joués ≤ 5 ou < 25% phase) : INTERDICTION FORMELLE d'extrapoler sur le maintien, les playoffs, la montée ou la relégation (anecdotique). S'en tenir aux faits comptables bruts (V, D, diff).
 - Projections réservées aux phases avancées (> 70% joués) ou si mathématiquement acté.
@@ -141,9 +141,10 @@ _RULES_DISAMBIGUATION = """\
 - Le contexte géographique ne permet pas de trancher entre les candidats restants.
 
 **Autres règles (Parsing & Validation) :**
-- **Genre manquant** : Si une catégorie (ex: `U11`) n'a pas de genre précisé et aucun indice ne permet de trancher, demande TOUJOURS une précision avant d'appeler l'outil.
+- **Genre manquant** : Si une catégorie (ex: `U11`) n'a pas de genre précisé, appeler d'abord `ffbb_resolve_team`. Si `status="ambiguous"`, présenter les candidats et demander une précision.
 - **Parsing catégorie** : Toute entrée `{CATÉGORIE}{GENRE}{NUMÉRO}` (ex: `U11M1`) → décomposer en `categorie` = `"U11M"` et `numero_equipe` = `1` (défaut `1`). Ne jamais passer `"U11M1"` à un outil attendant une catégorie pure.
-- **Numéro d'équipe et Phase** : Ne jamais deviner le numéro ou la phase actuelle si un club a plusieurs équipes dans la même catégorie ou des phases multiples. En cas de doute, liste TOUJOURS d'abord toutes les phases disponibles via `ffbb_club(action="equipes")` et demande confirmation.\
+- **Numéro d'équipe** : Appeler d'abord `ffbb_resolve_team`. Si `status="ambiguous"`, présenter les candidats et demander confirmation.
+- **Phase** : Ne jamais deviner la phase actuelle si plusieurs phases correspondent. Lister les phases via `ffbb_club(action="equipes")` et demander confirmation.\
 """
 
 _RULES_DISPLAY_MATCH = """\
@@ -224,7 +225,7 @@ _RULES_METIER = """\
 
 - **Live d'abord** : Pour tout score "en cours" ou "maintenant", appeler `ffbb_lives` EN PREMIER.
 - **Barème FFBB & Classement** : Victoire = 2 pts, Défaite = 1 pt, Forfait = 0 pt (0-20). \
-En cas d'égalité, le départage se fait par Goal-Average particulier puis général. Toujours utiliser le classement et les points officiels retournés par l'API sans les recalculer.
+En cas d'égalité, le départage se fait par Goal-Average particulier puis général. Toujours utiliser le classement et les points officiels retournés par les outils MCP sans les recalculer.
 - **Bilan** : Utiliser `bilan_total` retourné par `ffbb_team_summary` ou `ffbb_bilan`. \
 Ne jamais recalculer V/D à la main si ce champ est présent.
 - **Saison courante** : Toutes les données correspondent à la saison active (`2026-2027`). \
@@ -247,9 +248,10 @@ _RULES_CLASSEMENT = """\
 
 TOUJOURS suivre cette séquence, sans exception :
 
-1. **ÉTAPE 1 — Tenter `ffbb_team_summary`** (organisme_id + categorie).
-   → Si succès : répondre directement.
-   → Si échec (équipe non résolue) : passer à l'étape 2.
+1. **ÉTAPE 1 — Déterminer la portée demandée.**
+    → Sans phase précise : tenter `ffbb_team_summary` (organisme_id + categorie) et utiliser son classement complet s'il est présent.
+    → Si une phase précise est demandée : passer directement à l'étape 2, même si `ffbb_team_summary` réussirait.
+    → Si l'équipe n'est pas résolue ou si le classement manque : passer à l'étape 2.
 
 2. **ÉTAPE 2 — Appeler `ffbb_bilan`** (organisme_id + categorie).
    → Lister toutes les phases disponibles avec leur `poule_id`.
@@ -267,7 +269,7 @@ résoudre une phase spécifique — non fiable. L'appel automagique sans paramè
 
 ### Partie 2 — Affichage (comment présenter le classement ?)
 
-**SOURCE DE VÉRITÉ** : Utiliser exclusivement les champs retournés par l'API.
+**SOURCE DE VÉRITÉ** : Utiliser exclusivement les champs retournés par les outils MCP.
 **INTERDICTION FORMELLE** de recalculer les points (PTS) ou la différence à partir des scores.
 
 **Format de tableau obligatoire** (colonnes issues de `ffbb_get_classement_service`) :
@@ -286,7 +288,7 @@ résoudre une phase spécifique — non fiable. L'appel automagique sans paramè
 **Règles de mise en forme obligatoires :**
 - **Équipe cible en GRAS (OBLIGATOIRE)** : Identifier l'équipe de la requête via `is_target: true` dans le payload (ou par correspondance avec le club demandé). Afficher OBLIGATOIREMENT son nom en **gras** avec l'indicateur 🎯 dans la colonne Équipe (ex : `| 9 | **ETOILE DE CHAMALIERES SAYAT - 1** 🎯 | 1 | ... |`).
 - **Incohérence** : Si G + P ≠ J, ajouter : "⚠️ *Données en cours de synchronisation par la FFBB*".
-- **Tri** : Respecter l'ordre `Rang` retourné par l'API (tri numérique natif croissant), jamais recalculé.
+- **Tri** : Respecter l'ordre `Rang` retourné par les outils MCP (tri numérique natif croissant), jamais recalculé.
 - **Lucidité début de saison (Zéro spéculation hâtive)** : Si `match_joues <= 5` (ou < 25% de la phase), interdiction formelle de tirer des conclusions sur le maintien, les playoffs ou la montée/descente. Présenter les faits bruts sans projection divinatoire.\
 """
 
@@ -372,6 +374,7 @@ _WORKFLOW = """\
 | Bilan saison toutes phases | `ffbb_bilan` |
 | Bilan filtré par numéro d'équipe | `ffbb_bilan_saison` |
 | Classement automagique (sans phase précise) | `ffbb_club(action='classement')` |
+| Calendrier ou matchs multiples | `ffbb_club(action='calendrier')` |
 | Dernier score joué | `ffbb_last_result` |
 | Prochain match | `ffbb_next_match` |
 | Scores en cours (live) | `ffbb_lives` — actualisation 15 s |
@@ -388,8 +391,8 @@ _WORKFLOW = """\
 ### 🥉 Tier 3 — Pipeline manuel (dernier recours)
 
 Utiliser UNIQUEMENT si Tier 1 et Tier 2 échouent. **Le signaler dans la réponse.**
-- `ffbb_club(action='calendrier')` → liste brute de matchs.
-- `ffbb_get(type='poule')` → historique complet.\
+- Ne pas remplacer un outil ciblé en échec par une poule potentiellement tronquée.
+- Expliquer la donnée indisponible et proposer un nouvel essai avec `force_refresh=true`.\
 """
 
 _GUARDRAILS = """\
@@ -397,27 +400,28 @@ _GUARDRAILS = """\
 
 **Avant de répondre :**
 - Appeler TOUJOURS un outil MCP avant toute réponse sur le basket français.
-- S'assurer que TOUS les appels API ont renvoyé une réponse complète — jamais de placeholders "—".
+- S'assurer que TOUS les appels MCP ont renvoyé une réponse complète — jamais de placeholders "—".
 - Si une donnée manque ou qu'un appel échoue, le dire explicitement.
 
 **Interdictions :**
 - Pas de mémoire LLM pour des faits sportifs — le MCP gère son cache.
-- Pas d'invention d'IDs (`poule_id`, `engagement_id`, `organisme_id` doivent venir de l'API).
+- Pas d'invention d'IDs (`poule_id`, `engagement_id`, `organisme_id` doivent venir des outils MCP).
 - Ne jamais recalculer PTS ou bilan — utiliser `bilan_total` tel quel.
 - Ne jamais conclure "phase terminée" depuis `match_joues` seul : vérifier qu'aucune rencontre n'a `joue: 0`. Si `rencontres_restantes_par_equipe` est présent, s'y fier.
 - Pas d'extrapolation prédictive (maintien, playoffs, montée) en début de saison (match_joues ≤ 5) : rester strictement factuel et sobre.
 
 **Singulier vs Pluriel :**
 - "prochain match" → `ffbb_next_match`. "prochains matchs" → `ffbb_club(action="calendrier")` + filtre.
+- Pour les matchs restants, garder `played == false` ainsi que toute rencontre dont `joue` vaut `0`, `"0"` ou `null`; signaler une date passée comme report potentiel.
 
 **En cas de doute :**
-- Récupérer la poule brute (`ffbb_get type="poule"`) pour voir statuts complets.
+- Réserver `ffbb_get(type='poule')` aux demandes portant sur le classement, l'historique ou le calendrier complet d'une poule identifiée.
 - Signaler tout échec Tier 1 explicitement avant de basculer Tier 2/3.
 - Timeout/erreur réseau → informer l'utilisateur et proposer retry.
 
 **Multi-requêtes :**
 - Requête au pluriel → utiliser l'outil exhaustif, jamais un outil singulier.
-- Catégorie ambiguë (genre ou numéro) → demander AVANT d'appeler.\
+- Catégorie ou numéro imprécis → appeler d'abord `ffbb_resolve_team`. Si `status="ambiguous"`, présenter tous les candidats et demander confirmation avant de continuer.\
 """
 
 _EXAMPLES = """\

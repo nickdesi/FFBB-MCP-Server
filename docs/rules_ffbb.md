@@ -162,11 +162,18 @@ et qu'un engagement correspondant existe :
 
 ---
 
-### Règle 5 — Récupérer les matchs sur la bonne poule
+### Règle 5 — Choisir l'outil selon la portée
 
-`ffbb_get(type="poule", id=poule_id_retenu)`
+Pour une équipe précise ou une liste de matchs, utiliser
+`ffbb_club(action="calendrier")` avec les filtres résolus. Pour un prochain ou
+dernier match au singulier, utiliser respectivement `ffbb_next_match` ou
+`ffbb_last_result`.
 
-Filtrer les rencontres :
+Réserver `ffbb_get(type="poule", id=poule_id_retenu)` aux demandes portant sur
+le classement, l'historique ou le calendrier complet d'une poule identifiée.
+La réponse peut être tronquée pour une poule volumineuse.
+
+Lors de l'analyse d'un calendrier ou d'une poule complète, filtrer les rencontres :
 - `joue = 0` ou `joue = "0"` → match non encore joué
 - `joue = null` → match à considérer comme non joué si aucune autre information ne l'invalide
 - Identifier le club dans la rencontre avec cette priorité :
@@ -221,9 +228,11 @@ Pour toute demande de bilan global :
 → Ne PAS reconstruire manuellement un bilan depuis les poules individuelles.
 
 Pour le dernier résultat :
-→ Si club mono-équipe dans la catégorie → `ffbb_last_result` directement.
-→ Si multi-engagements → appliquer règles 3+4 pour identifier la bonne poule,
-   puis `ffbb_get(type="poule")` et filtrer `joue=1` + date la plus récente.
+→ Résoudre d'abord l'équipe avec `ffbb_resolve_team` si la catégorie, le numéro
+  ou la phase ne l'identifie pas de manière unique.
+→ Si `status="ambiguous"`, présenter les candidats et demander une précision.
+→ Une fois l'équipe identifiée, utiliser `ffbb_last_result` directement avec les
+  filtres résolus.
 
 ---
 
@@ -283,26 +292,22 @@ Pour le dernier résultat :
 
 [0] Demande de score live ? → ffbb_lives d'abord
 [1] Résoudre organisme_id → ambigu ? → demander confirmation
-[2] ffbb_club(action="equipes", filtre="CatégorieGenre")
-      → Aucun résultat ? → élargir le filtre
-      → Catégorie sans genre ? → demander M/F
-      → Genre connu sans numéro équipe ? → continuer sans score absolu
-      → 1 seul engagement actif ? → outils directs (next_match, last_result…)
-      → Plusieurs engagements ? → continuer
-[3] Exclure Coupes / Amicaux / Tournois ; garder Brassage/Qualification/Barrages si phase officielle active
-[4] numero_equipe explicite correspond ? → court-circuit, utiliser directement
-    Sinon → scorer : Phase/libellé (+35/25/15/10/5) + niveau (+10/7/5/3) + division faible (-2)
-[5] ffbb_get(type="poule", id=meilleur_score)
-      → engagement_id trouvé via idEngagementEquipe1/2 et joue=0 ? OUI → retourner le match le plus proche
-      NON → score suivant → retour [5]
-[6] Tous épuisés → force_refresh=true → retour [2]
-[7] Toujours rien → saison terminée/pause → informer + proposer ffbb_bilan
+[2] Catégorie, numéro ou phase imprécis ? → ffbb_resolve_team
+  → status="ambiguous" ? → présenter tous les candidats et demander confirmation
+  → status="resolved" ? → réutiliser tous les identifiants et filtres résolus
+[3] Demande au singulier ? → ffbb_next_match ou ffbb_last_result
+[4] Demande au pluriel ? → ffbb_club(action="calendrier")
+  → conserver played == false et joue dans (0, "0", null)
+  → date passée non jouée ? → conserver et signaler un report potentiel
+[5] Demande sur toute la poule ? → ffbb_get(type="poule", id=poule_id)
+[6] Aucun résultat ? → force_refresh=true sur l'outil ciblé, puis nouvel essai
+[7] Toujours rien → saison terminée/pause ou donnée indisponible → informer + proposer ffbb_bilan
 
 ---
 
 ### Implémentation technique — Champs et Casing
 
-**1. Champ `joue` (Match terminé/non-joué)**
+**1. Champ `joue` (analyse d'un calendrier ou d'une poule complète)**
 - Le système filtre les matchs à venir avec : `if joue not in (0, "0", None):`.
 - `0` ou `"0"` indique un match programmé non encore validé par le système live.
 - `None` est explicitement inclus pour considérer les matchs sans date ou sans état (`joue=null` dans l'API) comme "non-joués" (ex: matchs reportés sans nouvelle date fixée).

@@ -102,6 +102,51 @@ class TestPrompts:
         assert "prochains matchs" in prompt
         assert "calendrier" in prompt
 
+    def test_expert_basket_routes_plural_calendar_as_tier_1(self):
+        prompt = expert_basket()
+        tier_1 = prompt.split("### 🥇 Tier 1", 1)[1].split("### 🥈 Tier 2", 1)[0]
+        tier_3 = prompt.split("### 🥉 Tier 3", 1)[1].split("## 🛡️", 1)[0]
+
+        assert "ffbb_club(action='calendrier')" in tier_1
+        assert "ffbb_club(action='calendrier')" not in tier_3
+
+    def test_expert_basket_resolves_team_before_requesting_clarification(self):
+        prompt = expert_basket()
+
+        assert "appeler d'abord `ffbb_resolve_team`" in prompt
+        assert 'Si `status="ambiguous"`' in prompt
+        assert (
+            "Catégorie ambiguë (genre ou numéro) → demander AVANT d'appeler"
+            not in prompt
+        )
+
+    def test_expert_basket_limits_raw_poule_to_poule_scoped_requests(self):
+        prompt = expert_basket()
+
+        assert "Réserver `ffbb_get(type='poule')`" in prompt
+        assert "Récupérer la poule brute" not in prompt
+
+    def test_expert_basket_handles_requested_phase_explicitly(self):
+        prompt = expert_basket()
+
+        assert "Si une phase précise est demandée" in prompt
+        assert "répondre directement" not in prompt
+
+    def test_expert_basket_keeps_postponed_matches_when_filtering_calendar(self):
+        prompt = expert_basket()
+
+        assert "played == false" in prompt
+        assert 'joue` vaut `0`, `"0"` ou `null`' in prompt
+
+    def test_expert_basket_keeps_upstream_sources_behind_mcp_tools(self):
+        prompt = expert_basket()
+
+        assert "champs retournés par les outils MCP" in prompt
+        assert "TOUS les appels MCP" in prompt
+        assert "doivent venir des outils MCP" in prompt
+        assert "TOUS les appels API" not in prompt
+        assert "retournés par l'API" not in prompt
+
     def test_expert_basket_mentions_freshness_meta(self):
         prompt = expert_basket()
         assert "_meta.generated_at" in prompt

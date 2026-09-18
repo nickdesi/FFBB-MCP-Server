@@ -265,8 +265,10 @@ la logique de désambiguïsation (U11M1, U13F-2, etc.).
 **Exemple d'usage agent** :
 
 1. Appeler `ffbb_resolve_team` pour identifier précisément `U11M1` d'un club.
-2. Lire `team.poule_id` et utiliser `ffbb_get(type="poule", id=team.poule_id)` pour
-   obtenir le calendrier complet + classement.
+2. Si `status="ambiguous"`, présenter les candidats et demander une précision.
+3. Utiliser ensuite l'outil adapté : `ffbb_club(action="calendrier")` pour les matchs
+  de l'équipe, ou `ffbb_get(type="poule", id=team.poule_id)` pour le classement,
+  l'historique ou le calendrier complet de la poule.
 
 ---
 
@@ -439,6 +441,7 @@ Le serveur ne se contente pas de données brutes, il guide l'IA via des prompts 
    - Pour tout ce qui concerne le **bilan complet d’une équipe**, ses **résultats** ou son **classement** sur la saison, utilise en priorité :
      - `ffbb_bilan(club_name=..., categorie=...)` → **un seul appel** agrège toutes les phases en interne.
    - Ne reconstruis pas le bilan "à la main" à partir de `ffbb_get` ou `ffbb_club` si `ffbb_bilan` est disponible.
+  - Si l'utilisateur demande le classement d'une **phase précise**, utilise `ffbb_bilan` pour identifier le `poule_id` correspondant, puis `ffbb_get(type='poule', id=POULE_ID)` pour obtenir le classement complet de cette phase.
 
 2. **Workflow club → équipe → poule**
    - Pour naviguer d’un club vers la bonne poule :
@@ -452,16 +455,15 @@ Le serveur ne se contente pas de données brutes, il guide l'IA via des prompts 
    - Pour une question directe au singulier, préfère `ffbb_last_result` ou `ffbb_next_match`.
 
 4. **Données live et cache**
-   - Les données FFBB sont **toujours live** côté API officielle.
+  - Les données fédérales disponibles sont agrégées par `ffbb-data-client` depuis l'API FFBB, Meilisearch et Directus ; le serveur MCP n'interroge pas directement ces sources.
    - Ne suppose jamais l'existence d'un cache côté LLM ou côté utilisateur :
      - pour connaître un résultat, un classement ou un calendrier à jour, tu dois **appeler les outils**.
    - Le serveur MCP gère déjà un cache interne optimisé ; le LLM n'a pas à se préoccuper de la couche cache.
 
 5. **Désambiguïsation des catégories**
-   - Si l’utilisateur donne une catégorie ambiguë (ex. `"U13"` sans préciser Masculin/Féminin ni le numéro d’équipe), demande toujours des précisions :
-     - Genre : `M` ou `F` (ex. `U13M`, `U13F`).
-     - Numéro d’équipe lorsqu’il y en a plusieurs (`U13M-1`, `U13M-2`, etc.).
-   - Ne sélectionne pas arbitrairement une équipe en cas d’ambiguïté : priorise la demande d’informations supplémentaires.
+  - Si l’utilisateur donne une catégorie ou un numéro d'équipe imprécis, appelle d'abord `ffbb_resolve_team` avec les informations disponibles.
+  - Si le résolveur retourne `status="ambiguous"`, présente tous les candidats et demande une précision sur le genre, le numéro d'équipe ou la compétition selon les différences observées.
+  - Ne sélectionne pas arbitrairement une équipe parmi plusieurs candidats.
    - Si le club n'a qu'une seule équipe et qu'elle n'a pas de numéro en base, une requête `U11M1` peut la retrouver automatiquement comme équipe 1 implicite.
 
 6. **Noms de clubs avec apostrophe**

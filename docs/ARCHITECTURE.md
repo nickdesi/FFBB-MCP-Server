@@ -20,11 +20,12 @@ Le serveur supporte deux modes d'exposition :
 Cette couche modulaire fait le pont entre les outils MCP et le client API FFBB (`ffbb-data-client`). Elle implémente les patterns suivants :
 
 - **Accès FFBB & Factory Singleton** : Délègue les appels réseau au package `ffbb-data-client` (`>=2.0.0,<3.0.0`) via un singleton `FFBBClientFactory` avec rafraîchissement proactif du jeton d'accès en tâche de fond.
+- **Agrégation des sources** : Le serveur MCP n'interroge pas directement les backends fédéraux. `ffbb-data-client` unifie les données disponibles depuis l'API FFBB, Meilisearch et Directus, puis la couche service les normalise pour les outils MCP.
 - **Découpage modulaire par domaine métier** :
   - `services/club.py` : Navigation club, équipes, composition et outil composite `ffbb_team_summary`.
   - `services/poule.py` : Classements, bilans `ffbb_bilan`, calculs de goal-average et rencontres.
   - `services/salle.py` : Recherche et géolocalisation des salles et terrains.
-  - `services/search.py` : Recherche multi-index unifiée Directus / Meilisearch.
+  - `services/search.py` : Recherche multi-index Directus / Meilisearch déléguée à `ffbb-data-client`.
   - `services/regulations.py` : Façade de service pour l'interrogation du corpus et des règles officielles.
   - `services/warmup.py` : Préchauffage proactif au démarrage et réchauffement asynchrone.
   - `services/common.py` : Cache SWR (Stale-While-Revalidate) et helpers partagés.
@@ -57,13 +58,16 @@ sequenceDiagram
     participant LLM as Agent IA (Claude/Cursor)
     participant MCP as FFBB MCP Server (FastMCP)
     participant Service as Service Layer (services.py)
-    participant API as FFBB Official API
+  participant SDK as ffbb-data-client
+  participant Sources as API FFBB / Meilisearch / Directus
 
     LLM->>MCP: Appel d'outil unifié (ex: ffbb_search)
     MCP->>MCP: Validation Pydantic
     MCP->>Service: Dispatching selon paramètres
-    Service->>API: Requête HTTPS (ffbb-data-client)
-    API-->>Service: Données brutes
+  Service->>SDK: Appel du client métier
+  SDK->>Sources: Requêtes vers les sources FFBB utiles
+  Sources-->>SDK: Données fédérales disponibles
+  SDK-->>Service: Modèles normalisés
     Service->>Service: Filtrage & Sérialisation
     Service-->>MCP: Résultat JSON
     MCP-->>LLM: Réponse finale
@@ -98,8 +102,8 @@ Le serveur **FFBB MCP** est compatible avec tout client respectant le protocole 
 
 ## ⚡ Stratégie de Performance
 
-Le serveur FFBB MCP est conçu pour minimiser les appels à l'API FFBB
-quotaisée tout en gardant une fraîcheur acceptable pour les usages les
+Le serveur FFBB MCP est conçu pour minimiser les appels réseau effectués
+par `ffbb-data-client` tout en gardant une fraîcheur acceptable pour les usages les
 plus fréquents. Trois mécanismes complémentaires se combinent :
 
 ### 1. Cache TTL différencié (`services/common.py` + `cache_strategy.py`)
@@ -123,7 +127,7 @@ un score frais via `ffbb_lives`).
 
 ### 2. Sémaphore global de concurrence (`_MAX_CONCURRENT_FFBB`)
 
-Un `asyncio.Semaphore(8)` plafonne les appels parallèles à l'API FFBB
+Un `asyncio.Semaphore(8)` plafonne les appels parallèles vers l'amont FFBB
 pour éviter d'être rate-limité. Réglable via `MAX_CONCURRENT_FFBB=N`
 (valeur sûre d'après tests : 4–12).
 

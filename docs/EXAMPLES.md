@@ -54,7 +54,8 @@ Ce document fournit des exemples de bout en bout pour aider les agents IA à sui
 
 4. Construire la réponse :
    - Lister les matchs (date, heure, domicile/extérieur, adversaire, score si joué).
-   - Pour des **matchs restants**, garder uniquement `played == false`, puis trier par date croissante.
+   - Pour des **matchs restants**, garder `played == false` ainsi que les rencontres dont `joue` vaut `0`, `"0"` ou `null`, puis trier par date croissante.
+   - Si une rencontre non jouée porte une date passée, la conserver et signaler un report potentiel.
    - Si la réponse contient une métadonnée `_meta.generated_at`, l'utiliser pour qualifier la fraîcheur des données si utile.
 
 5. **Anti-pattern à éviter** :
@@ -73,16 +74,15 @@ Ce document fournit des exemples de bout en bout pour aider les agents IA à sui
 1. Détecter l'ambiguïté :
    - `"U13"` ne précise ni le genre (`M` ou `F`), ni le numéro d'équipe (`-1`, `-2`, ...).
 
-2. Demander une précision à l'utilisateur :
-
-   - Exemple de question :
-     > "Peux-tu préciser s'il s'agit de U13M ou U13F, et de quelle équipe (ex. U13M-1, U13M-2) ?"
+2. Appeler `ffbb_resolve_team` avec les informations disponibles.
+   - Si `status="resolved"`, poursuivre avec l'équipe résolue.
+   - Si `status="ambiguous"`, présenter les candidats retournés et demander à l'utilisateur de choisir.
 
 3. Une fois la catégorie clarifiée (par ex. `U13M-1`), suivre le workflow standard :
    - soit via `ffbb_bilan` si l'objectif est un **bilan complet** sur la saison,
    - soit via le workflow club → poule → `ffbb_get(type='poule')` si l'utilisateur veut spécifiquement le **classement d'une poule**.
 
-4. Ne jamais choisir arbitrairement une équipe en cas d'ambiguïté : la demande d'informations supplémentaires est préférable à une mauvaise hypothèse.
+4. Ne jamais choisir arbitrairement une équipe lorsque le résolveur retourne plusieurs candidats.
 
 ---
 
@@ -127,7 +127,8 @@ Ce document fournit des exemples de bout en bout pour aider les agents IA à sui
    - `ffbb_club(action="calendrier", organisme_id=<ID>, filtre="U13M", numero_equipe=1)`
 
 4. Filtrer côté agent :
-   - garder uniquement `played == false` ;
+   - garder `played == false` ainsi que les rencontres dont `joue` vaut `0`, `"0"` ou `null` ;
+   - signaler comme report potentiel toute rencontre non jouée dont la date est passée ;
    - trier par date croissante ;
    - compter les matchs restants ;
    - déterminer domicile/déplacement avec `equipe1` = domicile et `equipe2` = extérieur.
@@ -145,7 +146,7 @@ Ce document fournit des exemples de bout en bout pour aider les agents IA à sui
 - Utiliser `ffbb_bilan` ou `ffbb_bilan_saison` pour un bilan complet de saison.
 - Utiliser `ffbb_get(type="poule")` pour une demande sur la poule complète : classement, historique et calendrier global.
 - Utiliser `ffbb_club(action="calendrier")` pour une liste de matchs filtrée club/équipe/catégorie avec `is_last_match` et `is_next_match`.
-- Pour les matchs restants ou prochaines journées, filtrer `played == false` et trier par date croissante.
+- Pour les matchs restants ou prochaines journées, conserver `played == false` et les statuts `joue` non joués (`0`, `"0"`, `null`), puis trier par date croissante.
 - Si `_meta.generated_at`, `_meta.timezone` ou `_meta.cache` est présent, s'en servir pour qualifier la fraîcheur sans polluer la réponse.
 
 ---

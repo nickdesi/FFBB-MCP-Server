@@ -182,13 +182,13 @@ flowchart LR
     A[Client MCP<br/>Claude · Cursor · Antigravity] -->|Streamable HTTP / Stdio| B[FFBB MCP Server<br/>FastMCP]
     B --> C[Services métier<br/>Cache SWR & Agrégation]
     C --> D[ffbb-data-client<br/>SDK Python]
-    D --> E[(API Directus &<br/>Meilisearch FFBB)]
+    D --> E[(API FFBB · Meilisearch · Directus)]
 ```
 
 Points clés :
 
 - **Double transport** : Streamable HTTP distant (spec `2025-11-25`) ou Stdio local (`uvx`) ;
-- **SDK Python découplé** : Requêtes réseau et parsing Pydantic v2 délégués à `ffbb-data-client` ;
+- **SDK Python découplé** : Requêtes vers les sources fédérales et parsing Pydantic v2 délégués à `ffbb-data-client` ; le serveur MCP ne les interroge pas directement ;
 - **Agrégation composite** : 12 outils optimisés pour réduire les allers-retours et le contexte LLM ;
 - **Cache intelligent & SWR** : *Stale-While-Revalidate* avec TTL par type de donnée (30 s lives, 1 h bilans, 24 h clubs) ;
 - **Observabilité complète** : Dashboard HTML, métriques Prometheus, snapshot JSON et healthcheck intégrés.
