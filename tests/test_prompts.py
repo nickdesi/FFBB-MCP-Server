@@ -175,3 +175,12 @@ class TestPrompts:
         prompt = classement_poule("NM2")
         assert "sans spéculer sur l'issue finale" in prompt
         assert "≤ 5 matchs joués" in prompt
+
+    def test_routing_prompt_zero_slop(self):
+        assert "STYLE DIRECT (ZERO-SLOP)" in ROUTING_PROMPT
+        assert "Zéro politesse" in ROUTING_PROMPT
+
+    def test_expert_basket_prompt_zero_slop(self):
+        prompt = expert_basket()
+        assert "zéro politesse creuse ni préambule" in prompt
+        assert "Pas de verbiage de remplissage" in prompt

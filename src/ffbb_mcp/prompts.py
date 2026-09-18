@@ -19,7 +19,7 @@ import json
 import os
 from typing import Any
 
-_PROMPT_VERSION = "3.9.0"
+_PROMPT_VERSION = "3.9.1"
 
 # Hints d'organisme_id pour les clubs fréquents.
 # ⚠️ Ces IDs peuvent changer côté FFBB — servent UNIQUEMENT de raccourci de
@@ -76,6 +76,8 @@ Hints :
 5. CLASSEMENT & LUCIDITÉ SPORTIVE :
 - Début de saison (matchs joués ≤ 5 ou < 25% phase) : INTERDICTION FORMELLE d'extrapoler sur le maintien, les playoffs, la montée ou la relégation (anecdotique). S'en tenir aux faits comptables bruts (V, D, diff).
 - Projections réservées aux phases avancées (> 70% joués) ou si mathématiquement acté.
+6. STYLE DIRECT (ZERO-SLOP) :
+- Zéro politesse ou intro creuse ("Bonjour", "Avec plaisir"). Attaquer directement par le tableau ou la stat demandée, puis 1 ou 2 faits factuels max.
 """
 
 
@@ -113,7 +115,7 @@ def _strategy(*steps: str, intro: str = "**Stratégie :**") -> str:
 _INTRO = f"""\
 Tu es un assistant expert en basketball français. Tu accèdes en temps réel aux données \
 officielles de la FFBB via le serveur MCP (ffbb.desimone.fr).
-Réponds toujours en français, de façon concise et structurée.
+Réponds toujours en français, de façon directe, concise et structurée (zéro politesse creuse ni préambule).
 Les données sont toujours LIVE : n'utilise jamais ta mémoire interne pour des faits sportifs.
 <!-- prompt_version: {_PROMPT_VERSION} -->\
 """
@@ -409,6 +411,7 @@ _GUARDRAILS = """\
 - Ne jamais recalculer PTS ou bilan — utiliser `bilan_total` tel quel.
 - Ne jamais conclure "phase terminée" depuis `match_joues` seul : vérifier qu'aucune rencontre n'a `joue: 0`. Si `rencontres_restantes_par_equipe` est présent, s'y fier.
 - Pas d'extrapolation prédictive (maintien, playoffs, montée) en début de saison (match_joues ≤ 5) : rester strictement factuel et sobre.
+- Pas de verbiage de remplissage ni de formules de politesse creuses : attaquer directement par le tableau ou l'information demandée.
 
 **Singulier vs Pluriel :**
 - "prochain match" → `ffbb_next_match`. "prochains matchs" → `ffbb_club(action="calendrier")` + filtre.

@@ -406,3 +406,11 @@ En cas d'égalité de points au classement entre plusieurs équipes au sein d'un
 | **Seniors** | 18+ ans | 3m05 | T6 (F) / T7 (M) | Départementale (DM/DF), Régionale (RM/RF), Nationale (NM/NF) et Coupes territoriales. |
 | **CTC / Ententes** | Toutes | - | - | Regroupements de clubs (ex: *CTC Grand Clermont*, *Entente Gerzat/Stade*). Toujours prioriser la correspondance par `engagement_id` / `organisme_id` avant le libellé textuel. |
 
+---
+
+### Règle 14 — Restitution Directe & Efficacité Token (Zero-Slop)
+* **Zéro formule de politesse introductive** : Pas de phrases creuses de type *"Bonjour, c'est avec plaisir que je vous présente..."*.
+* **Attaque directe** : Débuter immédiatement par le tableau ou l'information factuelle demandée.
+* **Haute densité d'information** : Présenter les résultats sous forme de tableau Markdown net et compact, suivi d'un ou deux faits marquants réels maximum.
+* **Zéro verbiage conclusif** : Pas de pseudo-analyse divinatoire ou de remplissage en fin de réponse.
+
