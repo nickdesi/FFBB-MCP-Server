@@ -560,8 +560,8 @@ async def _build_calendar_matches(
         else:
             future_indices.append(idx)
 
-    last_played_idx = played_indices[0] if played_indices else None
-    next_future_idx = future_indices[-1] if future_indices else None
+    last_played_idx = played_indices[-1] if played_indices else None
+    next_future_idx = future_indices[0] if future_indices else None
 
     for idx, m in enumerate(all_matches):
         m["is_last_match"] = last_played_idx is not None and idx == last_played_idx

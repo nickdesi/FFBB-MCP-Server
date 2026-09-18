@@ -624,6 +624,115 @@ class TestCalendrierClubService:
         assert result["_meta"]["sort"] == "scheduled_at:asc"
 
     @pytest.mark.asyncio
+    async def test_calendar_is_next_match_and_is_last_match_ordering(
+        self, patch_get_client, mock_client
+    ):
+        org_mock = MagicMock()
+        mock_org_data = {
+            "nom": "GERZAT",
+            "engagements": [
+                {
+                    "id": 1001,
+                    "idCompetition": {
+                        "id": 101,
+                        "nom": "U18M",
+                        "categorie": {"code": "U18"},
+                    },
+                    "idPoule": {"id": 201},
+                    "numeroEquipe": 1,
+                }
+            ],
+        }
+        org_mock.model_dump = MagicMock(return_value=mock_org_data)
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        # 2 played matches + 3 future matches
+        poule_mock = MagicMock()
+        poule_mock.model_dump = MagicMock(
+            return_value={
+                "rencontres": [
+                    {
+                        "id": "m1",
+                        "date_rencontre": "2026-09-10T14:00:00+02:00",
+                        "nomEquipe1": "GERZAT",
+                        "nomEquipe2": "ADVERSAIRE A",
+                        "resultatEquipe1": 55,
+                        "resultatEquipe2": 50,
+                        "joue": 1,
+                    },
+                    {
+                        "id": "m2",
+                        "date_rencontre": "2026-09-17T14:00:00+02:00",
+                        "nomEquipe1": "ADVERSAIRE B",
+                        "nomEquipe2": "GERZAT",
+                        "resultatEquipe1": 60,
+                        "resultatEquipe2": 62,
+                        "joue": 1,
+                    },
+                    {
+                        "id": "m3",
+                        "date_rencontre": "2026-09-26T16:00:00+02:00",
+                        "nomEquipe1": "LIMAGNE",
+                        "nomEquipe2": "GERZAT",
+                        "joue": 0,
+                    },
+                    {
+                        "id": "m4",
+                        "date_rencontre": "2026-10-03T16:30:00+02:00",
+                        "nomEquipe1": "GERZAT",
+                        "nomEquipe2": "MARINGUES",
+                        "joue": 0,
+                    },
+                    {
+                        "id": "m5",
+                        "date_rencontre": "2026-10-11T11:00:00+02:00",
+                        "nomEquipe1": "THIERS",
+                        "nomEquipe2": "GERZAT",
+                        "joue": 0,
+                    },
+                ]
+            }
+        )
+        mock_client.get_poule_async = AsyncMock(return_value=poule_mock)
+        mock_client.get_salles_async = AsyncMock(return_value=[])
+
+        result = await get_calendrier_club_service(
+            organisme_id=123, categorie="U18M", force_refresh=True
+        )
+        assert len(result["items"]) == 5
+        items = result["items"]
+
+        # m1 is played, but not the last played (m2 was played later)
+        assert items[0]["id"] == "m1"
+        assert items[0]["played"] is True
+        assert items[0]["is_last_match"] is False
+        assert items[0]["is_next_match"] is False
+
+        # m2 is the MOST RECENT played match -> is_last_match = True
+        assert items[1]["id"] == "m2"
+        assert items[1]["played"] is True
+        assert items[1]["is_last_match"] is True
+        assert items[1]["is_next_match"] is False
+
+        # m3 (2026-09-26) is the EARLIEST upcoming match -> is_next_match = True
+        assert items[2]["id"] == "m3"
+        assert items[2]["played"] is False
+        assert items[2]["is_last_match"] is False
+        assert items[2]["is_next_match"] is True
+
+        # m4 (2026-10-03) is future, but not the next one
+        assert items[3]["id"] == "m4"
+        assert items[3]["played"] is False
+        assert items[3]["is_last_match"] is False
+        assert items[3]["is_next_match"] is False
+
+        # m5 (2026-10-11) is the furthest future, NOT is_next_match
+        assert items[4]["id"] == "m5"
+        assert items[4]["played"] is False
+        assert items[4]["is_last_match"] is False
+        assert items[4]["is_next_match"] is False
+
+    @pytest.mark.asyncio
     async def test_deduplicates_poule_fetches(self, patch_get_client, mock_client):
         org_mock = MagicMock()
         org_mock.model_dump = MagicMock(
