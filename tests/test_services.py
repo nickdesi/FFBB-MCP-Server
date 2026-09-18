@@ -656,9 +656,7 @@ class TestCalendrierClubService:
                         "date_rencontre": "2026-09-10T14:00:00+02:00",
                         "nomEquipe1": "GERZAT",
                         "nomEquipe2": "ADVERSAIRE A",
-                        "resultatEquipe1": 55,
-                        "resultatEquipe2": 50,
-                        "joue": 1,
+                        "joue": 0,
                     },
                     {
                         "id": "m2",

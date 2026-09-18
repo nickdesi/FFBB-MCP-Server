@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import httpx
@@ -552,8 +552,18 @@ async def _build_calendar_matches(
     future_indices: list[int] = []
 
     for idx, m in enumerate(all_matches):
-        m["played"] = (
-            m.get("joue") == 1 or m.get("joue") == "1" or m.get("joue") is True
+        dt_val = m.get("_dt")
+        has_scores = (
+            m.get("score_equipe1") is not None
+            and m.get("score_equipe2") is not None
+            and str(m.get("score_equipe1")).strip() not in ("", "None", "null")
+            and str(m.get("score_equipe2")).strip() not in ("", "None", "null")
+        )
+        is_past = dt_val is not None and dt_val < (now - timedelta(hours=3))
+        is_final_statut = m.get("statut") in ("final", "official", "forfeit")
+
+        m["played"] = bool(
+            m.get("joue") in (1, "1", True) or has_scores or is_final_statut or is_past
         )
         if m["played"]:
             played_indices.append(idx)
