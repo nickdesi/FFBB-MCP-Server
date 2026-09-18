@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.14.5] - 2026-09-18
+
+### Fixed
+- **Lucidité Sportive & Anti-Spéculation Début de Saison** : Intégration d'une règle de bon sens sportif interdisant formellement aux modèles de langage de projeter des conclusions ou objectifs de fin de saison (playoffs, accession, maintien, relégation) lorsque l'équipe a disputé 5 matchs ou moins (ou moins de 25% de la phase, ex: J2 sur 26 matchs). S'en tenir aux faits comptables réels (V, D, PM, PE, diff). Règle injectée dans `ROUTING_PROMPT`, `_RULES_CLASSEMENT`, `_GUARDRAILS` et documentée dans `docs/rules_ffbb.md` (Règle 11 §C).
+
+
 ## [1.14.4] - 2026-09-18
 
 ### Removed
