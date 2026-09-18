@@ -19,7 +19,7 @@ import json
 import os
 from typing import Any
 
-_PROMPT_VERSION = "3.8.0"
+_PROMPT_VERSION = "3.9.0"
 
 # Hints d'organisme_id pour les clubs fréquents.
 # ⚠️ Ces IDs peuvent changer côté FFBB — servent UNIQUEMENT de raccourci de
@@ -65,14 +65,17 @@ _KNOWN_CLUBS_HINTS = _format_known_club_ids()
 
 ROUTING_PROMPT = f"""\
 ## ROUTAGE DES OUTILS FFBB
-1. CARDINALITÉ MATCHS :
-- SINGULIER (prochain/dernier match) → `ffbb_next_match` ou `ffbb_last_result`.
-- PLURIEL (calendrier, matchs restants/à venir) → OBLIGATOIREMENT `ffbb_club(action="calendrier")` puis filtrer `played == false`. Ne JAMAIS appeler `ffbb_next_match` pour une demande plurielle.
-2. RÉUTILISATION D'ID : Mémoriser tout `organisme_id` résolu. Ne jamais repasser par `club_name` si l'ID est connu.
-Hints fréquents :
+1. MATCHS :
+- SINGULIER (prochain/dernier) → `ffbb_next_match` ou `ffbb_last_result`.
+- PLURIEL (calendrier, matchs à venir) → `ffbb_club(action="calendrier")` + filtre `played == false`. Ne JAMAIS utiliser `ffbb_next_match` au pluriel.
+2. IDs : Mémoriser tout `organisme_id` résolu.
+Hints :
 {_KNOWN_CLUBS_HINTS}
-3. DÉSAMBIGUÏSATION : Si catégorie sans numéro (ex: 'U13M'), appeler `ffbb_resolve_team` avant `ffbb_next_match`/`ffbb_last_result`.
-4. CALENDRIER : Pour matchs restants, filtrer `played: false`, trier par date croissante, identifier domicile/extérieur (club == equipe1 → domicile).
+3. DÉSAMBIGUÏSATION : Catégorie sans n° (ex: 'U13M') → `ffbb_resolve_team` avant match.
+4. CALENDRIER : `played: false`, tri par date, club == equipe1 → domicile.
+5. CLASSEMENT & LUCIDITÉ SPORTIVE :
+- Début de saison (matchs joués ≤ 5 ou < 25% phase) : INTERDICTION FORMELLE d'extrapoler sur le maintien, les playoffs, la montée ou la relégation (anecdotique). S'en tenir aux faits comptables bruts (V, D, diff).
+- Projections réservées aux phases avancées (> 70% joués) ou si mathématiquement acté.
 """
 
 
@@ -283,7 +286,8 @@ résoudre une phase spécifique — non fiable. L'appel automagique sans paramè
 **Règles de mise en forme obligatoires :**
 - **Équipe cible en GRAS (OBLIGATOIRE)** : Identifier l'équipe de la requête via `is_target: true` dans le payload (ou par correspondance avec le club demandé). Afficher OBLIGATOIREMENT son nom en **gras** avec l'indicateur 🎯 dans la colonne Équipe (ex : `| 9 | **ETOILE DE CHAMALIERES SAYAT - 1** 🎯 | 1 | ... |`).
 - **Incohérence** : Si G + P ≠ J, ajouter : "⚠️ *Données en cours de synchronisation par la FFBB*".
-- **Tri** : Respecter l'ordre `Rang` retourné par l'API (tri numérique natif croissant), jamais recalculé.\
+- **Tri** : Respecter l'ordre `Rang` retourné par l'API (tri numérique natif croissant), jamais recalculé.
+- **Lucidité début de saison (Zéro spéculation hâtive)** : Si `match_joues <= 5` (ou < 25% de la phase), interdiction formelle de tirer des conclusions sur le maintien, les playoffs ou la montée/descente. Présenter les faits bruts sans projection divinatoire.\
 """
 
 _RULES_TEAM_REPORT = """\
@@ -401,6 +405,7 @@ _GUARDRAILS = """\
 - Pas d'invention d'IDs (`poule_id`, `engagement_id`, `organisme_id` doivent venir de l'API).
 - Ne jamais recalculer PTS ou bilan — utiliser `bilan_total` tel quel.
 - Ne jamais conclure "phase terminée" depuis `match_joues` seul : vérifier qu'aucune rencontre n'a `joue: 0`. Si `rencontres_restantes_par_equipe` est présent, s'y fier.
+- Pas d'extrapolation prédictive (maintien, playoffs, montée) en début de saison (match_joues ≤ 5) : rester strictement factuel et sobre.
 
 **Singulier vs Pluriel :**
 - "prochain match" → `ffbb_next_match`. "prochains matchs" → `ffbb_club(action="calendrier")` + filtre.
@@ -548,7 +553,7 @@ def classement_poule(competition_name: str) -> str:
             ),
             "Présente le classement selon le format **## 🏆 CLASSEMENT D'UNE ÉQUIPE — WORKFLOW ET AFFICHAGE**.\n"
             "Colonnes obligatoires : **Rang | Équipe | PTS | J | G | P | M | E | Diff**.\n"
-            "Mettre en évidence les positions de montée/descente si identifiables.",
+            "Mettre en évidence les zones de classement (accession/relégation) de façon strictement descriptive, sans spéculer sur l'issue finale si le championnat débute à peine (≤ 5 matchs joués).",
         ]
     )
 

@@ -365,6 +365,14 @@ En cas d'égalité de points au classement entre plusieurs équipes au sein d'un
    * Établissement d'un classement particulier calculé **exclusivement sur les rencontres ayant opposé les équipes à égalité**.
    * Application du même ordre de critères (points particuliers, différence particulière, quotient particulier, puis général si nécessaire).
 
+#### C. Interprétation lucide des classements & Sobriété début de saison
+* **Début de saison (≤ 5 matchs joués ou < 25 % de la phase)** :
+  * **Interdiction formelle** de projeter des objectifs ou conclusions de fin de saison (playoffs, accession, maintien, relégation).
+  * À J2 ou J3 (ex: 2 matchs joués sur une poule de 14 équipes qui en compte 26), un bilan équilibré (1V-1D) ou une 5ᵉ place est purement anecdotique (~7 % du championnat disputé).
+  * L'analyse doit être strictement factuelle : points marqués, encaissés, dynamique récente, en rappelant que la hiérarchie est provisoire.
+* **Projections de fin de phase** :
+  * Réservées aux phases avancées (> 70 % des matchs disputés) ou aux cas où la qualification ou le maintien est mathématiquement acté.
+
 ---
 
 ### Règle 12 — Gestion de la Transition de Saison (2025-2026 ➔ 2026-2027)

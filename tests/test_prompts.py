@@ -1,6 +1,7 @@
 """Tests des prompts MCP FFBB."""
 
 from ffbb_mcp.prompts import (
+    ROUTING_PROMPT,
     analyser_match,
     bilan_equipe,
     calendrier_equipe,
@@ -113,3 +114,19 @@ class TestPrompts:
         assert "played == false" in prompt
         assert "date croissante" in prompt
         assert "numero_equipe=2" in prompt
+
+    def test_routing_prompt_classement_lucidite(self):
+        assert "CLASSEMENT & LUCIDITÉ SPORTIVE" in ROUTING_PROMPT
+        assert "matchs joués ≤ 5" in ROUTING_PROMPT
+        assert "INTERDICTION FORMELLE" in ROUTING_PROMPT
+
+    def test_expert_basket_prompt_classement_lucidite(self):
+        prompt = expert_basket()
+        assert "Lucidité début de saison" in prompt
+        assert "match_joues <= 5" in prompt
+        assert "Pas d'extrapolation prédictive" in prompt
+
+    def test_classement_poule_prompt_anti_speculation(self):
+        prompt = classement_poule("NM2")
+        assert "sans spéculer sur l'issue finale" in prompt
+        assert "≤ 5 matchs joués" in prompt

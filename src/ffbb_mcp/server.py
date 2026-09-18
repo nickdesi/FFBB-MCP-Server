@@ -212,7 +212,7 @@ mcp: FastMCP = FastMCP(
     "FFBB MCP Server",
     instructions=(
         ROUTING_PROMPT
-        + "\n[Données FFBB live. Format tableau classement strict (Rang, Équipe, PTS, J, G, P, M, E, Diff). Obligation formelle : repérer l'équipe ciblée (is_target=True) et mettre son nom en GRAS avec 🎯 : | Rang | **Nom Équipe** 🎯 | PTS | ... |. Pas de recalcul.]"
+        + "\n[Données live. Tableau classement: | Rang | **Nom Équipe** 🎯 | PTS | J | G | P | M | E | Diff | avec cible en GRAS (is_target=True). Pas de recalcul.]"
     ),
     dependencies=["mcp", "ffbb-data-client"],
     # Streamable HTTP transport (MCP spec 2025-11-25)
