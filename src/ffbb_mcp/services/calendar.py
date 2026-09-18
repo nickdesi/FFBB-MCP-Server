@@ -206,7 +206,7 @@ async def _build_calendar_matches(
             logger.error("Erreur lors de la récupération des équipes: %s", res)
 
     if numero_equipe is not None:
-        equipes = [
+        equipes_filtrees = [
             e
             for e in equipes
             if str(e.get("numero_equipe", "")) == str(numero_equipe)
@@ -214,6 +214,11 @@ async def _build_calendar_matches(
             or f" - {numero_equipe} " in str(e.get("nom", ""))
             or f"-{numero_equipe} " in str(e.get("nom", ""))
         ]
+        if not equipes_filtrees and numero_equipe == 1:
+            equipes_filtrees = [
+                e for e in equipes if not str(e.get("numero_equipe") or "").strip()
+            ]
+        equipes = equipes_filtrees
 
     if not equipes:
         return {

@@ -252,22 +252,21 @@ async def ffbb_saison_bilan_service(
             stats_from_rencontres = _compute_bilan_from_rencontres(
                 poule_data, eng_ids, club_nom
             )
+            stats = stats_from_rencontres or _new_bilan_totals()
             if stats_from_rencontres:
                 for k, v in stats_from_rencontres.items():
                     totaux[k] += v
-                phases.append(
-                    {
-                        "competition": poule_to_comp.get(
-                            pid, poule_data.get("nom", "")
-                        ),
-                        "poule_id": pid,
-                        "position": None,
-                        "total_equipes": None,
-                        "phase_type": _detect_phase_type(poule_to_comp.get(pid, "")),
-                        "phase_terminee": poule_data.get("phase_terminee", False),
-                        **stats_from_rencontres,
-                    }
-                )
+            phases.append(
+                {
+                    "competition": poule_to_comp.get(pid, poule_data.get("nom", "")),
+                    "poule_id": pid,
+                    "position": None,
+                    "total_equipes": None,
+                    "phase_type": _detect_phase_type(poule_to_comp.get(pid, "")),
+                    "phase_terminee": poule_data.get("phase_terminee", False),
+                    **stats,
+                }
+            )
 
     phases.sort(key=lambda x: x["competition"])
 

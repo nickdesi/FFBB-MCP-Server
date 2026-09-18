@@ -624,6 +624,54 @@ class TestCalendrierClubService:
         assert result["_meta"]["sort"] == "scheduled_at:asc"
 
     @pytest.mark.asyncio
+    async def test_numero_one_accepts_unique_team_without_number(
+        self, patch_get_client, mock_client
+    ):
+        org_mock = MagicMock()
+        org_mock.model_dump = MagicMock(
+            return_value={
+                "nom": "GERZAT BASKET",
+                "engagements": [
+                    {
+                        "id": "eng_1",
+                        "idCompetition": {
+                            "id": "comp_1",
+                            "nom": "Départementale masculine U18",
+                            "categorie": {"code": "U18"},
+                        },
+                        "idPoule": {"id": 201},
+                        "numeroEquipe": None,
+                    }
+                ],
+            }
+        )
+        mock_client.get_organisme_async = AsyncMock(return_value=org_mock)
+
+        poule_mock = MagicMock()
+        poule_mock.model_dump = MagicMock(
+            return_value={
+                "rencontres": [
+                    {
+                        "id": "match_1",
+                        "date_rencontre": "2026-10-03T16:30:00+02:00",
+                        "nomEquipe1": "GERZAT BASKET",
+                        "nomEquipe2": "MARINGUES",
+                        "idEngagementEquipe1": {"id": "eng_1"},
+                        "joue": 0,
+                    }
+                ]
+            }
+        )
+        mock_client.get_poule_async = AsyncMock(return_value=poule_mock)
+
+        result = await get_calendrier_club_service(
+            organisme_id=9282, categorie="U18M", numero_equipe=1
+        )
+
+        assert "warning" not in result
+        assert [item["id"] for item in result["items"]] == ["match_1"]
+
+    @pytest.mark.asyncio
     async def test_calendar_is_next_match_and_is_last_match_ordering(
         self, patch_get_client, mock_client
     ):

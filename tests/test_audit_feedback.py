@@ -211,6 +211,67 @@ async def test_ffbb_saison_bilan_poule_deduplication():
 
 
 @pytest.mark.asyncio
+async def test_ffbb_saison_bilan_future_matches_without_classement_is_active():
+    from unittest.mock import AsyncMock, patch
+
+    from ffbb_mcp.services.club import ffbb_saison_bilan_service
+
+    fake_equipes = [
+        {
+            "nom_equipe": "GERZAT BASKET",
+            "engagement_id": "eng_1",
+            "poule_id": "poule_1",
+            "competition": "Départementale masculine U18",
+            "numero_equipe": "",
+        }
+    ]
+    fake_poule = {
+        "nom": "Poule A",
+        "phase_terminee": False,
+        "classements": [],
+        "rencontres": [
+            {
+                "id": "match_1",
+                "date_rencontre": "2099-10-03T16:30:00+02:00",
+                "idEngagementEquipe1": {"id": "eng_1"},
+                "nomEquipe1": "GERZAT BASKET",
+                "nomEquipe2": "MARINGUES",
+                "joue": 0,
+            }
+        ],
+    }
+
+    with (
+        patch(
+            "ffbb_mcp.services.club.ffbb_equipes_club_service",
+            new_callable=AsyncMock,
+            return_value=fake_equipes,
+        ),
+        patch(
+            "ffbb_mcp.services.poule.get_poule_service",
+            new_callable=AsyncMock,
+            return_value=fake_poule,
+        ),
+        patch(
+            "ffbb_mcp.services.get_organisme_service",
+            new_callable=AsyncMock,
+            return_value={"id": 9282, "nom": "GERZAT BASKET"},
+        ),
+    ):
+        result = await ffbb_saison_bilan_service(
+            organisme_id=9282,
+            categorie="U18M",
+            numero_equipe=1,
+            force_refresh=True,
+        )
+
+    assert result["status"] == "ok"
+    assert result["saison_terminee"] is False
+    assert result["competitions_incluses"] == ["Départementale masculine U18"]
+    assert result["phases"][0]["match_joues"] == 0
+
+
+@pytest.mark.asyncio
 async def test_classement_quotient_null_when_zero_matches_played():
     """Vérifie que quotient est None (null) si match_joues == 0 pour éviter une division par zéro."""
     from unittest.mock import AsyncMock, patch
