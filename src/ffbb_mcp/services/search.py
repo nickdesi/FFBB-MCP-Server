@@ -72,6 +72,12 @@ _PHASE_PATTERN = re.compile(
 def _extract_base_competition_name(comp_name: str) -> str:
     if not comp_name:
         return ""
+
+    # ⚡ Bolt: Fast-path literal check avoids executing the complex re.IGNORECASE
+    # regex when there is no separator indicating a phase suffix.
+    if "-" not in comp_name and "–" not in comp_name:  # noqa: RUF001
+        return _normalize_name(comp_name.strip())
+
     base = _PHASE_PATTERN.sub("", comp_name).strip()
     return _normalize_name(base)
 
