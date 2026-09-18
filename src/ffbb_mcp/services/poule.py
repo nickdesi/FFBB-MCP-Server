@@ -429,6 +429,13 @@ async def ffbb_get_classement_service(
                 else None
             )
 
+            mj_raw = c.get("match_joues")
+            try:
+                mj_int = int(mj_raw) if mj_raw is not None else 0
+            except (TypeError, ValueError):
+                mj_int = 0
+            quotient_val = None if mj_int == 0 else c.get("quotient")
+
             flat.append(
                 {
                     "position": c.get("position"),
@@ -448,7 +455,7 @@ async def ffbb_get_classement_service(
                     "penalites_diverses": c.get("penalites_diverses"),
                     "nombre_forfaits": c.get("nombre_forfaits"),
                     "nombre_defauts": c.get("nombre_defauts"),
-                    "quotient": c.get("quotient"),
+                    "quotient": quotient_val,
                     "hors_classement": c.get("hors_classement"),
                 }
             )

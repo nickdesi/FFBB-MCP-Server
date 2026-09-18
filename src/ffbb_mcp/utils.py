@@ -286,6 +286,8 @@ _ESSENTIAL_KEYS = frozenset(
         "saison",
         "poule",
         "salles",
+        "topics",
+        "article_title",
     }
 )
 

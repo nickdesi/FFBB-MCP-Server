@@ -1315,6 +1315,19 @@ async def ffbb_resolve_team_service(
     if matched:
         candidates = matched
 
+    if is_division and target_num is None and len(candidates) > 1:
+        # Pour une division (ex: NM3) sans numéro explicite, si plusieurs équipes
+        # de numéros différents subsistent, cibler en priorité l'équipe 1 (équipe fanion).
+        nums = {(c.get("numero_equipe") or "").strip() for c in candidates}
+        if len(nums) > 1 and any(n in ("1", "") for n in nums):
+            t1_candidates = [
+                c
+                for c in candidates
+                if (c.get("numero_equipe") or "").strip() in ("1", "")
+            ]
+            if t1_candidates:
+                candidates = t1_candidates
+
     # Déduplication sémantique : uniquement au sein d'une MÊME compétition
     candidates = _deduplicate_same_team_phases(candidates)
 

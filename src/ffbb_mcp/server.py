@@ -1749,7 +1749,7 @@ async def ffbb_search_regulations(
 
     Permet de retrouver les articles pertinents sur les qualifications, montées/descentes,
     brassages jeunes, règles techniques (durée, ballons, zone), forfaits et brûlage.
-    Retourne `dict` avec `extraits[]` (`document_id`, `article_number`, `score`, `extrait`)
+    Retourne `dict` avec `results[]` (`id`, `document_id`, `article_number`, `article_title`, `relevance_score`, `content`, `topics[]`, `source_url`)
     triés par pertinence ; lecture seule, idempotent, cache SWR.
 
     Utilise cet outil quand tu ne connais pas le numéro d'article et que tu cherches par

@@ -261,3 +261,27 @@ def test_find_default_manifest_path():
     assert manifest is not None
     assert manifest.exists()
     assert manifest.name == "manifest.yaml"
+
+
+@pytest.mark.asyncio
+async def test_search_regulations_scoring_brulage():
+    """Vérifie que l'article 51 (brûlage) est classé avant l'article 12 pour une requête sur le brûlage."""
+    res = await ffbb_search_regulations(
+        query="brulage equipe reserve joueur",
+        level="federal",
+        limit=5,
+    )
+    assert isinstance(res, dict)
+    results = res.get("results") or []
+    assert len(results) >= 2
+
+    # L'article 51 doit être en tête devant l'article 12
+    first_art = results[0]
+    assert "Article 51" in first_art["article_number"]
+    assert "brûlage" in first_art["article_title"].lower()
+
+    # Vérification de la présence et du contenu du champ topics
+    for r in results:
+        assert "topics" in r
+        assert isinstance(r["topics"], list)
+        assert len(r["topics"]) > 0

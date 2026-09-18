@@ -287,6 +287,18 @@ async def ffbb_equipes_club_service(
                     continue
                 filtered_teams.append(t)
 
+            if is_division_filter and not comp_matches:
+                # Si un code de division (ex: NM3) a été demandé mais qu'aucun championnat
+                # ne porte exactement ce nom, on cible en priorité l'équipe 1 (équipe fanion)
+                # parmi les équipes seniors du même genre.
+                team1_matches = [
+                    t
+                    for t in filtered_teams
+                    if (t.get("numero_equipe") or "").strip() in ("1", "")
+                ]
+                if team1_matches:
+                    filtered_teams = team1_matches
+
         if parsed_filter and parsed_filter.numero_equipe is not None:
             want_num = str(parsed_filter.numero_equipe)
             exact_matches = [

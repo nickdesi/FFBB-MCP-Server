@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.14.3] - 2026-09-18
+
+### Fixed
+- **Regulations Engine — Scoring FTS5 & Boost Sémantique** : Pondération BM25 FTS5 ajustée avec surpondération forte des titres (`article_title=10.0`) et des `topics=5.0`. Re-ranking sémantique accent-insensible (+2.5 par mot du titre, +1.5 par topic) assurant un classement immédiat en tête des requêtes thématiques précises (ex: Article 51 Brûlage classé #1 devant Article 12 Licences pour "brûlage équipe réserve joueur"). Restitution inconditionnelle du champ structuré `topics` dans les résultats de recherche.
+- **Résolution Déterministe de Catégorie & Division** : Harmonisation de `ffbb_bilan` et `ffbb_team_summary` sur les filtres de division sans match direct (ex: NM3 pour un club évoluant en PNM) : fallback automatique et déterministe sur l'équipe fanion (équipe 1).
+- **Classement & Quotient Mathématiquement Rigoureux** : Retour de `quotient: null` lorsque `match_joues == 0` dans `ffbb_club(action="classement")` pour éliminer l'artefact trompeur de division par zéro (0.0).
+
+
 ## [1.14.2] - 2026-09-18
 
 ### Fixed

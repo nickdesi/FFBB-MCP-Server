@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import sqlite3
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,13 @@ from .indexer import index_manifest
 from .models import RegulationArticle, RegulationSearchResult
 
 logger = logging.getLogger(__name__)
+
+
+def _strip_accents(text: str) -> str:
+    """Normalise une chaîne en minuscules sans accents pour le matching sémantique."""
+    return "".join(
+        c for c in unicodedata.normalize("NFD", text) if unicodedata.category(c) != "Mn"
+    ).lower()
 
 
 def find_default_manifest_path() -> Path | None:
@@ -183,11 +191,11 @@ class RegulationsEngine:
                 results.append(RegulationSearchResult(article=art, score=1.0))
             return results
 
-        # Requête FTS5 avec scoring BM25
+        # Requête FTS5 avec scoring BM25 pondéré (titre=10, topics=5, article_number=5, content=1)
         sql = """
         SELECT a.id, a.document_id, a.season, a.level, a.organizer, a.categories,
                a.article_number, a.article_title, a.content, a.topics, a.source_url,
-               bm25(regulations_fts) as rank
+               bm25(regulations_fts, 5.0, 10.0, 1.0, 5.0, 1.0, 1.0) as rank
         FROM regulations_fts f
         JOIN regulation_articles a ON f.rowid = a.rowid
         WHERE regulations_fts MATCH ?
@@ -209,7 +217,8 @@ class RegulationsEngine:
             params.append(f"%{topic}%")
 
         sql += " ORDER BY rank LIMIT ?"
-        params.append(limit)
+        fetch_limit = max(limit * 3, 20)
+        params.append(fetch_limit)
 
         try:
             cursor.execute(sql, params)
@@ -217,6 +226,10 @@ class RegulationsEngine:
         except sqlite3.OperationalError as e:
             logger.error(f"Erreur SQL FTS5: {e} pour query='{fts_query}'")
             return []
+
+        query_words = [
+            _strip_accents(w) for w in re.findall(r"\w+", query) if len(w) > 2
+        ]
 
         results = []
         for row in rows:
@@ -234,8 +247,22 @@ class RegulationsEngine:
                 source_url=row["source_url"],
             )
             # FTS5 bm25 renvoie un score négatif (plus petit = plus pertinent)
-            score = round(abs(float(row["rank"])), 2)
-            results.append(RegulationSearchResult(article=art, score=score))
+            base_score = round(abs(float(row["rank"])), 2)
+
+            # Boost de pertinence sur le titre (+2.5 par terme) et les topics (+1.5 par terme)
+            title_norm = _strip_accents(art.article_title or "")
+            topics_norm = [_strip_accents(t) for t in art.topics if t]
+            title_boost = sum(2.5 for w in query_words if w in title_norm)
+            topic_boost = sum(
+                1.5 for w in query_words if any(w in t for t in topics_norm)
+            )
+
+            final_score = round(base_score + title_boost + topic_boost, 2)
+            results.append(RegulationSearchResult(article=art, score=final_score))
+
+        # Re-trier par score décroissant et appliquer la limite demandée
+        results.sort(key=lambda r: r.score, reverse=True)
+        results = results[:limit]
 
         # Fallback fédéral automatique : si une recherche filtrée sur un organisateur local
         # ne renvoie rien, on relance la recherche au niveau fédéral car le RSG FFBB

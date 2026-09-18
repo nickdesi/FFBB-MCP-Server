@@ -208,3 +208,114 @@ async def test_ffbb_saison_bilan_poule_deduplication():
         # Les totaux ne sont comptés qu'une seule fois (match_joues == 2, pas 4)
         assert res["bilan_total"]["match_joues"] == 2
         assert res["bilan_total"]["gagnes"] == 2
+
+
+@pytest.mark.asyncio
+async def test_classement_quotient_null_when_zero_matches_played():
+    """Vérifie que quotient est None (null) si match_joues == 0 pour éviter une division par zéro."""
+    from unittest.mock import AsyncMock, patch
+
+    from ffbb_mcp.services.poule import ffbb_get_classement_service
+
+    fake_poule = {
+        "id": 99999,
+        "classements": [
+            {
+                "id_engagement": {"id": "eng_1", "nom": "Equipe A", "numero_equipe": 1},
+                "position": 1,
+                "match_joues": 0,
+                "gagnes": 0,
+                "perdus": 0,
+                "points": 0,
+                "difference": 0,
+                "quotient": 0.0,
+            },
+            {
+                "id_engagement": {"id": "eng_2", "nom": "Equipe B", "numero_equipe": 1},
+                "position": 2,
+                "match_joues": 3,
+                "gagnes": 2,
+                "perdus": 1,
+                "points": 5,
+                "difference": 15,
+                "quotient": 1.12,
+            },
+        ],
+    }
+
+    with patch("ffbb_mcp.services.poule.get_client_async") as mock_client:
+        mock_cli = AsyncMock()
+        mock_cli.get_poule_async.return_value = fake_poule
+        mock_client.return_value = mock_cli
+
+        res = await ffbb_get_classement_service(poule_id=99999, force_refresh=True)
+        assert len(res) == 2
+        # Équipe 1 (0 match joué) : quotient doit être None (null en JSON)
+        assert res[0]["match_joues"] == 0
+        assert res[0]["quotient"] is None
+        # Équipe 2 (3 matchs joués) : quotient conservé
+        assert res[1]["match_joues"] == 3
+        assert res[1]["quotient"] == 1.12
+
+
+@pytest.mark.asyncio
+async def test_team_summary_division_nm3_resolves_team_1():
+    """Vérifie que categorie='NM3' cible l'équipe 1 (fanion) en l'absence de championnat NM3 exact."""
+    from unittest.mock import AsyncMock, patch
+
+    from ffbb_mcp.services.search import ffbb_resolve_team_service
+
+    fake_equipes = [
+        {
+            "team_id": "eng_sem1",
+            "engagement_id": "eng_sem1",
+            "numero_equipe": "1",
+            "team_label": "SEM1",
+            "nom_equipe": "STADE CLERMONTOIS",
+            "competition": "Pré nationale masculine",
+            "competition_code": "PNM",
+            "competition_type": "DIV",
+            "competition_id": "comp_pnm",
+            "poule_id": "poule_pnm",
+            "sexe": "M",
+            "categorie": "SE",
+        },
+        {
+            "team_id": "eng_sem2",
+            "engagement_id": "eng_sem2",
+            "numero_equipe": "2",
+            "team_label": "SEM2",
+            "nom_equipe": "STADE CLERMONTOIS - 2",
+            "competition": "Régionale masculine seniors - Division 2",
+            "competition_code": "RM2",
+            "competition_type": "DIV",
+            "competition_id": "comp_rm2",
+            "poule_id": "poule_rm2",
+            "sexe": "M",
+            "categorie": "SE",
+        },
+    ]
+
+    mock_resolve = AsyncMock(
+        return_value=(
+            [{"organisme_id": "9326", "nom": "STADE CLERMONTOIS"}],
+            None,
+        )
+    )
+
+    with (
+        patch("ffbb_mcp.services.search.resolve_club_and_org", mock_resolve),
+        patch(
+            "ffbb_mcp.services.ffbb_equipes_club_service",
+            new_callable=AsyncMock,
+            return_value=fake_equipes,
+        ),
+    ):
+        res = await ffbb_resolve_team_service(
+            organisme_id="9326",
+            categorie="NM3",
+            force_refresh=True,
+        )
+        assert res["status"] == "resolved"
+        assert res["team"]["team_label"] == "SEM1"
+        assert res["team"]["competition_code"] == "PNM"
