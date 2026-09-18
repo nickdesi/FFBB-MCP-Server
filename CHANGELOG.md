@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.14.2] - 2026-09-18
+
+### Fixed
+- **Regulations Engine & Package Data** : Intégration des fichiers de règlements (`data/regulations/` avec 13 documents Markdown et `manifest.yaml`) dans les assets du package Python (`package-data`) et dans le conteneur Docker. Initialisation inconditionnelle du schéma SQLite pour éliminer l'erreur `OperationalError: no such table: regulation_articles`.
+- **H2H Direct Resolution** : Support de la résolution directe par `engagement_id_a` et `engagement_id_b` dans `ffbb_head_to_head` sans exiger `club_a` / `organisme_id_a`, avec interrogation automatique de `client.get_engagement_async()`. Correction de l'héritage d'alias pour `engagement_id_b`.
+- **Performance Fast-Paths** : Fast-paths littéraux contournant les moteurs regex sur les recherches fréquentes.
+
+
 ## [1.14.1] - 2026-09-18
 
 ### Fixed
