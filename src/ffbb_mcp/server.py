@@ -645,14 +645,49 @@ async def ffbb_club(
         str | None,
         Field(description="Date fin YYYY-MM-DD (action='calendrier')."),
     ] = None,
+    scope: Annotated[
+        Literal["team", "club", "competition"] | None,
+        Field(
+            description="Scope : 'team' (équipe résolue), 'club' (global club) ou 'competition'."
+        ),
+    ] = None,
+    include_competition_types: Annotated[
+        list[str] | None,
+        Field(description="Types de compétition inclus (ex: ['DIV'])."),
+    ] = None,
+    exclude_competition_types: Annotated[
+        list[str] | None,
+        Field(description="Types de compétition exclus (ex: ['PLAT'])."),
+    ] = None,
+    include_friendlies: Annotated[
+        bool,
+        Field(description="Inclut les amicaux (exclus par défaut)."),
+    ] = False,
+    include_youth: Annotated[
+        bool,
+        Field(description="Inclut les équipes jeunes si demande senior."),
+    ] = False,
+    include_reserves: Annotated[
+        bool,
+        Field(description="Inclut les réserves si demande équipe 1."),
+    ] = False,
+    status_filter: Annotated[
+        list[str] | None,
+        Field(description="Filtre statuts : scheduled, live, final."),
+    ] = None,
+    strict_filters: Annotated[
+        bool,
+        Field(description="Filtrage strict sans extrapolation (défaut True)."),
+    ] = True,
+    group_by: Annotated[
+        Literal["competition", "team", "date"] | None,
+        Field(description="Regroupement : competition, team ou date."),
+    ] = None,
 ) -> list[dict[str, Any]] | list[CalendrierMatch] | dict[str, Any]:
     """Outils agrégés club : calendrier (matchs pluriels), équipes engagées ou classement.
 
     Outil de référence pour toute demande au pluriel : matchs restants, calendrier complet.
-    Pour une équipe senior au niveau national ou régional, la catégorie FFBB interne est souvent `SEM1` ou `SEF1` ;
-    le serveur résout désormais `NM3`, `NM2`, `NF1`, `PNM`, `R2`, etc. vers la bonne équipe et sa poule.
-    Pour action='classement', le poule_id est optionnel si club_name/organisme_id et categorie (ou filtre) sont fournis.
-    Utiliser adversaire avec action='calendrier' pour isoler les confrontations directes.
+    Résout NM3, PNM, etc. vers la bonne équipe.
     """
     try:
         effective_filtre = filtre or categorie
@@ -686,6 +721,24 @@ async def ffbb_club(
                 kwargs["competition_type"] = competition_type
             if season_id is not None:
                 kwargs["season_id"] = season_id
+            if scope is not None:
+                kwargs["scope"] = scope
+            if include_competition_types is not None:
+                kwargs["include_competition_types"] = include_competition_types
+            if exclude_competition_types is not None:
+                kwargs["exclude_competition_types"] = exclude_competition_types
+            if include_friendlies:
+                kwargs["include_friendlies"] = include_friendlies
+            if include_youth:
+                kwargs["include_youth"] = include_youth
+            if include_reserves:
+                kwargs["include_reserves"] = include_reserves
+            if status_filter is not None:
+                kwargs["status_filter"] = status_filter
+            if not strict_filters:
+                kwargs["strict_filters"] = strict_filters
+            if group_by is not None:
+                kwargs["group_by"] = group_by
             return await get_calendrier_club_service(**kwargs)
 
         # Actions equipes / classement : pré-résolution nécessaire
@@ -1052,19 +1105,9 @@ async def ffbb_team_summary(
     ] = False,
     ctx: Context[Any, Any, Any] | None = None,
 ) -> dict[str, Any]:
-    """Résumé complet et agent-friendly pour une équipe.
+    """Résumé complet d'équipe : bilan, classement, dernier et prochain match en un seul appel.
 
-    Combine en UN seul appel :
-      - bilan global (toutes phases)
-      - phase courante et son classement
-      - dernier match joué
-      - prochain match à venir
-
-    Pour une équipe senior au niveau national ou régional, la catégorie FFBB interne est souvent `SEM1` ou `SEF1` ;
-    le serveur résout désormais `NM3`, `NM2`, `NF1`, `PNM`, `R2`, etc. vers la bonne équipe et sa poule.
-    Recommandé pour une vue rapide d'une équipe précise. Si la catégorie est ambiguë
-    ou sans numéro d'équipe, l'outil tente une résolution via `ffbb_resolve_team`.
-    Pour une liste de matchs restants, utiliser plutôt `ffbb_club(action="calendrier")`.
+    Résout NM3, PNM, NF1, etc. vers la bonne équipe. En cas d'ambiguïté, suggère les candidats.
     """
     try:
         await _safe_report_progress(ctx, 0, total=3, message="Résolution de l'équipe…")
@@ -1617,14 +1660,7 @@ async def ffbb_head_to_head(
     ] = None,
     ctx: Context[Any, Any, Any] | None = None,
 ) -> dict[str, Any]:
-    """Compare deux équipes et analyse leurs confrontations directes (H2H).
-
-    Fournit :
-      - Bilan historique des confrontations directes de la saison (victoires A vs B, scores, écarts)
-      - Forme récente respective de chaque équipe (V-D-V-V...) et séries en cours
-      - Duel statistique des styles : Attaque vs Défense, ratio de victoires domicile/extérieur
-      - Points clés narratifs prêts pour la rédaction d'articles ou de synthèses d'avant-match
-    """
+    """Compare deux équipes et analyse leurs confrontations directes (H2H) et dynamiques."""
     try:
         await _safe_report_progress(
             ctx, 0, total=2, message="Analyse du face-à-face..."

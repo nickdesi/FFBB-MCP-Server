@@ -377,6 +377,8 @@ async def test_team_summary_division_nm3_resolves_team_1():
             categorie="NM3",
             force_refresh=True,
         )
-        assert res["status"] == "resolved"
-        assert res["team"]["team_label"] == "SEM1"
-        assert res["team"]["competition_code"] == "PNM"
+        # Règle stricte non négociable : NM3 ne correspond pas à PNM.
+        # Interdiction formelle de fallback vers PNM.
+        assert res["status"] in ("not_found", "ambiguous")
+        assert res.get("team") is None
+        assert (res.get("team") or {}).get("competition_code") != "PNM"

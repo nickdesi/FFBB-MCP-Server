@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.15.0] - 2026-09-19
+
+### Added
+- **Contrat de Fiabilité des Données (`DATA_RELIABILITY_CONTRACT.md`)** : Formalisation du principe non négociable « Préférer `ambiguous`/`not_found` à une donnée vraisemblable mais fausse ».
+- **Guide de Migration v1.15.0 (`MIGRATION_GUIDE.md`)** : Documentation exhaustive pour les agents IA et consommateurs du protocole MCP.
+- **Résolution Déterministe d'Équipe (`strict_resolver`)** :
+  - Priorités de résolution 1 à 6 sans fallback permissif (rejet formel NM3 != PNM, U15M != U15F).
+  - Gestion explicite des ambiguïtés réelles (`ambiguity_message`, `clarification_prompt`) et déduplication canonique des phases successives d'une même équipe.
+- **Machine à États Canonique des Matchs (`canonical_status.py`)** :
+  - Enum `CanonicalMatchStatus` (`scheduled`, `live`, `halftime`, `overtime`, `final`, `postponed`, `cancelled`, `forfeit_*`, `unknown_conflict`).
+  - Détection automatique et stricte des conflits de statut (scores sur matchs programmés, matchs joués sans scores, forfaits avec scores non réglementaires).
+  - Sas d'éligibilité aux agrégats sportifs (`is_match_eligible_for_aggregate`) excluant inconditionnellement les matchs en conflit des calculs de bilans, classements et dynamiques.
+- **Calendrier Scoped (`calendar.py`)** :
+  - Filtrage par portée (`scope=team|club|competition`).
+  - Exclusion automatique par défaut des matchs amicaux (`PLAT`, `AMIC`), tournois et plateaux (`include_friendlies=False`).
+  - Exclusion par défaut des coupes lorsqu'une division de championnat est ciblée.
+  - Avertissement formel d'absence d'élargissement silencieux en cas d'aucun match trouvé pour l'équipe ciblée.
+- **Sécurité et Hiérarchie Réglementaire (`applicability.py`)** :
+  - Hiérarchie juridique formelle : Fédéral (Rang 1) > Régional (Rang 2) > Départemental (Rang 3).
+  - Intégration systématique de l'empreinte SHA-256 du texte officiel et disclaimer légal de non-opposabilité.
+- **Budget Token & Conformité MCP** :
+  - Compactage des schémas JSON des 25 outils FastMCP sous le seuil strict de 45 000 caractères cumulés.
+  - Typage d'enveloppe uniforme `McpResponseEnvelope` avec statuts canoniques et métadonnées de provenance.
+- **Tests & Assurance Qualité** :
+  - 461 tests pytest (460 passés, 1 sauté, 0 échec) avec couverture globale à 84% (seuil requis >= 78%).
+  - Tests property-based via Hypothesis validant les invariants de statut canonique.
+
+### Fixed
+- Correction des micro-assertions de rétrocompatibilité sur les filtres d'équipes sans numéro et avertissements de clubs sans engagements.
+- Nettoyage intégral de la suite de linting (`ruff check`) et conformité totale au formatage PEP 8/Black (`ruff format`).
+
 ## [1.14.5] - 2026-09-18
 
 ### Fixed

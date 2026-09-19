@@ -266,6 +266,42 @@ class CalendrierMatch(BaseModel):
         default=None,
         description="Statut normalisé : scheduled, in_progress, final, official, postponed, cancelled, forfeit.",
     )
+    canonical_status: str | None = Field(
+        default=None,
+        description="Statut canonique strict : scheduled, live, final, unknown_conflict, etc.",
+    )
+    data_quality: dict[str, Any] | None = Field(
+        default=None,
+        description="Audit de qualité et traçabilité des conflits de statut.",
+    )
+    engagement_id: str | None = Field(
+        default=None,
+        description="ID d'engagement unique de l'équipe.",
+    )
+    team_label: str | None = Field(
+        default=None,
+        description="Libellé de l'équipe résolue.",
+    )
+    numero_equipe: int | None = Field(
+        default=None,
+        description="Numéro de l'équipe.",
+    )
+    competition_id: str | None = Field(
+        default=None,
+        description="ID de la compétition.",
+    )
+    competition_name: str | None = Field(
+        default=None,
+        description="Nom de la compétition.",
+    )
+    poule_id: str | None = Field(
+        default=None,
+        description="ID de la poule.",
+    )
+    season_id: str | None = Field(
+        default=None,
+        description="ID de la saison.",
+    )
 
     @field_validator("score_equipe1", "score_equipe2", "joue", mode="before")
     @classmethod

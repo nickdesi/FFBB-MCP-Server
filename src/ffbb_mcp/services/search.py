@@ -1100,7 +1100,7 @@ async def ffbb_resolve_team_service(
     force_refresh: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Résout une équipe unique d'un club pour une catégorie donnée.
+    """Résout une équipe unique d'un club pour une catégorie donnée via resolve_team_strict.
 
     Retourne un objet structuré et déterministe pour les agents :
       - `status`: "resolved" | "ambiguous" | "not_found"
@@ -1109,274 +1109,70 @@ async def ffbb_resolve_team_service(
       - `ambiguity`: message explicite en cas d'ambiguïté
       - `clarification_prompt`: question exploitable par le LLM pour clarifier
     """
-    import ffbb_mcp.services
+    from ffbb_mcp.envelope import ResponseStatus
+    from ffbb_mcp.strict_resolver import resolve_team_strict
 
-    if not club_name and not organisme_id:
-        if engagement_id:
-            from ffbb_mcp.client import FFBBClientFactory
-
-            client = await FFBBClientFactory.get_client_async()
-            try:
-                eng_data = await client.get_engagement_async(str(engagement_id).strip())
-            except Exception as e:
-                logger.error("Erreur résolution engagement %s: %s", engagement_id, e)
-                eng_data = None
-
-            if eng_data and eng_data.idOrganisme:
-                organisme_id = str(eng_data.idOrganisme)
-                if (
-                    numero_equipe is None
-                    and eng_data.numeroEquipe
-                    and str(eng_data.numeroEquipe).isdigit()
-                ):
-                    numero_equipe = int(eng_data.numeroEquipe)
-                if competition_id is None and eng_data.idCompetition:
-                    competition_id = eng_data.idCompetition
-                if poule_id is None and eng_data.idPoule:
-                    poule_id = eng_data.idPoule
-            else:
-                return {
-                    "status": "not_found",
-                    "team": None,
-                    "candidates": [],
-                    "ambiguity": f"Engagement '{engagement_id}' introuvable sur les serveurs FFBB",
-                    "clarification_prompt": None,
-                }
-        else:
-            raise McpError(
-                error=ErrorData(
-                    code=INTERNAL_ERROR,
-                    message="Fournir club_name ou organisme_id (ou engagement_id)",
-                )
+    if not club_name and not organisme_id and not engagement_id:
+        raise McpError(
+            error=ErrorData(
+                code=INTERNAL_ERROR,
+                message="Fournir club_name ou organisme_id (ou engagement_id)",
             )
+        )
 
-    # 1) Résoudre l'organisme avec métadonnées
-    resolved_clubs, _ = await resolve_club_and_org(
+    int_num: int | None = None
+    if numero_equipe is not None:
+        try:
+            int_num = int(numero_equipe)
+        except (ValueError, TypeError):
+            int_num = None
+
+    mode = kwargs.get("mode", "suggest")
+    res = await resolve_team_strict(
         club_name=club_name,
         organisme_id=organisme_id,
         categorie=categorie,
+        numero_equipe=int_num,
+        engagement_id=engagement_id,
+        competition_id=competition_id,
+        competition_type=competition_type,
+        poule_id=poule_id,
+        season_id=season_id,
+        mode=mode,
         force_refresh=force_refresh,
+        **kwargs,
     )
 
-    if not resolved_clubs:
-        return {
-            "status": "not_found",
-            "team": None,
-            "candidates": [],
-            "ambiguity": f"Club '{club_name or organisme_id}' introuvable",
-            "clarification_prompt": None,
-            "club_resolu": None,
-        }
-
-    from .common import (
-        disambiguate_clubs_by_category,
-        get_primary_club,
-        is_real_ambiguity,
-    )
-
-    equipes: list[dict[str, Any]] | None = None
-    if not organisme_id and categorie:
-        resolved_clubs, equipes = await disambiguate_clubs_by_category(
-            resolved_clubs,
-            categorie=categorie,
-            club_name=club_name,
-            force_refresh=force_refresh,
-        )
-
-    # Si ambiguïté club réelle
-    if is_real_ambiguity(resolved_clubs, club_name) and not organisme_id:
-        return {
-            "status": "ambiguous",
-            "team": None,
-            "candidates": resolved_clubs,
-            "ambiguity": f"Plusieurs clubs correspondent à '{club_name}'.",
-            "clarification_prompt": f"Plusieurs clubs correspondent à '{club_name}'. Précisez organisme_id.",
-            "club_resolu": None,
-        }
-
-    club_resolu = get_primary_club(resolved_clubs, club_name) or resolved_clubs[0]
-    target_org_id = str(club_resolu["organisme_id"])
-
-    # 2) Récupérer toutes les équipes candidates
-    if not categorie:
-        equipes = await ffbb_mcp.services.ffbb_equipes_club_service(
-            organisme_id=target_org_id, force_refresh=force_refresh
-        )
-        if not equipes or (
-            isinstance(equipes, list) and len(equipes) == 1 and "error" in equipes[0]
-        ):
-            return {
-                "status": "not_found",
-                "team": None,
-                "candidates": [],
-                "ambiguity": f"Aucune équipe trouvée pour le club '{club_resolu.get('nom', target_org_id)}'.",
-                "clarification_prompt": None,
-                "club_resolu": club_resolu,
-            }
-        equipes = _deduplicate_same_team_phases(equipes)
-        if len(equipes) == 1:
-            return {
-                "status": "resolved",
-                "team": equipes[0],
-                "candidates": equipes,
-                "ambiguity": None,
-                "clarification_prompt": None,
-                "club_resolu": club_resolu,
-            }
-        return {
-            "status": "ambiguous",
-            "team": None,
-            "candidates": equipes,
-            "ambiguity": "Veuillez préciser la catégorie souhaitée parmi les équipes du club.",
-            "clarification_prompt": "Veuillez préciser la catégorie souhaitée parmi les équipes du club.",
-            "club_resolu": club_resolu,
-        }
-
-    if equipes is None:
-        equipes = await ffbb_mcp.services.ffbb_equipes_club_service(
-            organisme_id=target_org_id, filtre=categorie, force_refresh=force_refresh
-        )
-
-    if not equipes or (
-        isinstance(equipes, list) and len(equipes) == 1 and "error" in equipes[0]
-    ):
-        msg = (
-            equipes[0]["error"]
-            if (equipes and "error" in equipes[0])
-            else f"Aucune équipe trouvée pour la catégorie '{categorie}'."
-        )
-        suggestions = (
-            equipes[0].get("suggested_teams")
-            if (equipes and "suggested_teams" in equipes[0])
-            else []
-        )
-        return {
-            "status": "not_found",
-            "team": None,
-            "candidates": suggestions,
-            "ambiguity": msg,
-            "clarification_prompt": None,
-            "club_resolu": club_resolu,
-        }
-
-    # 3) Application des filtres explicites de désambiguïsation par ordre de priorité strict
-    candidates = list(equipes)
-    if engagement_id is not None:
-        target_eng_id = str(engagement_id).strip()
-        candidates = [
-            c
-            for c in candidates
-            if str(c.get("engagement_id") or c.get("team_id") or "").strip()
-            == target_eng_id
-        ]
-
-    if poule_id is not None:
-        target_poule_id = str(poule_id).strip()
-        candidates = [
-            c
-            for c in candidates
-            if str(c.get("poule_id") or "").strip() == target_poule_id
-        ]
-
-    if competition_id is not None:
-        target_comp_id = str(competition_id).strip()
-        candidates = [
-            c
-            for c in candidates
-            if str(c.get("competition_id") or "").strip() == target_comp_id
-        ]
-
-    if competition_type is not None:
-        target_comp_type = str(competition_type).strip().upper()
-        candidates = [
-            c
-            for c in candidates
-            if str(c.get("competition_type") or "").strip().upper() == target_comp_type
-        ]
-
-    # 3.5) Matching intelligent du numéro
-    from .club import _parse_division_code
-
-    parsed = parse_categorie(categorie)
-    is_division = _parse_division_code(categorie) is not None
-    raw_num = (
-        numero_equipe
-        if numero_equipe is not None
-        else (
-            kwargs.get("numero_equipe")
-            if kwargs.get("numero_equipe") is not None
-            else (parsed.numero_equipe if not is_division else None)
-        )
-    )
-    target_num = str(raw_num) if raw_num is not None else None
-
-    # On cherche d'abord le numéro exact, fallback sur équipe sans numéro
-    matched = _resolve_team_number(candidates, target_num)
-    if matched:
-        candidates = matched
-
-    if is_division and target_num is None and len(candidates) > 1:
-        # Pour une division (ex: NM3) sans numéro explicite, si plusieurs équipes
-        # de numéros différents subsistent, cibler en priorité l'équipe 1 (équipe fanion).
-        nums = {(c.get("numero_equipe") or "").strip() for c in candidates}
-        if len(nums) > 1 and any(n in ("1", "") for n in nums):
-            t1_candidates = [
-                c
-                for c in candidates
-                if (c.get("numero_equipe") or "").strip() in ("1", "")
-            ]
-            if t1_candidates:
-                candidates = t1_candidates
-
-    # Déduplication sémantique : uniquement au sein d'une MÊME compétition
-    candidates = _deduplicate_same_team_phases(candidates)
-
-    # 4) Machine à états de la réponse
-    if not candidates:
-        all_labels = sorted(list({t["team_label"] for t in equipes}))
-        return {
-            "status": "not_found",
-            "team": None,
-            "candidates": all_labels,
-            "ambiguity": f"Aucun engagement ne correspond aux critères spécifiés pour '{categorie}'.",
-            "clarification_prompt": None,
-            "club_resolu": club_resolu,
-        }
-
-    if len(candidates) == 1:
+    if res.status == ResponseStatus.OK:
         return {
             "status": "resolved",
-            "team": candidates[0],
-            "candidates": candidates,
+            "team": res.selected,
+            "candidates": res.candidates,
             "ambiguity": None,
             "clarification_prompt": None,
-            "club_resolu": club_resolu,
+            "club_resolu": res.club_resolu,
+            "resolution": res.model_dump(),
         }
-
-    # Plusieurs engagements subsistent → ambiguïté réelle déclarée explicitement
-    comp_descriptions = []
-    for c in candidates:
-        c_label = c.get("competition") or c.get("competition_code") or "Compétition"
-        c_type = c.get("competition_type") or "Type inconnu"
-        c_id = c.get("competition_id") or ""
-        comp_descriptions.append(
-            f"'{c_label}' (type: {c_type}, competition_id: {c_id})"
-        )
-
-    clarification = (
-        f"L'équipe {club_resolu.get('nom', '')} {categorie or ''} participe à {len(candidates)} compétitions distinctes : "
-        + " ; ".join(comp_descriptions)
-        + ". Précisez `competition_id` ou `competition_type` pour cibler la compétition voulue."
-    )
-
-    return {
-        "status": "ambiguous",
-        "team": None,
-        "candidates": candidates,
-        "ambiguity": f"Plusieurs engagements ({len(candidates)}) correspondent à cette équipe.",
-        "clarification_prompt": clarification,
-        "club_resolu": club_resolu,
-    }
+    elif res.status == ResponseStatus.AMBIGUOUS:
+        return {
+            "status": "ambiguous",
+            "team": None,
+            "candidates": res.candidates,
+            "ambiguity": res.ambiguity_message,
+            "clarification_prompt": res.clarification_prompt,
+            "club_resolu": res.club_resolu,
+            "resolution": res.model_dump(),
+        }
+    else:
+        return {
+            "status": "not_found",
+            "team": None,
+            "candidates": res.candidates,
+            "ambiguity": res.ambiguity_message,
+            "clarification_prompt": res.clarification_prompt,
+            "club_resolu": res.club_resolu,
+            "resolution": res.model_dump(),
+        }
 
 
 async def get_rencontre_service(rencontre_id: int | str) -> dict[str, Any]:

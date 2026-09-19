@@ -15,7 +15,7 @@ Serveur [MCP](https://modelcontextprotocol.io) pour consulter calendriers, class
 
 <br />
 
-[![Version](https://img.shields.io/badge/version-1.14.5-green?style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.15.0-green?style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/releases/latest)
 [![Python](https://img.shields.io/badge/Python-3.14%2B-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org)
 [![CI](https://img.shields.io/github/actions/workflow/status/nickdesi/FFBB-MCP-Server/ci.yml?label=CI&style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/actions/workflows/ci.yml)
 [![MCP](https://img.shields.io/badge/MCP-Ready-00ADD8?style=for-the-badge&logo=modelcontextprotocol&logoColor=white)](https://modelcontextprotocol.io)
@@ -144,11 +144,11 @@ Configurez directement l'URL distante dans `mcp_config.json` via la directive na
 | `ffbb_lives` | Matchs en cours (scores live, rafraîchissement toutes les 15s). Retourne [] si aucun match. |
 | `ffbb_saisons` | Liste des saisons FFBB (référentiel temporel). |
 | `ffbb_resolve_team` | Identifie une equipe unique (Pivot central). |
-| `ffbb_team_summary` | Résumé complet et agent-friendly pour une équipe. |
+| `ffbb_team_summary` | Résumé complet d'équipe : bilan, classement, dernier et prochain match en un seul appel. |
 | `ffbb_last_result` | Dernier résultat d'une équipe précise. |
 | `ffbb_next_match` | Prochain match à jouer pour une équipe précise. |
 | `ffbb_bilan_saison` | Bilan détaillé de la saison pour une équipe précise (toutes phases). |
-| `ffbb_head_to_head` | Compare deux équipes et analyse leurs confrontations directes (H2H). |
+| `ffbb_head_to_head` | Compare deux équipes et analyse leurs confrontations directes (H2H) et dynamiques. |
 | `ffbb_search_regulations` | Recherche plein texte déterministe dans les règlements officiels FFBB, régionaux et départementaux. |
 | `ffbb_get_regulation_article` | Récupère le texte intégral et exact d'un article spécifique de règlement sans troncature. |
 | `ffbb_explain_tiebreak_rules` | Fournit les règles officielles de départage en cas d'égalité (Article 28 du RSG FFBB). |

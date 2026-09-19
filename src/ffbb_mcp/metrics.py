@@ -50,7 +50,54 @@ _swr_active: int = 0
 _swr_total: int = 0
 _swr_dropped: int = 0
 
+# Compteurs d'observabilité de fiabilité & qualité de données (Objectif 9)
+_resolution_ambiguous_total: int = 0
+_resolution_not_found_total: int = 0
+_silent_fallback_prevented_total: int = 0
+_source_conflict_total: int = 0
+_regulation_stale_total: int = 0
+
 _metrics_lock = Lock()
+
+
+def record_resolution_ambiguous() -> None:
+    """Enregistre une résolution d'équipe ayant abouti au statut ambiguous."""
+    global _resolution_ambiguous_total
+    with _metrics_lock:
+        _resolution_ambiguous_total += 1
+    _mark_dirty()
+
+
+def record_resolution_not_found() -> None:
+    """Enregistre une résolution d'équipe sans correspondance (not_found)."""
+    global _resolution_not_found_total
+    with _metrics_lock:
+        _resolution_not_found_total += 1
+    _mark_dirty()
+
+
+def record_silent_fallback_prevented() -> None:
+    """Enregistre un fallback silencieux empêché par le résolveur strict."""
+    global _silent_fallback_prevented_total
+    with _metrics_lock:
+        _silent_fallback_prevented_total += 1
+    _mark_dirty()
+
+
+def record_source_conflict() -> None:
+    """Enregistre une rencontre ayant des statuts source contradictoires."""
+    global _source_conflict_total
+    with _metrics_lock:
+        _source_conflict_total += 1
+    _mark_dirty()
+
+
+def record_regulation_stale() -> None:
+    """Enregistre un accès à un règlement périmé ou non vérifié pour la saison."""
+    global _regulation_stale_total
+    with _metrics_lock:
+        _regulation_stale_total += 1
+    _mark_dirty()
 
 
 # ---------------------------------------------------------------------------
@@ -154,6 +201,11 @@ def reset_metrics() -> None:
     """Réinitialise les métriques en mémoire (usage tests)."""
     global START_TIME, _calls_success, _calls_error, _latency_sum, _latency_count
     global _ffbb_inflight, _swr_active, _swr_total, _swr_dropped
+    global _resolution_ambiguous_total, _resolution_not_found_total
+    global \
+        _silent_fallback_prevented_total, \
+        _source_conflict_total, \
+        _regulation_stale_total
     with _metrics_lock:
         START_TIME = time.time()
         _calls_success = 0
@@ -164,6 +216,11 @@ def reset_metrics() -> None:
         _swr_active = 0
         _swr_total = 0
         _swr_dropped = 0
+        _resolution_ambiguous_total = 0
+        _resolution_not_found_total = 0
+        _silent_fallback_prevented_total = 0
+        _source_conflict_total = 0
+        _regulation_stale_total = 0
         for i in range(len(_latency_bucket_counts)):
             _latency_bucket_counts[i] = 0
         _cache_hits.clear()
@@ -201,6 +258,11 @@ def get_snapshot() -> dict[str, Any]:
         miss_reasons = dict(_cache_miss_reasons)
         tool_calls = dict(_tool_calls)
         error_types = dict(_error_types)
+        res_ambiguous = _resolution_ambiguous_total
+        res_not_found = _resolution_not_found_total
+        fallback_prevented = _silent_fallback_prevented_total
+        source_conflict = _source_conflict_total
+        reg_stale = _regulation_stale_total
 
     calls = success + errors
     error_rate = errors / calls if calls > 0 else 0.0
@@ -235,6 +297,11 @@ def get_snapshot() -> dict[str, Any]:
         "cache_miss_reasons": miss_reasons,
         "tool_calls": tool_calls,
         "error_types": error_types,
+        "resolution_ambiguous_total": res_ambiguous,
+        "resolution_not_found_total": res_not_found,
+        "silent_fallback_prevented_total": fallback_prevented,
+        "source_conflict_total": source_conflict,
+        "regulation_stale_total": reg_stale,
     }
 
 
@@ -375,6 +442,36 @@ def generate_prometheus_metrics() -> str:
             "Total des tâches SWR abandonnées (limite atteinte)",
             "counter",
             f"ffbb_swr_dropped_total {snap.get('swr_dropped', 0)}",
+        )
+        + _prom_block(
+            "ffbb_mcp_resolution_ambiguous_total",
+            "Total des résolutions d'équipe ayant abouti au statut ambiguous",
+            "counter",
+            f"ffbb_mcp_resolution_ambiguous_total {snap.get('resolution_ambiguous_total', 0)}",
+        )
+        + _prom_block(
+            "ffbb_mcp_resolution_not_found_total",
+            "Total des résolutions d'équipe sans correspondance (not_found)",
+            "counter",
+            f"ffbb_mcp_resolution_not_found_total {snap.get('resolution_not_found_total', 0)}",
+        )
+        + _prom_block(
+            "ffbb_mcp_silent_fallback_prevented_total",
+            "Total des fallbacks silencieux empêchés par le résolveur strict",
+            "counter",
+            f"ffbb_mcp_silent_fallback_prevented_total {snap.get('silent_fallback_prevented_total', 0)}",
+        )
+        + _prom_block(
+            "ffbb_mcp_source_conflict_total",
+            "Total des rencontres avec conflits de statut source détectés",
+            "counter",
+            f"ffbb_mcp_source_conflict_total {snap.get('source_conflict_total', 0)}",
+        )
+        + _prom_block(
+            "ffbb_mcp_regulation_stale_total",
+            "Total des accès à des règlements périmés pour la saison",
+            "counter",
+            f"ffbb_mcp_regulation_stale_total {snap.get('regulation_stale_total', 0)}",
         )
     )
 

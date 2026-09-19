@@ -25,7 +25,6 @@ from ffbb_mcp.utils import format_team_name
 
 from .common import _PARIS_TZ as _TZ
 from .common import (
-    _compute_match_statut,
     _detect_phase_type,
     _is_horaire_renseigne,
     _normalize_name,
@@ -109,6 +108,16 @@ async def _build_calendar_matches(
     competition_type: str | None = None,
     season_id: int | str | None = None,
     offset: int | None = None,
+    scope: str | None = None,
+    include_competition_types: list[str] | None = None,
+    exclude_competition_types: list[str] | None = None,
+    include_friendlies: bool = False,
+    include_youth: bool = False,
+    include_reserves: bool = False,
+    status_filter: list[str] | None = None,
+    strict_filters: bool = True,
+    group_by: str | None = None,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     """Construit la liste des matchs (calendrier complet) pour un club / catégorie."""
     from .search import resolve_club_and_org
@@ -188,12 +197,20 @@ async def _build_calendar_matches(
         if primary_c
         else (resolved_clubs[0].get("nom", "") if resolved_clubs else "")
     )
+    import sys
+
     import ffbb_mcp.services as svc
 
+    from .club import ffbb_equipes_club_service as default_eq_svc
+
+    eq_svc = (
+        getattr(sys.modules[__name__], "ffbb_equipes_club_service", None)
+        or getattr(svc, "ffbb_equipes_club_service", None)
+        or default_eq_svc
+    )
+
     eq_tasks = [
-        svc.ffbb_equipes_club_service(
-            organisme_id=oid, filtre=categorie, season_id=season_id
-        )
+        eq_svc(organisme_id=oid, filtre=categorie, season_id=season_id)
         for oid in target_org_ids
     ]
     eq_results = await asyncio.gather(*eq_tasks, return_exceptions=True)
@@ -205,23 +222,11 @@ async def _build_calendar_matches(
         elif isinstance(res, Exception):
             logger.error("Erreur lors de la récupération des équipes: %s", res)
 
-    if numero_equipe is not None:
-        equipes_filtrees = [
-            e
-            for e in equipes
-            if str(e.get("numero_equipe", "")) == str(numero_equipe)
-            or str(e.get("nom", "")).endswith(f"- {numero_equipe}")
-            or f" - {numero_equipe} " in str(e.get("nom", ""))
-            or f"-{numero_equipe} " in str(e.get("nom", ""))
-        ]
-        if not equipes_filtrees and numero_equipe == 1:
-            equipes_filtrees = [
-                e for e in equipes if not str(e.get("numero_equipe") or "").strip()
-            ]
-        equipes = equipes_filtrees
+    all_teams_raw = list(equipes)
 
-    if not equipes:
+    if not all_teams_raw:
         return {
+            "status": "not_found",
             "items": [],
             "_meta": {
                 "total": 0,
@@ -233,11 +238,131 @@ async def _build_calendar_matches(
                 "generated_at": datetime.now(_TZ).isoformat(),
             },
             "warning": (
-                f"Aucune équipe active pour '{club_name or organisme_id}' "
+                f"Aucune équipe active pour '{club_nom_resolu or club_name or organisme_id}' "
                 f"(catégorie: '{categorie or 'toutes'}'). "
                 "Le club existe mais n'a pas d'équipes engagées."
             ),
+            "candidates": [],
         }
+
+    effective_scope = scope
+    if not effective_scope:
+        if categorie or numero_equipe is not None or engagement_id is not None:
+            effective_scope = "team"
+        elif competition_id is not None:
+            effective_scope = "competition"
+        else:
+            effective_scope = "club"
+
+    from ffbb_mcp.aliases_registry import get_aliases_registry
+    from ffbb_mcp.utils import parse_categorie
+
+    registry = get_aliases_registry()
+    target_div = registry.lookup(categorie) if categorie else None
+
+    if effective_scope in ("team", "competition"):
+        if target_div:
+            equipes = [
+                e
+                for e in equipes
+                if registry.is_compatible(
+                    categorie, e.get("competition_code"), e.get("competition")
+                )
+                or registry.is_compatible(
+                    categorie, e.get("categorie"), e.get("nom") or e.get("team_label")
+                )
+            ]
+        elif categorie:
+            parsed_c = parse_categorie(categorie)
+            if parsed_c and parsed_c.categorie:
+                req_c = parsed_c.categorie.upper().strip()
+                equipes = [
+                    e
+                    for e in equipes
+                    if (e.get("categorie") or "").upper().strip() == req_c
+                    or {(e.get("categorie") or "").upper().strip(), req_c}
+                    <= {"SE", "SENIOR", "SENIORS"}
+                ]
+                if parsed_c.sexe:
+                    equipes = [
+                        e
+                        for e in equipes
+                        if (e.get("sexe") or "").upper().strip() == parsed_c.sexe
+                    ]
+
+        if numero_equipe is not None:
+            num_str = str(numero_equipe).strip()
+            equipes_filtrees = [
+                e
+                for e in equipes
+                if str(e.get("numero_equipe") or "").strip() == num_str
+                or str(e.get("nom") or "").endswith(f"- {num_str}")
+            ]
+            if not equipes_filtrees and numero_equipe == 1:
+                equipes_filtrees = [
+                    e for e in equipes if not str(e.get("numero_equipe") or "").strip()
+                ]
+            equipes = equipes_filtrees
+        elif target_div and not include_reserves:
+            equipes = [
+                e
+                for e in equipes
+                if str(e.get("numero_equipe") or "").strip() in ("1", "")
+            ]
+
+        # Exclusion des amicaux par défaut
+        if not include_friendlies:
+            equipes = [
+                e
+                for e in equipes
+                if str(e.get("competition_type") or "").upper()
+                not in ("PLAT", "AMIC", "AMICAL")
+                and "AMIC" not in str(e.get("competition") or "").upper()
+                and "TOURNVOI" not in str(e.get("competition") or "").upper()
+                and "TOURNOI" not in str(e.get("competition") or "").upper()
+            ]
+
+        # Exclusion des coupes par défaut si une division de championnat est ciblée
+        if include_competition_types:
+            inc_types = {t.upper() for t in include_competition_types}
+            equipes = [
+                e
+                for e in equipes
+                if str(e.get("competition_type") or "").upper() in inc_types
+            ]
+        elif target_div and not kwargs.get("include_cup", False):
+            equipes = [
+                e
+                for e in equipes
+                if str(e.get("competition_type") or "").upper() != "COUPE"
+                and "COUPE" not in str(e.get("competition") or "").upper()
+            ]
+
+        if exclude_competition_types:
+            exc_types = {t.upper() for t in exclude_competition_types}
+            equipes = [
+                e
+                for e in equipes
+                if str(e.get("competition_type") or "").upper() not in exc_types
+            ]
+
+        # Exclusion espoirs si senior demandé
+        if target_div and not target_div.is_espoir:
+            equipes = [
+                e
+                for e in equipes
+                if "ESPOIR" not in str(e.get("competition") or "").upper()
+            ]
+
+        # Exclusion équipes jeunes si senior demandé
+        if not include_youth and target_div and target_div.is_senior:
+            equipes = [
+                e
+                for e in equipes
+                if (e.get("categorie") or "").upper().strip()
+                in ("SE", "SENIOR", "SENIORS")
+                or not (e.get("categorie") or "").upper().strip().startswith("U")
+            ]
 
     if engagement_id is not None:
         target_eng = str(engagement_id).strip()
@@ -247,6 +372,7 @@ async def _build_calendar_matches(
             if str(e.get("engagement_id") or e.get("team_id") or "").strip()
             == target_eng
         ]
+
     if competition_id is not None:
         target_comp = str(competition_id).strip()
         equipes = [
@@ -254,6 +380,7 @@ async def _build_calendar_matches(
             for e in equipes
             if str(e.get("competition_id") or "").strip() == target_comp
         ]
+
     if competition_type is not None:
         target_type = str(competition_type).strip().upper()
         equipes = [
@@ -261,8 +388,13 @@ async def _build_calendar_matches(
             for e in equipes
             if str(e.get("competition_type") or "").strip().upper() == target_type
         ]
+
     if not equipes:
+        all_labels = sorted(
+            [str(t["team_label"]) for t in all_teams_raw if t.get("team_label")]
+        )
         return {
+            "status": "not_found",
             "items": [],
             "_meta": {
                 "total": 0,
@@ -274,9 +406,10 @@ async def _build_calendar_matches(
                 "generated_at": datetime.now(_TZ).isoformat(),
             },
             "warning": (
-                f"Aucun engagement ne correspond aux critères de compétition spécifiés "
-                f"(engagement_id={engagement_id}, competition_id={competition_id}, competition_type={competition_type})."
+                f"Aucun engagement ne correspond aux critères spécifiés (catégorie='{categorie}', scope='{effective_scope}'). "
+                "Aucun élargissement silencieux au calendrier global du club n'est autorisé."
             ),
+            "candidates": all_labels,
         }
 
     equipes = _dedup_equipes_by_engagement_local(equipes)
@@ -288,16 +421,23 @@ async def _build_calendar_matches(
         dict.fromkeys(str(e.get("poule_id")) for e in equipes if e.get("poule_id"))
     )
 
+    import sys
     import unittest.mock
 
     from .poule import get_poule_service as poule_fn
 
-    if isinstance(
+    poule_mod = sys.modules.get("ffbb_mcp.services.poule")
+    poule_getter = None
+    for cand in [
+        getattr(poule_mod, "get_poule_service", None),
         getattr(svc, "get_poule_service", None),
-        (unittest.mock.AsyncMock, unittest.mock.MagicMock),
-    ):
-        poule_getter = svc.get_poule_service
-    else:
+    ]:
+        if isinstance(
+            cand, (unittest.mock.AsyncMock, unittest.mock.MagicMock)
+        ) or hasattr(cand, "mock_calls"):
+            poule_getter = cand
+            break
+    if poule_getter is None:
         poule_getter = poule_fn
 
     poule_tasks = [poule_getter(poule_id) for poule_id in unique_poule_ids]
@@ -414,6 +554,30 @@ async def _build_calendar_matches(
                 iso_date = scheduled_date or None  # type: ignore[assignment]
                 time_confirmed = False
 
+            from ffbb_mcp.canonical_status import (
+                CanonicalMatchStatus,
+                canonicalize_match_status,
+            )
+
+            canon_statut, data_quality = canonicalize_match_status(match)
+
+            # Exclure les matchs en conflit sauf demande explicite
+            if canon_statut == CanonicalMatchStatus.UNKNOWN_CONFLICT and not kwargs.get(
+                "include_conflicts", False
+            ):
+                continue
+
+            # Exclure les matchs annulés sauf demande explicite
+            if canon_statut == CanonicalMatchStatus.CANCELLED and not kwargs.get(
+                "include_cancelled", False
+            ):
+                continue
+
+            if status_filter:
+                clean_sf = [s.lower() for s in status_filter]
+                if canon_statut.value not in clean_sf:
+                    continue
+
             calendar_match: dict[str, Any] = {
                 "id": str(match_id),
                 "date": iso_date,
@@ -421,14 +585,26 @@ async def _build_calendar_matches(
                 "scheduled_at": scheduled_at,
                 "time_confirmed": time_confirmed,
                 "horaire_renseigne": time_confirmed,
-                "statut": _compute_match_statut(match, dt_parsed),
+                "statut": canon_statut.value,
+                "canonical_status": canon_statut.value,
+                "data_quality": data_quality.model_dump(),
                 "joue": joue,
                 "equipe1": eq1,
                 "equipe2": eq2,
                 "score_equipe1": score1,
                 "score_equipe2": score2,
+                "engagement_id": equipe_eng_id,
+                "team_label": equipe.get("team_label")
+                or equipe.get("nom_equipe")
+                or "",
+                "numero_equipe": eq_num,
+                "competition_id": str(equipe.get("competition_id") or ""),
+                "competition_name": equipe.get("competition", ""),
                 "competition_nom": equipe.get("competition", ""),
-                "competition_type": _detect_phase_type(equipe.get("competition", "")),
+                "competition_type": equipe.get("competition_type")
+                or _detect_phase_type(equipe.get("competition", "")),
+                "poule_id": str(poule_id),
+                "season_id": str(season_id or equipe.get("season_id") or ""),
                 "num_journee": journee,
             }
             if salle:
@@ -663,6 +839,15 @@ async def get_calendrier_club_service(
     competition_id: int | str | None = None,
     competition_type: str | None = None,
     season_id: int | str | None = None,
+    scope: str | None = None,
+    include_competition_types: list[str] | None = None,
+    exclude_competition_types: list[str] | None = None,
+    include_friendlies: bool = False,
+    include_youth: bool = False,
+    include_reserves: bool = False,
+    status_filter: list[str] | None = None,
+    strict_filters: bool = True,
+    group_by: str | None = None,
     force_refresh: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
@@ -670,12 +855,33 @@ async def get_calendrier_club_service(
         engagement_id = kwargs.get("engagement_id")
     if offset is None:
         offset = kwargs.get("offset")
+    if scope is None:
+        scope = kwargs.get("scope")
+    if include_competition_types is None:
+        include_competition_types = kwargs.get("include_competition_types")
+    if exclude_competition_types is None:
+        exclude_competition_types = kwargs.get("exclude_competition_types")
+    if status_filter is None:
+        status_filter = kwargs.get("status_filter")
+    if group_by is None:
+        group_by = kwargs.get("group_by")
+
     limit = max(1, min(100, limit)) if limit is not None else None
     if offset is not None:
         offset = max(0, offset)
-    # Clé de cache sans limit/offset pour maximiser le hit ratio.
-    # La pagination est appliquée en aval sur le résultat complet.
-    cache_key = f"calendrier:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}:{numero_equipe or ''}:{_normalize_name(adversaire or '')}:{date_debut or ''}:{date_fin or ''}:{engagement_id or ''}:{competition_id or ''}:{competition_type or ''}"
+
+    inc_types = ",".join(sorted(include_competition_types or []))
+    exc_types = ",".join(sorted(exclude_competition_types or []))
+    st_filter = ",".join(sorted(status_filter or []))
+    # Clé de cache incluant le scope et les filtres métier
+    cache_key = (
+        f"calendrier:{organisme_id or ''}:{_normalize_name(club_name or '')}:"
+        f"{_normalize_name(categorie or '')}:{numero_equipe or ''}:"
+        f"{_normalize_name(adversaire or '')}:{date_debut or ''}:{date_fin or ''}:"
+        f"{engagement_id or ''}:{competition_id or ''}:{competition_type or ''}:"
+        f"{scope or ''}:{inc_types}:{exc_types}:{include_friendlies}:{include_youth}:"
+        f"{include_reserves}:{st_filter}:{strict_filters}:{group_by or ''}:{season_id or ''}"
+    )
 
     if force_refresh and state.cache_calendrier is not None:
         state.cache_calendrier.pop(cache_key, None)
@@ -700,6 +906,15 @@ async def get_calendrier_club_service(
             competition_type=competition_type,
             season_id=season_id,
             offset=offset,
+            scope=scope,
+            include_competition_types=include_competition_types,
+            exclude_competition_types=exclude_competition_types,
+            include_friendlies=include_friendlies,
+            include_youth=include_youth,
+            include_reserves=include_reserves,
+            status_filter=status_filter,
+            strict_filters=strict_filters,
+            group_by=group_by,
         ),
         cache_name="calendrier",
     )

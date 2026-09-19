@@ -1,8 +1,15 @@
-"""Modèles de données pour les règlements FFBB et départementaux."""
-
 from __future__ import annotations
 
+import hashlib
+from typing import Any
+
 from pydantic import BaseModel, Field
+
+
+def compute_content_hash(content: str) -> str:
+    """Calcule le hash SHA-256 canonique du contenu."""
+    digest = hashlib.sha256((content or "").strip().encode("utf-8")).hexdigest()
+    return f"sha256:{digest}"
 
 
 class RegulationArticle(BaseModel):
@@ -15,8 +22,13 @@ class RegulationArticle(BaseModel):
     document_id: str = Field(
         ..., description="ID du document source (ex: rsg_ffbb_2026_2027)"
     )
+    title: str | None = Field(default=None, description="Titre du document source")
     season: str = Field(..., description="Saison sportive (ex: 2026-2027)")
     level: str = Field(..., description="Niveau (federal, regional, departmental)")
+    jurisdiction: str = Field(
+        default="France",
+        description="Juridiction territoriale (France, Région, Département)",
+    )
     organizer: str = Field(
         ..., description="Organisme responsable (FFBB, Ligue AURA, Comité 63)"
     )
@@ -32,7 +44,36 @@ class RegulationArticle(BaseModel):
     topics: list[str] = Field(
         default_factory=list, description="Thématiques et mots-clés associés"
     )
-    source_url: str | None = Field(None, description="URL source officielle")
+    source_url: str | None = Field(
+        default=None, description="URL source officielle legacy"
+    )
+    official_source_url: str | None = Field(
+        default=None, description="URL source officielle"
+    )
+    source_retrieved_at: str | None = Field(
+        default=None, description="Horodatage ISO de récupération de la source"
+    )
+    source_last_verified_at: str | None = Field(
+        default=None, description="Horodatage ISO de dernière vérification officielle"
+    )
+    content_hash: str = Field(
+        default="", description="Hash SHA-256 du contenu de l'article pour traçabilité"
+    )
+    is_current_for_query: bool = Field(
+        default=True, description="Indique si l'article est d'actualité pour la requête"
+    )
+    applicability_notes: list[str] = Field(
+        default_factory=list,
+        description="Notes d'applicabilité, hiérarchie réglementaire et dérogations",
+    )
+
+    def model_post_init(self, __context: Any) -> None:
+        if not self.content_hash and self.content:
+            self.content_hash = compute_content_hash(self.content)
+        if not self.official_source_url and self.source_url:
+            self.official_source_url = self.source_url
+        if not self.source_url and self.official_source_url:
+            self.source_url = self.official_source_url
 
 
 class RegulationSearchResult(BaseModel):

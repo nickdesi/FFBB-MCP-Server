@@ -60,8 +60,12 @@ def _compute_bilan_from_rencontres(
     club_norm = _norm(club_nom)
     found = False
 
+    from ffbb_mcp.canonical_status import is_match_eligible_for_aggregate
+
     for r in rencontres:
-        if r.get("joue") not in (1, "1"):
+        if r.get("joue") not in (1, "1", True):
+            continue
+        if not is_match_eligible_for_aggregate(r):
             continue
 
         eq1 = r.get("nomEquipe1", "")

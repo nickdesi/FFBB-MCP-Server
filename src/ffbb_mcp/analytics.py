@@ -247,6 +247,8 @@ def compute_head_to_head(
     nom_b: str | None = None,
 ) -> dict[str, Any]:
     """Analyse les confrontations directes (Face-à-Face / Head-to-Head) entre deux équipes."""
+    from ffbb_mcp.canonical_status import is_match_eligible_for_aggregate
+
     norm_a = _normalize_name(nom_a or "")
     norm_b = _normalize_name(nom_b or "")
     eid_a = str(eng_id_a) if eng_id_a else None
@@ -260,7 +262,7 @@ def compute_head_to_head(
     total_pts_b = 0
 
     for r in rencontres:
-        if not isinstance(r, dict) or r.get("joue") not in (1, "1", True):
+        if not isinstance(r, dict) or not is_match_eligible_for_aggregate(r):
             continue
         score1 = r.get("resultatEquipe1")
         score2 = r.get("resultatEquipe2")

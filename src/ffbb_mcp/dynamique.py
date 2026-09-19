@@ -64,10 +64,12 @@ def compute_team_dynamique(
 
     played_matches: list[dict[str, Any]] = []
 
+    from ffbb_mcp.canonical_status import is_match_eligible_for_aggregate
+
     for r in rencontres:
         if not isinstance(r, dict):
             continue
-        if r.get("joue") not in (1, "1", True):
+        if not is_match_eligible_for_aggregate(r):
             continue
 
         eq1 = str(r.get("nomEquipe1", "") or "")

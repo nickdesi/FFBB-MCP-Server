@@ -56,7 +56,7 @@ from .division import (
     _filter_teams_by_competition,
     _parse_division_code,
 )
-from .search import ffbb_resolve_team_service  # noqa: F401
+from .search import ffbb_resolve_team_service, resolve_club_and_org  # noqa: F401
 
 logger = logging.getLogger("ffbb-mcp")
 _EMPTY_SET: set[str] = set()
@@ -260,9 +260,9 @@ async def ffbb_equipes_club_service(
                     filtered_teams = []
     else:
         # 2) Filtrage par niveau / division / code de compétition (ex: NM3, PNM, R2...)
-        comp_matches = _filter_teams_by_competition(all_teams, filtre)
-        if comp_matches:
-            filtered_teams = comp_matches
+        if is_division_filter:
+            comp_matches = _filter_teams_by_competition(all_teams, filtre)
+            filtered_teams = comp_matches if comp_matches else []
         else:
             for t in all_teams:
                 t_cat = (t.get("categorie") or "").upper().strip()
@@ -286,18 +286,6 @@ async def ffbb_equipes_club_service(
                 ):
                     continue
                 filtered_teams.append(t)
-
-            if is_division_filter and not comp_matches:
-                # Si un code de division (ex: NM3) a été demandé mais qu'aucun championnat
-                # ne porte exactement ce nom, on cible en priorité l'équipe 1 (équipe fanion)
-                # parmi les équipes seniors du même genre.
-                team1_matches = [
-                    t
-                    for t in filtered_teams
-                    if (t.get("numero_equipe") or "").strip() in ("1", "")
-                ]
-                if team1_matches:
-                    filtered_teams = team1_matches
 
         if parsed_filter and parsed_filter.numero_equipe is not None:
             want_num = str(parsed_filter.numero_equipe)
@@ -430,9 +418,27 @@ async def _resolve_team_equipes(
                 None,
             )
 
+    import sys
+    import unittest.mock
+
     import ffbb_mcp.services as svc
 
-    resolved_clubs, org_data = await svc.resolve_club_and_org(
+    resolve_fn = None
+    for cand in [
+        getattr(svc, "resolve_club_and_org", None),
+        getattr(sys.modules[__name__], "resolve_club_and_org", None),
+    ]:
+        if isinstance(
+            cand, (unittest.mock.AsyncMock, unittest.mock.MagicMock)
+        ) or hasattr(cand, "mock_calls"):
+            resolve_fn = cand
+            break
+    from .search import resolve_club_and_org as default_resolve_fn
+
+    if resolve_fn is None:
+        resolve_fn = default_resolve_fn
+
+    resolved_clubs, org_data = await resolve_fn(
         club_name=club_name,
         organisme_id=organisme_id,
         categorie=categorie,
@@ -609,10 +615,39 @@ async def _resolve_team_equipes(
         )
 
     # Détection d'ambiguïté si plusieurs compétitions distinctes subsistent sans filtre explicite
-    comp_ids = {str(e.get("competition_id") or "") for e in equipes}
+    # (Les phases successives d'une même équipe ne constituent pas une ambiguïté)
+    from .search import _extract_base_competition_name, _is_coupe_competition
+
+    def _is_same_team_different_phases(eq_list: list[dict[str, Any]]) -> bool:
+        if len(eq_list) <= 1:
+            return True
+        phases = {e.get("phase_label") for e in eq_list if e.get("phase_label")}
+        if len(phases) == len(eq_list) and len(phases) > 1:
+            nums = {str(e.get("numero_equipe") or "1") for e in eq_list}
+            types = {str(e.get("competition_type") or "").upper() for e in eq_list}
+            if len(nums) <= 1 and len(types) <= 1:
+                return True
+        distinct_bases = {
+            (
+                _is_coupe_competition(
+                    str(e.get("competition") or ""), e.get("competition_type")
+                ),
+                _extract_base_competition_name(str(e.get("competition") or "")),
+                str(e.get("numero_equipe") or "1"),
+            )
+            for e in eq_list
+        }
+        return len(distinct_bases) == 1
+
+    is_multi_phase = _is_same_team_different_phases(equipes)
+
+    comp_ids = {
+        str(e.get("competition_id") or e.get("competition") or "") for e in equipes
+    }
     eng_ids = {str(e.get("engagement_id") or e.get("team_id") or "") for e in equipes}
     if (
-        len(comp_ids) > 1
+        not is_multi_phase
+        and (len(comp_ids) > 1 or len(eng_ids) > 1)
         and engagement_id is None
         and competition_id is None
         and competition_type is None
@@ -622,26 +657,13 @@ async def _resolve_team_equipes(
         return (
             {
                 "status": "ambiguous",
-                "message": f"Plusieurs engagements ({len(equipes)}) existent pour '{categorie}'. Précisez `engagement_id`, `competition_id` ou `competition_type`.",
+                "message": f"Plusieurs engagements ({len(equipes)}) existent pour '{categorie or club_resolu.get('nom', '')}'. Précisez `engagement_id`, `competition_id` ou `competition_type`.",
                 "candidates": equipes,
                 "club_resolu": club_resolu,
             },
             [],
             club_resolu,
         )
-    # Également ambigu si plusieurs engagement_id distincts même compétition (rare mais possible)
-    if (
-        len(eng_ids) > 1
-        and len(comp_ids) == 1
-        and engagement_id is None
-        and competition_id is None
-        and competition_type is None
-        and poule_id is None
-        and len(equipes) > 1
-    ):
-        # Ne déclenche que si vraiment plusieurs engagements différents pour même catégorie
-        # (ex: U18M1 engagée 2 fois en PLAT phase différente mais déduplication n'a pas filtré)
-        pass  # laisse passer, la déduplication a déjà réduit
 
     return None, equipes, club_resolu
 
@@ -793,15 +815,23 @@ async def ffbb_next_match_service(
         force_refresh=force_refresh,
     )
 
+    from ffbb_mcp.canonical_status import (
+        CanonicalMatchStatus,
+        canonicalize_match_status,
+    )
+
+    valid_upcoming = {
+        CanonicalMatchStatus.SCHEDULED,
+        CanonicalMatchStatus.LIVE,
+        CanonicalMatchStatus.HALFTIME,
+        CanonicalMatchStatus.OVERTIME,
+    }
+
     tz = _PARIS_TZ
     upcoming: list[tuple[datetime, dict, dict]] = []
     for m, eq in all_matches:
-        joue = m.get("joue")
-        res1 = m.get("resultatEquipe1", m.get("resultat_equipe1"))
-        res2 = m.get("resultatEquipe2", m.get("resultat_equipe2"))
-        if joue not in (0, "0", None):
-            continue
-        if res1 not in (None, "", "None") or res2 not in (None, "", "None"):
+        st, q = canonicalize_match_status(m)
+        if q.level == "conflict" or st not in valid_upcoming:
             continue
         dt = _parse_dt(m.get("date_rencontre", m.get("date")))
         if dt is None:
@@ -821,12 +851,8 @@ async def ffbb_next_match_service(
         )
         upcoming = []
         for m, eq in all_matches:
-            joue = m.get("joue")
-            res1 = m.get("resultatEquipe1", m.get("resultat_equipe1"))
-            res2 = m.get("resultatEquipe2", m.get("resultat_equipe2"))
-            if joue not in (0, "0", None):
-                continue
-            if res1 not in (None, "", "None") or res2 not in (None, "", "None"):
+            st, q = canonicalize_match_status(m)
+            if q.level == "conflict" or st not in valid_upcoming:
                 continue
             dt = _parse_dt(m.get("date_rencontre", m.get("date")))
             if dt is None:
@@ -1007,11 +1033,30 @@ async def ffbb_last_result_service(
             numero_equipe=numero_equipe,
             force_refresh=refresh,
         )
-        joues = [
-            (m, eq)
-            for m, eq in all_matches
-            if m.get("joue") == 1 and m.get("resultatEquipe1") not in (None, "None")
-        ]
+        from ffbb_mcp.canonical_status import (
+            CanonicalMatchStatus,
+            canonicalize_match_status,
+            is_match_eligible_for_aggregate,
+        )
+
+        valid_final_statuses = {
+            CanonicalMatchStatus.FINAL,
+            CanonicalMatchStatus.FORFEIT_HOME,
+            CanonicalMatchStatus.FORFEIT_AWAY,
+            CanonicalMatchStatus.FORFEIT_BOTH,
+        }
+
+        joues = []
+        for m, eq in all_matches:
+            if not is_match_eligible_for_aggregate(m):
+                continue
+            st, q = canonicalize_match_status(m)
+            if (
+                st in valid_final_statuses
+                and q.level != "conflict"
+                and m.get("resultatEquipe1") not in (None, "None", "")
+            ):
+                joues.append((m, eq))
         if not joues:
             return None
 
@@ -1260,9 +1305,13 @@ async def ffbb_head_to_head_service(
         force_refresh=force_refresh,
     )
     if err_a:
+        status_a = err_a.get("status") or "not_found"
         return {
+            "status": status_a,
             "error": f"Équipe A ({eff_club_a or eff_org_id_a or eff_eng_a}) introuvable",
+            "message": err_a.get("message", "Équipe A introuvable"),
             "details": err_a,
+            "candidates": err_a.get("candidates", []),
         }
 
     err_b, eq_b, club_res_b = await _resolve_team_equipes(
@@ -1338,9 +1387,13 @@ async def ffbb_head_to_head_service(
                     break
 
     if err_b:
+        status_b = err_b.get("status") or "not_found"
         return {
+            "status": status_b,
             "error": f"Équipe B ({eff_club_b or eff_org_id_b or eff_eng_b}) introuvable",
+            "message": err_b.get("message", "Équipe B introuvable"),
             "details": err_b,
+            "candidates": err_b.get("candidates", []),
         }
 
     nom_a = (club_res_a or {}).get("nom") or eff_club_a or "Équipe A"
@@ -1431,8 +1484,24 @@ async def ffbb_head_to_head_service(
             f"Début de saison : première confrontation officielle de la saison entre {nom_a} et {nom_b}."
         )
 
+    h2h_formatted = {
+        "status": "no_head_to_head_found"
+        if h2h_data["confrontations_count"] == 0
+        else "ok",
+        "matches": h2h_data.get("matchs", []),
+        "wins_a": h2h_data.get("victoires_a", 0),
+        "wins_b": h2h_data.get("victoires_b", 0),
+        "draws": h2h_data.get("nuls", 0),
+        "points_a": h2h_data.get("moyenne_points_a", 0.0),
+        "points_b": h2h_data.get("moyenne_points_b", 0.0),
+        "confrontations_count": h2h_data["confrontations_count"],
+        "bilan_h2h": h2h_data["bilan_h2h"],
+    }
+
     result = {
         "status": "ok",
+        "head_to_head": h2h_formatted,
+        "face_a_face": h2h_data,
         "equipe_a": {
             "nom": nom_a,
             "club_resolu": club_res_a,
@@ -1445,7 +1514,6 @@ async def ffbb_head_to_head_service(
             "dynamique": dynamique_b,
             "profil": profil_b,
         },
-        "face_a_face": h2h_data,
         "points_cles_llm": narrative_points,
         "_meta": _freshness_meta(cache="poule", force_refresh_supported=True),
     }
