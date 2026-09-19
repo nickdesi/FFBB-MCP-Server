@@ -20,6 +20,11 @@ import httpx
 from pydantic import ValidationError
 
 from ffbb_mcp._state import state
+from ffbb_mcp.competition_type import (
+    format_competition_display,
+    resolve_competition_type,
+    resolve_practice,
+)
 from ffbb_mcp.models import CalendrierMatch
 from ffbb_mcp.utils import format_team_name
 
@@ -578,6 +583,21 @@ async def _build_calendar_matches(
                 if canon_statut.value not in clean_sf:
                     continue
 
+            comp_type_raw = str(equipe.get("competition_type") or "").strip() or None
+            comp_type_detail = resolve_competition_type(comp_type_raw)
+            poule_nom_clean = (
+                str(poule_data.get("nom") or "").strip()
+                if isinstance(poule_data, dict)
+                else ""
+            )
+            practice_info = resolve_practice(match.get("pratique"))
+            comp_nom_clean = (equipe.get("competition") or "").strip()
+            display_title = format_competition_display(
+                competition_name=comp_nom_clean,
+                poule_name=poule_nom_clean,
+                practice=practice_info,
+            )
+
             calendar_match: dict[str, Any] = {
                 "id": str(match_id),
                 "date": iso_date,
@@ -599,11 +619,17 @@ async def _build_calendar_matches(
                 or "",
                 "numero_equipe": eq_num,
                 "competition_id": str(equipe.get("competition_id") or ""),
-                "competition_name": equipe.get("competition", ""),
-                "competition_nom": equipe.get("competition", ""),
-                "competition_type": equipe.get("competition_type")
-                or _detect_phase_type(equipe.get("competition", "")),
+                "competition_name": comp_nom_clean,
+                "competition_nom": comp_nom_clean,
+                "competition_display": display_title,
+                "competition_type": comp_type_raw or _detect_phase_type(comp_nom_clean),
+                "competition_type_code": comp_type_raw,
+                "competition_type_detail": comp_type_detail.model_dump(),
                 "poule_id": str(poule_id),
+                "poule_nom": poule_nom_clean,
+                "poule_name": poule_nom_clean,
+                "pratique": practice_info.get("label") or practice_info.get("code"),
+                "pratique_code": practice_info.get("code"),
                 "season_id": str(season_id or equipe.get("season_id") or ""),
                 "num_journee": journee,
             }

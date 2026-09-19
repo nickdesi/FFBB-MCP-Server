@@ -302,6 +302,34 @@ class CalendrierMatch(BaseModel):
         default=None,
         description="ID de la saison.",
     )
+    competition_display: str | None = Field(
+        default=None,
+        description="Libellé formaté pour l'affichage : 'Compétition — Poule — Pratique'.",
+    )
+    competition_type_code: str | None = Field(
+        default=None,
+        description="Code technique brut FFBB (ex: PLAT, DIV, COUPE).",
+    )
+    competition_type_detail: dict[str, Any] | None = Field(
+        default=None,
+        description="Détail canonique documenté du type de compétition (code, label, source, documented).",
+    )
+    poule_nom: str | None = Field(
+        default=None,
+        description="Nom officiel de la poule (ex: 'Poule A').",
+    )
+    poule_name: str | None = Field(
+        default=None,
+        description="Nom officiel de la poule (alias).",
+    )
+    pratique: str | None = Field(
+        default=None,
+        description="Type de pratique (ex: Basket 5×5, 3x3).",
+    )
+    pratique_code: str | None = Field(
+        default=None,
+        description="Code technique brut de la pratique (ex: '5x5').",
+    )
 
     @field_validator("score_equipe1", "score_equipe2", "joue", mode="before")
     @classmethod

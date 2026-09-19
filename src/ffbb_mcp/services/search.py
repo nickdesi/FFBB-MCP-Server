@@ -12,6 +12,7 @@ from mcp.types import INTERNAL_ERROR, ErrorData
 from pydantic import ValidationError
 
 from ffbb_mcp._state import state
+from ffbb_mcp.competition_type import resolve_competition_type
 
 
 async def get_client_async(*args, **kwargs):
@@ -1643,6 +1644,7 @@ async def ffbb_find_team_candidates_service(
             confidence = 0.70
             reason = f"Équipe réserve n°{cand_num} ({team_label}, {comp_name}, niveau {niveau_str})."
 
+        comp_type_detail = resolve_competition_type(comp_type)
         candidates.append(
             {
                 "nom_equipe": nom_officiel,
@@ -1650,6 +1652,8 @@ async def ffbb_find_team_candidates_service(
                 "numero_equipe": cand_num,
                 "competition_name": comp_name,
                 "competition_type": comp_type,
+                "competition_type_code": comp_type,
+                "competition_type_detail": comp_type_detail.model_dump(),
                 "niveau": niveau_str,
                 "engagement_id": eng_id,
                 "poule_id": poule_id,

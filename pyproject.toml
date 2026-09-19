@@ -125,11 +125,13 @@ ignore_missing_imports = true
 
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "RUF059", "F821"]
+"tests/*" = ["S101", "RUF001", "RUF002", "RUF003", "RUF059", "F821"]
 "tools/*" = ["S110"]
 "src/ffbb_mcp/prompts.py" = ["RUF001", "RUF003"]
 "src/ffbb_mcp/cache_strategy.py" = ["RUF003"]
 "src/ffbb_mcp/server.py" = ["RUF001"]
+"src/ffbb_mcp/competition_type.py" = ["RUF001", "RUF002", "RUF003"]
+"src/ffbb_mcp/models.py" = ["RUF001", "RUF002", "RUF003"]
 "src/ffbb_mcp/services/*" = ["E402"]
 
 [[tool.mypy.overrides]]
