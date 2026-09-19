@@ -1,6 +1,6 @@
 # 🏀 Règles métier FFBB MCP
 
-> Validé contre MCP FFBB v1.7.0 et champs exposés par `ffbb-data-client` (>=2.0.0, Pydantic v2)
+> Validé contre MCP FFBB v1.14.5 et champs exposés par `ffbb-data-client` (>=2.4.25, Pydantic v2)
 >
 > **Source canonique de maintenance** : ce document est la **référence**
 > pour toute règle métier FFBB (scoring, désambiguïsation, exclusions, goal-average).
