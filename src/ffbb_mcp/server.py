@@ -29,6 +29,7 @@ from .services import (
     explain_tiebreak_rules_service,
     ffbb_bilan_service,
     ffbb_equipes_club_service,
+    ffbb_find_team_candidates_service,
     ffbb_get_classement_service,
     ffbb_head_to_head_service,
     ffbb_last_result_service,
@@ -1046,6 +1047,80 @@ async def ffbb_resolve_team(
 
 
 # ---------------------------------------------------------------------------
+# TOOL 7bis — Recherche et désambiguïsation d'équipes candidates
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(
+    name="ffbb_find_team_candidates",
+    title="Recherche et désambiguïsation d'équipes candidates",
+    annotations=_READONLY_ANNOTATIONS,
+)
+@track_tool_usage("ffbb_find_team_candidates")
+async def ffbb_find_team_candidates(
+    club_name: Annotated[
+        str | None,
+        Field(
+            description="Nom du club ou de la CTC (ex: 'Cournon', 'Stade Clermontois'). Requis si organisme_id absent."
+        ),
+    ] = None,
+    organisme_id: Annotated[
+        int | str | None,
+        Field(description="ID FFBB du club (ex: '9289'). Requis si club_name absent."),
+    ] = None,
+    categorie: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Catégorie, étiquette ou division demandée (ex: 'U13F1', 'U13F', 'U15M', 'NM3', 'Senior'). "
+                "L'outil extrait tranche d'âge, genre et numéro recherchés pour isoler les candidats."
+            )
+        ),
+    ] = None,
+    sexe: Annotated[
+        Literal["M", "F", "MIXTE"] | None,
+        Field(description="Genre de l'équipe ('M', 'F' ou 'MIXTE')."),
+    ] = None,
+    numero_equipe: Annotated[
+        int | None,
+        Field(description="Numéro d'équipe facultatif (ex: 1, 2)."),
+    ] = None,
+    season_id: Annotated[
+        int | str | None,
+        Field(description="ID de la saison FFBB (optionnel)."),
+    ] = None,
+    include_next_match: Annotated[
+        bool,
+        Field(
+            description="Si True (défaut), récupère le prochain match programmé pour chaque candidat."
+        ),
+    ] = True,
+    force_refresh: Annotated[
+        bool,
+        Field(description="Si True, force le rafraîchissement des données."),
+    ] = False,
+) -> dict[str, Any]:
+    """Recherche et ordonne les équipes candidates d'un club/CTC pour désambiguïser avant tout calendrier/résultat.
+
+    Évite la confusion entre équipe fanion sans numéro (ex: U13F en régional) et équipe réserve (ex: U13F2 en départemental).
+    Retourne la liste des candidats triés avec confiance, motif, détails de compétition et prochain match.
+    """
+    try:
+        return await ffbb_find_team_candidates_service(
+            club_name=club_name,
+            organisme_id=organisme_id,
+            categorie=categorie,
+            sexe=sexe,
+            numero_equipe=numero_equipe,
+            season_id=season_id,
+            include_next_match=include_next_match,
+            force_refresh=force_refresh,
+        )
+    except Exception as e:
+        raise handle_api_error(e) from e
+
+
+# ---------------------------------------------------------------------------
 # TOOL 8 — Résumé d'équipe (bilan + prochain/dernier match)
 # ---------------------------------------------------------------------------
 
@@ -2004,6 +2079,18 @@ def _optimize_tool_schemas(mcp_instance: FastMCP) -> None:
             {"required": ["engagement_id_b"]},
             {"required": ["engagement_id"]},
             {"required": ["poule_id"]},
+        ]
+
+    # ffbb_find_team_candidates accepte soit organisme_id soit club_name
+    cand_tool = tools_map.get("ffbb_find_team_candidates")
+    if (
+        cand_tool
+        and hasattr(cand_tool, "parameters")
+        and isinstance(cand_tool.parameters, dict)
+    ):
+        cand_tool.parameters["anyOf"] = [
+            {"required": ["organisme_id"]},
+            {"required": ["club_name"]},
         ]
 
     # Suppression de l'output_schema verbeux sur tous les outils pour diviser le payload tools/list

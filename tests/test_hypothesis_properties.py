@@ -7,7 +7,11 @@ import unicodedata
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from ffbb_mcp.aliases_registry import get_aliases_registry
+from ffbb_mcp.aliases_registry import (
+    compact_alias_key,
+    get_aliases_registry,
+    normalize_alias_key,
+)
 from ffbb_mcp.canonical_status import CanonicalMatchStatus, canonicalize_match_status
 
 # Stratégie générant des divisions arbitraires ou mal formées
@@ -47,9 +51,16 @@ def test_property_no_random_string_maps_to_national_division_unless_declared(
     registry = get_aliases_registry()
     div = registry.lookup(raw_query)
     if div is not None:
-        # Si une division a été trouvée, la chaîne nettoyée doit être dans ses alias
+        # Si une division a été trouvée, la chaîne nettoyée doit être déclarée dans ses alias/clés
+        declared = {
+            normalize_alias_key(a) for a in [*div.aliases, div.key, div.canonical_code]
+        }
+        compact_declared = {
+            compact_alias_key(a) for a in [*div.aliases, div.key, div.canonical_code]
+        }
         norm = registry.normalize_alias(raw_query)
-        assert norm in div.aliases
+        comp = compact_alias_key(raw_query)
+        assert norm in declared or comp in compact_declared
 
 
 @given(

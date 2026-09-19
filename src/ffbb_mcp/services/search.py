@@ -1279,3 +1279,450 @@ async def resolve_poule_id_service(
 
     equipes.sort(key=sort_key, reverse=True)
     return str(equipes[0].get("poule_id"))
+
+
+def _determine_niveau_label(comp_name: str, comp_type: str, raw_niveau: Any) -> str:
+    """Détermine un niveau lisible pour les humains et les LLMs."""
+    upper = (comp_name or "").upper()
+    if "BRASSAGE" in upper and any(
+        k in upper
+        for k in (
+            "RF",
+            "RM",
+            "RÉGION",
+            "REGION",
+            "REGIONAL",
+            "R1",
+            "R2",
+            "R3",
+        )
+    ):
+        return "régional / brassage"
+    if any(
+        k in upper
+        for k in (
+            "RF",
+            "RM",
+            "R1",
+            "R2",
+            "R3",
+            "PNM",
+            "PNF",
+            "RÉGION",
+            "REGION",
+            "REGIONAL",
+        )
+    ):
+        return "régional"
+    if any(k in upper for k in ("NM", "NF", "NATIONALE", "NATIONAL", "N1", "N2", "N3")):
+        return "national"
+    if any(
+        k in upper
+        for k in ("DÉPARTEMENTAL", "DEPARTEMENTAL", "DF", "DM", "D1", "D2", "D3")
+    ):
+        return "départemental"
+    if "COUPE" in upper or (comp_type or "").upper() == "COUPE":
+        return "coupe"
+    if raw_niveau == 1:
+        return "régional"
+    if raw_niveau == 2:
+        return "départemental"
+    return "départemental"
+
+
+async def ffbb_find_team_candidates_service(
+    club_name: str | None = None,
+    organisme_id: int | str | None = None,
+    categorie: str | None = None,
+    sexe: str | None = None,
+    numero_equipe: int | str | None = None,
+    season_id: int | str | None = None,
+    force_refresh: bool = False,
+    include_next_match: bool = True,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Recherche et ordonne les équipes candidates d'un club/CTC pour désambiguïser avant tout calendrier/résultat.
+
+    Évite la confusion entre équipe fanion sans numéro (ex: U13F en régional) et équipe réserve (ex: U13F2 en départemental).
+    Retourne la liste des candidats triés avec confiance, motif, détails de compétition et prochain match.
+    """
+    import zoneinfo
+    from datetime import datetime
+
+    import ffbb_mcp.services
+    from ffbb_mcp.aliases_registry import get_aliases_registry
+
+    from .common import (
+        disambiguate_clubs_by_category,
+        get_primary_club,
+        is_real_ambiguity,
+    )
+
+    _paris_tz = zoneinfo.ZoneInfo("Europe/Paris")
+
+    if not club_name and not organisme_id:
+        raise McpError(
+            error=ErrorData(
+                code=INTERNAL_ERROR,
+                message="Fournir au minimum club_name ou organisme_id",
+            )
+        )
+
+    resolved_clubs, _ = await resolve_club_and_org(
+        club_name=club_name,
+        organisme_id=organisme_id,
+        categorie=categorie,
+        force_refresh=force_refresh,
+    )
+    if not resolved_clubs:
+        return {
+            "status": "not_found",
+            "message": f"Club '{club_name or organisme_id}' introuvable.",
+            "candidates": [],
+            "clarification_prompt": None,
+        }
+
+    if not organisme_id and categorie:
+        resolved_clubs, _ = await disambiguate_clubs_by_category(
+            resolved_clubs,
+            categorie=categorie,
+            club_name=club_name,
+            season_id=season_id,
+            force_refresh=force_refresh,
+        )
+
+    if is_real_ambiguity(resolved_clubs, club_name) and not organisme_id:
+        return {
+            "status": "ambiguous_club",
+            "message": f"Plusieurs clubs correspondent à '{club_name}'. Précisez l'organisme_id.",
+            "candidates": resolved_clubs,
+            "clarification_prompt": f"Plusieurs clubs correspondent à '{club_name}'. Précisez l'organisme_id parmi les options.",
+        }
+
+    club_resolu = get_primary_club(resolved_clubs, club_name) or resolved_clubs[0]
+    target_org_id = str(club_resolu["organisme_id"])
+    club_nom = club_resolu.get("nom", "")
+
+    all_teams = await ffbb_mcp.services.ffbb_equipes_club_service(
+        organisme_id=target_org_id,
+        force_refresh=force_refresh,
+        season_id=season_id,
+    )
+    if not all_teams or (len(all_teams) == 1 and "error" in all_teams[0]):
+        return {
+            "status": "not_found",
+            "message": f"Aucune équipe engagée trouvée pour le club '{club_nom}'.",
+            "club": club_resolu,
+            "candidates": [],
+            "clarification_prompt": None,
+        }
+
+    registry = get_aliases_registry()
+    parsed_req = parse_categorie(categorie) if categorie else None
+    target_div = registry.lookup(categorie) if categorie else None
+
+    req_age: str | None = None
+    req_sexe: str | None = sexe.upper().strip() if sexe else None
+    req_num: int | None = None
+
+    if numero_equipe is not None:
+        try:
+            req_num = int(numero_equipe)
+        except (ValueError, TypeError):
+            req_num = None
+    elif parsed_req and parsed_req.numero_equipe is not None:
+        req_num = parsed_req.numero_equipe
+
+    if parsed_req and parsed_req.categorie:
+        req_age = parsed_req.categorie.upper().strip()
+    if not req_sexe and parsed_req and parsed_req.sexe:
+        req_sexe = parsed_req.sexe.upper().strip()
+
+    if target_div:
+        if target_div.canonical_age:
+            req_age = target_div.canonical_age
+        if not req_sexe and target_div.sex:
+            req_sexe = target_div.sex
+
+    matching_teams: list[dict[str, Any]] = []
+    for t in all_teams:
+        if not isinstance(t, dict) or "error" in t:
+            continue
+        t_cat = (t.get("categorie") or "").upper().strip()
+        t_sexe = (t.get("sexe") or "").upper().strip()
+        t_label = (t.get("team_label") or "").upper().strip()
+        t_comp = (t.get("competition") or "").upper().strip()
+
+        # 1. Tranche d'âge
+        if req_age:
+            is_age_match = (
+                t_cat == req_age
+                or {t_cat, req_age} <= {"SE", "SENIOR", "SENIORS"}
+                or req_age in t_label
+                or req_age in t_comp
+            )
+            if not is_age_match:
+                continue
+
+        # 2. Genre
+        if req_sexe:
+            if t_sexe and t_sexe != req_sexe:
+                continue
+            if not t_sexe:
+                if req_sexe == "F" and "F" not in t_label and "FEMININ" not in t_comp:
+                    continue
+                if req_sexe == "M" and "M" not in t_label and "MASCULIN" not in t_comp:
+                    continue
+
+        matching_teams.append(t)
+
+    if not matching_teams and (req_age or req_sexe):
+        return {
+            "status": "not_found",
+            "message": f"Aucune équipe trouvée pour le club '{club_nom}' avec les critères spécifiés (catégorie={categorie}, sexe={sexe}).",
+            "club": club_resolu,
+            "candidates": [],
+            "clarification_prompt": None,
+        }
+
+    if not matching_teams:
+        matching_teams = [
+            t for t in all_teams if isinstance(t, dict) and "error" not in t
+        ]
+
+    # Déduplication par engagement_id
+    seen_engs: set[str] = set()
+    unique_teams: list[dict[str, Any]] = []
+    for t in matching_teams:
+        eid = str(t.get("engagement_id") or t.get("team_id") or "")
+        if eid and eid in seen_engs:
+            continue
+        if eid:
+            seen_engs.add(eid)
+        unique_teams.append(t)
+
+    candidates: list[dict[str, Any]] = []
+    for t in unique_teams:
+        team_label = t.get("team_label") or ""
+        numero_raw = t.get("numero_equipe")
+        cand_num = (
+            int(numero_raw) if (numero_raw and str(numero_raw).isdigit()) else None
+        )
+        comp_name = (t.get("competition") or "").strip()
+        comp_type = (t.get("competition_type") or "").strip()
+        raw_niveau = t.get("niveau")
+        niveau_str = _determine_niveau_label(comp_name, comp_type, raw_niveau)
+        eng_id = str(t.get("engagement_id") or t.get("team_id") or "")
+        poule_id = str(t.get("poule_id") or "") if t.get("poule_id") else None
+
+        nom_officiel = t.get("nom_equipe") or club_nom
+        next_match_info: dict[str, Any] | None = None
+
+        if include_next_match and poule_id:
+            try:
+                matches = await ffbb_mcp.services._fetch_poule_matches(
+                    [t],
+                    organisme_nom=club_nom,
+                    numero_equipe=cand_num,
+                    force_refresh=force_refresh,
+                )
+                if matches:
+                    for m, _ in matches:
+                        m_nom1 = str(m.get("nomEquipe1") or "")
+                        m_nom2 = str(m.get("nomEquipe2") or "")
+                        for cand_nom in (m_nom1, m_nom2):
+                            cand_nom_clean = cand_nom.strip()
+                            if (
+                                club_nom.lower() in cand_nom_clean.lower()
+                                or "ctc" in cand_nom_clean.lower()
+                                or "entente" in cand_nom_clean.lower()
+                            ):
+                                if cand_num is None or cand_num == 1:
+                                    if not any(
+                                        cand_nom_clean.endswith(f"- {n}")
+                                        for n in range(2, 10)
+                                    ):
+                                        nom_officiel = cand_nom_clean
+                                        break
+                                elif cand_nom_clean.endswith(
+                                    f"- {cand_num}"
+                                ) or cand_nom_clean.endswith(f"-{cand_num}"):
+                                    nom_officiel = cand_nom_clean
+                                    break
+                        if nom_officiel != (t.get("nom_equipe") or club_nom):
+                            break
+
+                    def _match_sort_key(item: tuple[dict, dict]) -> str:
+                        m = item[0]
+                        d = m.get("date_rencontre") or m.get("date") or "9999-99-99"
+                        h = m.get("heure") or "00:00"
+                        return f"{d} {h}"
+
+                    sorted_matches = sorted(matches, key=_match_sort_key)
+                    today_iso = datetime.now(_paris_tz).strftime("%Y-%m-%d")
+                    upcoming = [
+                        m
+                        for m, _ in sorted_matches
+                        if (m.get("date_rencontre") or m.get("date") or "") >= today_iso
+                    ]
+                    target_m = (
+                        upcoming[0]
+                        if upcoming
+                        else (sorted_matches[-1][0] if sorted_matches else None)
+                    )
+
+                    if target_m:
+                        m1 = target_m.get("nomEquipe1") or ""
+                        m2 = target_m.get("nomEquipe2") or ""
+                        is_dom = (
+                            nom_officiel.lower() in m1.lower()
+                            or club_nom.lower() in m1.lower()
+                        )
+                        adv = m2 if is_dom else m1
+                        date_m = str(
+                            target_m.get("date_rencontre") or target_m.get("date") or ""
+                        )
+                        heure_raw = target_m.get("heure")
+                        horaire_flag = target_m.get("horaire")
+                        if horaire_flag in ("0", 0):
+                            heure_str = "Horaire à fixer"
+                        elif heure_raw:
+                            heure_str = str(heure_raw)[:5].replace(":", "h")
+                        elif len(date_m) >= 16 and " " in date_m:
+                            time_part = date_m.split()[1][:5]
+                            heure_str = time_part.replace(":", "h")
+                        else:
+                            heure_str = "Horaire à fixer"
+
+                        next_match_info = {
+                            "date": date_m[:10] if date_m else "Date non fixée",
+                            "heure": heure_str,
+                            "adversaire": adv,
+                            "domicile_exterieur": (
+                                "domicile" if is_dom else "extérieur"
+                            ),
+                            "lieu": target_m.get("nomSalle")
+                            or target_m.get("commune")
+                            or None,
+                        }
+            except Exception as e:
+                logger.debug(
+                    "Erreur récupération next_match candidat %s: %s", eng_id, e
+                )
+
+        # Calcul confiance & motif
+        confidence = 0.5
+        reason = ""
+        if req_num is not None:
+            if cand_num == req_num:
+                confidence = 1.0
+                reason = f"Correspondance exacte : équipe n°{cand_num} ({team_label}, {comp_name})."
+            elif cand_num is None:
+                if req_num == 1:
+                    confidence = 0.85
+                    reason = (
+                        f"Équipe principale sans numéro explicite dans FFBB ({team_label}, {comp_name}, niveau {niveau_str}). "
+                        "En FFBB, l'équipe fanion / de plus haut niveau n'a généralement pas de suffixe '1'."
+                    )
+                else:
+                    confidence = 0.40
+                    reason = f"Équipe sans numéro explicite ({team_label}) alors que l'équipe n°{req_num} était requise."
+            else:
+                confidence = 0.60 if abs(cand_num - req_num) == 1 else 0.45
+                reason = (
+                    f"Même catégorie ({team_label}), mais équipe distincte n°{cand_num} "
+                    f"engagée en {comp_name} (niveau {niveau_str})."
+                )
+        elif categorie and team_label.upper() == categorie.upper().strip():
+            confidence = 0.95
+            reason = f"Libellé FFBB exact '{team_label}' ({comp_name})."
+        elif cand_num == 1 or cand_num is None:
+            confidence = 0.85
+            reason = f"Équipe fanion / principale ({team_label}, {comp_name}, niveau {niveau_str})."
+        else:
+            confidence = 0.70
+            reason = f"Équipe réserve n°{cand_num} ({team_label}, {comp_name}, niveau {niveau_str})."
+
+        candidates.append(
+            {
+                "nom_equipe": nom_officiel,
+                "team_label": team_label,
+                "numero_equipe": cand_num,
+                "competition_name": comp_name,
+                "competition_type": comp_type,
+                "niveau": niveau_str,
+                "engagement_id": eng_id,
+                "poule_id": poule_id,
+                "next_match": next_match_info,
+                "match_confidence": confidence,
+                "match_reason": reason,
+            }
+        )
+
+    # Tri par score décroissant puis niveau
+    def _cand_sort_key(c: dict[str, Any]) -> tuple[float, int, int]:
+        conf = c["match_confidence"]
+        num_score = 10 if c["numero_equipe"] in (1, None) else 5
+        niv_score = 10 if "régional" in c["niveau"] or "national" in c["niveau"] else 5
+        return (conf, num_score, niv_score)
+
+    candidates.sort(key=_cand_sort_key, reverse=True)
+
+    if not candidates:
+        return {
+            "status": "not_found",
+            "club": club_resolu,
+            "candidates": [],
+            "ambiguity": f"Aucun engagement ne correspond aux critères spécifiés ({categorie}).",
+            "clarification_prompt": None,
+        }
+
+    status = "ambiguous"
+    if len(candidates) == 1 or (
+        req_num is not None
+        and candidates[0]["match_confidence"] == 1.0
+        and candidates[1]["match_confidence"] < 0.7
+    ):
+        status = "resolved"
+
+    clarification_prompt = None
+    if status == "ambiguous" or len(candidates) > 1:
+        lines = [
+            "## Équipes candidates\n",
+            f"Je ne trouve pas de libellé FFBB exact correspondant à `{categorie or 'votre recherche'}`.",
+            f"Voici les équipes les plus proches pour {club_nom} :\n",
+        ]
+        for idx, c in enumerate(candidates, 1):
+            num_str = (
+                f"{c['numero_equipe']}"
+                if c.get("numero_equipe") is not None
+                else "non renseigné dans FFBB"
+            )
+            nxt = c.get("next_match")
+            if nxt:
+                nxt_str = f"{nxt.get('date')} à {nxt.get('heure')}, vs {nxt.get('adversaire')} ({nxt.get('domicile_exterieur')})"
+            else:
+                nxt_str = "non disponible"
+
+            lines.append(
+                f"{idx}. **{c['nom_equipe']}**\n"
+                f"   - Étiquette FFBB : `{c['team_label']}`\n"
+                f"   - Compétition : `{c['competition_name']}`\n"
+                f"   - Niveau : `{c['niveau']}`\n"
+                f"   - Numéro d'équipe : `{num_str}`\n"
+                f"   - Engagement : `{c['engagement_id']}`\n"
+                f"   - Prochain match : {nxt_str}\n"
+            )
+
+        lines.append(
+            "> Laquelle souhaites-tu consulter ? Réponds avec le numéro ou avec l'engagement_id."
+        )
+        clarification_prompt = "\n".join(lines)
+
+    return {
+        "status": status,
+        "club": club_resolu,
+        "total_candidates": len(candidates),
+        "candidates": candidates,
+        "clarification_prompt": clarification_prompt,
+    }

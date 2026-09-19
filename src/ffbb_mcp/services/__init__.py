@@ -47,6 +47,7 @@ from .regulations import (
 from .salle import get_salle_service
 from .search import (
     _extract_club_key_word,
+    ffbb_find_team_candidates_service,
     ffbb_resolve_team_service,
     ffbb_search_service,
     filter_inactive_ententes,
@@ -77,6 +78,7 @@ __all__ = [
     "explain_tiebreak_rules_service",
     "ffbb_bilan_service",
     "ffbb_equipes_club_service",
+    "ffbb_find_team_candidates_service",
     "ffbb_get_classement_service",
     "ffbb_head_to_head_service",
     "ffbb_last_result_service",

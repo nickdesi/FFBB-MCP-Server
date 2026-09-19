@@ -101,6 +101,10 @@ class AliasesRegistry:
                 self._exact_alias_index[k_norm] = div
                 self._compact_alias_index[k_comp] = div
 
+    def normalize_alias(self, text: str | None) -> str:
+        """Normalise un texte d'alias (suppression accents, ponctuation, espaces multiples)."""
+        return normalize_alias_key(text)
+
     def lookup(self, query: str | None) -> CanonicalDivision | None:
         """Résout une division ou catégorie demandée par l'utilisateur."""
         if not query:

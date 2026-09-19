@@ -316,7 +316,7 @@ async def _build_calendar_matches(
                 e
                 for e in equipes
                 if str(e.get("competition_type") or "").upper()
-                not in ("PLAT", "AMIC", "AMICAL")
+                not in ("AMIC", "AMICAL")
                 and "AMIC" not in str(e.get("competition") or "").upper()
                 and "TOURNVOI" not in str(e.get("competition") or "").upper()
                 and "TOURNOI" not in str(e.get("competition") or "").upper()

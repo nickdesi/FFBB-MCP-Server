@@ -144,6 +144,7 @@ Configurez directement l'URL distante dans `mcp_config.json` via la directive na
 | `ffbb_lives` | Matchs en cours (scores live, rafraîchissement toutes les 15s). Retourne [] si aucun match. |
 | `ffbb_saisons` | Liste des saisons FFBB (référentiel temporel). |
 | `ffbb_resolve_team` | Identifie une equipe unique (Pivot central). |
+| `ffbb_find_team_candidates` | Recherche et ordonne les équipes candidates d'un club/CTC pour désambiguïser avant tout calendrier/résultat. |
 | `ffbb_team_summary` | Résumé complet d'équipe : bilan, classement, dernier et prochain match en un seul appel. |
 | `ffbb_last_result` | Dernier résultat d'une équipe précise. |
 | `ffbb_next_match` | Prochain match à jouer pour une équipe précise. |

@@ -530,16 +530,22 @@ async def test_tool_schemas_conformance_and_token_budget():
         {"required": ["competition_id"]},
     ]
 
+    # 2bis. Vérification anyOf sur ffbb_find_team_candidates
+    assert tools_map["ffbb_find_team_candidates"].inputSchema.get("anyOf") == [
+        {"required": ["organisme_id"]},
+        {"required": ["club_name"]},
+    ]
+
     # 3. Vérification de la suppression d'outputSchema inutile
     for tool in tools:
         assert getattr(tool, "outputSchema", None) is None, (
             f"outputSchema inattendu sur {tool.name}"
         )
 
-    # 4. Vérification du budget token (seuil ajusté après ajout des 4 outils de règlements FFBB - 25 outils)
+    # 4. Vérification du budget token (seuil ajusté après ajout de ffbb_find_team_candidates - 26 outils)
     total_tools_chars = sum(len(json.dumps(t.model_dump())) for t in tools)
-    assert total_tools_chars < 45000, (
-        f"Payload tools trop lourd ({total_tools_chars} chars, attendu < 45000)"
+    assert total_tools_chars < 50000, (
+        f"Payload tools trop lourd ({total_tools_chars} chars, attendu < 50000)"
     )
 
     instructions_len = len(mcp.instructions or "")
