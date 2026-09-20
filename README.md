@@ -141,7 +141,7 @@ Configurez directement l'URL distante dans `mcp_config.json` via la directive na
 | `ffbb_bilan` | Bilan complet d'une équipe toutes phases confondues en UN seul appel (V/D/N, paniers, phases). |
 | `ffbb_get` | Recupere une ressource FFBB par identifiant. |
 | `ffbb_club` | Outils agrégés club : calendrier (matchs pluriels), équipes engagées ou classement. |
-| `ffbb_lives` | Matchs en cours (scores live, rafraîchissement toutes les 15s). Retourne [] si aucun match. |
+| `ffbb_lives` | Flux live FFBB, éventuellement complété par un calendrier ciblé et prudent. |
 | `ffbb_saisons` | Liste des saisons FFBB (référentiel temporel). |
 | `ffbb_resolve_team` | Identifie une equipe unique (Pivot central). |
 | `ffbb_find_team_candidates` | Recherche et ordonne les équipes candidates d'un club/CTC pour désambiguïser avant tout calendrier/résultat. |

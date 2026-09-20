@@ -104,7 +104,7 @@ def test_horaire_renseigne_detection():
 async def test_get_lives_service_filtering():
     from unittest.mock import AsyncMock, patch
 
-    from ffbb_mcp._state import state
+    from ffbb_mcp._state import reset_service_state
     from ffbb_mcp.services.poule import get_lives_service
 
     raw_matches = [
@@ -114,9 +114,7 @@ async def test_get_lives_service_filtering():
         {"match_id": 4, "match_status": "COMPLETE", "score_home": 80, "score_out": 75},
     ]
 
-    # Invalider cache
-    if state.cache_lives is not None:
-        state.cache_lives.clear()
+    reset_service_state()
 
     with patch("ffbb_mcp.services.poule.get_client_async") as mock_get_client:
         mock_client = AsyncMock()
@@ -131,6 +129,46 @@ async def test_get_lives_service_filtering():
         # Avec include_scheduled=True : tous les matchs
         all_lives = await get_lives_service(include_scheduled=True)
         assert len(all_lives) == 4
+
+
+@pytest.mark.asyncio
+async def test_get_lives_service_uses_targeted_calendar_fallback():
+    from unittest.mock import AsyncMock, patch
+
+    from ffbb_mcp._state import reset_service_state
+    from ffbb_mcp.services.poule import get_lives_service
+
+    reset_service_state()
+
+    presumed_match = {
+        "id": "scheduled-after-tipoff",
+        "engagement_id": "eng_nm2",
+        "canonical_status": "scheduled",
+        "temporal_status": "presumed_in_progress",
+        "status_confidence": "medium",
+    }
+    with (
+        patch("ffbb_mcp.services.poule._fetch_lives", new_callable=AsyncMock) as fetch,
+        patch(
+            "ffbb_mcp.services.calendar.get_calendrier_club_service",
+            new_callable=AsyncMock,
+            return_value={"items": [presumed_match]},
+        ) as calendar,
+    ):
+        fetch.return_value = []
+        matches = await get_lives_service(
+            organisme_id="9326",
+            engagement_id="eng_nm2",
+            include_calendar_fallback=True,
+        )
+
+    assert matches == [presumed_match]
+    calendar.assert_awaited_once_with(
+        organisme_id="9326",
+        engagement_id="eng_nm2",
+        status_filter=["live"],
+        scope="team",
+    )
 
 
 @pytest.mark.asyncio

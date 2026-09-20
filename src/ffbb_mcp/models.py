@@ -270,6 +270,18 @@ class CalendrierMatch(BaseModel):
         default=None,
         description="Statut canonique strict : scheduled, live, final, unknown_conflict, etc.",
     )
+    temporal_status: str | None = Field(
+        default=None,
+        description="État temporel calculé, sans valeur de confirmation FFBB.",
+    )
+    status_confidence: str | None = Field(
+        default=None,
+        description="Confiance associée au statut : high, medium ou low.",
+    )
+    status_explanation: str | None = Field(
+        default=None,
+        description="Explication factuelle du statut et de son niveau de confiance.",
+    )
     data_quality: dict[str, Any] | None = Field(
         default=None,
         description="Audit de qualité et traçabilité des conflits de statut.",

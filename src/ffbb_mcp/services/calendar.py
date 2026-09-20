@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 import httpx
@@ -567,9 +567,14 @@ async def _build_calendar_matches(
             from ffbb_mcp.canonical_status import (
                 CanonicalMatchStatus,
                 canonicalize_match_status,
+                derive_temporal_match_status,
             )
 
             canon_statut, data_quality = canonicalize_match_status(match)
+            temporal_status = derive_temporal_match_status(
+                {**match, "scheduled_at": scheduled_at},
+                canonical_status=canon_statut,
+            )
 
             # Exclure les matchs en conflit sauf demande explicite
             if canon_statut == CanonicalMatchStatus.UNKNOWN_CONFLICT and not kwargs.get(
@@ -585,7 +590,15 @@ async def _build_calendar_matches(
 
             if status_filter:
                 clean_sf = [s.lower() for s in status_filter]
-                if canon_statut.value not in clean_sf:
+                matches_live_filter = (
+                    "live" in clean_sf
+                    and temporal_status.status.value == "presumed_in_progress"
+                )
+                if (
+                    canon_statut.value not in clean_sf
+                    and temporal_status.status.value not in clean_sf
+                    and not matches_live_filter
+                ):
                     continue
 
             comp_type_raw = str(equipe.get("competition_type") or "").strip() or None
@@ -612,6 +625,9 @@ async def _build_calendar_matches(
                 "horaire_renseigne": time_confirmed,
                 "statut": canon_statut.value,
                 "canonical_status": canon_statut.value,
+                "temporal_status": temporal_status.status.value,
+                "status_confidence": temporal_status.confidence,
+                "status_explanation": temporal_status.explanation,
                 "data_quality": data_quality.model_dump(),
                 "joue": joue,
                 "equipe1": eq1,
@@ -764,18 +780,16 @@ async def _build_calendar_matches(
     future_indices: list[int] = []
 
     for idx, m in enumerate(all_matches):
-        dt_val = m.get("_dt")
         has_scores = (
             m.get("score_equipe1") is not None
             and m.get("score_equipe2") is not None
             and str(m.get("score_equipe1")).strip() not in ("", "None", "null")
             and str(m.get("score_equipe2")).strip() not in ("", "None", "null")
         )
-        is_past = dt_val is not None and dt_val < (now - timedelta(hours=3))
         is_final_statut = m.get("statut") in ("final", "official", "forfeit")
 
         m["played"] = bool(
-            m.get("joue") in (1, "1", True) or has_scores or is_final_statut or is_past
+            m.get("joue") in (1, "1", True) or has_scores or is_final_statut
         )
         if m["played"]:
             played_indices.append(idx)

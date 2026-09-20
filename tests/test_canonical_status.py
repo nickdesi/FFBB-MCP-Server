@@ -1,10 +1,15 @@
 """Matrice exhaustive des tests de statut canonique et exclusion des conflits."""
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 import pytest
 
 from ffbb_mcp.canonical_status import (
     CanonicalMatchStatus,
+    TemporalMatchStatus,
     canonicalize_match_status,
+    derive_temporal_match_status,
     is_match_eligible_for_aggregate,
 )
 
@@ -195,3 +200,42 @@ def test_final_match_is_not_returned_as_live_by_default():
         CanonicalMatchStatus.HALFTIME,
         CanonicalMatchStatus.OVERTIME,
     )
+
+
+def test_scheduled_match_after_tipoff_is_presumed_in_progress():
+    match = {
+        "scheduled_at": "2026-09-20T15:30:00+02:00",
+        "statut": "scheduled",
+        "played": False,
+        "joue": 0,
+    }
+    canonical_status, _ = canonicalize_match_status(match)
+
+    temporal = derive_temporal_match_status(
+        match,
+        canonical_status=canonical_status,
+        now=datetime(2026, 9, 20, 16, 3, tzinfo=ZoneInfo("Europe/Paris")),
+    )
+
+    assert canonical_status == CanonicalMatchStatus.SCHEDULED
+    assert temporal.status == TemporalMatchStatus.PRESUMED_IN_PROGRESS
+    assert temporal.confidence == "medium"
+    assert "33 minute" in temporal.explanation
+
+
+def test_scheduled_match_long_after_tipoff_has_unknown_status():
+    match = {
+        "scheduled_at": "2026-09-20T12:00:00+02:00",
+        "statut": "scheduled",
+        "played": False,
+        "joue": 0,
+    }
+
+    temporal = derive_temporal_match_status(
+        match,
+        canonical_status=CanonicalMatchStatus.SCHEDULED,
+        now=datetime(2026, 9, 20, 16, 3, tzinfo=ZoneInfo("Europe/Paris")),
+    )
+
+    assert temporal.status == TemporalMatchStatus.STATUS_UNKNOWN_AFTER_TIPOFF
+    assert temporal.confidence == "low"

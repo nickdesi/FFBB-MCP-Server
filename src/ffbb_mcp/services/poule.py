@@ -102,12 +102,114 @@ def _is_live_match(m: dict[str, Any]) -> bool:
     )
 
 
-async def get_lives_service(include_scheduled: bool = False) -> list[dict]:
+async def get_lives_service(
+    include_scheduled: bool = False,
+    *,
+    organisme_id: int | str | None = None,
+    club_name: str | None = None,
+    categorie: str | None = None,
+    numero_equipe: int | None = None,
+    engagement_id: int | str | None = None,
+    include_calendar_fallback: bool = True,
+) -> list[dict]:
     ttl = _read_positive_int_env("FFBB_CACHE_TTL_LIVES", get_static_ttl("lives"))
     raw_lives = await _swr_serve(state.cache_lives, "lives", "lives", ttl, _fetch_lives)
-    if include_scheduled or not raw_lives:
-        return raw_lives
-    return [m for m in raw_lives if _is_live_match(m)]
+    target_requested = any(
+        value is not None and value != ""
+        for value in (organisme_id, club_name, categorie, numero_equipe, engagement_id)
+    )
+    if not target_requested:
+        if include_scheduled or not raw_lives:
+            return raw_lives
+        return [m for m in raw_lives if _is_live_match(m)]
+
+    target_engagement = str(engagement_id or "")
+    target_organisme = str(organisme_id or "")
+
+    def matches_target(match: dict[str, Any]) -> bool:
+        engagement_values = {
+            str(match.get(key) or "")
+            for key in (
+                "engagement_id",
+                "id_engagement",
+                "idEngagementEquipe1",
+                "idEngagementEquipe2",
+            )
+        }
+        organisme_values = {
+            str(match.get(key) or "")
+            for key in (
+                "organisme_id",
+                "id_organisme",
+                "idOrganismeEquipe1",
+                "idOrganismeEquipe2",
+            )
+        }
+        team_names = " ".join(
+            str(match.get(key) or "")
+            for key in (
+                "equipe1",
+                "equipe2",
+                "nomEquipe1",
+                "nomEquipe2",
+                "team_label",
+            )
+        )
+        if target_engagement and target_engagement in engagement_values:
+            return True
+        if target_organisme and target_organisme in organisme_values:
+            return True
+        if club_name and _normalize_name(club_name) in _normalize_name(team_names):
+            return True
+        return not (target_engagement or target_organisme or club_name)
+
+    selected = [
+        dict(match)
+        for match in raw_lives
+        if matches_target(match) and (include_scheduled or _is_live_match(match))
+    ]
+    for match in selected:
+        if _is_live_match(match):
+            match.setdefault("canonical_status", "live")
+            match.setdefault("temporal_status", "live")
+            match.setdefault("status_confidence", "high")
+            match.setdefault(
+                "status_explanation",
+                "Statut live explicitement remonté par la FFBB.",
+            )
+
+    if not include_calendar_fallback:
+        return selected
+
+    from .calendar import get_calendrier_club_service
+
+    calendar_kwargs: dict[str, Any] = {
+        "status_filter": ["live"],
+        "scope": "team" if engagement_id or categorie or numero_equipe else "club",
+    }
+    for key, value in (
+        ("organisme_id", organisme_id),
+        ("club_name", club_name),
+        ("categorie", categorie),
+        ("numero_equipe", numero_equipe),
+        ("engagement_id", engagement_id),
+    ):
+        if value is not None and value != "":
+            calendar_kwargs[key] = value
+
+    calendar = await get_calendrier_club_service(**calendar_kwargs)
+    calendar_items = calendar.get("items", []) if isinstance(calendar, dict) else []
+    known_ids = {
+        str(match.get("id") or match.get("match_id") or "") for match in selected
+    }
+    for match in calendar_items:
+        match_id = str(match.get("id") or match.get("match_id") or "")
+        if match_id and match_id in known_ids:
+            continue
+        selected.append(match)
+        if match_id:
+            known_ids.add(match_id)
+    return selected
 
 
 _SAISONS_FIELDS = ["id", "libelle", "code", "actif", "debut", "fin", "enCours"]

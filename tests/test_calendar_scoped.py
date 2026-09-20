@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from unittest.mock import AsyncMock
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -290,3 +292,42 @@ async def test_calendar_response_identifies_every_match_engagement_and_competiti
         assert m.get("team_label") is not None
         assert m.get("canonical_status") is not None
         assert m.get("data_quality") is not None
+
+
+@pytest.mark.asyncio
+async def test_live_filter_includes_scheduled_match_after_tipoff(
+    complex_club_data, monkeypatch
+):
+    from ffbb_mcp import canonical_status as status_module
+
+    teams, poules = complex_club_data
+    poules["poule_nm2"]["rencontres"][0]["date_rencontre"] = "2026-09-20 15:30:00"
+    real_derive = status_module.derive_temporal_match_status
+
+    def derive_at_fixed_time(match, *, canonical_status=None, now=None):
+        return real_derive(
+            match,
+            canonical_status=canonical_status,
+            now=datetime(2026, 9, 20, 16, 3, tzinfo=ZoneInfo("Europe/Paris")),
+        )
+
+    monkeypatch.setattr(
+        status_module, "derive_temporal_match_status", derive_at_fixed_time
+    )
+
+    res = await get_calendrier_club_service(
+        club_name="Stade Clermontois",
+        organisme_id="9326",
+        categorie="NM2",
+        numero_equipe=1,
+        scope="team",
+        status_filter=["live"],
+        force_refresh=True,
+    )
+
+    assert len(res["items"]) == 1
+    match = res["items"][0]
+    assert match["canonical_status"] == "scheduled"
+    assert match["temporal_status"] == "presumed_in_progress"
+    assert match["status_confidence"] == "medium"
+    assert "33 minute" in match["status_explanation"]

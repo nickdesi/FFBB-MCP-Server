@@ -6,9 +6,11 @@ ne contamine les calculs sportifs (bilan, dernier/prochain match, H2H, forme, cl
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from ffbb_mcp.envelope import DataQualityInfo
 
@@ -27,6 +29,128 @@ class CanonicalMatchStatus(StrEnum):
     FORFEIT_AWAY = "forfeit_away"
     FORFEIT_BOTH = "forfeit_both"
     UNKNOWN_CONFLICT = "unknown_conflict"
+
+
+class TemporalMatchStatus(StrEnum):
+    """État temporel calculé, distinct du statut officiel FFBB."""
+
+    SCHEDULED = "scheduled"
+    PRESUMED_IN_PROGRESS = "presumed_in_progress"
+    STATUS_UNKNOWN_AFTER_TIPOFF = "status_unknown_after_tipoff"
+    LIVE = "live"
+    FINAL = "final"
+    POSTPONED = "postponed"
+    CANCELLED = "cancelled"
+    UNKNOWN_CONFLICT = "unknown_conflict"
+
+
+@dataclass(frozen=True, slots=True)
+class TemporalStatusInfo:
+    status: TemporalMatchStatus
+    confidence: str
+    explanation: str
+
+
+_PARIS_TZ = ZoneInfo("Europe/Paris")
+_PRESUMED_LIVE_WINDOW = timedelta(hours=3)
+
+
+def derive_temporal_match_status(
+    match: dict[str, Any],
+    *,
+    canonical_status: CanonicalMatchStatus | None = None,
+    now: datetime | None = None,
+) -> TemporalStatusInfo:
+    """Calcule l'état temporel sans altérer le statut officiel normalisé."""
+    status = canonical_status or canonicalize_match_status(match)[0]
+
+    if status in (
+        CanonicalMatchStatus.LIVE,
+        CanonicalMatchStatus.HALFTIME,
+        CanonicalMatchStatus.OVERTIME,
+    ):
+        return TemporalStatusInfo(
+            TemporalMatchStatus.LIVE,
+            "high",
+            "Statut live explicitement remonté par la FFBB.",
+        )
+    if status in (
+        CanonicalMatchStatus.FINAL,
+        CanonicalMatchStatus.FORFEIT_HOME,
+        CanonicalMatchStatus.FORFEIT_AWAY,
+        CanonicalMatchStatus.FORFEIT_BOTH,
+    ):
+        return TemporalStatusInfo(
+            TemporalMatchStatus.FINAL,
+            "high",
+            "Résultat final ou forfait confirmé par la FFBB.",
+        )
+    if status == CanonicalMatchStatus.POSTPONED:
+        return TemporalStatusInfo(
+            TemporalMatchStatus.POSTPONED,
+            "high",
+            "Report confirmé par la FFBB.",
+        )
+    if status == CanonicalMatchStatus.CANCELLED:
+        return TemporalStatusInfo(
+            TemporalMatchStatus.CANCELLED,
+            "high",
+            "Annulation confirmée par la FFBB.",
+        )
+    if status == CanonicalMatchStatus.UNKNOWN_CONFLICT:
+        return TemporalStatusInfo(
+            TemporalMatchStatus.UNKNOWN_CONFLICT,
+            "low",
+            "Les données FFBB présentent des statuts contradictoires.",
+        )
+
+    raw_date = (
+        match.get("scheduled_at")
+        or match.get("date_rencontre")
+        or match.get("date")
+        or match.get("date_reelle")
+    )
+    try:
+        scheduled_at = datetime.fromisoformat(str(raw_date).replace(" ", "T"))
+    except (TypeError, ValueError):
+        scheduled_at = None
+
+    if scheduled_at is None:
+        return TemporalStatusInfo(
+            TemporalMatchStatus.SCHEDULED,
+            "low",
+            "Horaire de début indisponible ; statut FFBB conservé.",
+        )
+    if scheduled_at.tzinfo is None:
+        scheduled_at = scheduled_at.replace(tzinfo=_PARIS_TZ)
+
+    current_time = now or datetime.now(_PARIS_TZ)
+    if current_time.tzinfo is None:
+        current_time = current_time.replace(tzinfo=_PARIS_TZ)
+    elapsed = current_time.astimezone(UTC) - scheduled_at.astimezone(UTC)
+
+    if elapsed < timedelta(0):
+        return TemporalStatusInfo(
+            TemporalMatchStatus.SCHEDULED,
+            "high",
+            "L'horaire officiel de début n'est pas encore atteint.",
+        )
+
+    elapsed_minutes = int(elapsed.total_seconds() // 60)
+    if elapsed <= _PRESUMED_LIVE_WINDOW:
+        return TemporalStatusInfo(
+            TemporalMatchStatus.PRESUMED_IN_PROGRESS,
+            "medium",
+            f"Horaire de début dépassé de {elapsed_minutes} minute(s) ; "
+            "aucune donnée live ni résultat final FFBB disponible.",
+        )
+
+    return TemporalStatusInfo(
+        TemporalMatchStatus.STATUS_UNKNOWN_AFTER_TIPOFF,
+        "low",
+        f"Horaire de début dépassé de {elapsed_minutes} minute(s) ; "
+        "aucun statut final FFBB disponible après la fenêtre habituelle du match.",
+    )
 
 
 def _parse_int_score(val: Any) -> int | None:

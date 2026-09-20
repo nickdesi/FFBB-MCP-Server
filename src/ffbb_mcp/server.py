@@ -912,10 +912,56 @@ async def ffbb_get_lives(
             )
         ),
     ] = False,
+    organisme_id: Annotated[
+        int | str | None,
+        Field(description="ID du club pour cibler et compléter le flux live."),
+    ] = None,
+    club_name: Annotated[
+        str | None,
+        Field(description="Nom du club si son identifiant n'est pas connu."),
+    ] = None,
+    categorie: Annotated[
+        str | None,
+        Field(description="Catégorie de l'équipe ciblée, par exemple U18M ou NM2."),
+    ] = None,
+    numero_equipe: Annotated[
+        int | None,
+        Field(description="Numéro de l'équipe ciblée dans la catégorie."),
+    ] = None,
+    engagement_id: Annotated[
+        int | str | None,
+        Field(description="ID d'engagement précis de l'équipe ciblée."),
+    ] = None,
+    include_calendar_fallback: Annotated[
+        bool,
+        Field(
+            description=(
+                "Pour une cible club/équipe, complète le flux FFBB avec les matchs "
+                "dont l'horaire est dépassé, sans les présenter comme live confirmés."
+            )
+        ),
+    ] = True,
 ) -> list[dict[str, Any]]:
-    """Matchs en cours (scores live, rafraîchissement toutes les 15s). Retourne [] si aucun match."""
+    """Flux live FFBB, éventuellement complété par un calendrier ciblé et prudent."""
     try:
-        return await get_lives_service(include_scheduled=include_scheduled)
+        filters = {
+            "organisme_id": organisme_id,
+            "club_name": club_name,
+            "categorie": categorie,
+            "numero_equipe": numero_equipe,
+            "engagement_id": engagement_id,
+        }
+        if not any(value is not None for value in filters.values()):
+            return await get_lives_service(include_scheduled=include_scheduled)
+        return await get_lives_service(
+            include_scheduled=include_scheduled,
+            organisme_id=organisme_id,
+            club_name=club_name,
+            categorie=categorie,
+            numero_equipe=numero_equipe,
+            engagement_id=engagement_id,
+            include_calendar_fallback=include_calendar_fallback,
+        )
     except Exception as e:
         raise handle_api_error(e) from e
 
