@@ -9,10 +9,41 @@ from .metrics import get_snapshot
 _CORE_TOOLS = {
     "ffbb_search",
     "ffbb_resolve_team",
+    "ffbb_find_team_candidates",
+    "ffbb_team_summary",
+    "ffbb_bilan",
+    "ffbb_bilan_saison",
     "ffbb_next_match",
     "ffbb_last_result",
     "ffbb_club",
     "ffbb_get",
+    "ffbb_lives",
+    "ffbb_head_to_head",
+    "ffbb_search_regulations",
+    "ffbb_get_regulation_article",
+    "ffbb_explain_tiebreak_rules",
+    "ffbb_list_regulations",
+}
+
+_TOOL_CATEGORIES = {
+    "ffbb_search": "Recherche",
+    "ffbb_resolve_team": "Équipe",
+    "ffbb_find_team_candidates": "Équipe",
+    "ffbb_team_summary": "Synthèse",
+    "ffbb_bilan": "Bilan",
+    "ffbb_bilan_saison": "Bilan",
+    "ffbb_next_match": "Matchs",
+    "ffbb_last_result": "Matchs",
+    "ffbb_club": "Club",
+    "ffbb_get": "Détails",
+    "ffbb_lives": "Live",
+    "ffbb_head_to_head": "Confrontations",
+    "ffbb_search_regulations": "Règlements",
+    "ffbb_get_regulation_article": "Règlements",
+    "ffbb_explain_tiebreak_rules": "Règlements",
+    "ffbb_list_regulations": "Règlements",
+    "ffbb_version": "Système",
+    "ffbb_saisons": "Système",
 }
 
 
@@ -46,18 +77,31 @@ def _build_dashboard_html() -> str:
     tool_rows = ""
     for name, count in sorted(tool_calls.items(), key=lambda item: (-item[1], item[0])):
         bucket = "CORE" if name in _CORE_TOOLS else "LEGACY"
+        category = _TOOL_CATEGORIES.get(name, "Autre")
+        tag_cls = "core" if bucket == "CORE" else "legacy"
         tool_rows += (
             f"<tr>"
             f"<td class='cache-name'>{name}</td>"
             f"<td class='num'>{count}</td>"
-            f"<td>{bucket}</td>"
+            f"<td><span class='category-tag'>{category}</span></td>"
+            f"<td><span class='tag {tag_cls}'>{bucket}</span></td>"
             f"</tr>"
         )
 
     if not tool_rows:
         tool_rows = (
-            "<tr><td colspan='3' class='empty'>Aucun appel outil MCP observe.</td></tr>"
+            "<tr><td colspan='4' class='empty'>Aucun appel outil MCP observe.</td></tr>"
         )
+
+    # Fiabilité et résolutions sportives
+    res_ambiguous = snap.get("resolution_ambiguous_total", 0)
+    res_not_found = snap.get("resolution_not_found_total", 0)
+    fallback_prevented = snap.get("silent_fallback_prevented_total", 0)
+    source_conflict = snap.get("source_conflict_total", 0)
+
+    # SWR
+    swr_active = snap.get("swr_active", 0)
+    swr_total = snap.get("swr_total", 0)
 
     status_badge_cls = "healthy" if error_rate <= 0.05 else "degraded"
     status_label = "HEALTHY" if error_rate <= 0.05 else "DEGRADED"
@@ -161,6 +205,9 @@ def _build_dashboard_html() -> str:
         "    .ring-center .big{font-family:var(--display);font-size:26px;font-weight:900;color:var(--text)}\n"
         "    .ring-center .small{font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}\n"
         "    .table-container{background:var(--surface);border:1px solid var(--border);border-radius:18px;overflow:hidden;backdrop-filter:blur(10px)}\n"
+        "    .table-toolbar{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;background:rgba(255,255,255,.015)}\n"
+        "    .search-box{background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:6px 12px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;transition:border-color .2s;width:220px}\n"
+        "    .search-box:focus{border-color:var(--cyan);background:rgba(255,255,255,.08)}\n"
         "    table{width:100%;border-collapse:collapse}\n"
         "    th{background:rgba(255,255,255,.02);color:var(--muted);font-size:10px;letter-spacing:.12em;text-transform:uppercase;padding:14px 18px;text-align:left;border-bottom:1px solid var(--border);font-family:var(--display);font-weight:700}\n"
         "    td{padding:13px 18px;border-bottom:1px solid var(--border);color:var(--text);font-size:13px}\n"
@@ -171,6 +218,10 @@ def _build_dashboard_html() -> str:
         "    .tag{font-size:9px;font-weight:800;letter-spacing:.08em;padding:3px 9px;border-radius:6px;text-transform:uppercase}\n"
         "    .tag.core{color:var(--green);background:rgba(0,230,118,.12);border:1px solid rgba(0,230,118,.3)}\n"
         "    .tag.legacy{color:var(--muted);background:rgba(255,255,255,.05);border:1px solid var(--border)}\n"
+        "    .category-tag{font-size:10px;color:var(--muted);background:rgba(255,255,255,.05);padding:3px 8px;border-radius:6px;letter-spacing:.02em}\n"
+        "    .btn-pause{background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:12px;font-weight:600;padding:8px 14px;border-radius:10px;cursor:pointer;transition:.25s}\n"
+        "    .btn-pause:hover{border-color:var(--cyan);color:var(--cyan)}\n"
+        "    .btn-pause.active{background:rgba(34,211,238,.15);border-color:var(--cyan);color:var(--cyan)}\n"
         "    .bar-track{display:inline-block;width:110px;height:7px;background:rgba(255,255,255,.07);border-radius:10px;vertical-align:middle;overflow:hidden}\n"
         "    .bar-fill{height:100%;border-radius:10px;transition:width .6s cubic-bezier(.16,1,.3,1)} .bar-label{font-size:12px;margin-left:9px;font-variant-numeric:tabular-nums;font-family:var(--display);color:var(--text)}\n"
         "    .empty{color:var(--muted);font-style:italic;text-align:center;padding:30px}\n"
@@ -197,6 +248,7 @@ def _build_dashboard_html() -> str:
         "    </div>\n"
         "    <div class='nav-links'>\n"
         "      <a href='/' class='nav-btn'>&#8592; Site</a>\n"
+        "      <button id='btn-pause' class='btn-pause' title='Mettre en pause le polling automatique'>&#10074;&#10074; Pause</button>\n"
         f"      <span id='status-badge' class='badge {status_badge_cls}'><span class='dot'></span><span id='k-status-label'>{status_label}</span></span>\n"
         "      <button id='btn-refresh' class='nav-btn btn-refresh'>&#8635; Sync</button>\n"
         "    </div>\n"
@@ -205,7 +257,7 @@ def _build_dashboard_html() -> str:
         "    <div class='hero'>\n"
         "      <div>\n"
         "        <h1>Supervision <span>Temps R&eacute;el</span></h1>\n"
-        "        <p>Pulse du serveur MCP FFBB &mdash; donn&eacute;es vivantes, mises &agrave; jour en continu</p>\n"
+        "        <p>Pulse du serveur MCP FFBB &mdash; donn&eacute;es vivantes, observabilit&eacute; et fiabilit&eacute; sportive</p>\n"
         "      </div>\n"
         "      <div class='live'><span class='dot'></span> LIVE &middot; MAJ <span id='last-updated'>&mdash;</span></div>\n"
         "    </div>\n"
@@ -217,7 +269,14 @@ def _build_dashboard_html() -> str:
         f"      <div class='kpi'><div class='label'>&#9201; Latence moy.</div><div id='k-latency' class='value cyan'>{avg_lat_ms:.1f}<span style='font-size:14px;color:var(--muted)'>ms</span></div><div class='sub'>par appel API</div><canvas id='lat-spark' class='spark'></canvas></div>\n"
         f"      <div class='kpi'><div class='label'>&#128256; En cours</div><div id='k-inflight' class='value {inflight_class}'>{inflight}</div><div class='sub'>requ&ecirc;tes inflight</div></div>\n"
         "    </div>\n"
-        "    <div class='section-title'><span class='ic'>&#128190;</span> Efficacit&eacute; du Cache</div>\n"
+        "    <div class='section-title'><span class='ic'>&#127936;</span> R&eacute;solution Sportive &amp; Fiabilit&eacute;</div>\n"
+        "    <div class='kpi-grid'>\n"
+        f"      <div class='kpi'><div class='label'>&#128270; Ambigu&iuml;t&eacute;s lev&eacute;es</div><div id='k-ambiguous' class='value'>{res_ambiguous}</div><div class='sub'>clarifications retourn&eacute;es</div></div>\n"
+        f"      <div class='kpi'><div class='label'>&#128683; Fallbacks bloqu&eacute;s</div><div id='k-fallback-prevented' class='value green'>{fallback_prevented}</div><div class='sub'>&eacute;largissements &eacute;vit&eacute;s</div></div>\n"
+        f"      <div class='kpi'><div class='label'>&#10067; Non trouv&eacute;s</div><div id='k-not-found' class='value'>{res_not_found}</div><div class='sub'>requ&ecirc;tes infructueuses</div></div>\n"
+        f"      <div class='kpi'><div class='label'>&#9878; Conflits de source</div><div id='k-source-conflict' class='value'>{source_conflict}</div><div class='sub'>incoh&eacute;rences d&eacute;tect&eacute;es</div></div>\n"
+        "    </div>\n"
+        "    <div class='section-title'><span class='ic'>&#128190;</span> Efficacit&eacute; du Cache &amp; SWR</div>\n"
         "    <div class='kpi-grid'>\n"
         f"      <div class='kpi'><div class='label'>&#10003; Hits</div><div id='k-hits' class='value green'>{hits}</div></div>\n"
         f"      <div class='kpi'><div class='label'>&#10007; Misses</div><div id='k-misses' class='value'>{misses}</div></div>\n"
@@ -226,10 +285,10 @@ def _build_dashboard_html() -> str:
         f"          <svg class='ring' viewBox='0 0 130 130'><defs><linearGradient id='rg' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='#ff5722'/><stop offset='50%' stop-color='#ff2d95'/><stop offset='100%' stop-color='#22d3ee'/></linearGradient></defs><circle class='ring-bg' cx='65' cy='65' r='52'/><circle id='ring-fg' class='ring-fg' cx='65' cy='65' r='52' stroke-dasharray='326.7' stroke-dashoffset='{ring_offset:.1f}'/></svg>\n"
         f"          <div class='ring-center'><span id='k-hitratio' class='big'>{hit_pct:.1f}%</span><span class='small'>Hit Ratio</span></div>\n"
         "        </div>\n"
-        f"        <div><div class='label' style='margin-bottom:6px'>Ratio global</div><div id='k-hitratio-sub' class='value' style='font-size:18px'>{hits} / {hits + misses}</div><div class='sub'>hits / total</div></div>\n"
+        f"        <div><div class='label' style='margin-bottom:6px'>Ratio global</div><div id='k-hitratio-sub' class='value' style='font-size:18px'>{hits} / {hits + misses}</div><div class='sub'>hits / total &bull; SWR: <span id='k-swr-info'>{swr_active} actifs ({swr_total} total)</span></div></div>\n"
         "      </div>\n"
         "    </div>\n"
-        "    <div class='section-title'><span class='ic'>&#128204;</span> D&eacute;tails par Segment</div>\n"
+        "    <div class='section-title'><span class='ic'>&#128204;</span> D&eacute;tails par Segment de Cache</div>\n"
         "    <div class='table-container'>\n"
         "      <table>\n"
         "        <thead><tr><th>Type de ressource</th><th style='text-align:right'>Hits</th><th style='text-align:right'>Misses</th><th style='text-align:right'>Total</th><th>Ratio</th></tr></thead>\n"
@@ -243,18 +302,24 @@ def _build_dashboard_html() -> str:
         f"      <div class='kpi'><div class='label'>&#128300; Tools distincts</div><div id='k-tools' class='value'>{len(tool_calls)}</div></div>\n"
         "    </div>\n"
         "    <div class='table-container' style='margin-top:16px'>\n"
+        "      <div class='table-toolbar'>\n"
+        "        <span style='font-size:12px;color:var(--muted)'>Filtrer les outils actifs</span>\n"
+        "        <input type='text' id='tool-search' class='search-box' placeholder='Filtrer par nom ou domaine...' />\n"
+        "      </div>\n"
         "      <table>\n"
-        "        <thead><tr><th>Outil</th><th style='text-align:right'>Appels</th><th>Classe</th></tr></thead>\n"
+        "        <thead><tr><th>Outil</th><th style='text-align:right'>Appels</th><th>Domaine</th><th>Classe</th></tr></thead>\n"
         f"        <tbody id='tool-tbody'>{tool_rows}</tbody>\n"
         "      </table>\n"
         "    </div>\n"
-        "    <div class='section-title'><span class='ic'>&#128279;</span> Points d'acc&egrave;s</div>\n"
+        "    <div class='section-title'><span class='ic'>&#128279;</span> Points d'acc&egrave;s &amp; Diagnostics</div>\n"
         "    <div class='endpoints'>\n"
         "      <a class='ep-link' href='/'><span class='ep-method'>GET</span> Accueil</a>\n"
         "      <a class='ep-link' href='/health'><span class='ep-method'>GET</span> Sant&eacute;</a>\n"
-        "      <a class='ep-link' href='/metrics'><span class='ep-method'>GET</span> Metrics</a>\n"
+        "      <a class='ep-link' href='/metrics'><span class='ep-method'>GET</span> Metrics Prometheus</a>\n"
+        "      <a class='ep-link' href='/metrics.json'><span class='ep-method'>GET</span> Metrics JSON</a>\n"
+        "      <a class='ep-link' href='/docs/'><span class='ep-method'>GET</span> Documentation</a>\n"
         "      <a class='ep-link active' href='/dashboard'><span class='ep-method'>GET</span> Dashboard</a>\n"
-        "      <a class='ep-link' href='/mcp'><span class='ep-method'>POST</span> MCP</a>\n"
+        "      <a class='ep-link' href='/mcp'><span class='ep-method'>POST</span> MCP Endpoint</a>\n"
         "    </div>\n"
         "  </main>\n"
         "  <footer>\n"
@@ -264,8 +329,9 @@ def _build_dashboard_html() -> str:
         "  <script>\n"
         "  (function(){\n"
         "    const CORE = " + str(sorted(_CORE_TOOLS)) + ";\n"
+        "    const TOOL_CATS = " + str(_TOOL_CATEGORIES) + ";\n"
         "    const RING_C = 2 * Math.PI * 52;\n"
-        "    let disp = {}, latHist = [], upBase = null, upT = 0;\n"
+        "    let disp = {}, latHist = [], upBase = null, upT = 0, isPaused = false, currentToolCalls = {};\n"
         "    const $ = id => document.getElementById(id);\n"
         "    function fmtInt(n){ return Math.round(n).toLocaleString('fr-FR'); }\n"
         "    function animate(id, target, dec){\n"
@@ -286,24 +352,34 @@ def _build_dashboard_html() -> str:
         "    }\n"
         "    function barColor(p){ return p >= 80 ? '#00e676' : (p >= 50 ? '#ffab40' : '#ff5252'); }\n"
         "    function updateCache(cache){\n"
-        "      const tb = $('cache-tbody'); if(!tb) return; let rows = '', hits = 0, total = 0;\n"
+        "      const tb = $('cache-tbody'); if(!tb) return { hits: 0, misses: 0, total: 0 };\n"
+        "      let rows = '', hits = 0, misses = 0, total = 0;\n"
         "      for(const [name, s] of Object.entries(cache)){\n"
-        "        hits += s.hits; total += s.total;\n"
-        "        const p = (s.hit_ratio * 100); const col = barColor(p);\n"
-        "        rows += \"<tr><td class='cache-name'>\" + name + \"</td><td class='num'>\" + fmtInt(s.hits) + \"</td><td class='num'>\" + fmtInt(s.misses) + \"</td><td class='num'>\" + fmtInt(s.total) + \"</td><td><div class='bar-track'><div class='bar-fill' style='width:\" + p.toFixed(1) + \"%;background:\" + col + \"'></div></div><span class='bar-label'>\" + p.toFixed(1) + \"%</span></td></tr>\";\n"
+        "        hits += (s.hits || 0); misses += (s.misses || 0); total += (s.total || 0);\n"
+        "        const p = (s.hit_ratio * 100) || 0; const col = barColor(p);\n"
+        "        rows += \"<tr><td class='cache-name'>\" + name + \"</td><td class='num'>\" + fmtInt(s.hits||0) + \"</td><td class='num'>\" + fmtInt(s.misses||0) + \"</td><td class='num'>\" + fmtInt(s.total||0) + \"</td><td><div class='bar-track'><div class='bar-fill' style='width:\" + p.toFixed(1) + \"%;background:\" + col + \"'></div></div><span class='bar-label'>\" + p.toFixed(1) + \"%</span></td></tr>\";\n"
         "      }\n"
         "      tb.innerHTML = rows || \"<tr><td colspan='5' class='empty'>Aucune donnee de cache — aucun appel API effectue.</td></tr>\";\n"
-        "      return { hits, total };\n"
+        "      return { hits, misses, total };\n"
         "    }\n"
-        "    function updateTools(tc){\n"
-        "      const tb = $('tool-tbody'); if(!tb) return; let rows = '', core = 0, legacy = 0;\n"
+        "    function renderToolsTable(tc, filterText){\n"
+        "      const tb = $('tool-tbody'); if(!tb) return { core: 0, legacy: 0, n: 0 };\n"
+        "      let rows = '', core = 0, legacy = 0;\n"
+        "      const q = (filterText || '').toLowerCase().trim();\n"
         "      const entries = Object.entries(tc).sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0]));\n"
         "      for(const [name, c] of entries){\n"
         "        const isCore = CORE.includes(name); isCore ? core += c : legacy += c;\n"
-        "        rows += \"<tr><td class='cache-name'>\" + name + \"</td><td class='num'>\" + fmtInt(c) + \"</td><td><span class='tag ' + (isCore?'core':'legacy') + ''>\" + (isCore?'CORE':'LEGACY') + \"</span></td></tr>\";\n"
+        "        const cat = TOOL_CATS[name] || 'Autre';\n"
+        "        if(q && !name.toLowerCase().includes(q) && !cat.toLowerCase().includes(q)) continue;\n"
+        "        rows += \"<tr><td class='cache-name'>\" + name + \"</td><td class='num'>\" + fmtInt(c) + \"</td><td><span class='category-tag'>\" + cat + \"</span></td><td><span class='tag ' + (isCore?'core':'legacy') + ''>\" + (isCore?'CORE':'LEGACY') + \"</span></td></tr>\";\n"
         "      }\n"
-        "      tb.innerHTML = rows || \"<tr><td colspan='3' class='empty'>Aucun appel outil MCP observe.</td></tr>\";\n"
+        "      tb.innerHTML = rows || \"<tr><td colspan='4' class='empty'>Aucun outil ne correspond aux crit&egrave;res.</td></tr>\";\n"
         "      return { core, legacy, n: entries.length };\n"
+        "    }\n"
+        "    function updateTools(tc){\n"
+        "      currentToolCalls = tc || {};\n"
+        "      const filterInput = $('tool-search');\n"
+        "      return renderToolsTable(currentToolCalls, filterInput ? filterInput.value : '');\n"
         "    }\n"
         "    function drawSpark(){\n"
         "      const c = $('lat-spark'); if(!c || latHist.length < 2) return;\n"
@@ -320,6 +396,7 @@ def _build_dashboard_html() -> str:
         "      const lx = X(latHist.length-1), ly = Y(latHist[latHist.length-1]); ctx.beginPath(); ctx.arc(lx,ly,3,0,7); ctx.fillStyle='#fff'; ctx.fill();\n"
         "    }\n"
         "    function refresh(){\n"
+        "      if(isPaused) return;\n"
         "      fetch('/metrics.json').then(r => r.json()).then(d => {\n"
         "        const calls = (d.api_calls_success||0) + (d.api_calls_error||0);\n"
         "        const errors = d.api_calls_error||0;\n"
@@ -328,12 +405,18 @@ def _build_dashboard_html() -> str:
         "        setText('k-error-rate', 'taux d\\'echec ' + (errors/Math.max(1,calls)*100).toFixed(1) + '%');\n"
         "        animate('k-latency', lat, 1);\n"
         "        animate('k-inflight', d.api_inflight_requests||0);\n"
+        "        animate('k-ambiguous', d.resolution_ambiguous_total||0);\n"
+        "        animate('k-fallback-prevented', d.silent_fallback_prevented_total||0);\n"
+        "        animate('k-not-found', d.resolution_not_found_total||0);\n"
+        "        animate('k-source-conflict', d.source_conflict_total||0);\n"
         "        const cv = updateCache(d.cache||{}); const tv = updateTools(d.tool_calls||{});\n"
         "        animate('k-hits', cv.hits); animate('k-misses', cv.misses);\n"
         "        animate('k-core', tv.core); animate('k-legacy', tv.legacy); animate('k-tools', tv.n);\n"
         "        const hr = cv.total ? cv.hits/cv.total : 0;\n"
         "        setText('k-hitratio', (hr*100).toFixed(1) + '%');\n"
         "        setText('k-hitratio-sub', cv.hits + ' / ' + cv.total);\n"
+        "        const swrA = d.swr_active || 0, swrT = d.swr_total || 0;\n"
+        "        setText('k-swr-info', swrA + ' actifs (' + swrT + ' total)');\n"
         "        const fg = $('ring-fg'); if(fg) fg.setAttribute('stroke-dashoffset', RING_C * (1 - hr));\n"
         "        const badge = $('status-badge'); const ok = (d.api_error_rate || 0) <= 0.05;\n"
         "        if(badge){ badge.className = 'badge ' + (ok?'healthy':'degraded'); setText('k-status-label', ok?'HEALTHY':'DEGRADED'); }\n"
@@ -343,9 +426,21 @@ def _build_dashboard_html() -> str:
         "      }).catch(()=>{});\n"
         "    }\n"
         "    function tick(){\n"
-        "      if(upBase !== null){ const s = upBase + (Date.now() - upT)/1000; setText('k-uptime', uptimeStr(s)); setText('k-uptime-s', Math.floor(s) + 's actifs'); }\n"
+        "      if(upBase !== null && !isPaused){ const s = upBase + (Date.now() - upT)/1000; setText('k-uptime', uptimeStr(s)); setText('k-uptime-s', Math.floor(s) + 's actifs'); }\n"
         "    }\n"
-        "    $('btn-refresh').addEventListener('click', () => location.reload());\n"
+        "    $('btn-refresh').addEventListener('click', () => refresh());\n"
+        "    const pauseBtn = $('btn-pause');\n"
+        "    if(pauseBtn){\n"
+        "      pauseBtn.addEventListener('click', () => {\n"
+        "        isPaused = !isPaused;\n"
+        "        pauseBtn.className = 'btn-pause' + (isPaused ? ' active' : '');\n"
+        "        pauseBtn.innerHTML = isPaused ? '&#9658; Reprendre' : '&#10074;&#10074; Pause';\n"
+        "      });\n"
+        "    }\n"
+        "    const toolSearch = $('tool-search');\n"
+        "    if(toolSearch){\n"
+        "      toolSearch.addEventListener('input', (e) => renderToolsTable(currentToolCalls, e.target.value));\n"
+        "    }\n"
         "    window.addEventListener('resize', drawSpark);\n"
         "    refresh(); setInterval(refresh, 5000); setInterval(tick, 1000);\n"
         "  })();\n"

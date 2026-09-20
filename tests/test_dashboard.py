@@ -46,6 +46,7 @@ def test_dashboard_html_renders_degraded_cache_rows(monkeypatch):
                 "ffbb_search": 7,
                 "ffbb_get": 5,
                 "ffbb_team_summary": 3,
+                "ffbb_custom_legacy": 1,
             },
         },
     )
@@ -67,5 +68,6 @@ def test_dashboard_html_renders_degraded_cache_rows(monkeypatch):
     assert "Calls Legacy" in html
     assert "class='cache-name'>ffbb_search" in html
     assert "class='cache-name'>ffbb_team_summary" in html
+    assert "R&eacute;solution Sportive &amp; Fiabilit&eacute;" in html
     assert ">CORE<" in html
     assert ">LEGACY<" in html
