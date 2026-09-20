@@ -1325,13 +1325,98 @@ async def ffbb_team_summary(
         cleaned_last_match = _clean_match_item(last_match)
         cleaned_next_match = _clean_match_item(next_match)
 
+        from ffbb_mcp.presentation import (
+            build_provenance_block,
+            format_source_label,
+        )
+
+        team_name_str = (
+            (team_data.get("team_label") if isinstance(team_data, dict) else None)
+            or (team_data.get("nom_equipe") if isinstance(team_data, dict) else None)
+            or (team_data.get("nom") if isinstance(team_data, dict) else None)
+            or club_name
+            or "Équipe"
+        )
+        summary_dict = (
+            (bilan.get("bilan_total") or {}) if isinstance(bilan, dict) else {}
+        )
+        v_count = summary_dict.get("victoires", 0)
+        d_count = summary_dict.get("defaites", 0)
+        dyn_str = f" (dynamique : {dynamique_data})" if dynamique_data else ""
+        short_ans = f"Bilan pour {team_name_str} : {v_count} victoires, {d_count} défaites{dyn_str}."
+
+        detail_parts = []
+        if isinstance(last_match, dict) and "presentation" in last_match:
+            detail_parts.append(
+                f"Dernier résultat : {last_match['presentation'].get('short_answer', '')}"
+            )
+        elif cleaned_last_match:
+            detail_parts.append("Dernier match enregistré.")
+
+        if isinstance(next_match, dict) and "presentation" in next_match:
+            detail_parts.append(
+                f"Prochain match : {next_match['presentation'].get('short_answer', '')}"
+            )
+        elif cleaned_next_match:
+            detail_parts.append("Prochain match programmé.")
+
+        detail_line = (
+            " ".join(detail_parts)
+            if detail_parts
+            else "Aucun match récent ou programmé."
+        )
+
+        presentation = {
+            "short_answer": short_ans,
+            "detail_line": detail_line,
+            "source_label": format_source_label(),
+            "warnings": [],
+        }
+
+        resource_ids = {
+            "organisme_id": str(effective_org_id) if effective_org_id else None,
+            "engagement_id": str(engagement_id) if engagement_id else None,
+            "competition_id": str(competition_id) if competition_id else None,
+            "poule_id": str(poule_id) if poule_id else None,
+        }
+        provenance = build_provenance_block(
+            source="ffbb_api_live",
+            cache_status="miss" if force_refresh else "hit",
+            resource_ids=resource_ids,
+        )
+
         return {
+            "status": "ok",
             "team": team_data,
-            "phase_courante": bilan.get("phase_courante"),
+            "phase_courante": bilan.get("phase_courante")
+            if isinstance(bilan, dict)
+            else None,
             "last_match": cleaned_last_match,
             "next_match": cleaned_next_match,
-            "summary": bilan.get("bilan_total"),
+            "summary": bilan.get("bilan_total") if isinstance(bilan, dict) else None,
             "dynamique": dynamique_data,
+            "data": {
+                "team": team_data,
+                "phase_courante": bilan.get("phase_courante")
+                if isinstance(bilan, dict)
+                else None,
+                "summary": bilan.get("bilan_total")
+                if isinstance(bilan, dict)
+                else None,
+                "dynamique": dynamique_data,
+                "last_match": (
+                    last_match.get("data", {}).get("match")
+                    if isinstance(last_match, dict) and "data" in last_match
+                    else cleaned_last_match
+                ),
+                "next_match": (
+                    next_match.get("data", {}).get("match")
+                    if isinstance(next_match, dict) and "data" in next_match
+                    else cleaned_next_match
+                ),
+            },
+            "presentation": presentation,
+            "provenance": provenance,
         }
 
     except Exception as e:

@@ -26,6 +26,11 @@ from ffbb_mcp.competition_type import (
     resolve_practice,
 )
 from ffbb_mcp.models import CalendrierMatch
+from ffbb_mcp.presentation import (
+    build_provenance_block,
+    evaluate_round_reliability,
+    format_source_label,
+)
 from ffbb_mcp.utils import format_team_name
 
 from .common import _PARIS_TZ as _TZ
@@ -820,11 +825,23 @@ async def _build_calendar_matches(
     effective = paginated
 
     validated_matches = []
+    round_warnings = []
     for m in effective:
         if "warning" in m:
             validated_matches.append(m)
         else:
-            validated_matches.append(CalendrierMatch(**m).model_dump(by_alias=True))
+            vm = CalendrierMatch(**m).model_dump(by_alias=True)
+            raw_j = vm.get("journee") or vm.get("num_journee")
+            r_info = evaluate_round_reliability(raw_j)
+            vm["round"] = {
+                "display_value": r_info.display_value,
+                "is_reliable": r_info.is_reliable,
+            }
+            if not r_info.is_reliable:
+                vm["journee"] = None
+                if r_info.warning and r_info.warning not in round_warnings:
+                    round_warnings.append(r_info.warning)
+            validated_matches.append(vm)
 
     has_more = (effective_offset + len(validated_matches)) < total_before_limit
     next_offset = (effective_offset + len(validated_matches)) if has_more else None
@@ -844,8 +861,30 @@ async def _build_calendar_matches(
     if has_more:
         meta["truncated"] = True
 
+    presentation = {
+        "short_answer": f"{total_before_limit} rencontre(s) au calendrier.",
+        "detail_line": f"{len(validated_matches)} rencontre(s) affichée(s) (tri chronologique).",
+        "source_label": format_source_label(),
+        "warnings": round_warnings,
+    }
+    poule_id_val = kwargs.get("poule_id") or (
+        unique_poule_ids[0] if len(unique_poule_ids) == 1 else None
+    )
+    provenance = build_provenance_block(
+        source="ffbb_api_live",
+        cache_status="miss",
+        resource_ids={
+            "organisme_id": str(organisme_id) if organisme_id else None,
+            "competition_id": str(competition_id) if competition_id else None,
+            "poule_id": str(poule_id_val) if poule_id_val else None,
+            "engagement_id": str(engagement_id) if engagement_id else None,
+        },
+    )
+
     return {
         "items": validated_matches,
+        "presentation": presentation,
+        "provenance": provenance,
         "_meta": meta,
     }
 

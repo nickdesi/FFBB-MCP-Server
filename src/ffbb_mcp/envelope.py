@@ -20,6 +20,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from ffbb_mcp.presentation import PresentationInfo, ProvenanceTechnical
+
 
 class ResponseStatus(StrEnum):
     """Statuts canoniques autorisés pour l'enveloppe de réponse."""
@@ -79,13 +81,28 @@ class ProvenanceCache(BaseModel):
 class ProvenanceInfo(BaseModel):
     """Traçabilité de la provenance de la donnée sportive ou réglementaire."""
 
+    provider: str = Field(
+        default="FFBB", description="Fournisseur officiel de la donnée sportive."
+    )
+    retrieved_at: str = Field(
+        default_factory=lambda: datetime.now(UTC).isoformat(),
+        description="Horodatage ISO-8601 de récupération.",
+    )
+    data_freshness: str = Field(
+        default="live",
+        description="Fraîcheur de la donnée ('live', 'recent_cache', 'stale').",
+    )
+    display_to_user: bool = Field(
+        default=False,
+        description="Flag indiquant que les détails techniques ne doivent pas être affichés brut à l'utilisateur.",
+    )
     source: str = Field(
         default="ffbb_api_live",
         description="Source de la donnée : 'ffbb_api_live', 'meilisearch', 'cache', 'regulations_index'.",
     )
     fetched_at: str = Field(
         default_factory=lambda: datetime.now(UTC).isoformat(),
-        description="Horodatage ISO-8601 de récupération.",
+        description="Horodatage ISO-8601 de récupération (alias legacy).",
     )
     source_updated_at: str | None = Field(
         default=None,
@@ -96,6 +113,10 @@ class ProvenanceInfo(BaseModel):
     )
     cache: ProvenanceCache = Field(
         default_factory=ProvenanceCache, description="Détails sur l'état du cache."
+    )
+    technical: ProvenanceTechnical | dict[str, Any] = Field(
+        default_factory=ProvenanceTechnical,
+        description="Métadonnées techniques isolées réservées aux développeurs et logs.",
     )
 
 
@@ -126,6 +147,10 @@ class McpResponseEnvelope[T](BaseModel):
     )
     data: T | None = Field(
         default=None, description="Données sportives ou réglementaires utiles."
+    )
+    presentation: PresentationInfo | dict[str, Any] | None = Field(
+        default=None,
+        description="Bloc d'assistance au rendu naturel (short_answer, detail_line, source_label, warnings).",
     )
     warnings: list[str] = Field(
         default_factory=list,
@@ -171,11 +196,13 @@ def create_response_envelope(
     provenance: ProvenanceInfo | None = None,
     data_quality: DataQualityInfo | None = None,
     request_id: str | None = None,
+    presentation: PresentationInfo | dict[str, Any] | None = None,
 ) -> McpResponseEnvelope[Any]:
     """Fabrique une enveloppe de réponse MCP standardisée."""
     return McpResponseEnvelope[Any](
         status=status,
         data=data,
+        presentation=presentation,
         warnings=warnings or [],
         errors=errors or [],
         resolution=resolution or ResolutionInfo(),

@@ -488,14 +488,31 @@ async def resolve_team_strict(
         )
 
     # Plusieurs candidats subsistent -> ambiguïté réelle
-    comp_descs = [
-        f"'{c.get('competition')}' (type: {c.get('competition_type')}, id: {c.get('competition_id')}, num: {c.get('numero_equipe', '1')})"
-        for c in candidates
-    ]
+    user_choices = []
+    for c in candidates:
+        team_lbl = (
+            c.get("team_label")
+            or c.get("nom")
+            or c.get("nom_equipe")
+            or categorie
+            or "Équipe"
+        )
+        num = c.get("numero_equipe")
+        comp = c.get("competition") or c.get("competition_name") or ""
+        parts = []
+        if num and num not in (1, "1") and str(num) not in team_lbl:
+            parts.append(f"{team_lbl} {num}")
+        else:
+            parts.append(team_lbl)
+        if comp:
+            parts.append(comp)
+        user_choices.append(" — ".join(parts))
+
+    club_disp = club_resolu.get("nom") if club_resolu else (club_name or "ce club")
     prompt = (
-        f"L'équipe {club_resolu.get('nom')} a {len(candidates)} engagements distincts : "
-        + " ; ".join(comp_descs)
-        + ". Précisez `competition_id`, `competition_type` ou `numero_equipe`."
+        f"L'équipe {club_disp} a {len(candidates)} engagements distincts : "
+        + " ; ".join(user_choices)
+        + ". Précisez la division, la catégorie ou le numéro d'équipe."
     )
 
     amb_msg = (

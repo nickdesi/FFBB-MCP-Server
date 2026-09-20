@@ -1144,7 +1144,45 @@ async def ffbb_resolve_team_service(
         **kwargs,
     )
 
+    from ffbb_mcp.presentation import (
+        build_ambiguous_presentation,
+        build_provenance_block,
+        format_source_label,
+    )
+
     if res.status == ResponseStatus.OK:
+        sel_team = res.selected or {}
+        comp_name = sel_team.get("competition") or ""
+        lbl = (
+            sel_team.get("team_label")
+            or sel_team.get("nom_equipe")
+            or categorie
+            or "Équipe"
+        )
+        res_ids = {
+            "engagement_id": str(sel_team.get("engagement_id"))
+            if sel_team.get("engagement_id")
+            else None,
+            "poule_id": str(sel_team.get("poule_id"))
+            if sel_team.get("poule_id")
+            else None,
+            "competition_id": str(sel_team.get("competition_id"))
+            if sel_team.get("competition_id")
+            else None,
+        }
+        provenance = build_provenance_block(
+            source="ffbb_api_live",
+            cache_status="hit" if not force_refresh else "miss",
+            resource_ids=res_ids,
+        )
+        presentation = {
+            "short_answer": f"Équipe résolue : {lbl}.",
+            "detail_line": f"Engagée en {comp_name}."
+            if comp_name
+            else "Engagement confirmé.",
+            "source_label": format_source_label(),
+            "warnings": [],
+        }
         return {
             "status": "resolved",
             "team": res.selected,
@@ -1152,19 +1190,39 @@ async def ffbb_resolve_team_service(
             "ambiguity": None,
             "clarification_prompt": None,
             "club_resolu": res.club_resolu,
+            "presentation": presentation,
+            "provenance": provenance,
             "resolution": res.model_dump(),
         }
     elif res.status == ResponseStatus.AMBIGUOUS:
+        ambig_block = build_ambiguous_presentation(
+            candidates=res.candidates,
+            club_name=res.club_resolu.get("nom") if res.club_resolu else club_name,
+            categorie=categorie,
+        )
         return {
             "status": "ambiguous",
             "team": None,
             "candidates": res.candidates,
             "ambiguity": res.ambiguity_message,
-            "clarification_prompt": res.clarification_prompt,
+            "clarification_prompt": ambig_block["clarification_prompt"],
             "club_resolu": res.club_resolu,
+            "presentation": ambig_block["presentation"],
+            "provenance": ambig_block["provenance"],
             "resolution": res.model_dump(),
         }
     else:
+        provenance = build_provenance_block(
+            source="ffbb_api_live",
+            cache_status="hit" if not force_refresh else "miss",
+        )
+        presentation = {
+            "short_answer": f"Aucune équipe trouvée pour '{categorie or club_name}'.",
+            "detail_line": res.ambiguity_message
+            or "Vérifiez l'orthographe ou les critères demandés.",
+            "source_label": format_source_label(),
+            "warnings": [res.ambiguity_message] if res.ambiguity_message else [],
+        }
         return {
             "status": "not_found",
             "team": None,
@@ -1172,6 +1230,8 @@ async def ffbb_resolve_team_service(
             "ambiguity": res.ambiguity_message,
             "clarification_prompt": res.clarification_prompt,
             "club_resolu": res.club_resolu,
+            "presentation": presentation,
+            "provenance": provenance,
             "resolution": res.model_dump(),
         }
 

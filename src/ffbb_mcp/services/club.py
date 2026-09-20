@@ -29,6 +29,12 @@ async def get_client_async(*args, **kwargs):
     return await ffbb_mcp.client.get_client_async(*args, **kwargs)
 
 
+from ffbb_mcp.presentation import (
+    build_match_presentation,
+    build_provenance_block,
+    evaluate_round_reliability,
+    format_source_label,
+)
 from ffbb_mcp.utils import ParsedCategorie, format_team_name, parse_categorie
 
 from .bilan import (
@@ -868,11 +874,27 @@ async def ffbb_next_match_service(
                 }
             )
         )
+        provenance = build_provenance_block(
+            source="ffbb_api_live",
+            cache_status="hit" if not force_refresh else "miss",
+            resource_ids={
+                "organisme_id": str(organisme_id) if organisme_id else None,
+            },
+        )
+        empty_presentation = {
+            "short_answer": "Aucun match à venir trouvé pour cette équipe.",
+            "detail_line": "Toutes les rencontres de la phase actuelle ont été jouées ou le calendrier officiel n'est pas encore programmé.",
+            "source_label": format_source_label(),
+            "warnings": ["Aucun match programmé."],
+        }
         return {
             "status": "no_upcoming_match",
             "message": "Aucun match à venir trouvé pour cette équipe.",
             "club_resolu": club_resolu,
             "candidates": all_available_equipes,
+            "presentation": empty_presentation,
+            "provenance": provenance,
+            "_meta": _freshness_meta(cache="poule", force_refresh_supported=True),
         }
 
     phase_to_matches: dict[int, list[tuple[datetime, dict, dict]]] = {}
@@ -961,33 +983,127 @@ async def ffbb_next_match_service(
     time_confirmed = bool(_is_horaire_renseigne(next_match, next_dt))
     scheduled_date = next_dt.strftime("%Y-%m-%d") if next_dt else None
     scheduled_at = next_dt.isoformat() if (time_confirmed and next_dt) else None
+
+    # Fiabilité de la journée
+    raw_round = next_match.get("numeroJournee")
+    round_info = evaluate_round_reliability(raw_round)
+
+    my_team_name = (
+        eq1_name
+        if domicile is True
+        else (
+            eq2_name
+            if domicile is False
+            else (source_team.get("team_label") or source_team.get("nom_equipe") or "")
+        )
+    )
+    opp_team_name = adversaire or (eq2_name if domicile is True else eq1_name)
+    category_label = source_team.get("team_label") or categorie or ""
+    competition_name = source_team.get("competition") or ""
+
+    presentation_obj = build_match_presentation(
+        team_name=my_team_name,
+        opponent_name=opp_team_name,
+        is_home=domicile,
+        status="scheduled",
+        dt_obj=next_dt,
+        time_confirmed=time_confirmed,
+        venue_name=lieu,
+        venue_city=ville,
+        competition_name=competition_name,
+        round_info=round_info,
+        is_last_result=False,
+    )
+
+    resource_ids = {
+        "competition_id": str(source_team.get("competition_id"))
+        if source_team.get("competition_id") is not None
+        else None,
+        "poule_id": str(source_team.get("poule_id"))
+        if source_team.get("poule_id") is not None
+        else None,
+        "engagement_id": str(source_team.get("engagement_id"))
+        if source_team.get("engagement_id") is not None
+        else None,
+        "match_id": str(next_match.get("id"))
+        if next_match.get("id") is not None
+        else None,
+    }
+    provenance = build_provenance_block(
+        source="ffbb_api_live",
+        cache_status="miss" if force_refresh else "hit",
+        resource_ids=resource_ids,
+        raw_journee=raw_round if not round_info.is_reliable else None,
+        data_freshness="live" if force_refresh else "recent_cache",
+    )
+
+    time_iso = (
+        f"{next_dt.hour:02d}:{next_dt.minute:02d}"
+        if (time_confirmed and next_dt)
+        else None
+    )
+
+    legacy_match = {
+        "poule_id": str(source_team.get("poule_id"))
+        if source_team.get("poule_id") is not None
+        else None,
+        "match_id": str(next_match.get("id"))
+        if next_match.get("id") is not None
+        else None,
+        "date": next_dt.isoformat() if next_dt and time_confirmed else scheduled_date,
+        "scheduled_date": scheduled_date,
+        "scheduled_at": scheduled_at,
+        "time_confirmed": time_confirmed,
+        "horaire_renseigne": time_confirmed,
+        "statut": _compute_match_statut(next_match, next_dt),
+        "adversaire": adversaire,
+        "domicile": domicile,
+        "equipe1": eq1_name,
+        "equipe2": eq2_name,
+        "salle": lieu,
+        "ville": ville,
+        "adresse": adresse_salle,
+        "journee": round_info.display_value,
+        "round": {
+            "display_value": round_info.display_value,
+            "is_reliable": round_info.is_reliable,
+        },
+    }
+
     return {
         "status": "ok",
+        "data": {
+            "team": {
+                "name": my_team_name,
+                "category": category_label,
+                "competition": competition_name,
+            },
+            "match": {
+                "context_label": "Prochain match programmé",
+                "status": "scheduled",
+                "date": scheduled_date,
+                "time": time_iso,
+                "timezone": "Europe/Paris",
+                "home_team": eq1_name,
+                "away_team": eq2_name,
+                "home_score": None,
+                "away_score": None,
+                "result_for_team": None,
+                "venue": {
+                    "name": lieu or None,
+                    "city": ville or None,
+                },
+                "round": {
+                    "display_value": round_info.display_value,
+                    "is_reliable": round_info.is_reliable,
+                },
+            },
+        },
+        "presentation": presentation_obj.model_dump(),
+        "provenance": provenance,
         "club_resolu": club_resolu,
         "team": source_team,
-        "match": {
-            "poule_id": str(source_team.get("poule_id"))
-            if source_team.get("poule_id") is not None
-            else None,
-            "match_id": str(next_match.get("id"))
-            if next_match.get("id") is not None
-            else None,
-            "date": next_dt.isoformat()
-            if next_dt and time_confirmed
-            else scheduled_date,
-            "scheduled_date": scheduled_date,
-            "scheduled_at": scheduled_at,
-            "time_confirmed": time_confirmed,
-            "horaire_renseigne": time_confirmed,
-            "statut": _compute_match_statut(next_match, next_dt),
-            "adversaire": adversaire,
-            "domicile": domicile,
-            "equipe1": eq1_name,
-            "equipe2": eq2_name,
-            "salle": lieu,
-            "ville": ville,
-            "adresse": adresse_salle,
-        },
+        "match": legacy_match,
         "_meta": _freshness_meta(cache="poule", force_refresh_supported=True),
     }
 
@@ -1098,11 +1214,26 @@ async def ffbb_last_result_service(
                 }
             )
         )
+        provenance = build_provenance_block(
+            source="ffbb_api_live",
+            cache_status="hit" if not force_refresh else "miss",
+            resource_ids={
+                "organisme_id": str(organisme_id) if organisme_id else None,
+            },
+        )
+        empty_presentation = {
+            "short_answer": "Aucun match joué trouvé.",
+            "detail_line": "Aucune rencontre terminée n'est enregistrée pour cette équipe sur la saison.",
+            "source_label": format_source_label(),
+            "warnings": ["Aucun résultat disponible."],
+        }
         return {
             "status": "no_result",
             "message": "Aucun match joué trouvé.",
             "club_resolu": club_resolu,
             "candidates": all_available_equipes,
+            "presentation": empty_presentation,
+            "provenance": provenance,
             "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
         }
 
@@ -1191,8 +1322,117 @@ async def ffbb_last_result_service(
         else scheduled_date_last
     )
 
+    # Fiabilité de la journée
+    raw_round = dernier.get("numeroJournee")
+    round_info = evaluate_round_reliability(raw_round)
+
+    my_team_name = (
+        format_team_name(dernier.get("nomEquipe1", ""), num1)
+        if est_domicile
+        else format_team_name(dernier.get("nomEquipe2", ""), num2)
+    )
+    opp_team_name = (
+        format_team_name(dernier.get("nomEquipe2", ""), num2)
+        if est_domicile
+        else format_team_name(dernier.get("nomEquipe1", ""), num1)
+    )
+    category_label = source_eq.get("team_label") or categorie or ""
+
+    time_iso = (
+        f"{dt_last.hour:02d}:{dt_last.minute:02d}"
+        if (time_confirmed_last and dt_last)
+        else None
+    )
+
+    presentation_obj = build_match_presentation(
+        team_name=my_team_name,
+        opponent_name=opp_team_name,
+        is_home=est_domicile,
+        status="final",
+        dt_obj=dt_last,
+        time_confirmed=time_confirmed_last,
+        home_score=score_nous if est_domicile else score_eux,
+        away_score=score_eux if est_domicile else score_nous,
+        venue_name=lieu,
+        venue_city=ville,
+        competition_name=competition_name,
+        round_info=round_info,
+        is_last_result=True,
+    )
+
+    resource_ids = {
+        "competition_id": str(source_eq.get("competition_id"))
+        if source_eq.get("competition_id") is not None
+        else None,
+        "poule_id": str(source_eq.get("poule_id"))
+        if source_eq.get("poule_id") is not None
+        else None,
+        "engagement_id": str(source_eq.get("engagement_id"))
+        if source_eq.get("engagement_id") is not None
+        else None,
+        "match_id": str(dernier.get("id")) if dernier.get("id") is not None else None,
+    }
+    provenance = build_provenance_block(
+        source="ffbb_api_live",
+        cache_status="miss" if force_refresh else "hit",
+        resource_ids=resource_ids,
+        raw_journee=raw_round if not round_info.is_reliable else None,
+        data_freshness="live" if force_refresh else "recent_cache",
+    )
+
+    result_team_val = (
+        "win"
+        if victoire
+        else (
+            "loss"
+            if (
+                score_nous is not None
+                and score_eux is not None
+                and score_nous < score_eux
+            )
+            else (
+                "draw"
+                if (
+                    score_nous is not None
+                    and score_eux is not None
+                    and score_nous == score_eux
+                )
+                else None
+            )
+        )
+    )
+
     return {
         "status": "ok",
+        "data": {
+            "team": {
+                "name": my_team_name,
+                "category": category_label,
+                "competition": competition_name,
+            },
+            "match": {
+                "context_label": "Dernier match joué",
+                "status": "final",
+                "date": scheduled_date_last,
+                "time": time_iso,
+                "timezone": "Europe/Paris",
+                "home_team": format_team_name(dernier.get("nomEquipe1", ""), num1),
+                "away_team": format_team_name(dernier.get("nomEquipe2", ""), num2),
+                "home_score": _safe_int(dernier.get("resultatEquipe1")),
+                "away_score": _safe_int(dernier.get("resultatEquipe2")),
+                "result_for_team": result_team_val,
+                "venue": {
+                    "name": lieu or None,
+                    "city": ville or None,
+                },
+                "round": {
+                    "display_value": round_info.display_value,
+                    "is_reliable": round_info.is_reliable,
+                },
+            },
+        },
+        "presentation": presentation_obj.model_dump(),
+        "provenance": provenance,
         "club_resolu": club_resolu,
         "date": iso_date_last,
         "scheduled_date": scheduled_date_last,
@@ -1200,7 +1440,7 @@ async def ffbb_last_result_service(
         "time_confirmed": time_confirmed_last,
         "horaire_renseigne": time_confirmed_last,
         "statut": _compute_match_statut(dernier, dt_last),
-        "journee": dernier.get("numeroJournee"),
+        "journee": round_info.display_value,
         "competition": competition_name,
         "competition_id": str(source_eq.get("competition_id"))
         if source_eq.get("competition_id") is not None
