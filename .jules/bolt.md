@@ -75,3 +75,6 @@
 ## 2026-09-18 - [Regex Optimizations with Fast-Path Checks]
 **Learning:** Pre-compiling regex expressions combined with fast-path checks (e.g. `if "-" not in s`) avoids invoking the regex engine entirely when not needed, reducing runtime by ~30-40%.
 **Action:** When a regex is executed frequently, identify characteristics of the matched string (like explicit hyphens or prefixes) and use a literal check to short-circuit.
+## 2023-10-25 - [Pre-compile Regex and Use .isascii Fast-Path]
+**Learning:** For frequently called text normalization functions (like `normalize_alias_key`), using `.isascii()` as an early exit avoids the significant overhead of full Unicode NFD normalization and character-by-character category checks for standard ASCII strings. Additionally, pre-compiling regular expressions (like punctuation replacement) at the module level avoids `re` module compilation or cache lookup overhead on every execution.
+**Action:** Always pre-compile `re` objects at the module level when they are statically known, and use `.isascii()` to short-circuit Unicode normalization functions for simple strings.

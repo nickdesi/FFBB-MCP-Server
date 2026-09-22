@@ -17,16 +17,23 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger("ffbb-mcp")
 
 
+_PUNCT_REGEX = re.compile(r"[\-_\.\'\/\(\)]+")
+
 def normalize_alias_key(text: str | None) -> str:
     """Normalise un libellé ou code (minuscules, sans accents, sans tirets ni espaces multiples)."""
     if not text:
         return ""
-    # Décomposition Unicode pour supprimer les accents
-    clean = "".join(
-        c for c in unicodedata.normalize("NFD", text) if unicodedata.category(c) != "Mn"
-    ).lower()
+
+    if text.isascii():
+        clean = text.lower()
+    else:
+        # Décomposition Unicode pour supprimer les accents
+        clean = "".join(
+            c for c in unicodedata.normalize("NFD", text) if unicodedata.category(c) != "Mn"
+        ).lower()
+
     # Remplacer ponctuation et séparateurs par un espace
-    clean = re.sub(r"[\-_\.\'\/\(\)]+", " ", clean)
+    clean = _PUNCT_REGEX.sub(" ", clean)
     return " ".join(clean.split())
 
 
