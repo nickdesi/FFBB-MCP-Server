@@ -78,6 +78,20 @@ def track_tool_usage(tool_name: str):
 logger = logging.getLogger("ffbb-mcp")
 
 
+# Enveloppes de ffbb_last_result/next_match exploitables dans team_summary :
+# "ok" (match trouvé) ou "no_upcoming_match" (vide explicite avec présentation).
+# Les enveloppes d'erreur (ambiguous/not_found/error) ne doivent pas passer
+# pour des matchs.
+_SUMMARY_MATCH_STATUSES = frozenset({"ok", "no_upcoming_match"})
+
+
+def _accepted_match_envelope(raw: Any) -> dict[str, Any] | None:
+    """Ne retient qu'une enveloppe de match exploitable, sinon None."""
+    if isinstance(raw, dict) and raw.get("status") in _SUMMARY_MATCH_STATUSES:
+        return raw
+    return None
+
+
 def _resolve_log_level(raw: str | None) -> int:
     """Résout un niveau de log à partir d'une valeur d'environnement."""
     if not raw:
@@ -1278,9 +1292,19 @@ async def ffbb_team_summary(
         if not effective_org_id:
             return {"error": "Impossible de résoudre le club"}
 
-        await _safe_report_progress(
-            ctx, 1, total=3, message="Récupération bilan et matchs en parallèle…"
+        # La présence de `categorie` ne doit pas conditionner ces appels : quand
+        # l'équipe est désambiguïsée par engagement_id/poule_id seuls (ex: brassage
+        # U13M), les services sous-jacents résolvent très bien sans catégorie
+        # (filtre engagement_id). Sans cela, next_match restait null alors que
+        # find_team_candidates trouvait le match via le même engagement.
+        has_team_context = (
+            bool(categorie) or engagement_id is not None or resolved_team is not None
         )
+
+        if effective_org_id and has_team_context:
+            await _safe_report_progress(
+                ctx, 1, total=3, message="Récupération bilan et matchs en parallèle…"
+            )
 
         # Lancer bilan + last_result + next_match en parallèle
         # On passe effective_org_id au lieu de club_name pour éviter une double résolution
@@ -1296,7 +1320,7 @@ async def ffbb_team_summary(
             force_refresh=force_refresh,
         )
 
-        if effective_org_id and categorie:
+        if effective_org_id and has_team_context:
             last_coro = ffbb_last_result_service(
                 organisme_id=effective_org_id,
                 categorie=categorie,
@@ -1322,12 +1346,16 @@ async def ffbb_team_summary(
             raw_bilan, raw_last, raw_next = await asyncio.gather(
                 bilan_coro, last_coro, next_coro, return_exceptions=True
             )
-            # Normaliser les exceptions et types en dicts d'erreur / None
+            # Normaliser les exceptions et types en dicts d'erreur / None.
+            # Seules les enveloppes exploitables sont retenues ("ok", ou
+            # "no_upcoming_match" qui porte un message explicite) : les
+            # enveloppes d'erreur (ambiguous/not_found/error) ne doivent pas
+            # passer pour des matchs.
             bilan = (
                 raw_bilan if isinstance(raw_bilan, dict) else {"error": str(raw_bilan)}
             )
-            last_match = raw_last if isinstance(raw_last, dict) else None
-            next_match = raw_next if isinstance(raw_next, dict) else None
+            last_match = _accepted_match_envelope(raw_last)
+            next_match = _accepted_match_envelope(raw_next)
         else:
             raw_bilan = await bilan_coro
             bilan = (
