@@ -126,9 +126,16 @@ async def get_lives_service(
     target_engagement = str(engagement_id or "")
     target_organisme = str(organisme_id or "")
 
+    def _match_id(value: Any) -> str:
+        # Les rencontres portent les ids dans des dicts (idEngagementEquipe1.id) :
+        # str(dict) ne matcherait jamais l'id demandé.
+        if isinstance(value, dict):
+            value = value.get("id")
+        return str(value or "")
+
     def matches_target(match: dict[str, Any]) -> bool:
         engagement_values = {
-            str(match.get(key) or "")
+            _match_id(match.get(key))
             for key in (
                 "engagement_id",
                 "id_engagement",
@@ -137,7 +144,7 @@ async def get_lives_service(
             )
         }
         organisme_values = {
-            str(match.get(key) or "")
+            _match_id(match.get(key))
             for key in (
                 "organisme_id",
                 "id_organisme",
@@ -183,8 +190,10 @@ async def get_lives_service(
 
     from .calendar import get_calendrier_club_service
 
+    # Le fallback calendrier doit respecter include_scheduled : avec ["live"]
+    # seul, une poule sans match en cours n'apportait jamais les programmés.
     calendar_kwargs: dict[str, Any] = {
-        "status_filter": ["live"],
+        "status_filter": ["live", "scheduled"] if include_scheduled else ["live"],
         "scope": "team" if engagement_id or categorie or numero_equipe else "club",
     }
     for key, value in (

@@ -116,6 +116,7 @@ async def _build_calendar_matches(
     engagement_id: int | str | None = None,
     competition_id: int | str | None = None,
     competition_type: str | None = None,
+    poule_id: int | str | None = None,
     season_id: int | str | None = None,
     offset: int | None = None,
     scope: str | None = None,
@@ -234,6 +235,22 @@ async def _build_calendar_matches(
 
     all_teams_raw = list(equipes)
 
+    # Désambiguïsation forte : un engagement_id explicite qui matche l'inventaire
+    # court-circuite les heuristiques floues (alias de catégorie, exclusion des
+    # amicaux par nom de compétition...). Sans cela, une équipe PLAT/brassage
+    # ("TOURNOI ..." dans le nom) était éliminée avant même le filtre engagement.
+    explicit_match: list[dict[str, Any]] | None = None
+    if engagement_id is not None:
+        target_eng = str(engagement_id).strip()
+        matched = [
+            e
+            for e in all_teams_raw
+            if str(e.get("engagement_id") or e.get("team_id") or "").strip()
+            == target_eng
+        ]
+        if matched:
+            explicit_match = matched
+
     if not all_teams_raw:
         return {
             "status": "not_found",
@@ -270,7 +287,7 @@ async def _build_calendar_matches(
     registry = get_aliases_registry()
     target_div = registry.lookup(categorie) if categorie else None
 
-    if effective_scope in ("team", "competition"):
+    if effective_scope in ("team", "competition") and explicit_match is None:
         if target_div:
             equipes = [
                 e
@@ -374,6 +391,9 @@ async def _build_calendar_matches(
                 or not (e.get("categorie") or "").upper().strip().startswith("U")
             ]
 
+    if explicit_match is not None:
+        equipes = explicit_match
+
     if engagement_id is not None:
         target_eng = str(engagement_id).strip()
         equipes = [
@@ -397,6 +417,12 @@ async def _build_calendar_matches(
             e
             for e in equipes
             if str(e.get("competition_type") or "").strip().upper() == target_type
+        ]
+
+    if poule_id is not None:
+        target_poule = str(poule_id).strip()
+        equipes = [
+            e for e in equipes if str(e.get("poule_id") or "").strip() == target_poule
         ]
 
     if not equipes:
@@ -917,6 +943,7 @@ async def get_calendrier_club_service(
     engagement_id: int | str | None = None,
     competition_id: int | str | None = None,
     competition_type: str | None = None,
+    poule_id: int | str | None = None,
     season_id: int | str | None = None,
     scope: str | None = None,
     include_competition_types: list[str] | None = None,
@@ -932,6 +959,8 @@ async def get_calendrier_club_service(
 ) -> dict[str, Any]:
     if engagement_id is None:
         engagement_id = kwargs.get("engagement_id")
+    if poule_id is None:
+        poule_id = kwargs.get("poule_id")
     if offset is None:
         offset = kwargs.get("offset")
     if scope is None:
@@ -958,6 +987,7 @@ async def get_calendrier_club_service(
         f"{_normalize_name(categorie or '')}:{numero_equipe or ''}:"
         f"{_normalize_name(adversaire or '')}:{date_debut or ''}:{date_fin or ''}:"
         f"{engagement_id or ''}:{competition_id or ''}:{competition_type or ''}:"
+        f"{poule_id or ''}:"
         f"{scope or ''}:{inc_types}:{exc_types}:{include_friendlies}:{include_youth}:"
         f"{include_reserves}:{st_filter}:{strict_filters}:{group_by or ''}:{season_id or ''}"
     )
@@ -983,6 +1013,7 @@ async def get_calendrier_club_service(
             engagement_id=engagement_id,
             competition_id=competition_id,
             competition_type=competition_type,
+            poule_id=poule_id,
             season_id=season_id,
             offset=offset,
             scope=scope,

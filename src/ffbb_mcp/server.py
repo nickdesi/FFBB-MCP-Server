@@ -709,8 +709,40 @@ async def ffbb_club(
 
         # Action calendrier : le service gère résolution + ambiguïté en interne
         if action == "calendrier":
+            if not organisme_id and not club_name and engagement_id is not None:
+                # L'engagement exact permet de retrouver l'organisme (même
+                # logique que _resolve_team_equipes) : le schema autorise
+                # l'identification par engagement_id / poule_id / competition_id.
+                try:
+                    from ffbb_mcp.client import FFBBClientFactory
+
+                    _eng_client = await FFBBClientFactory.get_client_async()
+                    _eng_data = await _eng_client.get_engagement_async(
+                        str(engagement_id).strip()
+                    )
+                    if _eng_data is not None and getattr(
+                        _eng_data, "idOrganisme", None
+                    ):
+                        organisme_id = str(_eng_data.idOrganisme)
+                except Exception:
+                    logger.debug(
+                        "Résolution organisme depuis engagement_id échouée",
+                        exc_info=True,
+                    )
             if not organisme_id and not club_name:
-                return [{"error": "Fournir organisme_id ou club_name"}]
+                return {
+                    "status": "error",
+                    "message": "Fournir organisme_id ou club_name (ou un engagement_id résolvable)",
+                    "items": [],
+                    "_meta": {
+                        "total": 0,
+                        "returned": 0,
+                        "limit": limit or 0,
+                        "offset": offset or 0,
+                        "has_more": False,
+                        "sort": "scheduled_at:asc",
+                    },
+                }
             effective_refresh = force_refresh
             kwargs: dict[str, Any] = {
                 "club_name": club_name,
@@ -734,6 +766,8 @@ async def ffbb_club(
                 kwargs["competition_id"] = competition_id
             if competition_type is not None:
                 kwargs["competition_type"] = competition_type
+            if poule_id is not None:
+                kwargs["poule_id"] = poule_id
             if season_id is not None:
                 kwargs["season_id"] = season_id
             if scope is not None:
