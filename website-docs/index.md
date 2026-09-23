@@ -24,7 +24,7 @@ features:
     details: "Schémas, paramètres et workflows des outils FFBB MCP, hors README."
     icon: 🛠️
   - title: "Exploitation"
-    details: "Architecture, performance, cache, métriques et déploiement Coolify."
+    details: "Architecture, performance, cache, métriques et déploiement Dokploy / Zoraxy."
     icon: ⚙️
 ---
 

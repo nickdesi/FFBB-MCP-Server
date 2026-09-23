@@ -33,7 +33,7 @@ export default defineConfig({
       {
         text: 'Déploiement',
         items: [
-          { text: 'Coolify', link: '/deploy/coolify' }
+          { text: 'Dokploy & Zoraxy', link: '/deploy/dokploy-zoraxy' }
         ]
       }
     ],

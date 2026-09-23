@@ -12,7 +12,7 @@ Bienvenue dans le centre de documentation officiel du serveur **FFBB MCP**.
 | **[🏗️ Architecture Technique](ARCHITECTURE.md)** | Fonctionnement interne du serveur, MCPServer (Stateless Core), transport Streamable HTTP, services, moteur de règlements FTS5 et cycle de vie. | Développeurs & Architectes |
 | **[💬 Exemples & Cas d'usage](EXAMPLES.md)** | Prompts types, exemples d'appels pour Claude Desktop, Cursor et assistants IA (données et règlements officiels). | Utilisateurs & Intégrateurs |
 | **[⚡ Performance & Optimisations](PERFORMANCE.md)** | Gestion du cache SQLite / SWR, benchmarks de latence, métriques Prometheus et dashboards. | Développeurs & DevOps |
-| **[🐳 Guide de Déploiement Coolify](COOLIFY_DEPLOYMENT.md)** | Guide pas à pas pour déployer sur Coolify avec Nginx Proxy Manager et SSL. | DevOps & Administrateurs |
+| **[🐳 Guide de Déploiement (Dokploy & Zoraxy)](DEPLOYMENT_DOKPLOY_ZORAXY.md)** | Guide pas à pas pour déployer sur Dokploy avec Zoraxy Reverse Proxy et SSL. | DevOps & Administrateurs |
 | **[📜 Règles Métier Basket (rules_ffbb.md)](rules_ffbb.md)** | Guide de navigation et heuristiques pour explorer les données FFBB (clubs, poules, classements, lives, règlements officiels). | Développeurs & LLMs |
 
 ---

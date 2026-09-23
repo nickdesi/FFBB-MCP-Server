@@ -19,4 +19,4 @@ body:
     id: environment
     attributes:
       label: Environnement
-      placeholder: "VS Code, Claude Desktop, Cursor, Docker, Coolify..."
+      placeholder: "VS Code, Claude Desktop, Cursor, Docker, Dokploy, Zoraxy..."

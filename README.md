@@ -229,7 +229,7 @@ Le pipeline CI (`.github/workflows/ci.yml`) exécute ruff, mypy, pytest et le co
 - [Référence des outils](docs/TOOLS_REFERENCE.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Performance et cache](docs/PERFORMANCE.md)
-- [Déploiement Coolify](docs/COOLIFY_DEPLOYMENT.md)
+- [Déploiement Dokploy & Zoraxy](docs/DEPLOYMENT_DOKPLOY_ZORAXY.md)
 
 ---
 

@@ -7,7 +7,7 @@ Consultez d'abord :
 - [`README.md`](README.md) pour l'installation rapide ;
 - [`docs/TOOLS_REFERENCE.md`](docs/TOOLS_REFERENCE.md) pour la référence des outils ;
 - [`docs/EXAMPLES.md`](docs/EXAMPLES.md) pour les exemples d'usage ;
-- [`docs/COOLIFY_DEPLOYMENT.md`](docs/COOLIFY_DEPLOYMENT.md) pour le déploiement.
+- [`docs/DEPLOYMENT_DOKPLOY_ZORAXY.md`](docs/DEPLOYMENT_DOKPLOY_ZORAXY.md) pour le déploiement.
 
 ## Où demander quoi ?
 

@@ -13,7 +13,7 @@ Nous utilisons le framework `mcp.server.mcpserver` (SDK `mcp 2.2.0+`, spec `2026
 Le serveur supporte deux modes d'exposition :
 
 - **Stdio** : Utilisé pour l'exécution locale (via `uvx`). Communication via stdin/stdout.
-- **Streamable HTTP** : Utilisé pour le déploiement cloud (Coolify). Endpoint unique `/mcp` acceptant `POST` (JSON-RPC) et `GET` (stream serveur→client optionnel). Transport configuré via `MCP_MODE=http` ou `MCP_MODE=streamable-http`.
+- **Streamable HTTP** : Utilisé pour le déploiement cloud (Dokploy & Zoraxy). Endpoint unique `/mcp` acceptant `POST` (JSON-RPC) et `GET` (stream serveur→client optionnel). Transport configuré via `MCP_MODE=http` ou `MCP_MODE=streamable-http`.
 
 ### 3. Service Layer (Package `services/`)
 
@@ -84,7 +84,7 @@ D'autres routes annexes sont exposées par l'application Starlette/MCPServer :
 
 | Route | Rôle |
 | --- | --- |
-| `/health` | Healthcheck JSON enrichi pour Coolify/monitoring. |
+| `/health` | Healthcheck JSON enrichi pour Dokploy/Zoraxy/monitoring. |
 | `/metrics` | Métriques Prometheus texte. |
 | `/metrics.json` | Snapshot JSON lisible par dashboard ou supervision légère. |
 | `/dashboard` | Dashboard HTML de monitoring. |
