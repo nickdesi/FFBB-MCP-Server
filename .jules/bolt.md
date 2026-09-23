@@ -75,3 +75,6 @@
 ## 2026-09-18 - [Regex Optimizations with Fast-Path Checks]
 **Learning:** Pre-compiling regex expressions combined with fast-path checks (e.g. `if "-" not in s`) avoids invoking the regex engine entirely when not needed, reducing runtime by ~30-40%.
 **Action:** When a regex is executed frequently, identify characteristics of the matched string (like explicit hyphens or prefixes) and use a literal check to short-circuit.
+## 2024-05-24 - [Avoid `encode('ascii', 'ignore')` for accent stripping]
+**Learning:** Using `.encode('ascii', 'ignore')` after `unicodedata.normalize("NFD", text)` is extremely fast for stripping accents, but it introduces functional regressions by removing *all* non-ASCII characters (e.g., currency symbols, special typographies), not just the diacritical marks.
+**Action:** When stripping accents, use `str.translate` with a precomputed mapping of 'Mn' (Mark, Nonspacing) category characters to `None`. This is safe and still provides a massive speedup over manual list comprehensions iterating over characters.
