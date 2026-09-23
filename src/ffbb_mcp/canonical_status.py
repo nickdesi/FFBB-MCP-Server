@@ -111,7 +111,8 @@ def derive_temporal_match_status(
         or match.get("date_reelle")
     )
     try:
-        scheduled_at = datetime.fromisoformat(str(raw_date).replace(" ", "T"))
+        # ⚡ Bolt: Fast-path. datetime.fromisoformat() natively supports space separators
+        scheduled_at = datetime.fromisoformat(str(raw_date))
     except (TypeError, ValueError):
         scheduled_at = None
 
@@ -367,9 +368,8 @@ def canonicalize_match_status(
     match_dt: datetime | None = None
     if raw_date:
         try:
-            # Traiter formats ISO ou standard 'YYYY-MM-DD HH:MM:SS'
-            iso_str = raw_date.replace(" ", "T")
-            match_dt = datetime.fromisoformat(iso_str)
+            # ⚡ Bolt: Fast-path. datetime.fromisoformat() natively supports space separators
+            match_dt = datetime.fromisoformat(raw_date)
             if match_dt.tzinfo is None:
                 match_dt = match_dt.replace(tzinfo=UTC)
         except Exception:

@@ -702,16 +702,70 @@ def handle_api_error(e: Exception) -> McpError:
                 )
             )
         if status in (401, 403):
+            # Distinguish Directus permission error (JSON) from BunnyCDN WAF block (HTML)
+            content_type = getattr(e.response, "headers", {}).get("content-type", "")
+            if "application/json" in content_type:
+                detail = (
+                    "Accès FFBB refusé par Directus (403). Cause probable : "
+                    "la compétition ou ressource demandée appartient à une saison archivée "
+                    "et n'est plus accessible avec le token courant. "
+                    "Action conseillée : utilisez ffbb_saisons() pour vérifier la saison "
+                    "en cours, puis relancez votre recherche avec un identifiant de la "
+                    "saison actuelle."
+                )
+            else:
+                detail = (
+                    "Accès FFBB bloqué par le CDN (403 BunnyCDN). "
+                    "Cause probable : User-Agent non reconnu ou IP temporairement bloquée. "
+                    "Action conseillée : vérifiez que ffbb-data-client est à jour et réessayez."
+                )
+            return McpError(error=ErrorData(code=INTERNAL_ERROR, message=detail))
+        if status == 429:
             return McpError(
                 error=ErrorData(
                     code=INTERNAL_ERROR,
                     message=(
-                        "Accès FFBB refusé (401/403). Action conseillée: vérifiez la configuration "
-                        "d'accès FFBB et réessayez ensuite."
+                        "Rate-limit FFBB atteint (429). Action conseillée: réduisez les appels parallèles "
+                        "et réessayez dans quelques secondes."
                     ),
                 )
             )
-        if status == 429:
+
+    # Erreurs SDK ffbb-data-client (FFBBHTTPError & sous-classes) : duck-typing
+    # sur status_code pour éviter un import dur. Le SDK tague explicitement
+    # "BunnyCDN" vs "Directus" dans le message (cf. _raise_for_status).
+    sdk_status = getattr(e, "status_code", None)
+    if isinstance(sdk_status, int):
+        if sdk_status == 404:
+            return McpError(
+                error=ErrorData(
+                    code=INTERNAL_ERROR,
+                    message=(
+                        "Ressource FFBB introuvable (404). Action conseillée: vérifiez l'identifiant "
+                        "numérique ou relancez ffbb_search(type='organismes') pour résoudre le club."
+                    ),
+                )
+            )
+        if sdk_status in (401, 403):
+            lowered = error_msg.lower()
+            is_cdn = "bunnycdn" in lowered or "blocked by cdn" in lowered
+            if is_cdn:
+                detail = (
+                    "Accès FFBB bloqué par le CDN (403 BunnyCDN). "
+                    "Cause probable : User-Agent non reconnu ou IP temporairement bloquée. "
+                    "Action conseillée : vérifiez que ffbb-data-client est à jour et réessayez."
+                )
+            else:
+                detail = (
+                    "Accès FFBB refusé par Directus (403). Cause probable : "
+                    "la compétition ou ressource demandée appartient à une saison archivée "
+                    "et n'est plus accessible avec le token courant. "
+                    "Action conseillée : utilisez ffbb_saisons() pour vérifier la saison "
+                    "en cours, puis relancez votre recherche avec un identifiant de la "
+                    "saison actuelle."
+                )
+            return McpError(error=ErrorData(code=INTERNAL_ERROR, message=detail))
+        if sdk_status == 429:
             return McpError(
                 error=ErrorData(
                     code=INTERNAL_ERROR,
