@@ -1609,10 +1609,15 @@ async def ffbb_last_result(
     try:
         effective_refresh = force_refresh
         effective_num = numero_equipe if numero_equipe is not None else 1
+        effective_cat = categorie or ""
+        if categorie:
+            parsed = parse_categorie(categorie)
+            if parsed and parsed.numero_equipe is not None:
+                effective_num = parsed.numero_equipe
         return await ffbb_last_result_service(
             club_name=club_name,
             organisme_id=organisme_id,
-            categorie=categorie or "",
+            categorie=effective_cat,
             numero_equipe=effective_num,
             engagement_id=engagement_id,
             competition_id=competition_id,
@@ -1708,10 +1713,15 @@ async def ffbb_next_match(
 
     try:
         effective_num = numero_equipe if numero_equipe is not None else 1
+        effective_cat = categorie or ""
+        if categorie:
+            parsed = parse_categorie(categorie)
+            if parsed and parsed.numero_equipe is not None:
+                effective_num = parsed.numero_equipe
         return await ffbb_next_match_service(
             club_name=club_name,
             organisme_id=organisme_id,
-            categorie=categorie or "",
+            categorie=effective_cat,
             numero_equipe=effective_num,
             engagement_id=engagement_id,
             competition_id=competition_id,

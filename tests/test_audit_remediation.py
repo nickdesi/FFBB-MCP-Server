@@ -260,3 +260,41 @@ async def test_team_summary_ambiguity_propagation(
     assert summary_ambig.get("status") == "ambiguous"
     assert "candidates" in summary_ambig
     assert len(summary_ambig["candidates"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_next_match_and_last_result_auto_parse_numero_equipe(
+    mock_client, mock_scba_organisme
+) -> None:
+    """Vérifie que ffbb_next_match et ffbb_last_result extraient le numéro d'équipe depuis 'categorie' si numero_equipe est None."""
+    from ffbb_mcp.server import ffbb_next_match
+
+    mock_client.get_organisme_async = AsyncMock(return_value=mock_scba_organisme)
+    mock_client.get_poule_async = AsyncMock(
+        return_value={
+            "id": "200000003056290",
+            "nom": "Poule U18",
+            "rencontres": [
+                {
+                    "id": "match_u18_1",
+                    "date_rencontre": "2026-10-10 14:00:00",
+                    "joue": 0,
+                    "idEngagementEquipe1": {"id": "200000005347163"},
+                    "idEngagementEquipe2": {"id": "adv_999"},
+                    "nomEquipe1": "STADE CLERMONTOIS BASKET AUVERGNE - 1",
+                    "nomEquipe2": "ADVERSAIRE BASKET",
+                }
+            ],
+        }
+    )
+
+    # Appel avec categorie='U18M1' et numero_equipe=None
+    res = await ffbb_next_match(
+        organisme_id=9326,
+        categorie="U18M1",
+        numero_equipe=None,
+        competition_type="PLAT",
+        force_refresh=True,
+    )
+    assert res.get("status") == "ok"
+    assert res.get("match", {}).get("match_id") == "match_u18_1"
