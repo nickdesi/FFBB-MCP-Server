@@ -303,10 +303,18 @@ async def ffbb_saison_bilan_service(
         ratio_global_victoires=ratio_saison,
     )
 
+    # Catégorie normalisée depuis l'équipe résolue (team_label ex: "U13M"),
+    # pas le paramètre brut qui peut être absent (engagement seul → "").
+    resolved_categorie = (
+        (equipes[0].get("team_label") or equipes[0].get("categorie") or "").strip()
+        if equipes
+        else ""
+    )
+
     return {
         "status": "ok",
         "club": club_nom,
-        "categorie": categorie or "",
+        "categorie": resolved_categorie or categorie or "",
         "bilan_total": totaux,
         "dynamique": dynamique,
         "saison_terminee": saison_terminee,
