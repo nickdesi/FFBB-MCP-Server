@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.16.1] - 2026-09-23
+
+### Fixed
+- **CI / Release Workflow** : Idempotence de la publication PyPI dans `release.yml` en ignorant l'erreur HTTP 400 "File already exists" en cas de latence CDN d'index simple ou de re-tag.
+- **Documentation** : Remplacement intégral des références obsolètes à Coolify et Nginx Proxy Manager par la documentation officielle de déploiement **Dokploy & Zoraxy Reverse Proxy** (`docs/DEPLOYMENT_DOKPLOY_ZORAXY.md`).
+
 ## [1.16.0] - 2026-09-23
 
 ### Changed
