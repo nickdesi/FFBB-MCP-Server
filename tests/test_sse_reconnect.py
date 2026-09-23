@@ -9,12 +9,15 @@ from ffbb_mcp.server import mcp
 
 
 @pytest.mark.asyncio
-async def test_sse_stream_reconnection_replaces_old_stream_without_conflict():
+async def test_sse_stream_reconnection_replaces_old_stream_without_conflict(
+    monkeypatch,
+):
     """Vérifie que la reconnexion d'un flux SSE sur la même session n'entraîne pas d'erreur 409 Conflict.
 
     Comble la lacune connue du SDK MCP StreamableHTTP où la reconnexion d'un flux GET standalone
     déclenchait un 409 Conflict bloquant Antigravity et les clients SSE.
     """
+    monkeypatch.setenv("MCP_STATELESS_HTTP", "false")
     app = create_app(mcp, allowed_origins=["*"])
     async with mcp.session_manager.run():
         transport = ASGITransport(app=app)

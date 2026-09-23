@@ -4,11 +4,12 @@ import contextlib
 import logging
 from typing import Any
 
-from mcp.shared.exceptions import McpError
 from mcp.types import INTERNAL_ERROR, ErrorData
 
 from ffbb_mcp._state import _read_positive_int_env, state
 from ffbb_mcp.cache_strategy import get_poule_ttl, get_static_ttl
+
+from .common import McpError
 
 
 async def get_client_async(*args, **kwargs):

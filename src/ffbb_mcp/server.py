@@ -13,9 +13,16 @@ from importlib.metadata import PackageNotFoundError as _PkgNotFound
 from importlib.metadata import version as _meta_version
 from typing import Annotated, Any, Literal
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server import MCPServer
+from mcp.server.mcpserver import Context
 from mcp.server.transport_security import TransportSecuritySettings
-from mcp.types import ToolAnnotations
+from mcp.types import Tool, ToolAnnotations
+
+# Alias de compatibilité pour accès legacy camelCase sur les objets Tool
+if not hasattr(Tool, "inputSchema"):
+    Tool.inputSchema = property(lambda self: self.input_schema)  # type: ignore[attr-defined]
+if not hasattr(Tool, "outputSchema"):
+    Tool.outputSchema = property(lambda self: self.output_schema)  # type: ignore[attr-defined]
 from pydantic import Field
 
 from ffbb_mcp.models import BilanResponse, CalendrierMatch
@@ -123,7 +130,7 @@ def _resolve_uvicorn_log_level(level: int) -> str:
 
 
 async def _safe_report_progress(
-    ctx: Context[Any, Any, Any] | None,
+    ctx: Context | None,
     progress: float,
     total: float | None = None,
     message: str | None = None,
@@ -172,10 +179,10 @@ def _validate_filter_by(filter_by: str | None) -> str | None:
 
 
 _READONLY_ANNOTATIONS = ToolAnnotations(
-    readOnlyHint=True,
-    destructiveHint=False,
-    idempotentHint=True,
-    openWorldHint=True,
+    read_only_hint=True,
+    destructive_hint=False,
+    idempotent_hint=True,
+    open_world_hint=True,
 )
 
 
@@ -223,24 +230,19 @@ else:
     # Désactivation automatique si wildcard présent (non supporté par le SDK MCP v1.x)
     _dns_protection = "*" not in _allowed_hosts and "*" not in _allowed_origins
 
-mcp: FastMCP = FastMCP(
+transport_security = TransportSecuritySettings(
+    enable_dns_rebinding_protection=_dns_protection,
+    allowed_hosts=_allowed_hosts,
+    allowed_origins=_allowed_origins,
+)
+
+mcp: MCPServer = MCPServer(
     "FFBB MCP Server",
     instructions=(
         ROUTING_PROMPT
         + "\n[Données live. Tableau classement: | Rang | **Nom Équipe** 🎯 | PTS | J | G | P | M | E | Diff | avec cible en GRAS (is_target=True). Pas de recalcul.]"
     ),
     dependencies=["mcp", "ffbb-data-client"],
-    # Streamable HTTP transport (MCP spec 2025-11-25)
-    # stateless_http=False → session persistante avec mcp-session-id
-    #   (requis par Antigravity et la plupart des clients MCP)
-    # json_response=True  → répond en application/json (plus simple que SSE pour POST)
-    stateless_http=False,
-    json_response=True,
-    transport_security=TransportSecuritySettings(
-        enable_dns_rebinding_protection=_dns_protection,
-        allowed_hosts=_allowed_hosts,
-        allowed_origins=_allowed_origins,
-    ),
 )
 
 
@@ -424,7 +426,7 @@ async def ffbb_bilan(
         bool,
         Field(description="Si True, contourne le cache."),
     ] = False,
-    ctx: Context[Any, Any, Any] | None = None,
+    ctx: Context | None = None,
 ) -> dict[str, Any] | BilanResponse:
     """Bilan complet d'une équipe toutes phases confondues en UN seul appel (V/D/N, paniers, phases).
 
@@ -1272,7 +1274,7 @@ async def ffbb_team_summary(
         bool,
         Field(description="Si True, force un rafraichissement des donnees"),
     ] = False,
-    ctx: Context[Any, Any, Any] | None = None,
+    ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Résumé complet d'équipe : bilan, classement, dernier et prochain match en un seul appel.
 
@@ -1787,7 +1789,7 @@ async def ffbb_bilan_saison(
             description="Si True, contourne le cache pour récupérer des données fraîches."
         ),
     ] = False,
-    ctx: Context[Any, Any, Any] | None = None,
+    ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Bilan détaillé de la saison pour une équipe précise (toutes phases).
 
@@ -1926,7 +1928,7 @@ async def ffbb_head_to_head(
             description="Alias pour organisme_id_b : ID FFBB du second club / adversaire."
         ),
     ] = None,
-    ctx: Context[Any, Any, Any] | None = None,
+    ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Compare deux équipes et analyse leurs confrontations directes (H2H) et dynamiques."""
     try:
@@ -2014,7 +2016,7 @@ async def ffbb_search_regulations(
             description="Nombre maximal d'extraits d'articles à retourner (défaut 5, max 10)"
         ),
     ] = 5,
-    ctx: Context[Any, Any, Any] | None = None,
+    ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Recherche plein texte déterministe dans les règlements officiels FFBB, régionaux et départementaux.
 
@@ -2081,7 +2083,7 @@ async def ffbb_get_regulation_article(
         str,
         Field(description="Saison sportive (défaut '2026-2027')"),
     ] = "2026-2027",
-    ctx: Context[Any, Any, Any] | None = None,
+    ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Récupère le texte intégral et exact d'un article spécifique de règlement sans troncature.
 
@@ -2128,7 +2130,7 @@ async def ffbb_explain_tiebreak_rules(
         str,
         Field(description="Saison sportive (défaut '2026-2027')"),
     ] = "2026-2027",
-    ctx: Context[Any, Any, Any] | None = None,
+    ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Fournit les règles officielles de départage en cas d'égalité (Article 28 du RSG FFBB).
 
@@ -2175,7 +2177,7 @@ async def ffbb_list_regulations(
         str,
         Field(description="Saison sportive (défaut '2026-2027')"),
     ] = "2026-2027",
-    ctx: Context[Any, Any, Any] | None = None,
+    ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Liste l'ensemble des textes réglementaires fédéraux (RSG, RSP Élite, NM1-NM3, LF2-NF3),
     régionaux (Ligues IDF, Hauts-de-France, AURA...) et départementaux
@@ -2210,7 +2212,7 @@ async def ffbb_list_regulations(
 # ---------------------------------------------------------------------------
 
 
-def _optimize_tool_schemas(mcp_instance: FastMCP) -> None:
+def _optimize_tool_schemas(mcp_instance: MCPServer) -> None:
     """Optimise les schémas JSON des outils MCP et élimine l'empreinte token superflue.
 
     1. anyOf inter-arguments : indique formellement aux agents IA qu'au moins un critère
@@ -2342,10 +2344,13 @@ def main() -> None:
             f"Démarrage MCP FFBB en mode Streamable HTTP sur {host}:{port}/mcp ..."
         )
 
-        mcp.settings.streamable_http_path = "/mcp"
         from ffbb_mcp.app_factory import create_app
 
-        app = create_app(mcp, _allowed_origins)
+        app = create_app(
+            mcp,
+            allowed_origins=_allowed_origins,
+            transport_security=transport_security,
+        )
 
         import uvicorn
 

@@ -43,8 +43,11 @@ def apply_sse_reconnect_patch() -> None:
             GET_STREAM_KEY,
             LAST_EVENT_ID_HEADER,
             MCP_SESSION_ID_HEADER,
+            REQUEST_STREAM_BUFFER_SIZE,
             EventMessage,
+            SSEEvent,
             StreamableHTTPServerTransport,
+            check_accept_headers,
         )
     except ImportError:  # pragma: no cover - robustness
         logger.warning(
@@ -62,7 +65,7 @@ def apply_sse_reconnect_patch() -> None:
             )
 
         # Validate Accept header - must include text/event-stream
-        _, has_sse = self._check_accept_headers(request)
+        _, has_sse = check_accept_headers(request)
 
         if not has_sse:
             response = self._create_error_response(
@@ -105,24 +108,29 @@ def apply_sse_reconnect_patch() -> None:
 
         # Create SSE stream
         sse_stream_writer, sse_stream_reader = anyio.create_memory_object_stream[
-            dict[str, Any]
+            SSEEvent
         ](0)
-        stream_pair = anyio.create_memory_object_stream[EventMessage](0)
 
         async def standalone_sse_writer() -> None:
             try:
-                self._request_streams[GET_STREAM_KEY] = stream_pair
-                standalone_stream_reader = stream_pair[1]
+                self._request_streams[GET_STREAM_KEY] = (
+                    anyio.create_memory_object_stream[EventMessage](
+                        REQUEST_STREAM_BUFFER_SIZE
+                    )
+                )
+                standalone_stream_reader = self._request_streams[GET_STREAM_KEY][1]
 
                 async with sse_stream_writer, standalone_stream_reader:
                     async for event_message in standalone_stream_reader:
                         event_data = self._create_event_data(event_message)
                         await sse_stream_writer.send(event_data)
+            except anyio.ClosedResourceError:
+                pass
             except Exception:
                 logger.exception("Error in standalone SSE writer")
             finally:
                 logger.debug("Closing standalone SSE writer")
-                if self._request_streams.get(GET_STREAM_KEY) == stream_pair:
+                if self._request_streams.get(GET_STREAM_KEY) is not None:
                     await self._clean_up_memory_streams(GET_STREAM_KEY)
 
         # Create and start EventSourceResponse
@@ -137,10 +145,11 @@ def apply_sse_reconnect_patch() -> None:
             await response(request.scope, request.receive, send)
         except Exception:
             logger.exception("Error in standalone SSE response")
+            if self._request_streams.get(GET_STREAM_KEY) is not None:
+                await self._clean_up_memory_streams(GET_STREAM_KEY)
+        finally:
             await sse_stream_writer.aclose()
             await sse_stream_reader.aclose()
-            if self._request_streams.get(GET_STREAM_KEY) == stream_pair:
-                await self._clean_up_memory_streams(GET_STREAM_KEY)
 
     StreamableHTTPServerTransport._handle_get_request = (  # type: ignore[method-assign]
         _graceful_handle_get_request
@@ -168,12 +177,15 @@ def apply_fastmcp_json_formatting_patch() -> None:
         return
 
     try:
-        import mcp.server.fastmcp.utilities.func_metadata as fm
+        try:
+            import mcp.server.mcpserver.utilities.func_metadata as fm
+        except ImportError:
+            import mcp.server.fastmcp.utilities.func_metadata as fm  # type: ignore[no-redef]
         import pydantic_core
         from mcp.types import ContentBlock, TextContent
     except ImportError:  # pragma: no cover
         logger.warning(
-            "mcp.server.fastmcp.utilities.func_metadata non disponible, patch JSON ignoré."
+            "mcp.server.mcpserver.utilities.func_metadata non disponible, patch JSON ignoré."
         )
         return
 
@@ -192,6 +204,6 @@ def apply_fastmcp_json_formatting_patch() -> None:
             return [TextContent(type="text", text=json_text)]
         return orig_convert(result)
 
-    fm._convert_to_content = _standardized_convert_to_content
+    fm._convert_to_content = _standardized_convert_to_content  # type: ignore[assignment]
     _JSON_PATCHED = True
     logger.info("✅ Patch de formatage JSON array FastMCP appliqué avec succès.")

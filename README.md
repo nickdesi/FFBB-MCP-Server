@@ -15,7 +15,7 @@ Serveur [MCP](https://modelcontextprotocol.io) pour consulter calendriers, class
 
 <br />
 
-[![Version](https://img.shields.io/badge/version-1.15.0-green?style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.16.0-green?style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/releases/latest)
 [![Python](https://img.shields.io/badge/Python-3.14%2B-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org)
 [![CI](https://img.shields.io/github/actions/workflow/status/nickdesi/FFBB-MCP-Server/ci.yml?label=CI&style=for-the-badge)](https://github.com/nickdesi/FFBB-MCP-Server/actions/workflows/ci.yml)
 [![MCP](https://img.shields.io/badge/MCP-Ready-00ADD8?style=for-the-badge&logo=modelcontextprotocol&logoColor=white)](https://modelcontextprotocol.io)
@@ -180,7 +180,7 @@ https://ffbb.desimone.fr/mcp
 
 ```mermaid
 flowchart LR
-    A[Client MCP<br/>Claude · Cursor · Antigravity] -->|Streamable HTTP / Stdio| B[FFBB MCP Server<br/>FastMCP]
+    A[Client MCP<br/>Claude · Cursor · Antigravity] -->|Streamable HTTP / Stdio| B[FFBB MCP Server<br/>MCPServer]
     B --> C[Services métier<br/>Cache SWR & Agrégation]
     C --> D[ffbb-data-client<br/>SDK Python]
     D --> E[(API FFBB · Meilisearch · Directus)]
@@ -188,7 +188,7 @@ flowchart LR
 
 Points clés :
 
-- **Double transport** : Streamable HTTP distant (spec `2025-11-25`) ou Stdio local (`uvx`) ;
+- **Double transport** : Streamable HTTP distant (spec `2026-07-28`, Stateless Core) ou Stdio local (`uvx`) ;
 - **SDK Python découplé** : Requêtes vers les sources fédérales et parsing Pydantic v2 délégués à `ffbb-data-client` ; le serveur MCP ne les interroge pas directement ;
 - **Agrégation composite** : 12 outils optimisés pour réduire les allers-retours et le contexte LLM ;
 - **Cache intelligent & SWR** : *Stale-While-Revalidate* avec TTL par type de donnée (30 s lives, 1 h bilans, 24 h clubs) ;

@@ -243,7 +243,7 @@ def _build_dashboard_html() -> str:
         "      <img src='/logo.webp' alt='FFBB logo' onerror=\"this.style.display='none'\">\n"
         "      <div>\n"
         "        <div class='title'>FFBB MCP Dashboard</div>\n"
-        f"        <div class='meta'>v<b>{_PACKAGE_VERSION}</b> &nbsp;&bull;&nbsp; spec <b>2025-11-25</b></div>\n"
+        f"        <div class='meta'>v<b>{_PACKAGE_VERSION}</b> &nbsp;&bull;&nbsp; spec <b>2026-07-28</b></div>\n"
         "      </div>\n"
         "    </div>\n"
         "    <div class='nav-links'>\n"

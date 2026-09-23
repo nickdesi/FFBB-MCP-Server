@@ -4,7 +4,7 @@ import logging
 import numbers
 
 import pytest
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
 
 from ffbb_mcp.routes import (
     _build_index_html,
@@ -21,8 +21,8 @@ from ffbb_mcp.server import (
 
 
 def test_server_initialization():
-    """Vérifie que FastMCP est bien initialisé."""
-    assert isinstance(mcp, FastMCP)
+    """Vérifie que MCPServer est bien initialisé."""
+    assert isinstance(mcp, MCPServer)
     assert mcp.name == "FFBB MCP Server"
 
 
@@ -179,9 +179,8 @@ async def test_ffbb_lives_via_call_tool():
     ) as mock_svc:
         result = await mcp.call_tool("ffbb_lives", {})
         mock_svc.assert_called_once_with(include_scheduled=False)
-        # result = (content_list, structured_dict) en mode JSON.
-        content_list, _structured = result
-        assert content_list, "FastMCP doit renvoyer au moins un TextContent"
+        content_list = result.content if hasattr(result, "content") else result[0]
+        assert content_list, "MCPServer doit renvoyer au moins un TextContent"
         payload = json.loads(content_list[0].text)
         # ``_freshness_meta`` peut envelopper la liste → on supporte dict ou list.
         items = payload if isinstance(payload, list) else [payload]
@@ -245,8 +244,8 @@ async def test_ffbb_get_competition_via_call_tool():
     ) as mock_svc:
         result = await mcp.call_tool("ffbb_get", {"id": "42", "type": "competition"})
         mock_svc.assert_called_once_with(competition_id="42")
-        content_list, _structured = result
-        assert content_list, "FastMCP doit renvoyer au moins un TextContent"
+        content_list = result.content if hasattr(result, "content") else result[0]
+        assert content_list, "MCPServer doit renvoyer au moins un TextContent"
         payload = json.loads(content_list[0].text)
         # Le payload peut être soit l'objet direct, soit enveloppé sous "result".
         obj = payload.get("result", payload) if isinstance(payload, dict) else payload
@@ -263,7 +262,9 @@ async def test_ffbb_bilan_service_error_raises_tool_error():
     """
     from unittest.mock import AsyncMock, patch
 
-    from mcp.server.fastmcp.exceptions import ToolError
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    from ffbb_mcp.services.common import McpError
 
     expected_markers = (
         "Erreur API FFBB",
@@ -279,7 +280,7 @@ async def test_ffbb_bilan_service_error_raises_tool_error():
     ):
         try:
             await mcp.call_tool("ffbb_bilan", {"club_name": "ASVEL"})
-        except ToolError as exc:
+        except (ToolError, McpError) as exc:
             # Format émis par handle_api_error() :
             # f"Erreur API FFBB ({error_type}): {error_msg}. Action conseillée: …"
             msg = str(exc)
@@ -299,9 +300,11 @@ async def test_ffbb_search_validation_error():
 
     On ancre sur le substring littéral émis par ``_validate_filter_by()``.
     """
-    from mcp.server.fastmcp.exceptions import ToolError
+    from mcp.server.mcpserver.exceptions import ToolError
 
-    with pytest.raises(ToolError) as exc_info:
+    from ffbb_mcp.services.common import McpError
+
+    with pytest.raises((ToolError, McpError)) as exc_info:
         await mcp.call_tool(
             "ffbb_search",
             {"query": "test", "filter_by": "bad\x00input"},

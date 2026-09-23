@@ -224,6 +224,7 @@ ENV_DESCRIPTIONS = {
     "FFBB_KNOWN_CLUB_IDS": "Override JSON de la liste d'organisme_id connus pour les prompts MCP (fallback : _DEFAULT_KNOWN_CLUB_IDS)",
     "FFBB_REGULATIONS_MANIFEST": "Chemin explicite vers le fichier manifest.yaml des règlements sportifs",
     "FFBB_DATA_DIR": "Répertoire racine contenant les données statiques (ex: regulations, cache)",
+    "MCP_STATELESS_HTTP": "Activer le mode stateless HTTP MCP spec 2026-07-28 sans session (défaut : true)",
 }
 
 

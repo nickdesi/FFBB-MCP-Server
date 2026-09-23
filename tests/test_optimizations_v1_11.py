@@ -73,9 +73,15 @@ async def test_fastmcp_json_array_serialization():
             {"id": "2024-2025", "nom": "2024/2025"},
         ]
 
-        converted = await tool.run(arguments={}, convert_result=True)
+        try:
+            converted = await tool.run(arguments={}, context=None, convert_result=True)
+        except TypeError:
+            converted = await tool.run(arguments={}, convert_result=True)
 
-        if isinstance(converted, tuple):
+        if hasattr(converted, "content"):
+            unstructured = converted.content
+            _structured = getattr(converted, "structured_content", None)
+        elif isinstance(converted, tuple):
             unstructured, _structured = converted
         else:
             unstructured = converted

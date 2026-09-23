@@ -7,12 +7,13 @@ from functools import lru_cache
 from typing import Any, Protocol, cast
 
 import httpx
-from mcp.shared.exceptions import McpError
 from mcp.types import INTERNAL_ERROR, ErrorData
 from pydantic import ValidationError
 
 from ffbb_mcp._state import state
 from ffbb_mcp.competition_type import resolve_competition_type
+
+from .common import McpError
 
 
 async def get_client_async(*args, **kwargs):

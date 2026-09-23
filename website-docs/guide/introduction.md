@@ -16,11 +16,11 @@ Il permet aux assistants IA (Claude, Gemini, Cursor) de naviguer intelligemment 
 
 ```mermaid
 flowchart LR
-    A["Agent IA\nClaude / Cursor"] -->|"Streamable HTTP\nPOST /mcp"| B("FastMCP Server\nffbb.desimone.fr")
+    A["Agent IA\nClaude / Cursor"] -->|"Streamable HTTP\nPOST /mcp"| B("MCPServer\nffbb.desimone.fr")
     B -->|"Logique Métier & Cache"| C{"Services\nUnifiés"}
     C <-->|"ffbb-data-client"| D[("FFBB API Officielle")]
 ```
 
-- **Transport** : Streamable HTTP (spec MCP 2025-11-25).
+- **Transport** : Streamable HTTP (spec MCP 2026-07-28, Stateless Core).
 - **Cache Intelligent** : TTL dynamique s'adaptant au calendrier (mercredi/weekend live).
 - **Auto-résolution** : Identification automatique des équipes et des poules.

@@ -15,8 +15,33 @@ from zoneinfo import ZoneInfo
 
 from cachetools import TLRUCache, TTLCache
 from httpx import HTTPStatusError
-from mcp.shared.exceptions import McpError
+from mcp.shared.exceptions import MCPError
 from mcp.types import INTERNAL_ERROR, ErrorData
+
+
+class McpError(MCPError):
+    """Classe de compatibilité rétrocompatible pour McpError (MCP v1 -> v2)."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        if "error" in kwargs:
+            err = kwargs["error"]
+            super().__init__(
+                code=err.code, message=err.message, data=getattr(err, "data", None)
+            )
+        elif args and isinstance(args[0], ErrorData):
+            super().__init__(
+                code=args[0].code, message=args[0].message, data=args[0].data
+            )
+        elif len(args) == 1 and isinstance(args[0], str):
+            super().__init__(code=INTERNAL_ERROR, message=args[0])
+        else:
+            super().__init__(*args, **kwargs)
+
+
+import mcp.shared.exceptions
+
+if not hasattr(mcp.shared.exceptions, "McpError"):
+    mcp.shared.exceptions.McpError = McpError  # type: ignore[attr-defined]
 
 from ffbb_mcp._state import _read_positive_int_env, state
 from ffbb_mcp.cache_strategy import get_static_ttl

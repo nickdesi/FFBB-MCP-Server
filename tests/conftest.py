@@ -2,7 +2,12 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import mcp.shared.exceptions
 import pytest
+from mcp.shared.exceptions import MCPError
+
+if not hasattr(mcp.shared.exceptions, "McpError"):
+    mcp.shared.exceptions.McpError = MCPError  # type: ignore[attr-defined]
 
 
 @pytest.fixture

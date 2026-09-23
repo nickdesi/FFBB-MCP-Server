@@ -19,7 +19,6 @@ import logging
 from typing import Any
 
 import httpx
-from mcp.shared.exceptions import McpError
 from pydantic import ValidationError
 
 from ffbb_mcp._state import state
@@ -28,6 +27,7 @@ from ffbb_mcp.utils import parse_categorie
 
 from .common import (
     _BILAN_STAT_FIELDS,
+    McpError,
     _detect_phase_type,
     _extract_and_accumulate_bilan,
     _freshness_meta,

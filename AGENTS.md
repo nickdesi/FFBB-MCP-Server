@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB MCP server | server.py: 2364 lignes | services.py: 8257 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 2369 lignes | services.py: 8284 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -136,8 +136,8 @@ src/ffbb_mcp/
 ├── prompts.py             # Prompts MCP réutilisables
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
-├── server.py              # Tools MCP + main() (≈2364 lignes)
-├── services/              # Logique métier modularisée (≈8257 lignes)
+├── server.py              # Tools MCP + main() (≈2369 lignes)
+├── services/              # Logique métier modularisée (≈8284 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── bilan.py           # Module de service
 │   ├── calendar.py        # Module de service
@@ -159,7 +159,7 @@ src/ffbb_mcp/
 - Pas de suffixe `_compact_` ou `_impl_` exposé
 - Modifier une fonction à la fois, seulement si test/usage échoue
 - Nouvelle fonction → test manuel validé avant exposition MCP
-- **Modularisation** : Le package `services/` (total ≈8257 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
+- **Modularisation** : Le package `services/` (total ≈8284 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
 
 ## Commandes
 - Démarrer le serveur MCP (stdio) : `rtk uv run python -m ffbb_mcp` (recommandé pour Claude Desktop)
@@ -194,6 +194,8 @@ Avant push/tag/release :
 |----------|--------|-------|
 | `XDG_CACHE_HOME` | `` | Dossier racine pour stocker les fichiers de cache persistants (ex: acronymes, benchmark) |
 | `MCP_MODE` | `stdio` | Mode de transport (`stdio` / `streamable-http`) |
+| `MCP_STATELESS_HTTP` | `true` | Activer le mode stateless HTTP MCP spec 2026-07-28 sans session (défaut : true) |
+| `ENABLE_DNS_PROTECTION` | `` | Activer/désactiver explicitement la protection contre le DNS rebinding |
 | `TRUSTED_PROXY_HOSTS` | `127.0.0.1` | Proxies de confiance |
 | `FFBB_LIVES_REFRESH_INTERVAL` | `10` | Intervalle de rafraîchissement proactif des lives en secondes, mode HTTP (défaut : 10) |
 | `FFBB_CACHE_BACKEND` | `sqlite` | Choix du backend de cache HTTP (`sqlite` ou `redis`) |
@@ -206,7 +208,6 @@ Avant push/tag/release :
 | `PUBLIC_URL` | `https://ffbb.desimone.fr` | URL publique pour liens/sitemap |
 | `ALLOWED_HOSTS` | `*` | Hosts autorisés (DNS rebinding protection) |
 | `ALLOWED_ORIGINS` | `*` | Origins CORS |
-| `ENABLE_DNS_PROTECTION` | `` | Activer/désactiver explicitement la protection contre le DNS rebinding |
 | `FFBB_LOG_LEVEL` | `INFO` | Niveau de log |
 | `HOST` | `0.0.0.0` | Interface d'écoute |
 | `PORT` | `9123` | Port d'écoute HTTP |

@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.16.0] - 2026-09-23
+
+### Changed
+- **Migration MCP Specification 2026-07-28 & SDK Python `mcp 2.2.0+`** :
+  - **Architecture Stateless Core** : Abandon du composant legacy `FastMCP` au profit de `mcp.server.mcpserver.MCPServer` et du transport standardisé Streamable HTTP avec mode stateless HTTP par défaut (`stateless_http=True`), configurable via `MCP_STATELESS_HTTP`.
+  - **Sécurité de transport & CORS** : Intégration de `TransportSecuritySettings` avec liste d'autorisation explicite (`localhost`, `127.0.0.1`, `testserver`, `ffbb.desimone.fr`) et ajout des en-têtes `Mcp-Method` / `Mcp-Name` dans la politique CORS.
+  - **Gestion des exceptions MCP v2** : Déplacement de `ToolError` dans `mcp.server.mcpserver.exceptions` et implémentation de la classe adaptative `McpError(MCPError)` pour compatibilité transparente avec l'ancienne et la nouvelle signature RPC JSON-RPC.
+  - **Normalisation des annotations d'outils** : Migration vers `ToolAnnotations` v2 utilisant des paramètres nommés snake_case (`read_only_hint`, `destructive_hint`, `open_world_hint`).
+  - **Unification du typage `Context`** : Signature allégée `Context[LifespanContextT, RequestT]` alignée sur le modèle sans session v2.
+  - **Endpoint de monitoring `/health`** : Mise à jour de la spec déclarée vers `2026-07-28` et ajustement du dashboard HTML de supervision.
+
 ## [1.15.0] - 2026-09-19
 
 ### Added

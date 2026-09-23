@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ffbb-mcp-server"
-version = "1.15.0"
+version = "1.16.0"
 description = "MCP Server for FFBB (Fédération Française de Basketball) data"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -36,7 +36,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "mcp[cli]>=1.28.1,<2.0.0",
+    "mcp[cli]>=2.2.0,<3.0.0",
     "ffbb-data-client>=2.4.6,<3.0.0",
     "httpx>=0.28.0",
     "uvicorn>=0.30.0,<1.0.0",

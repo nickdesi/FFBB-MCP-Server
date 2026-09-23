@@ -4,9 +4,9 @@ Ce document détaille le fonctionnement interne du serveur **FFBB MCP**.
 
 ## 🧩 Composants Principaux
 
-### 1. FastMCP (Core)
+### 1. MCPServer (Stateless Core)
 
-Nous utilisons le framework `mcp.server.fastmcp` pour simplifier la définition des outils, prompts et ressources. Il gère automatiquement la sérialisation JSON-RPC et la validation des types via **Pydantic**.
+Nous utilisons le framework `mcp.server.mcpserver` (SDK `mcp 2.2.0+`, spec `2026-07-28`) pour définir les outils, prompts et ressources. Il gère la sérialisation JSON-RPC, la validation Pydantic et le transport standardisé sans état de session.
 
 ### 2. Transport Layer
 
@@ -56,7 +56,7 @@ Ce découpage garde des points d'entrée simples pour les LLM tout en évitant u
 ```mermaid
 sequenceDiagram
     participant LLM as Agent IA (Claude/Cursor)
-    participant MCP as FFBB MCP Server (FastMCP)
+    participant MCP as FFBB MCP Server (MCPServer)
     participant Service as Service Layer (services.py)
   participant SDK as ffbb-data-client
   participant Sources as API FFBB / Meilisearch / Directus
@@ -75,12 +75,12 @@ sequenceDiagram
 
 ## 🌐 Déploiement Streamable HTTP
 
-En mode `http` (ou `streamable-http`), le serveur configure FastMCP pour exposer le transport **Streamable HTTP** (spec 2025-11-25) sur l'endpoint unique `/mcp` :
+En mode `http` (ou `streamable-http`), le serveur configure MCPServer pour exposer le transport **Streamable HTTP** (spec 2026-07-28, Stateless Core) sur l'endpoint unique `/mcp` :
 
 - `POST /mcp` → JSON-RPC (initialize, tools/call…) — **obligatoire**
 - `GET /mcp` → Server-to-client stream — optionnel
 
-D'autres routes annexes sont exposées par l'application Starlette/FastMCP :
+D'autres routes annexes sont exposées par l'application Starlette/MCPServer :
 
 | Route | Rôle |
 | --- | --- |

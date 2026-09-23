@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from mcp.server.fastmcp import FastMCP
+    from mcp.server import MCPServer
     from starlette.requests import Request
 
 from starlette.responses import (
@@ -156,7 +156,7 @@ def _logo_response() -> Response:
     return RedirectResponse(_REMOTE_LOGO_URL)
 
 
-def register_routes(mcp: FastMCP) -> None:
+def register_routes(mcp: MCPServer) -> None:
     """Registers all custom HTTP routes on the FastMCP instance."""
 
     @mcp.custom_route("/health", methods=["GET"])  # type: ignore[untyped-decorator]
@@ -175,7 +175,7 @@ def register_routes(mcp: FastMCP) -> None:
                 "service": "ffbb-mcp",
                 "version": _PACKAGE_VERSION,
                 "transport": "streamable-http",
-                "spec": "2025-11-25",
+                "spec": "2026-07-28",
                 "uptime_seconds": round(uptime_s, 1),
                 "uptime_human": f"{days}j {hours:02d}:{minutes:02d}:{seconds:02d}",
                 "api_calls_total": summary["api_calls_total"],

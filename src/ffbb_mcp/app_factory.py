@@ -11,8 +11,9 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-    from mcp.server.fastmcp import FastMCP
+    from mcp.server import MCPServer
 
+from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
@@ -70,7 +71,11 @@ async def _bootstrap_cache() -> None:
         logger.debug("Warm-up organismes échoué", exc_info=True)
 
 
-def create_app(mcp: FastMCP, allowed_origins: list[str]) -> Starlette:
+def create_app(
+    mcp: MCPServer,
+    allowed_origins: list[str],
+    transport_security: TransportSecuritySettings | None = None,
+) -> Starlette:
     from ffbb_mcp.sse_patch import (
         apply_fastmcp_json_formatting_patch,
         apply_sse_reconnect_patch,
@@ -107,7 +112,46 @@ def create_app(mcp: FastMCP, allowed_origins: list[str]) -> Starlette:
                         e,
                     )
 
-    mcp_app = mcp.streamable_http_app()
+    stateless_env = os.environ.get("MCP_STATELESS_HTTP", "true").lower()
+    is_stateless = stateless_env in ("true", "1", "yes")
+
+    if transport_security is None:
+        dns_env = os.environ.get("ENABLE_DNS_PROTECTION")
+        enable_dns = (
+            dns_env.lower() == "true"
+            if dns_env is not None
+            else ("*" not in allowed_origins)
+        )
+        hosts = [
+            h.strip()
+            for h in os.environ.get(
+                "ALLOWED_HOSTS",
+                "localhost,localhost:*,127.0.0.1,127.0.0.1:*,testserver,testserver:*",
+            ).split(",")
+            if h.strip()
+        ]
+        for default_h in (
+            "localhost",
+            "localhost:*",
+            "127.0.0.1",
+            "127.0.0.1:*",
+            "testserver",
+            "testserver:*",
+        ):
+            if default_h not in hosts:
+                hosts.append(default_h)
+        transport_security = TransportSecuritySettings(
+            enable_dns_rebinding_protection=enable_dns,
+            allowed_hosts=hosts,
+            allowed_origins=allowed_origins if "*" not in allowed_origins else [],
+        )
+
+    mcp_app = mcp.streamable_http_app(
+        streamable_http_path="/mcp",
+        json_response=True,
+        stateless_http=is_stateless,
+        transport_security=transport_security,
+    )
 
     app = Starlette(
         debug=False,
@@ -134,11 +178,13 @@ def create_app(mcp: FastMCP, allowed_origins: list[str]) -> Starlette:
             "Authorization",
             "Mcp-Session-Id",
             "MCP-Protocol-Version",
+            "Mcp-Method",
+            "Mcp-Name",
             "X-Forwarded-For",
             "X-Forwarded-Proto",
             "X-Real-IP",
         ],
-        expose_headers=["Content-Type", "Mcp-Session-Id"],
+        expose_headers=["Content-Type", "Mcp-Session-Id", "Mcp-Method", "Mcp-Name"],
     )
 
     app.add_middleware(GZipMiddleware, minimum_size=1000)
