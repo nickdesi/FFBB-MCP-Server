@@ -33,10 +33,12 @@ from .poule import (
     find_team_poule_service,
     format_poule_response,
     get_competition_service,
+    get_engagement_service,
     get_lives_service,
     get_organisme_service,
     get_poule_service,
     get_saisons_service,
+    resolve_opponent_from_poule,
 )
 from .regulations import (
     explain_tiebreak_rules_service,
@@ -93,6 +95,7 @@ __all__ = [
     "get_calendrier_club_service",
     "get_client_async",
     "get_competition_service",
+    "get_engagement_service",
     "get_entraineur_service",
     "get_lives_service",
     "get_officiel_service",
@@ -107,6 +110,7 @@ __all__ = [
     "list_regulations_service",
     "multi_search_service",
     "resolve_club_and_org",
+    "resolve_opponent_from_poule",
     "resolve_poule_id_service",
     "search_organismes_service",
     "search_regulations_service",

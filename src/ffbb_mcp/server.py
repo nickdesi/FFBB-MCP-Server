@@ -49,6 +49,7 @@ from .services import (
     get_cache_ttls,
     get_calendrier_club_service,
     get_competition_service,
+    get_engagement_service,
     get_entraineur_service,
     get_lives_service,
     get_officiel_service,
@@ -491,6 +492,7 @@ async def ffbb_get(
             "officiel",
             "entraineur",
             "salle",
+            "engagement",
         ],
         Field(description="Type de ressource a charger."),
     ],
@@ -518,6 +520,7 @@ async def ffbb_get(
     - `type="competition"` equivaut a `get_competition`. Si `club` est fourni, localise directement la poule du club au sein de la compétition.
     - `type="poule"` charge la poule (classements + rencontres).
     - `type="organisme"` charge les details d'un club.
+    - `type="engagement"` charge les details d'un engagement d'équipe (club, poule, calendrier filtré).
     - `type="rencontre"` charge une rencontre précise.
     - `type="salle"` charge les details d'une salle et son adresse normalisée.
 
@@ -540,6 +543,8 @@ async def ffbb_get(
             return await format_poule_response(poule_data)
         elif type == "organisme":
             return await get_organisme_service(organisme_id=id)
+        elif type == "engagement":
+            return await get_engagement_service(id, force_refresh=force_refresh)
         elif type == "rencontre":
             return await get_rencontre_service(id)
         elif type == "officiel":

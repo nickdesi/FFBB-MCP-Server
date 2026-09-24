@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import re
 from typing import Any
 
 from mcp.types import INTERNAL_ERROR, ErrorData
@@ -18,7 +19,11 @@ async def get_client_async(*args, **kwargs):
     return await ffbb_mcp.client.get_client_async(*args, **kwargs)
 
 
-from ffbb_mcp.utils import format_team_name, serialize_model
+from ffbb_mcp.utils import (
+    format_team_name,
+    jaro_winkler_similarity,
+    serialize_model,
+)
 
 from .common import (
     _cache_set,
@@ -303,8 +308,18 @@ async def get_poule_service(
     poule_id_int = _coerce_numeric_id(poule_id, "poule_id")
     cache_key = f"poule:{poule_id_int}"
 
-    if force_refresh and state.cache_poule is not None:
-        state.cache_poule.pop(cache_key, None)
+    if force_refresh:
+        if state.cache_poule is not None:
+            state.cache_poule.pop(cache_key, None)
+        if state.cache_classement is not None:
+            if hasattr(state.cache_classement, "delete_prefix"):
+                state.cache_classement.delete_prefix(f"classement:{poule_id_int}")
+            elif hasattr(state.cache_classement, "keys"):
+                for k in list(state.cache_classement.keys()):
+                    if str(k).startswith(f"classement:{poule_id_int}"):
+                        state.cache_classement.pop(k, None)
+            else:
+                state.cache_classement.pop(f"classement:{poule_id_int}", None)
 
     ttl = await get_poule_ttl(poule_id_int, get_lives_service)
 
@@ -454,6 +469,17 @@ async def get_organisme_service(
 
     if force_refresh and state.cache_organisme is not None:
         state.cache_organisme.pop(cache_key, None)
+        if state.cache_equipes is not None:
+            if hasattr(state.cache_equipes, "delete_prefix"):
+                state.cache_equipes.delete_prefix(f"equipes:{organisme_id_int}:")
+            elif hasattr(state.cache_equipes, "keys"):
+                keys_to_pop = [
+                    k
+                    for k in list(state.cache_equipes.keys())
+                    if str(k).startswith(f"equipes:{organisme_id_int}:")
+                ]
+                for k in keys_to_pop:
+                    state.cache_equipes.pop(k, None)
 
     async def _fetch() -> dict:
         client = await get_client_async()
@@ -493,8 +519,11 @@ async def ffbb_get_classement_service(
         f"classement:{poule_id_int}:{target_organisme_id or ''}:{target_num or ''}"
     )
 
-    if force_refresh and state.cache_classement is not None:
-        state.cache_classement.pop(cache_key, None)
+    if force_refresh:
+        if state.cache_classement is not None:
+            state.cache_classement.pop(cache_key, None)
+        if state.cache_poule is not None:
+            state.cache_poule.pop(f"poule:{poule_id_int}", None)
 
     ttl = await get_poule_ttl(poule_id_int, get_lives_service)
 
@@ -804,3 +833,395 @@ async def find_team_poule_service(
         "competition_id": comp_id_str,
         "competition_nom": comp_nom,
     }
+
+
+_PREFIX_CLEAN_RE = re.compile(r"^(IE\s*-\s*|CTC\s+|ENT\.\s*|ENTENTE\s+)", re.IGNORECASE)
+
+
+def _clean_team_for_match(name: str) -> str:
+    norm = _normalize_name(name)
+    return _PREFIX_CLEAN_RE.sub("", norm).strip()
+
+
+def resolve_opponent_from_poule(
+    poule_data: dict[str, Any],
+    opponent_name: str,
+) -> dict[str, Any]:
+    """Résout l'adversaire d'un match (Étape 3 ID-first) à partir des équipes de sa poule.
+
+    Recherche déterministe dans les classements (ou rencontres) de la poule déjà chargée.
+    Retourne l'engagement_id et l'organisme_id réels de l'adversaire sans nouvelle recherche externe.
+    Si la confiance est inférieure à 0.8, renvoie un statut ambigu sans décision arbitraire.
+    """
+    if not poule_data or not opponent_name:
+        return {
+            "status": "not_found",
+            "resolved_id": None,
+            "engagement_id": None,
+            "organisme_id": None,
+            "nom": None,
+            "numero_equipe": None,
+            "confidence": 0.0,
+            "match_strategy": [],
+            "ambiguous_candidates": [],
+            "message": "Données de poule ou nom d'adversaire manquant.",
+        }
+
+    classements = poule_data.get("classements") or []
+    # Fallback si classements vides : reconstruire les équipes depuis les rencontres
+    if not classements and poule_data.get("rencontres"):
+        seen_noms = set()
+        virtual_classements = []
+        for r in poule_data.get("rencontres", []):
+            for side in ("1", "2"):
+                nom = r.get(f"nomEquipe{side}")
+                eng_id = r.get(f"idEngagementEquipe{side}")
+                org_id = (
+                    r.get(f"idOrganismeEquipe{side}")
+                    or r.get(f"id_organisme_{side}")
+                    or r.get(f"idOrganisme{side}")
+                )
+                if nom and nom not in seen_noms:
+                    seen_noms.add(nom)
+                    virtual_classements.append(
+                        {
+                            "id_engagement": {"id": eng_id, "nom": nom},
+                            "organisme_nom": nom,
+                            "organisme_id": str(org_id) if org_id is not None else None,
+                        }
+                    )
+        classements = virtual_classements
+
+    if not classements:
+        return {
+            "status": "not_found",
+            "resolved_id": None,
+            "engagement_id": None,
+            "organisme_id": None,
+            "nom": None,
+            "numero_equipe": None,
+            "confidence": 0.0,
+            "match_strategy": [],
+            "ambiguous_candidates": [],
+            "message": "Poule sans équipes répertoriées dans les classements ou rencontres.",
+        }
+
+    raw_opp = str(opponent_name).strip()
+    norm_opp = _normalize_name(raw_opp)
+    clean_opp = _clean_team_for_match(raw_opp)
+
+    # Détection d'un numéro d'équipe à la fin (1 à 9 uniquement pour ne pas confondre avec un département ex: 42, 38)
+    num_match = re.search(r"[-_\s]+([1-9])$", raw_opp)
+    target_num = num_match.group(1) if num_match else None
+    base_raw_opp = (
+        re.sub(r"[-_\s]+([1-9])$", "", raw_opp).strip() if target_num else raw_opp
+    )
+    base_clean_opp = _clean_team_for_match(base_raw_opp)
+
+    candidates: list[dict[str, Any]] = []
+
+    for c in classements:
+        c_eng = c.get("id_engagement") or {}
+        c_eng_id = str(c_eng.get("id") or "") if c_eng.get("id") is not None else None
+        c_org_id = (
+            str(c.get("organisme_id") or "")
+            if c.get("organisme_id") is not None
+            else None
+        )
+        c_nom = str(c_eng.get("nom") or c.get("organisme_nom") or "")
+        c_num = str(c_eng.get("numero_equipe") or c_eng.get("numero_equ") or "").strip()
+        c_norm = _normalize_name(c_nom)
+        c_clean = _clean_team_for_match(c_nom)
+
+        # 1. Correspondance exacte brute
+        if c_nom.upper() == raw_opp.upper():
+            return {
+                "status": "resolved",
+                "resolved_id": c_eng_id,
+                "engagement_id": c_eng_id,
+                "organisme_id": c_org_id,
+                "nom": c_nom,
+                "numero_equipe": c_num or None,
+                "confidence": 1.0,
+                "match_strategy": ["poule_classement_exact"],
+                "ambiguous_candidates": [],
+            }
+
+        # Vérification de cohérence du numéro d'équipe
+        num_consistent = True
+        if (target_num and c_num and target_num != c_num) or (
+            target_num and not c_num and target_num != "1"
+        ):
+            num_consistent = False
+
+        if not num_consistent:
+            continue
+
+        # 2. Correspondance normalisée complète
+        if c_norm == norm_opp or (c_num and f"{c_norm} {c_num}" == norm_opp):
+            return {
+                "status": "resolved",
+                "resolved_id": c_eng_id,
+                "engagement_id": c_eng_id,
+                "organisme_id": c_org_id,
+                "nom": c_nom,
+                "numero_equipe": c_num or None,
+                "confidence": 1.0,
+                "match_strategy": ["poule_classement_normalized_exact"],
+                "ambiguous_candidates": [],
+            }
+
+        # 3. Correspondance nettoyée (préfixes CTC / IE retirés)
+        if c_clean == clean_opp or (c_num and f"{c_clean} {c_num}" == clean_opp):
+            candidates.append(
+                {
+                    "engagement_id": c_eng_id,
+                    "organisme_id": c_org_id,
+                    "nom": c_nom,
+                    "numero_equipe": c_num or None,
+                    "score": 0.98,
+                    "strategy": "poule_classement_cleaned_exact",
+                }
+            )
+            continue
+
+        # 4. Correspondance de base sans numéro
+        if c_clean == base_clean_opp or (
+            c_num and f"{c_clean} {c_num}" == base_clean_opp
+        ):
+            candidates.append(
+                {
+                    "engagement_id": c_eng_id,
+                    "organisme_id": c_org_id,
+                    "nom": c_nom,
+                    "numero_equipe": c_num or None,
+                    "score": 0.95,
+                    "strategy": "poule_classement_base_exact",
+                }
+            )
+            continue
+
+        # 5. Inclusion sous-chaîne
+        if base_clean_opp in c_clean or c_clean in base_clean_opp:
+            ratio = min(len(base_clean_opp), len(c_clean)) / max(
+                len(base_clean_opp), len(c_clean)
+            )
+            score = 0.85 + (0.10 * ratio)
+            candidates.append(
+                {
+                    "engagement_id": c_eng_id,
+                    "organisme_id": c_org_id,
+                    "nom": c_nom,
+                    "numero_equipe": c_num or None,
+                    "score": round(score, 3),
+                    "strategy": "poule_classement_inclusion",
+                }
+            )
+            continue
+
+        # 6. Approximatif Jaro-Winkler
+        jw = jaro_winkler_similarity(c_clean, clean_opp)
+        if jw >= 0.75:
+            candidates.append(
+                {
+                    "engagement_id": c_eng_id,
+                    "organisme_id": c_org_id,
+                    "nom": c_nom,
+                    "numero_equipe": c_num or None,
+                    "score": round(jw, 3),
+                    "strategy": "poule_classement_fuzzy",
+                }
+            )
+
+    if not candidates:
+        return {
+            "status": "not_found",
+            "resolved_id": None,
+            "engagement_id": None,
+            "organisme_id": None,
+            "nom": None,
+            "numero_equipe": None,
+            "confidence": 0.0,
+            "match_strategy": [],
+            "ambiguous_candidates": [],
+            "message": f"Aucun adversaire correspondant à '{opponent_name}' dans la poule.",
+        }
+
+    # Tri par score décroissant
+    candidates.sort(key=lambda x: x["score"], reverse=True)
+    best = candidates[0]
+
+    # Vérification d'ambiguïté si plusieurs candidats proches (< 0.10)
+    if len(candidates) > 1:
+        second = candidates[1]
+        if (best["score"] - second["score"]) < 0.10:
+            return {
+                "status": "ambiguous",
+                "resolved_id": None,
+                "engagement_id": None,
+                "organisme_id": None,
+                "nom": None,
+                "numero_equipe": None,
+                "confidence": best["score"],
+                "match_strategy": ["poule_ambiguous"],
+                "ambiguous_candidates": candidates[:3],
+                "message": (
+                    f"Ambiguïté dans la poule entre plusieurs équipes pour '{opponent_name}'. "
+                    "Confirmation utilisateur requise."
+                ),
+            }
+
+    # Garde-fou seuil 0.8 : suspension si confiance insuffisante
+    if best["score"] < 0.80:
+        return {
+            "status": "ambiguous",
+            "resolved_id": None,
+            "engagement_id": None,
+            "organisme_id": None,
+            "nom": None,
+            "numero_equipe": None,
+            "confidence": best["score"],
+            "match_strategy": ["poule_low_confidence"],
+            "ambiguous_candidates": [best],
+            "message": (
+                f"Confiance insuffisante ({best['score']}) pour '{opponent_name}'. "
+                "Confirmation requise."
+            ),
+        }
+
+    return {
+        "status": "resolved",
+        "resolved_id": best["engagement_id"],
+        "engagement_id": best["engagement_id"],
+        "organisme_id": best["organisme_id"],
+        "nom": best["nom"],
+        "numero_equipe": best["numero_equipe"],
+        "confidence": best["score"],
+        "match_strategy": [best["strategy"]],
+        "ambiguous_candidates": [],
+    }
+
+
+async def get_engagement_service(
+    engagement_id: int | str, *, force_refresh: bool = False
+) -> dict[str, Any]:
+    """Récupère les détails d'un engagement FFBB (équipe, club, poule, rencontres)."""
+    eng_id_int = _coerce_numeric_id(engagement_id, "engagement_id")
+    eng_id_str = str(eng_id_int)
+    cache_key = f"engagement:{eng_id_str}"
+
+    if force_refresh and state.cache_engagement is not None:
+        state.cache_engagement.pop(cache_key, None)
+
+    async def _fetch() -> dict[str, Any]:
+        client = await get_client_async()
+        eng = await _with_ffbb_semaphore(
+            _safe_call_with_inflight(
+                f"Engagement {eng_id_str}",
+                lambda: client.get_engagement_async(eng_id_str),
+            ),
+        )
+        if not eng:
+            return {"error": f"Engagement '{eng_id_str}' introuvable."}
+
+        eng_dict = serialize_model(eng) or {}
+        org_id = str(eng_dict.get("idOrganisme") or "")
+        comp_id = str(eng_dict.get("idCompetition") or "")
+        poule_id = str(eng_dict.get("idPoule") or "")
+        num_eq = eng_dict.get("numeroEquipe") or None
+
+        club_info: dict[str, Any] | None = None
+        team_info: dict[str, Any] | None = None
+
+        if org_id:
+            try:
+                org_data = await get_organisme_service(org_id)
+                if org_data and isinstance(org_data, dict):
+                    club_info = {
+                        "id": org_id,
+                        "nom": org_data.get("nom"),
+                        "code": org_data.get("code"),
+                    }
+                from .club import ffbb_equipes_club_service
+
+                teams = await ffbb_equipes_club_service(organisme_id=org_id)
+                for t in teams:
+                    if (
+                        str(t.get("engagement_id") or t.get("team_id") or "")
+                        == eng_id_str
+                    ):
+                        team_info = t
+                        break
+            except Exception as e:
+                logger.warning(
+                    "Erreur enrichissement organisme pour engagement %s: %s",
+                    eng_id_str,
+                    e,
+                )
+
+        poule_info: dict[str, Any] | None = None
+        classement_info: dict[str, Any] | None = None
+        matches: list[dict[str, Any]] = []
+
+        if poule_id:
+            try:
+                poule_data = await get_poule_service(
+                    poule_id, force_refresh=force_refresh
+                )
+                if poule_data and isinstance(poule_data, dict):
+                    poule_info = {
+                        "id": poule_id,
+                        "nom": poule_data.get("nom"),
+                        "competition_id": poule_data.get("idCompetition") or comp_id,
+                    }
+                    target_names: set[str] = set()
+                    if team_info and team_info.get("club"):
+                        target_names.add(str(team_info["club"]))
+                    if club_info and club_info.get("nom"):
+                        target_names.add(str(club_info["nom"]))
+
+                    for c in poule_data.get("classements") or []:
+                        c_eng = c.get("id_engagement") or {}
+                        if str(c_eng.get("id") or "") == eng_id_str:
+                            classement_info = c
+                            if c_eng.get("nom"):
+                                target_names.add(str(c_eng["nom"]))
+                            if c.get("organisme_nom"):
+                                target_names.add(str(c["organisme_nom"]))
+
+                    for m in poule_data.get("rencontres") or []:
+                        id1 = str(m.get("idEngagementEquipe1") or "")
+                        id2 = str(m.get("idEngagementEquipe2") or "")
+                        n1 = m.get("nomEquipe1") or ""
+                        n2 = m.get("nomEquipe2") or ""
+                        if eng_id_str in (id1, id2) or (
+                            target_names and (n1 in target_names or n2 in target_names)
+                        ):
+                            matches.append(m)
+            except Exception as e:
+                logger.warning(
+                    "Erreur enrichissement poule pour engagement %s: %s",
+                    eng_id_str,
+                    e,
+                )
+
+        return {
+            "id": eng_id_str,
+            "numero_equipe": num_eq,
+            "organisme_id": org_id,
+            "competition_id": comp_id,
+            "poule_id": poule_id,
+            "club": club_info,
+            "team": team_info,
+            "poule": poule_info,
+            "classement": classement_info,
+            "calendrier": matches,
+            "total_matchs": len(matches),
+        }
+
+    return await _dedupe_inflight_detail(
+        cache_key,
+        _fetch,
+        cache_name="engagement",
+        cache=state.cache_engagement,
+    )

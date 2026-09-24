@@ -425,24 +425,19 @@ async def _resolve_team_equipes(
             )
 
     import sys
-    import unittest.mock
 
     import ffbb_mcp.services as svc
+    import ffbb_mcp.services.search as search_mod
 
-    resolve_fn = None
-    for cand in [
-        getattr(svc, "resolve_club_and_org", None),
-        getattr(sys.modules[__name__], "resolve_club_and_org", None),
-    ]:
-        if isinstance(
-            cand, (unittest.mock.AsyncMock, unittest.mock.MagicMock)
-        ) or hasattr(cand, "mock_calls"):
-            resolve_fn = cand
-            break
-    from .search import resolve_club_and_org as default_resolve_fn
-
-    if resolve_fn is None:
-        resolve_fn = default_resolve_fn
+    resolve_fn = search_mod.resolve_club_and_org
+    for mod in [search_mod, sys.modules.get(__name__), svc]:
+        if mod is not None:
+            cand = getattr(mod, "resolve_club_and_org", None)
+            if cand is not None and (
+                hasattr(cand, "mock_calls") or hasattr(cand, "_mock_self")
+            ):
+                resolve_fn = cand
+                break
 
     resolved_clubs, org_data = await resolve_fn(
         club_name=club_name,
@@ -494,20 +489,15 @@ async def _resolve_team_equipes(
     target_org_id = str(club_resolu["organisme_id"])
 
     if equipes is None:
-        import unittest.mock
-
         eq_fn = ffbb_equipes_club_service
-        if isinstance(
-            ffbb_equipes_club_service,
-            (unittest.mock.AsyncMock, unittest.mock.MagicMock),
-        ):
-            eq_fn = ffbb_equipes_club_service
-        elif isinstance(
-            getattr(svc, "ffbb_equipes_club_service", None),
-            (unittest.mock.AsyncMock, unittest.mock.MagicMock),
-        ):
-            eq_fn = svc.ffbb_equipes_club_service
-
+        for mod in [sys.modules.get(__name__), svc]:
+            if mod is not None:
+                cand = getattr(mod, "ffbb_equipes_club_service", None)
+                if cand is not None and (
+                    hasattr(cand, "mock_calls") or hasattr(cand, "_mock_self")
+                ):
+                    eq_fn = cand
+                    break
         equipes = await eq_fn(
             organisme_id=target_org_id,
             filtre=categorie,
@@ -578,12 +568,44 @@ async def _resolve_team_equipes(
             e for e in equipes if str(e.get("season_id") or "").strip() == target_season
         ]
 
-    if len(equipes) > 1 and numero_equipe is not None:
-        want = str(numero_equipe)
+    eff_num = numero_equipe
+    if eff_num is None and categorie:
+        parsed_cat = parse_categorie(categorie)
+        if parsed_cat and parsed_cat.numero_equipe is not None:
+            eff_num = parsed_cat.numero_equipe
+
+    if len(equipes) > 1 and eff_num is not None:
+        want = str(eff_num)
         filtered = [
             e for e in equipes if (e.get("numero_equipe") or "").strip() == want
         ]
-        if not filtered:
+        if not filtered and eff_num == 1:
+            # Équipe fanion demandée : filtrer les équipes sans numéro de réserve (2, 3...)
+            potential = [
+                e
+                for e in equipes
+                if not (e.get("numero_equipe") or "").strip()
+                and not any(
+                    str(e.get("nom") or "").endswith(f"- {n}")
+                    or str(e.get("nom") or "").endswith(f"-{n}")
+                    for n in range(2, 10)
+                )
+            ]
+            if len(potential) == 1:
+                filtered = potential
+            elif len(potential) > 1:
+                from .division import get_competition_level_rank
+
+                ranked = sorted(potential, key=get_competition_level_rank, reverse=True)
+                if get_competition_level_rank(ranked[0]) > get_competition_level_rank(
+                    ranked[1]
+                ):
+                    filtered = [ranked[0]]
+                else:
+                    filtered = ranked
+            else:
+                filtered = []
+        elif not filtered:
             filtered = [
                 e for e in equipes if not (e.get("numero_equipe") or "").strip()
             ]
@@ -599,7 +621,7 @@ async def _resolve_team_equipes(
             return (
                 {
                     "status": not_found_status,
-                    "message": f"Aucune équipe matchant '{categorie}' n°{numero_equipe} (ou unique) trouvée.",
+                    "message": f"Aucune équipe matchant '{categorie}' n°{eff_num} (ou unique) trouvée.",
                     "club_resolu": club_resolu,
                     "candidates": all_available,
                 },
@@ -689,17 +711,15 @@ async def _fetch_poule_matches(
         my_eng = eq.get("engagement_id")
         if not pid:
             return []
-        import unittest.mock
-
         import ffbb_mcp.services as svc
 
         from .poule import get_poule_service as poule_fn
 
-        if isinstance(
-            getattr(svc, "get_poule_service", None),
-            (unittest.mock.AsyncMock, unittest.mock.MagicMock),
+        cand = getattr(svc, "get_poule_service", None)
+        if cand is not None and (
+            hasattr(cand, "mock_calls") or hasattr(cand, "_mock_self")
         ):
-            poule_getter = svc.get_poule_service
+            poule_getter = cand
         else:
             poule_getter = poule_fn
 
@@ -1001,6 +1021,43 @@ async def ffbb_next_match_service(
     category_label = source_team.get("team_label") or categorie or ""
     competition_name = source_team.get("competition") or ""
 
+    # Résolution robuste ID-first de l'adversaire depuis la poule
+    poule_id_match = source_team.get("poule_id")
+    opponent_resolution: dict[str, Any] | None = None
+    opp_org_id: str | None = None
+    opp_eng_id: str | None = None
+    opp_num_eq: str | None = None
+    if poule_id_match and opp_team_name:
+        from .poule import get_poule_service, resolve_opponent_from_poule
+
+        try:
+            poule_data = await get_poule_service(poule_id_match)
+            if poule_data and isinstance(poule_data, dict):
+                opponent_resolution = resolve_opponent_from_poule(
+                    poule_data, opp_team_name
+                )
+                if (
+                    opponent_resolution
+                    and opponent_resolution.get("status") == "resolved"
+                ):
+                    opp_org_id = (
+                        str(opponent_resolution.get("organisme_id") or "") or None
+                    )
+                    opp_eng_id = (
+                        str(opponent_resolution.get("engagement_id") or "") or None
+                    )
+                    opp_num_eq = (
+                        str(opponent_resolution.get("numero_equipe") or "")
+                        if opponent_resolution.get("numero_equipe") is not None
+                        else None
+                    )
+        except Exception as e:
+            logger.debug(
+                "Erreur résolution adversaire depuis la poule %s: %s",
+                poule_id_match,
+                e,
+            )
+
     presentation_obj = build_match_presentation(
         team_name=my_team_name,
         opponent_name=opp_team_name,
@@ -1057,6 +1114,10 @@ async def ffbb_next_match_service(
         "horaire_renseigne": time_confirmed,
         "statut": _compute_match_statut(next_match, next_dt),
         "adversaire": adversaire,
+        "adversaire_organisme_id": opp_org_id,
+        "adversaire_engagement_id": opp_eng_id,
+        "adversaire_numero_equipe": opp_num_eq,
+        "adversaire_resolution": opponent_resolution,
         "domicile": domicile,
         "equipe1": eq1_name,
         "equipe2": eq2_name,
@@ -1089,6 +1150,18 @@ async def ffbb_next_match_service(
                 "home_score": None,
                 "away_score": None,
                 "result_for_team": None,
+                "opponent": {
+                    "name": opp_team_name,
+                    "organisme_id": opp_org_id,
+                    "engagement_id": opp_eng_id,
+                    "numero_equipe": opp_num_eq,
+                    "confidence": opponent_resolution.get("confidence")
+                    if opponent_resolution
+                    else None,
+                    "match_strategy": opponent_resolution.get("match_strategy")
+                    if opponent_resolution
+                    else [],
+                },
                 "venue": {
                     "name": lieu or None,
                     "city": ville or None,
@@ -1102,6 +1175,10 @@ async def ffbb_next_match_service(
         "presentation": presentation_obj.model_dump(),
         "provenance": provenance,
         "club_resolu": club_resolu,
+        "adversaire_organisme_id": opp_org_id,
+        "adversaire_engagement_id": opp_eng_id,
+        "adversaire_numero_equipe": opp_num_eq,
+        "adversaire_resolution": opponent_resolution,
         "team": source_team,
         "match": legacy_match,
         "_meta": _freshness_meta(cache="poule", force_refresh_supported=True),
@@ -1338,6 +1415,43 @@ async def ffbb_last_result_service(
     )
     category_label = source_eq.get("team_label") or categorie or ""
 
+    # Résolution robuste ID-first de l'adversaire depuis la poule
+    poule_id_last = source_eq.get("poule_id")
+    opponent_resolution: dict[str, Any] | None = None
+    opp_org_id: str | None = None
+    opp_eng_id: str | None = None
+    opp_num_eq: str | None = None
+    if poule_id_last and opp_team_name:
+        from .poule import get_poule_service, resolve_opponent_from_poule
+
+        try:
+            poule_data = await get_poule_service(poule_id_last)
+            if poule_data and isinstance(poule_data, dict):
+                opponent_resolution = resolve_opponent_from_poule(
+                    poule_data, opp_team_name
+                )
+                if (
+                    opponent_resolution
+                    and opponent_resolution.get("status") == "resolved"
+                ):
+                    opp_org_id = (
+                        str(opponent_resolution.get("organisme_id") or "") or None
+                    )
+                    opp_eng_id = (
+                        str(opponent_resolution.get("engagement_id") or "") or None
+                    )
+                    opp_num_eq = (
+                        str(opponent_resolution.get("numero_equipe") or "")
+                        if opponent_resolution.get("numero_equipe") is not None
+                        else None
+                    )
+        except Exception as e:
+            logger.debug(
+                "Erreur résolution adversaire depuis la poule %s: %s",
+                poule_id_last,
+                e,
+            )
+
     time_iso = (
         f"{dt_last.hour:02d}:{dt_last.minute:02d}"
         if (time_confirmed_last and dt_last)
@@ -1425,6 +1539,18 @@ async def ffbb_last_result_service(
                     "name": lieu or None,
                     "city": ville or None,
                 },
+                "opponent": {
+                    "name": opp_team_name,
+                    "organisme_id": opp_org_id,
+                    "engagement_id": opp_eng_id,
+                    "numero_equipe": opp_num_eq,
+                    "confidence": opponent_resolution.get("confidence")
+                    if opponent_resolution
+                    else None,
+                    "match_strategy": opponent_resolution.get("match_strategy")
+                    if opponent_resolution
+                    else [],
+                },
                 "round": {
                     "display_value": round_info.display_value,
                     "is_reliable": round_info.is_reliable,
@@ -1434,6 +1560,10 @@ async def ffbb_last_result_service(
         "presentation": presentation_obj.model_dump(),
         "provenance": provenance,
         "club_resolu": club_resolu,
+        "adversaire_organisme_id": opp_org_id,
+        "adversaire_engagement_id": opp_eng_id,
+        "adversaire_numero_equipe": opp_num_eq,
+        "adversaire_resolution": opponent_resolution,
         "date": iso_date_last,
         "scheduled_date": scheduled_date_last,
         "scheduled_at": scheduled_at_last,

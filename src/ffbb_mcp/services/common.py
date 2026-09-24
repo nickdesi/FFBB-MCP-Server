@@ -238,6 +238,13 @@ async def disambiguate_clubs_by_category(
     if not categorie or not is_real_ambiguity(resolved_clubs, club_name):
         return resolved_clubs, None
 
+    # Si club_name est renseigné, restreindre d'abord aux clubs ayant une similarité minimale
+    # pour éviter qu'un club sans rapport ne soit retenu uniquement parce qu'il a une équipe
+    if club_name:
+        confident = [c for c in resolved_clubs if is_club_match_confident(c, club_name)]
+        if confident:
+            resolved_clubs = confident
+
     import ffbb_mcp.services as svc
 
     async def _fetch_teams(
@@ -295,20 +302,119 @@ async def disambiguate_clubs_by_category(
     return resolved_clubs, None
 
 
+def is_club_match_confident(
+    candidate: dict[str, Any] | None, query: str | None
+) -> bool:
+    """Vérifie si un club candidat correspond de manière crédible à la requête.
+
+    Empêche le fallback silencieux vers un club arbitraire sans rapport
+    (ex: Pontoise pour 'ANDREZIEUX-BOUTHEON LOIRE SUD BASKET').
+    """
+    if not candidate or not query:
+        return True
+
+    cand_nom = str(candidate.get("nom") or "").strip()
+    cand_code = str(candidate.get("code") or "").strip().upper()
+    q = query.strip()
+    if not cand_nom:
+        return False
+
+    q_norm = _normalize_name(q).upper()
+    cand_nom_norm = _normalize_name(cand_nom).upper()
+
+    # 1. Match exact ou inclusion directe
+    if q_norm == cand_nom_norm or q_norm in cand_nom_norm or cand_nom_norm in q_norm:
+        return True
+
+    # 2. Match de code FFBB exact
+    q_code = q.upper().replace(" ", "").replace("-", "")
+    if cand_code and q_code == cand_code:
+        return True
+
+    # 3. Match d'acronyme ou alias
+    from ffbb_mcp.aliases import CLUB_ALIASES, resolve_acronym
+
+    acronym_res = resolve_acronym(q.upper())
+    if (
+        acronym_res != q.upper()
+        and _normalize_name(acronym_res).upper() in cand_nom_norm
+    ):
+        return True
+    alias_res = CLUB_ALIASES.get(q.lower())
+    if alias_res and _normalize_name(alias_res).upper() in cand_nom_norm:
+        return True
+
+    # 4. Chevauchement de mot distinctif (>= 4 caractères, non générique)
+    # Les mots génériques ne suffisent pas (ex: "BASKET", "CLUB", "LOIRE")
+    generic_words = {
+        "BASKET",
+        "BASKETBALL",
+        "CLUB",
+        "BC",
+        "BBC",
+        "AS",
+        "CS",
+        "US",
+        "AL",
+        "IE",
+        "CTC",
+        "ENT",
+        "BALL",
+        "LOIRE",
+        "SUD",
+        "NORD",
+        "EST",
+        "OUEST",
+        "SAINT",
+        "SAINTE",
+    }
+    q_words = [w for w in q_norm.split() if len(w) >= 4 and w not in generic_words]
+    cand_words = set(cand_nom_norm.split())
+    has_distinctive_word = any(w in cand_words for w in q_words)
+
+    from ffbb_mcp.utils import jaro_winkler_similarity
+
+    jw = jaro_winkler_similarity(cand_nom, q)
+
+    # Entente officielle contenant le mot-clé du club (ex: ENT. GERZAT / JULES VERNE pour Gerzat Basket)
+    if _is_entente_name(cand_nom) and has_distinctive_word:
+        return True
+
+    if has_distinctive_word and jw >= 0.65:
+        return True
+
+    # 5. Similarité Jaro-Winkler élevée globale (pour fautes de frappe directes)
+    return jw >= 0.82
+
+
 def get_primary_club(
     resolved_clubs: list[dict[str, Any]], club_name: str | None = None
 ) -> dict[str, Any] | None:
     """Extrait le club principal cible parmi les candidats résolus."""
     if not resolved_clubs:
         return None
-    if len(resolved_clubs) == 1:
-        return resolved_clubs[0]
+
+    # Filtrer uniquement les candidats confiants si club_name est fourni
+    if club_name:
+        confident_clubs = [
+            c for c in resolved_clubs if is_club_match_confident(c, club_name)
+        ]
+        if not confident_clubs:
+            # Aucun club candidat ne matche de manière crédible le nom demandé !
+            # Zéro hallucination, zéro fallback silencieux vers un club tiers
+            return None
+        candidates_to_use = confident_clubs
+    else:
+        candidates_to_use = resolved_clubs
+
+    if len(candidates_to_use) == 1:
+        return candidates_to_use[0]
 
     norm_query = _normalize_name(club_name) if club_name else ""
 
     # Match exact en priorité absolue
     if norm_query:
-        for c in resolved_clubs:
+        for c in candidates_to_use:
             c_nom = _normalize_name(c.get("nom", ""))
             if (
                 c_nom == norm_query
@@ -318,11 +424,11 @@ def get_primary_club(
                 return c
 
     # Premier club non-entente
-    for c in resolved_clubs:
+    for c in candidates_to_use:
         if not _is_entente_name(c.get("nom", "")):
             return c
 
-    return resolved_clubs[0]
+    return candidates_to_use[0]
 
 
 def _coerce_numeric_id(value: int | str, label: str) -> int:
@@ -640,6 +746,13 @@ state.cache_equipes = make_persistent_cache(
     ),
     "equipes",
 )
+state.cache_engagement = make_persistent_cache(
+    TTLCache(
+        maxsize=512,
+        ttl=_read_positive_int_env("FFBB_CACHE_TTL_ENGAGEMENT", 3600),
+    ),
+    "engagement",
+)
 
 _inflight_locks: dict[int, asyncio.Lock] = {}
 _inflight_locks_guard = threading.Lock()
@@ -699,6 +812,7 @@ def get_cache_ttls() -> dict[str, int]:
             "FFBB_CACHE_TTL_SALLE", get_static_ttl("salle")
         ),
         "resolve_club": _read_positive_int_env("FFBB_CACHE_TTL_RESOLVE_CLUB", 3600),
+        "engagement": _read_positive_int_env("FFBB_CACHE_TTL_ENGAGEMENT", 3600),
     }
 
 

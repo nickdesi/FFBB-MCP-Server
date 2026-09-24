@@ -252,6 +252,36 @@ class PersistentCache:
         except sqlite3.Error:
             pass
 
+    def keys(self) -> Any:
+        return self._inner.keys()
+
+    def values(self) -> Any:
+        return self._inner.values()
+
+    def items(self) -> Any:
+        return self._inner.items()
+
+    def __iter__(self) -> Any:
+        return iter(self._inner)
+
+    def __len__(self) -> int:
+        return len(self._inner)
+
+    def delete_prefix(self, prefix: str) -> None:
+        """Supprime toutes les entrées dont la clé commence par prefix (mémoire + SQLite)."""
+        keys_to_del = [k for k in list(self._inner.keys()) if str(k).startswith(prefix)]
+        for k in keys_to_del:
+            self.pop(k, None)
+        try:
+            with _DB_LOCK:
+                _get_conn().execute(
+                    "DELETE FROM service_cache WHERE name=? AND key LIKE ?",
+                    (self._name, f"{prefix}%"),
+                )
+                _get_conn().commit()
+        except sqlite3.Error:
+            pass
+
     @property
     def ttl(self) -> int:
         return int(getattr(self._inner, "ttl", 0))

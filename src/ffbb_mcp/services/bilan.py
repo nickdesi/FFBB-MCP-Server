@@ -463,17 +463,15 @@ async def _build_bilan_payload(
     )
 
     async def _fetch_poule_bilan(pid: str) -> dict[str, Any] | Exception:
-        import unittest.mock
-
         import ffbb_mcp.services as svc
 
         from .poule import get_poule_service as poule_fn
 
-        if isinstance(
-            getattr(svc, "get_poule_service", None),
-            (unittest.mock.AsyncMock, unittest.mock.MagicMock),
+        cand = getattr(svc, "get_poule_service", None)
+        if cand is not None and (
+            hasattr(cand, "mock_calls") or hasattr(cand, "_mock_self")
         ):
-            poule_getter = svc.get_poule_service
+            poule_getter = cand
         else:
             poule_getter = poule_fn
 

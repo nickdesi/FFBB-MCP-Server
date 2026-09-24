@@ -157,3 +157,114 @@ def _filter_teams_by_competition(
         and "AMICAL" not in _normalize_name(t.get("competition_code") or "").upper()
     ]
     return officials if officials else matched
+
+
+def get_competition_level_rank(candidate: dict[str, Any]) -> int:
+    """Calcule le rang hiérarchique d'un niveau de compétition.
+
+    Plus le score est élevé, plus le niveau sportif est haut :
+    - National (Championnat de France / NM / NF / Elite / organisateur F) : 3000+
+    - Régional (PLAT / Brassage / RM / RF / R1-R3 / PNM / organisateur L) : 2000+
+    - Départemental (DIV / DM / DF / D1-D4 / D10 / organisateur C) : 1000+
+
+    Permet d'attribuer déterministement le rôle d'équipe fanion (équipe 1)
+    à l'engagement de plus haut niveau quand ``numero_equipe`` est absent (None ou "").
+    """
+    comp_code = (candidate.get("competition_code") or "").strip().upper()
+    comp_nom = _normalize_name(candidate.get("competition") or "").upper()
+    comp_type = (candidate.get("competition_type") or "").strip().upper()
+    niveau_raw = candidate.get("niveau")
+    organisateur = (candidate.get("organisateur") or "").strip().upper()
+
+    score = 0
+
+    # 1. Détection National (3000+)
+    is_national = (
+        organisateur in ("F", "FEDERATION", "NATIONAL")
+        or "CHAMPIONNAT DE FRANCE" in comp_nom
+        or (
+            "NATIONALE" in comp_nom
+            and "PRE NATIONALE" not in comp_nom
+            and "PRE-NATIONALE" not in comp_nom
+        )
+        or bool(re.match(r"^N[MF]?\d+", comp_code))
+        or comp_code.startswith("NAT")
+        or comp_code.startswith("ELITE")
+    )
+    if is_national:
+        score = 3000
+        if "ELITE" in comp_code or "ELITE" in comp_nom:
+            score += 500
+        elif "NM1" in comp_code or "NF1" in comp_code or "N1" in comp_code:
+            score += 300
+        elif "NM2" in comp_code or "NF2" in comp_code or "N2" in comp_code:
+            score += 200
+        elif "NM3" in comp_code or "NF3" in comp_code or "N3" in comp_code:
+            score += 100
+        return score
+
+    # 2. Détection Régional (2000+)
+    is_pre_nationale = (
+        "PRE NATIONALE" in comp_nom
+        or "PRE-NATIONALE" in comp_nom
+        or comp_code.startswith("PN")
+    )
+    is_regional = (
+        is_pre_nationale
+        or organisateur in ("L", "LIGUE", "REGIONAL")
+        or "REGIONALE" in comp_nom
+        or "REGIONAL" in comp_nom
+        or "BRASSAGE" in comp_nom
+        or comp_type == "PLAT"
+        or bool(re.match(r"^R[MF]?U?\d*", comp_code))
+        or (isinstance(niveau_raw, str) and "REGIONAL" in niveau_raw.upper())
+    )
+    if is_regional:
+        score = 2000
+        if is_pre_nationale:
+            score += 400
+        elif "BRASSAGE" in comp_nom or "BRASSAGE" in comp_code:
+            score += 300
+        elif "R1" in comp_code or "R1" in comp_nom or "DIVISION 1" in comp_nom:
+            score += 250
+        elif "R2" in comp_code or "R2" in comp_nom or "DIVISION 2" in comp_nom:
+            score += 150
+        elif "R3" in comp_code or "R3" in comp_nom or "DIVISION 3" in comp_nom:
+            score += 50
+        elif comp_type == "PLAT":
+            score += 100
+        return score
+
+    # 3. Détection Départemental (1000+)
+    is_pre_regionale = (
+        "PRE REGIONALE" in comp_nom
+        or "PRE-REGIONALE" in comp_nom
+        or comp_code.startswith("PR")
+    )
+    is_departemental = (
+        is_pre_regionale
+        or organisateur in ("C", "COMITE", "DEPARTEMENTAL")
+        or "DEPARTEMENTALE" in comp_nom
+        or "DEPARTEMENTAL" in comp_nom
+        or comp_type == "DIV"
+        or bool(re.match(r"^D[MF]?U?\d*", comp_code))
+        or (isinstance(niveau_raw, str) and "DEPARTEMENTAL" in niveau_raw.upper())
+    )
+    if is_departemental:
+        score = 1000
+        if is_pre_regionale:
+            score += 400
+        elif "D1" in comp_code or "DIVISION 1" in comp_nom:
+            score += 300
+        elif "D2" in comp_code or "DIVISION 2" in comp_nom:
+            score += 200
+        elif "D3" in comp_code or "DIVISION 3" in comp_nom:
+            score += 100
+        elif "DIVISION 10" in comp_nom or "-10" in comp_code:
+            score += 10  # Division basse
+        return score
+
+    # 4. Fallback générique
+    if comp_type == "COUPE" or "COUPE" in comp_nom:
+        return 500
+    return 100

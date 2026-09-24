@@ -79,6 +79,7 @@ _STATIC_TTLS = {
     "salle": 604_800,  # 7 jours (immuable)
     "saisons": 86_400,  # 24h
     "competitions": 86_400,  # 24h
+    "engagement": 43_200,  # 12h
 }
 
 

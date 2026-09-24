@@ -133,8 +133,13 @@ async def _build_calendar_matches(
     """Construit la liste des matchs (calendrier complet) pour un club / catégorie."""
     from .search import resolve_club_and_org
 
+    force_refresh_flag = kwargs.get("force_refresh", False)
     resolved_clubs, _ = await resolve_club_and_org(
-        club_name=club_name, organisme_id=organisme_id, categorie=categorie, limit=5
+        club_name=club_name,
+        organisme_id=organisme_id,
+        categorie=categorie,
+        limit=5,
+        force_refresh=force_refresh_flag,
     )
 
     if not resolved_clubs:
@@ -167,6 +172,7 @@ async def _build_calendar_matches(
             categorie=categorie,
             club_name=club_name,
             season_id=season_id,
+            force_refresh=force_refresh_flag,
         )
 
     if is_real_ambiguity(resolved_clubs, club_name) and not organisme_id:
@@ -199,15 +205,35 @@ async def _build_calendar_matches(
             "candidates": candidates,
         }
 
-    target_org_ids = [str(c["organisme_id"]) for c in resolved_clubs]
-    target_org_ids = list(dict.fromkeys(oid for oid in target_org_ids if oid))
-
     primary_c = get_primary_club(resolved_clubs, club_name)
-    club_nom_resolu = (
-        primary_c.get("nom", "")
-        if primary_c
-        else (resolved_clubs[0].get("nom", "") if resolved_clubs else "")
-    )
+    if not primary_c and club_name:
+        return {
+            "items": [],
+            "_meta": {
+                "total": 0,
+                "returned": 0,
+                "limit": limit if limit is not None else 0,
+                "offset": offset if offset is not None else 0,
+                "has_more": False,
+                "sort": "scheduled_at:asc",
+                "generated_at": datetime.now(_TZ).isoformat(),
+            },
+            "error": (
+                f"Aucun club correspondant de manière certaine à '{club_name}' n'a été trouvé. "
+                "Vérifie l'orthographe ou utilise ffbb_search."
+            ),
+            "candidates": resolved_clubs,
+        }
+
+    if primary_c:
+        target_org_ids = [str(primary_c["organisme_id"])]
+        club_nom_resolu = primary_c.get("nom", "")
+    else:
+        target_org_ids = [
+            str(c["organisme_id"]) for c in resolved_clubs if c.get("organisme_id")
+        ]
+        target_org_ids = list(dict.fromkeys(target_org_ids))
+        club_nom_resolu = resolved_clubs[0].get("nom", "") if resolved_clubs else ""
     import sys
 
     import ffbb_mcp.services as svc
@@ -326,9 +352,36 @@ async def _build_calendar_matches(
                 or str(e.get("nom") or "").endswith(f"- {num_str}")
             ]
             if not equipes_filtrees and numero_equipe == 1:
-                equipes_filtrees = [
-                    e for e in equipes if not str(e.get("numero_equipe") or "").strip()
+                potential = [
+                    e
+                    for e in equipes
+                    if not str(e.get("numero_equipe") or "").strip()
+                    and not any(
+                        str(e.get("nom") or "").endswith(f"- {n}")
+                        or str(e.get("nom") or "").endswith(f"-{n}")
+                        for n in range(2, 10)
+                    )
                 ]
+                if len(potential) == 1:
+                    equipes_filtrees = potential
+                elif len(potential) > 1:
+                    from .division import get_competition_level_rank
+
+                    ranked = sorted(
+                        potential, key=get_competition_level_rank, reverse=True
+                    )
+                    if get_competition_level_rank(
+                        ranked[0]
+                    ) > get_competition_level_rank(ranked[1]):
+                        equipes_filtrees = [ranked[0]]
+                    else:
+                        equipes_filtrees = ranked
+                else:
+                    equipes_filtrees = [
+                        e
+                        for e in equipes
+                        if not str(e.get("numero_equipe") or "").strip()
+                    ]
             equipes = equipes_filtrees
         elif target_div and not include_reserves:
             equipes = [
@@ -458,7 +511,6 @@ async def _build_calendar_matches(
     )
 
     import sys
-    import unittest.mock
 
     from .poule import get_poule_service as poule_fn
 
@@ -468,9 +520,9 @@ async def _build_calendar_matches(
         getattr(poule_mod, "get_poule_service", None),
         getattr(svc, "get_poule_service", None),
     ]:
-        if isinstance(
-            cand, (unittest.mock.AsyncMock, unittest.mock.MagicMock)
-        ) or hasattr(cand, "mock_calls"):
+        if cand is not None and (
+            hasattr(cand, "mock_calls") or hasattr(cand, "_mock_self")
+        ):
             poule_getter = cand
             break
     if poule_getter is None:

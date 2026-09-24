@@ -430,6 +430,91 @@ def _resolve_team_number(
     return matched
 
 
+async def _search_organismes_directus(
+    query: str, limit: int = 10
+) -> list[dict[str, Any]]:
+    """Recherche des organismes directement via l'API Directus de la FFBB.
+
+    Permet de contourner les lacunes de l'index Meilisearch (ex: organisme 10948 Andrézieux)
+    et supporte la recherche par code FFBB (ex: ARA0042016), acronymes et sous-chaînes.
+    """
+    client = await get_client_async()
+    api = getattr(client, "_api", None)
+    if not api:
+        return []
+    base = getattr(api, "url", "https://api.ffbb.app").rstrip("/")
+    headers = getattr(api, "headers", {})
+
+    q_clean = query.strip()
+    if not q_clean:
+        return []
+
+    is_code = bool(re.match(r"^[A-Za-z]{2,4}\d{4,9}$", q_clean))
+    from ffbb_mcp.aliases import resolve_acronym
+
+    resolved_acronym = resolve_acronym(q_clean)
+
+    queries_to_try: list[tuple[str, str]] = []
+    if is_code:
+        queries_to_try.append(("code", q_clean))
+    queries_to_try.append(("search", q_clean))
+    if resolved_acronym != q_clean:
+        queries_to_try.append(("search", resolved_acronym))
+
+    # Mots clés distinctifs (sans stop-words et sans mots géographiques génériques)
+    cleaned = re.sub(r"[^\w\s]", " ", q_clean).strip()
+    words = cleaned.split()
+    tokens = [
+        w
+        for w in words
+        if len(w) >= 4
+        and w.upper() not in _GENERIC_CLUB_WORDS
+        and w.upper() not in {"LOIRE", "SUD", "NORD", "EST", "OUEST", "SAINT", "SAINTE"}
+    ]
+    for tok in tokens:
+        queries_to_try.append(("nom_icontains", tok))
+
+    results: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    fields_param = "fields[]=id,nom,code,commune.libelle,commune.codePostal,logo.id,logo.gradient_color"
+
+    session = getattr(api, "async_cached_session", None)
+
+    for q_type, q_val in queries_to_try:
+        if len(results) >= limit:
+            break
+        if q_type == "code":
+            url = f"{base}/items/ffbbserver_organismes?filter[code][_icontains]={q_val}&{fields_param}&limit={limit}"
+        elif q_type == "nom_icontains":
+            url = f"{base}/items/ffbbserver_organismes?filter[nom][_icontains]={q_val}&{fields_param}&limit={limit}"
+        else:
+            url = f"{base}/items/ffbbserver_organismes?search={q_val}&{fields_param}&limit={limit}"
+
+        try:
+            if session:
+                resp = await session.get(url, headers=headers)
+            else:
+                async with httpx.AsyncClient(timeout=8.0) as http:
+                    resp = await http.get(url, headers=headers)
+            if resp.status_code == 200:
+                data = resp.json().get("data", [])
+                if isinstance(data, list):
+                    for item in data:
+                        oid = str(item.get("id"))
+                        if oid and oid not in seen_ids:
+                            seen_ids.add(oid)
+                            results.append(item)
+        except Exception as e:
+            logger.debug(
+                "Erreur requête directus organismes (%s, %s): %s",
+                q_type,
+                q_val,
+                e,
+            )
+
+    return results
+
+
 async def resolve_club_and_org(
     club_name: str | None,
     organisme_id: int | str | None,
@@ -501,24 +586,22 @@ async def resolve_club_and_org(
             else []
         )
 
+        # Fallback Directus si Meilisearch n'a trouvé aucun match confiant
+        from ffbb_mcp.services.common import is_club_match_confident
+
+        has_confident_org = any(is_club_match_confident(o, club_name) for o in orgs)
+        if not orgs or not has_confident_org:
+            directus_orgs = await _search_organismes_directus(club_name, limit=limit)
+            if directus_orgs:
+                existing_org_ids = {str(o.get("id")) for o in orgs}
+                new_directus = [
+                    o for o in directus_orgs if str(o.get("id")) not in existing_org_ids
+                ]
+                orgs = new_directus + orgs
+
         # Application du Smart Resolution M/F
         if categorie:
             orgs = _filter_orgs_by_gender(orgs, categorie, club_name)
-
-        if orgs:
-            # On récupère le détail du premier pour avoir les métadonnées riches
-            try:
-                first_org_id = orgs[0].get("id")
-                if first_org_id:
-                    org_data = await ffbb_mcp.services.get_organisme_service(
-                        first_org_id
-                    )
-            except (httpx.HTTPError, McpError, ValidationError):
-                logger.debug(
-                    "Impossible de charger les détails du premier organisme pour %s",
-                    club_name,
-                    exc_info=True,
-                )
 
         resolved = _build_resolved_entries(orgs)
 
@@ -546,10 +629,33 @@ async def resolve_club_and_org(
                 key=lambda c: (
                     2.0
                     if _normalize_name(c.get("nom", "")) == norm_club_name
+                    or str(c.get("code", "")).upper() == club_name.upper().strip()
                     else jaro_winkler_similarity(club_name, c["nom"])
                 ),
                 reverse=True,
             )
+
+        # Garde-fou anti-hallucination : ne conserver que les candidats ayant une correspondance crédible
+        if resolved and club_name:
+            confident_resolved = [
+                c for c in resolved if is_club_match_confident(c, club_name)
+            ]
+            resolved = confident_resolved
+
+        if resolved:
+            # On récupère le détail du premier club résolu pour avoir les métadonnées riches
+            try:
+                first_org_id = resolved[0].get("organisme_id")
+                if first_org_id:
+                    org_data = await ffbb_mcp.services.get_organisme_service(
+                        first_org_id, force_refresh=force_refresh
+                    )
+            except (httpx.HTTPError, McpError, ValidationError):
+                logger.debug(
+                    "Impossible de charger les détails du premier organisme pour %s",
+                    club_name,
+                    exc_info=True,
+                )
 
     result = (resolved, org_data)
     _cache_set(
@@ -787,6 +893,23 @@ async def search_organismes_service(
         sort=sort,
         force_refresh=force_refresh,
     )
+    from ffbb_mcp.services.common import is_club_match_confident
+
+    q_clean = nom.strip()
+    is_code = bool(re.match(r"^[A-Za-z]{2,4}\d{4,9}$", q_clean))
+    has_confident = (
+        any(is_club_match_confident(r, nom) for r in results) if results else False
+    )
+    if not results or is_code or not has_confident or len(results) < limit:
+        directus_results = await _search_organismes_directus(nom, limit=limit)
+        if directus_results:
+            existing_ids = {str(r.get("id") or r.get("organisme_id")) for r in results}
+            for d_item in directus_results:
+                d_id = str(d_item.get("id"))
+                if d_id not in existing_ids:
+                    existing_ids.add(d_id)
+                    results.insert(0, d_item)
+
     if results and any(_is_entente_name(o.get("nom")) for o in results):
         results = await filter_inactive_ententes(results, force_refresh=force_refresh)
     return results
@@ -955,6 +1078,31 @@ async def multi_search_service(
                 if item.get("_type") != "organismes"
                 or str(item.get("id") or item.get("organisme_id")) in active_ids
             ]
+
+        # Fallback Directus si aucun organisme confiant n'a été trouvé par Meilisearch
+        from ffbb_mcp.services.common import is_club_match_confident
+
+        has_org_match = any(
+            item.get("_type") == "organismes" and is_club_match_confident(item, nom)
+            for item in output
+        )
+        q_clean = nom.strip()
+        is_code = bool(re.match(r"^[A-Za-z]{2,4}\d{4,9}$", q_clean))
+        if not has_org_match or is_code:
+            directus_orgs = await _search_organismes_directus(nom, limit=min(5, limit))
+            if directus_orgs:
+                existing_ids = {
+                    str(item.get("id") or item.get("organisme_id"))
+                    for item in output
+                    if item.get("_type") == "organismes"
+                }
+                for d_item in directus_orgs:
+                    d_id = str(d_item.get("id"))
+                    if d_id not in existing_ids:
+                        existing_ids.add(d_id)
+                        d_copy = dict(d_item)
+                        d_copy["_type"] = "organismes"
+                        output.insert(0, d_copy)
 
         # Slice pour pagination offset
         sliced = output[offset : offset + limit] if offset else output[:limit]
@@ -1413,6 +1561,7 @@ async def ffbb_find_team_candidates_service(
 
     import ffbb_mcp.services
     from ffbb_mcp.aliases_registry import get_aliases_registry
+    from ffbb_mcp.services.division import get_competition_level_rank
 
     from .common import (
         disambiguate_clubs_by_category,
@@ -1563,6 +1712,13 @@ async def ffbb_find_team_candidates_service(
             seen_engs.add(eid)
         unique_teams.append(t)
 
+    max_div_rank_per_label: dict[str, int] = {}
+    for t in unique_teams:
+        lbl = str(t.get("team_label") or "").upper().strip()
+        r = get_competition_level_rank(t)
+        if r > max_div_rank_per_label.get(lbl, -1):
+            max_div_rank_per_label[lbl] = r
+
     candidates: list[dict[str, Any]] = []
     for t in unique_teams:
         team_label = t.get("team_label") or ""
@@ -1675,17 +1831,44 @@ async def ffbb_find_team_candidates_service(
         # Calcul confiance & motif
         confidence = 0.5
         reason = ""
+
+        cand_div_rank = get_competition_level_rank(t)
+
         if req_num is not None:
             if cand_num == req_num:
                 confidence = 1.0
                 reason = f"Correspondance exacte : équipe n°{cand_num} ({team_label}, {comp_name})."
             elif cand_num is None:
                 if req_num == 1:
-                    confidence = 0.85
-                    reason = (
-                        f"Équipe principale sans numéro explicite dans FFBB ({team_label}, {comp_name}, niveau {niveau_str}). "
-                        "En FFBB, l'équipe fanion / de plus haut niveau n'a généralement pas de suffixe '1'."
-                    )
+                    none_ranks = [
+                        get_competition_level_rank(tm)
+                        for tm in unique_teams
+                        if not tm.get("numero_equipe")
+                    ]
+                    max_none_rank = max(none_ranks) if none_ranks else 0
+                    is_unique_max = none_ranks.count(max_none_rank) == 1
+                    if (
+                        cand_div_rank == max_none_rank
+                        and is_unique_max
+                        and len(none_ranks) > 1
+                    ):
+                        confidence = 0.95
+                        reason = (
+                            f"Équipe fanion sans numéro explicite résolue par hiérarchie de niveau "
+                            f"({team_label}, {comp_name}, niveau {niveau_str})."
+                        )
+                    elif cand_div_rank < max_none_rank:
+                        confidence = 0.55
+                        reason = (
+                            f"Équipe de niveau inférieur ({team_label}, {comp_name}, niveau {niveau_str}) "
+                            f"alors que l'équipe fanion n°1 était requise."
+                        )
+                    else:
+                        confidence = 0.85
+                        reason = (
+                            f"Équipe principale sans numéro explicite dans FFBB ({team_label}, {comp_name}, niveau {niveau_str}). "
+                            "En FFBB, l'équipe fanion / de plus haut niveau n'a généralement pas de suffixe '1'."
+                        )
                 else:
                     confidence = 0.40
                     reason = f"Équipe sans numéro explicite ({team_label}) alors que l'équipe n°{req_num} était requise."
@@ -1696,11 +1879,29 @@ async def ffbb_find_team_candidates_service(
                     f"engagée en {comp_name} (niveau {niveau_str})."
                 )
         elif categorie and team_label.upper() == categorie.upper().strip():
-            confidence = 0.95
-            reason = f"Libellé FFBB exact '{team_label}' ({comp_name})."
+            if cand_div_rank < max_div_rank_per_label.get(
+                team_label.upper().strip(), 0
+            ):
+                confidence = 0.65
+                reason = (
+                    f"Libellé FFBB '{team_label}' ({comp_name}), "
+                    f"mais division inférieure ({niveau_str}) par rapport à l'équipe fanion."
+                )
+            else:
+                confidence = 0.95
+                reason = f"Libellé FFBB exact '{team_label}' ({comp_name})."
         elif cand_num == 1 or cand_num is None:
-            confidence = 0.85
-            reason = f"Équipe fanion / principale ({team_label}, {comp_name}, niveau {niveau_str})."
+            if cand_div_rank < max_div_rank_per_label.get(
+                team_label.upper().strip(), 0
+            ):
+                confidence = 0.65
+                reason = (
+                    f"Équipe sans numéro explicite ({team_label}, {comp_name}), "
+                    f"mais division inférieure ({niveau_str}) par rapport à l'équipe fanion."
+                )
+            else:
+                confidence = 0.85
+                reason = f"Équipe fanion / principale ({team_label}, {comp_name}, niveau {niveau_str})."
         else:
             confidence = 0.70
             reason = f"Équipe réserve n°{cand_num} ({team_label}, {comp_name}, niveau {niveau_str})."
@@ -1716,20 +1917,23 @@ async def ffbb_find_team_candidates_service(
                 "competition_type_code": comp_type,
                 "competition_type_detail": comp_type_detail.model_dump(),
                 "niveau": niveau_str,
+                "div_rank": cand_div_rank,
                 "engagement_id": eng_id,
                 "poule_id": poule_id,
                 "next_match": next_match_info,
+                "confidence": confidence,
                 "match_confidence": confidence,
                 "match_reason": reason,
             }
         )
 
-    # Tri par score décroissant puis niveau
-    def _cand_sort_key(c: dict[str, Any]) -> tuple[float, int, int]:
+    # Tri par score décroissant puis niveau de compétition
+    def _cand_sort_key(c: dict[str, Any]) -> tuple[float, int, int, int]:
         conf = c["match_confidence"]
+        d_rank = c.get("div_rank", 0)
         num_score = 10 if c["numero_equipe"] in (1, None) else 5
         niv_score = 10 if "régional" in c["niveau"] or "national" in c["niveau"] else 5
-        return (conf, num_score, niv_score)
+        return (conf, d_rank, num_score, niv_score)
 
     candidates.sort(key=_cand_sort_key, reverse=True)
 

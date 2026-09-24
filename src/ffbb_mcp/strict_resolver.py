@@ -94,29 +94,29 @@ def _dedup_same_team_phases(teams: list[dict[str, Any]]) -> list[dict[str, Any]]
     return _deduplicate_same_team_phases(teams)
 
 
-def _get_resolve_club_and_org_fn() -> Any:
-    from unittest.mock import Mock
+def _is_mock(val: Any) -> bool:
+    return hasattr(val, "mock_calls") or hasattr(val, "_mock_self")
 
+
+def _get_resolve_club_and_org_fn() -> Any:
     import ffbb_mcp.services as svc
     import ffbb_mcp.services.club as club_mod
     import ffbb_mcp.services.search as search_mod
 
     for mod in [search_mod, club_mod, svc]:
         val = getattr(mod, "resolve_club_and_org", None)
-        if val is not None and (isinstance(val, Mock) or hasattr(val, "mock_calls")):
+        if val is not None and _is_mock(val):
             return val
     return search_mod.resolve_club_and_org
 
 
 def _get_equipes_club_service_fn() -> Any:
-    from unittest.mock import Mock
-
     import ffbb_mcp.services as svc
     import ffbb_mcp.services.club as club_mod
 
     for mod in [club_mod, svc]:
         val = getattr(mod, "ffbb_equipes_club_service", None)
-        if val is not None and (isinstance(val, Mock) or hasattr(val, "mock_calls")):
+        if val is not None and _is_mock(val):
             return val
     return club_mod.ffbb_equipes_club_service
 
@@ -133,6 +133,7 @@ async def resolve_team_strict(
     season_id: str | int | None = None,
     mode: Literal["strict", "suggest", "all"] = "strict",
     force_refresh: bool = False,
+    all_teams: list[dict[str, Any]] | None = None,
     **kwargs: Any,
 ) -> TeamResolutionResult:
     """Résout une équipe unique de manière déterministe et sans approximation."""
@@ -219,63 +220,72 @@ async def resolve_team_strict(
     # -----------------------------------------------------------------------
     # PRIORITÉ 2 & Résolution Club / Organisme
     # -----------------------------------------------------------------------
-    if not club_name and not organisme_id:
+    if not club_name and not organisme_id and not all_teams:
         return TeamResolutionResult(
             status=ResponseStatus.INVALID_REQUEST,
             ambiguity_message="Fournir au minimum club_name, organisme_id ou engagement_id.",
             match_strategy=strategies,
         )
 
-    res_fn = _get_resolve_club_and_org_fn()
-    resolved_clubs, _org_data = await res_fn(
-        club_name=club_name,
-        organisme_id=organisme_id,
-        categorie=categorie,
-        force_refresh=force_refresh,
-    )
-
-    if not resolved_clubs:
-        return TeamResolutionResult(
-            status=ResponseStatus.NOT_FOUND,
-            ambiguity_message=f"Club '{club_name or organisme_id}' introuvable sur les serveurs FFBB.",
-            match_strategy=strategies,
-        )
-
-    from ffbb_mcp.services.common import (
-        disambiguate_clubs_by_category,
-        get_primary_club,
-        is_real_ambiguity,
-    )
-
-    equipes_prefetched: list[dict[str, Any]] | None = None
-    if not organisme_id and categorie:
-        resolved_clubs, equipes_prefetched = await disambiguate_clubs_by_category(
-            resolved_clubs,
-            categorie=categorie,
-            club_name=club_name,
-            season_id=season_id,
-        )
-
-    if is_real_ambiguity(resolved_clubs, club_name) and not organisme_id:
-        return TeamResolutionResult(
-            status=ResponseStatus.AMBIGUOUS,
-            candidates=resolved_clubs,
-            ambiguity_message=f"Plusieurs clubs correspondent à '{club_name}'. Précisez organisme_id.",
-            clarification_prompt=f"Plusieurs clubs correspondent à '{club_name}'. Précisez organisme_id.",
-            match_strategy=["ambiguous_club_name"],
-        )
-
-    club_resolu = get_primary_club(resolved_clubs, club_name) or resolved_clubs[0]
-    target_org_id = str(club_resolu["organisme_id"])
-
-    # Récupérer la totalité des équipes réelles du club (ou utiliser celles préchargées)
-    if equipes_prefetched is not None:
-        all_teams = equipes_prefetched
+    target_org_id = str(organisme_id or "")
+    if all_teams is not None:
+        club_resolu = {
+            "nom": club_name or "Club",
+            "organisme_id": target_org_id,
+        }
     else:
-        eq_fn = _get_equipes_club_service_fn()
-        all_teams = await eq_fn(
-            organisme_id=target_org_id, force_refresh=force_refresh, season_id=season_id
+        res_fn = _get_resolve_club_and_org_fn()
+        resolved_clubs, _org_data = await res_fn(
+            club_name=club_name,
+            organisme_id=organisme_id,
+            categorie=categorie,
+            force_refresh=force_refresh,
         )
+
+        if not resolved_clubs:
+            return TeamResolutionResult(
+                status=ResponseStatus.NOT_FOUND,
+                ambiguity_message=f"Club '{club_name or organisme_id}' introuvable sur les serveurs FFBB.",
+                match_strategy=strategies,
+            )
+
+        from ffbb_mcp.services.common import (
+            disambiguate_clubs_by_category,
+            get_primary_club,
+            is_real_ambiguity,
+        )
+
+        equipes_prefetched: list[dict[str, Any]] | None = None
+        if not organisme_id and categorie:
+            resolved_clubs, equipes_prefetched = await disambiguate_clubs_by_category(
+                resolved_clubs,
+                categorie=categorie,
+                club_name=club_name,
+                season_id=season_id,
+            )
+
+        if is_real_ambiguity(resolved_clubs, club_name) and not organisme_id:
+            return TeamResolutionResult(
+                status=ResponseStatus.AMBIGUOUS,
+                candidates=resolved_clubs,
+                ambiguity_message=f"Plusieurs clubs correspondent à '{club_name}'. Précisez organisme_id.",
+                clarification_prompt=f"Plusieurs clubs correspondent à '{club_name}'. Précisez organisme_id.",
+                match_strategy=["ambiguous_club_name"],
+            )
+
+        club_resolu = get_primary_club(resolved_clubs, club_name) or resolved_clubs[0]
+        target_org_id = str(club_resolu["organisme_id"])
+
+        # Récupérer la totalité des équipes réelles du club (ou utiliser celles préchargées)
+        if equipes_prefetched is not None:
+            all_teams = equipes_prefetched
+        else:
+            eq_fn = _get_equipes_club_service_fn()
+            all_teams = await eq_fn(
+                organisme_id=target_org_id,
+                force_refresh=force_refresh,
+                season_id=season_id,
+            )
     if not all_teams or (
         isinstance(all_teams, list) and len(all_teams) == 1 and "error" in all_teams[0]
     ):
@@ -437,16 +447,47 @@ async def resolve_team_strict(
         ]
         if exact_num:
             candidates = exact_num
-        elif (
-            eff_num == 1
-            and len(candidates) == 1
-            and not candidates[0].get("numero_equipe")
-        ):
-            # Équipe unique sans numéro explicite
-            candidates[0].setdefault(
-                "note",
-                "équipe sans numéro explicite, correspond potentiellement à ce numéro",
-            )
+        elif eff_num == 1:
+            # Équipe fanion demandée (équipe 1) sans numéro explicite FFBB
+            # 1. Éliminer les équipes qui portent explicitement un numéro de réserve (2, 3, ...)
+            potential_team_1 = [
+                c
+                for c in candidates
+                if str(c.get("numero_equipe") or "").strip() in ("", "1")
+                and not any(
+                    str(c.get("nom") or "").endswith(f"- {n}")
+                    or str(c.get("nom") or "").endswith(f"-{n}")
+                    for n in range(2, 10)
+                )
+            ]
+            if len(potential_team_1) == 1:
+                # Équipe unique sans numéro explicite
+                potential_team_1[0].setdefault(
+                    "note",
+                    "équipe sans numéro explicite, correspond potentiellement à ce numéro",
+                )
+                candidates = potential_team_1
+            elif len(potential_team_1) > 1:
+                # Plusieurs équipes sans numéro explicite :
+                # Appliquer la hiérarchie par niveau de compétition (National > Régional > Départemental)
+                from ffbb_mcp.services.division import get_competition_level_rank
+
+                ranked = sorted(
+                    potential_team_1, key=get_competition_level_rank, reverse=True
+                )
+                best_rank = get_competition_level_rank(ranked[0])
+                second_rank = get_competition_level_rank(ranked[1])
+                if best_rank > second_rank:
+                    strategies.append("fallback_highest_division_as_team_1")
+                    ranked[0].setdefault(
+                        "note",
+                        "équipe fanion (équipe 1) résolue par hiérarchie de niveau de compétition",
+                    )
+                    candidates = [ranked[0]]
+                else:
+                    candidates = ranked
+            else:
+                candidates = []
         else:
             # Si aucune équipe ne porte ce numéro
             candidates = []

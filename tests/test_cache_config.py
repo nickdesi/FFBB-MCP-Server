@@ -43,6 +43,7 @@ def test_get_cache_ttls_structure():
         "poule",
         "salle",
         "resolve_club",
+        "engagement",
     }
     assert set(ttls.keys()) == expected_keys
     for val in ttls.values():

@@ -35,6 +35,11 @@ def _strip_accents(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 CLUB_ALIASES = {
+    "alsb": "andrezieux boutheon loire sud basket",
+    "andrezieux": "andrezieux boutheon loire sud basket",
+    "andrezieux basket": "andrezieux boutheon loire sud basket",
+    "andrezieux-boutheon": "andrezieux boutheon loire sud basket",
+    "andrezieux-boutheon loire sud basket": "andrezieux boutheon loire sud basket",
     "jav": "jeanne d'arc de vichy",
     "ja vichy": "jeanne d'arc de vichy",
     "scba": "stade clermontois basket auvergne",
@@ -122,6 +127,7 @@ _ALIAS_PATTERN_ALL = re.compile(
 # ---------------------------------------------------------------------------
 
 _DEFAULT_ACRONYMS = {
+    "ALSB": "ANDREZIEUX BOUTHEON LOIRE SUD BASKET",
     "ASVEL": "Villeurbanne",
     "JAV": "Jeanne d'Arc de Vichy",
     "SLUC": "Nancy",
