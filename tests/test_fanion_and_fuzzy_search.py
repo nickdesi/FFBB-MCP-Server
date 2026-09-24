@@ -257,6 +257,16 @@ def test_is_club_match_confident():
     assert is_club_match_confident(cand_alsb, "ANDREZIEUX-BOUTHEON LOIRE SUD BASKET")
     assert is_club_match_confident(cand_alsb, "ANDREZIEUX")
 
+    # Régression: LA MONNERIE BASKET (JW≈0.83) ne doit PAS passer pour
+    # une requête "LA MONTJOIE SAINT DENIS EN VAL" — préfixe partagé "LA MON"
+    # mais aucun mot distinctif en commun.
+    cand_monnerie = {"nom": "LA MONNERIE BASKET", "code": "ARA0063002"}
+    assert not is_club_match_confident(cand_monnerie, "LA MONTJOIE SAINT DENIS EN VAL")
+
+    # Le vrai club Montjoie doit rester confiant
+    cand_montjoie = {"nom": "LA MONTJOIE SAINT DENIS EN VAL", "code": "CVL0045078"}
+    assert is_club_match_confident(cand_montjoie, "LA MONTJOIE SAINT DENIS EN VAL")
+
 
 @pytest.mark.asyncio
 async def test_get_engagement_service_and_ffbb_get(

@@ -346,6 +346,8 @@ def is_club_match_confident(
 
     # 4. Chevauchement de mot distinctif (>= 4 caractères, non générique)
     # Les mots génériques ne suffisent pas (ex: "BASKET", "CLUB", "LOIRE")
+    # Inclut les déterminants et prépositions français courants qui gonflent
+    # artificiellement le score JW sans apporter de signal distinctif.
     generic_words = {
         "BASKET",
         "BASKETBALL",
@@ -367,6 +369,10 @@ def is_club_match_confident(
         "OUEST",
         "SAINT",
         "SAINTE",
+        "ETOILE",
+        "STADE",
+        "AMICALE",
+        "OLYMPIQUE",
     }
     q_words = [w for w in q_norm.split() if len(w) >= 4 and w not in generic_words]
     cand_words = set(cand_nom_norm.split())
@@ -383,8 +389,16 @@ def is_club_match_confident(
     if has_distinctive_word and jw >= 0.65:
         return True
 
-    # 5. Similarité Jaro-Winkler élevée globale (pour fautes de frappe directes)
-    return jw >= 0.82
+    # 5. Similarité Jaro-Winkler élevée — seuil adapté au contexte
+    if q_words:
+        # Des mots distinctifs existent dans la requête mais AUCUN n'est
+        # partagé avec le candidat → exiger une quasi-identité (>= 0.92)
+        # pour éviter les faux positifs par préfixe partagé
+        # (ex: "LA MONNERIE BASKET" JW=0.83 vs "LA MONTJOIE SAINT DENIS EN VAL")
+        return jw >= 0.92
+
+    # Requête très courte ou entièrement composée de mots génériques
+    return jw >= 0.85
 
 
 def get_primary_club(
