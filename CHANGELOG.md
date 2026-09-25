@@ -6,7 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [1.16.2] - 2026-09-25
+## [1.16.3] - 2026-09-25
+
+### Fixed
+- **`numero_equipe` ignoré sans suffixe FFBB -1/-2 (`ffbb_resolve_team`, `ffbb_next_match`, `ffbb_last_result`, `ffbb_bilan`, `ffbb_team_summary`, `ffbb_head_to_head`)** : quand plusieurs engagements partagent la même catégorie/genre sans numéro natif (ex: JEANNE D'ARC DE VICHY U15M en RMU15 Brassage régional et en Départementale), le `numero_equipe` demandé est désormais interprété via la hiérarchie de division (`rank_candidates_by_division` / `resolve_team_by_division_rank` dans `services/division.py`) — `1` → plus haut `div_rank` (fanion), `2` → réserve — au lieu de renvoyer une ambiguïté brute. Centralisé dans le pivot `_resolve_team_equipes` / `resolve_team_strict`.
+- **Calendrier de la réserve sans suffixe (`ffbb_next_match`, `ffbb_last_result`)** : les rencontres d'une équipe sans numéro natif s'affichent sans suffixe "- N" ; `_fetch_poule_matches` les accepte désormais pour l'équipe résolue (poule déjà scopée, sans ambiguïté) au lieu de renvoyer `no_upcoming_match`. Détection domicile/extérieur de `ffbb_last_result` passée en ID-first avec le même repli.
+- **Déduplication des phases (`_deduplicate_same_team_phases`)** : ne fusionne plus deux divisions de niveaux confiants distincts (régional vs départemental) sous un même nom d'équipe sans suffixe ; les phases successives de même niveau continuent d'être dédupliquées.
+
+
+## [1.16.3] - 2026-09-25
 
 ### Fixed
 - **Résolution Déterministe de Club (`club_name`)** : Correction critique de la désambiguïsation Meilisearch par nom officiel complet (ex: "LA MONTJOIE SAINT DENIS EN VAL" résout désormais immédiatement vers `organisme_id=10017`).
