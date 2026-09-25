@@ -1681,7 +1681,11 @@ async def ffbb_resolve_team_service(
     elif res.status == ResponseStatus.AMBIGUOUS:
         ambig_block = build_ambiguous_presentation(
             candidates=res.candidates,
-            club_name=res.club_resolu.get("nom") if res.club_resolu else club_name,
+            club_name=(
+                res.club_resolu.get("nom")
+                if isinstance(res.club_resolu, dict)
+                else club_name
+            ),
             categorie=categorie,
         )
         return {

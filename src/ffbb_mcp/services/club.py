@@ -677,10 +677,13 @@ async def _resolve_team_equipes(
         and poule_id is None
         and season_id is None
     ):
+        club_nom_str = (
+            club_resolu.get("nom", "") if isinstance(club_resolu, dict) else ""
+        )
         return (
             {
                 "status": "ambiguous",
-                "message": f"Plusieurs engagements ({len(equipes)}) existent pour '{categorie or club_resolu.get('nom', '')}'. Précisez `engagement_id`, `competition_id` ou `competition_type`.",
+                "message": f"Plusieurs engagements ({len(equipes)}) existent pour '{categorie or club_nom_str}'. Précisez `engagement_id`, `competition_id` ou `competition_type`.",
                 "candidates": equipes,
                 "club_resolu": club_resolu,
             },
@@ -1807,15 +1810,15 @@ async def ffbb_head_to_head_service(
             },
         }
 
-    nom_a = (
-        club_res_a.get("nom")
-        if isinstance(club_res_a, dict)
-        else (eff_club_a or "Équipe A")
+    nom_a: str = str(
+        (club_res_a.get("nom") if isinstance(club_res_a, dict) else None)
+        or eff_club_a
+        or "Équipe A"
     )
-    nom_b = (
-        club_res_b.get("nom")
-        if isinstance(club_res_b, dict)
-        else (eff_club_b or "Équipe B")
+    nom_b: str = str(
+        (club_res_b.get("nom") if isinstance(club_res_b, dict) else None)
+        or eff_club_b
+        or "Équipe B"
     )
 
     poules_a = {str(e["poule_id"]) for e in eq_a if e.get("poule_id")}
@@ -1834,7 +1837,12 @@ async def ffbb_head_to_head_service(
         return_exceptions=True,
     )
     poules_list = [p for p in poules_raw if isinstance(p, dict)]
-    all_rencontres = [r for p in poules_list for r in (p.get("rencontres") or [])]
+    all_rencontres: list[dict[str, Any]] = [
+        r
+        for p in poules_list
+        for r in (p.get("rencontres") or [])
+        if isinstance(r, dict)
+    ]
 
     eng_ids_a = {str(e["engagement_id"]) for e in eq_a if e.get("engagement_id")}
     eng_ids_b = {str(e["engagement_id"]) for e in eq_b if e.get("engagement_id")}
