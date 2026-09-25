@@ -76,7 +76,7 @@ async def test_find_team_candidates_preserves_target_team_and_opponent():
 
 
 def test_match_presentation_score_order_on_defeat():
-    """BUG #2: Vérifie que l'ordre des scores en cas de défaite est 'score_cible à score_adversaire'."""
+    """BUG #2: Vérifie que l'ordre des scores suit la convention FFBB (domicile puis extérieur)."""
     dt = datetime(2026, 9, 20, 15, 30, tzinfo=ZoneInfo("Europe/Paris"))
     r_info = evaluate_round_reliability(1)
 
@@ -94,10 +94,34 @@ def test_match_presentation_score_order_on_defeat():
         is_last_result=True,
     )
 
-    # Doit afficher 34 à 63 (score de l'équipe cible en premier) et non 63 à 34
+    # Convention FFBB : domicile (34) puis extérieur (63)
     assert "34 à 63" in p_loss.short_answer
     assert "63 à 34" not in p_loss.short_answer
     assert "s'est incliné" in p_loss.short_answer
+
+
+def test_match_presentation_score_order_away_team_home_first():
+    """BUG #2 (convention domicile-first): équipe cible à l'extérieur, score affiché domicile puis extérieur."""
+    dt = datetime(2026, 9, 20, 15, 30, tzinfo=ZoneInfo("Europe/Paris"))
+    r_info = evaluate_round_reliability(1)
+
+    # Cible à l'extérieur (55) battue par le domicile (70) : affichage "70 à 55"
+    p_loss_away = build_match_presentation(
+        team_name="JA Vichy",
+        opponent_name="US Issoire",
+        is_home=False,
+        status="final",
+        dt_obj=dt,
+        time_confirmed=True,
+        home_score=70,
+        away_score=55,
+        round_info=r_info,
+        is_last_result=True,
+    )
+
+    assert "70 à 55" in p_loss_away.short_answer
+    assert "55 à 70" not in p_loss_away.short_answer
+    assert "s'est incliné" in p_loss_away.short_answer
 
 
 def test_dynamique_tendance_consistency_few_matches():
