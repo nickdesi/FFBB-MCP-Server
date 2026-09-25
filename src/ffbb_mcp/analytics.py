@@ -306,11 +306,12 @@ def compute_head_to_head(
             pts_a = s1 if side_a == 1 else s2
             pts_b = s2 if side_a == 1 else s1
             date_str = str(r.get("date_rencontre") or r.get("date") or "")
+            raw_salle = r.get("salle_details")
+            salle_details_lib = (
+                raw_salle.get("libelle") if isinstance(raw_salle, dict) else ""
+            )
             salle = str(
-                r.get("nomSalle")
-                or r.get("nom_salle")
-                or (r.get("salle_details") or {}).get("libelle")
-                or ""
+                r.get("nomSalle") or r.get("nom_salle") or salle_details_lib or ""
             )
 
             total_pts_a += pts_a

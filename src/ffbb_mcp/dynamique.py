@@ -125,11 +125,12 @@ def compute_team_dynamique(
         date_str = str(r.get("date_rencontre") or r.get("date") or "")
         dt_val = _parse_dt_safe(date_str) or datetime.min.replace(tzinfo=_PARIS_TZ)
 
+        raw_salle = r.get("salle_details")
+        salle_details_lib = (
+            raw_salle.get("libelle") if isinstance(raw_salle, dict) else ""
+        )
         salle_name = str(
-            r.get("nomSalle")
-            or r.get("nom_salle")
-            or (r.get("salle_details") or {}).get("libelle")
-            or ""
+            r.get("nomSalle") or r.get("nom_salle") or salle_details_lib or ""
         )
         journee = str(r.get("nomJournee") or r.get("numJournee") or "")
 

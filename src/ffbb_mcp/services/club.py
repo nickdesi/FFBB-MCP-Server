@@ -35,7 +35,12 @@ from ffbb_mcp.presentation import (
     evaluate_round_reliability,
     format_source_label,
 )
-from ffbb_mcp.utils import ParsedCategorie, format_team_name, parse_categorie
+from ffbb_mcp.utils import (
+    ParsedCategorie,
+    format_team_name,
+    parse_categorie,
+    resolve_relation_field,
+)
 
 from .bilan import (
     _build_bilan_payload,  # noqa: F401
@@ -172,11 +177,7 @@ async def ffbb_equipes_club_service(
         comp_id_raw = comp.get("id")
         poule_id_raw = poule.get("id")
 
-        saison_raw = (
-            (comp.get("saison") or {}).get("id")
-            if isinstance(comp.get("saison"), dict)
-            else None
-        )
+        _, saison_raw = resolve_relation_field(comp, "saison")
         team_info = {
             "team_id": team_id_str,
             "engagement_id": team_id_str,
@@ -1806,8 +1807,16 @@ async def ffbb_head_to_head_service(
             },
         }
 
-    nom_a = (club_res_a or {}).get("nom") or eff_club_a or "Équipe A"
-    nom_b = (club_res_b or {}).get("nom") or eff_club_b or "Équipe B"
+    nom_a = (
+        club_res_a.get("nom")
+        if isinstance(club_res_a, dict)
+        else (eff_club_a or "Équipe A")
+    )
+    nom_b = (
+        club_res_b.get("nom")
+        if isinstance(club_res_b, dict)
+        else (eff_club_b or "Équipe B")
+    )
 
     poules_a = {str(e["poule_id"]) for e in eq_a if e.get("poule_id")}
     poules_b = {str(e["poule_id"]) for e in eq_b if e.get("poule_id")}
@@ -1867,15 +1876,21 @@ async def ffbb_head_to_head_service(
     if h2h_data["confrontations_count"] > 0:
         narrative_points.append(h2h_data["bilan_h2h"])
     if dynamique_a.get("forme_str"):
+        serie_actuelle_a = dynamique_a.get("serie_actuelle")
         label_a = (
-            (dynamique_a.get("serie_actuelle") or {}).get("label") or ""  # type: ignore[union-attr]
+            serie_actuelle_a.get("label") or ""
+            if isinstance(serie_actuelle_a, dict)
+            else (str(serie_actuelle_a) if serie_actuelle_a else "")
         )
         narrative_points.append(
             f"Forme {nom_a} (5 derniers) : {dynamique_a['forme_str']} ({label_a})"
         )
     if dynamique_b.get("forme_str"):
+        serie_actuelle_b = dynamique_b.get("serie_actuelle")
         label_b = (
-            (dynamique_b.get("serie_actuelle") or {}).get("label") or ""  # type: ignore[union-attr]
+            serie_actuelle_b.get("label") or ""
+            if isinstance(serie_actuelle_b, dict)
+            else (str(serie_actuelle_b) if serie_actuelle_b else "")
         )
         narrative_points.append(
             f"Forme {nom_b} (5 derniers) : {dynamique_b['forme_str']} ({label_b})"

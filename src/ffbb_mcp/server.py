@@ -510,7 +510,12 @@ def _build_default_get_presentation(
         poules = data.get("poules") or []
         short_ans = f"Compétition '{nom}' ({len(poules)} poule(s))."
         code = data.get("code") or ""
-        saison_lbl = (data.get("saison") or {}).get("libelle") or ""
+        raw_saison = data.get("saison")
+        saison_lbl = (
+            raw_saison.get("libelle")
+            if isinstance(raw_saison, dict)
+            else (str(raw_saison) if raw_saison else "")
+        )
         detail = (
             f"Code: {code} · Saison: {saison_lbl}."
             if code or saison_lbl
@@ -524,7 +529,12 @@ def _build_default_get_presentation(
             if code
             else f"Club / Organisme : {nom}."
         )
-        commune = (data.get("commune") or {}).get("libelle") or ""
+        raw_commune = data.get("commune")
+        commune = (
+            raw_commune.get("libelle")
+            if isinstance(raw_commune, dict)
+            else (str(raw_commune) if raw_commune else "")
+        )
         detail = f"Ville : {commune}." if commune else "Détails de l'organisme."
     elif type_name == "engagement":
         from ffbb_mcp.utils import format_team_name
@@ -540,10 +550,16 @@ def _build_default_get_presentation(
         raw_poule = data.get("poule")
         poule: dict[str, Any] = raw_poule if isinstance(raw_poule, dict) else {}
 
+        raw_classement_eng = classement.get("id_engagement")
+        classement_nom = (
+            raw_classement_eng.get("nom")
+            if isinstance(raw_classement_eng, dict)
+            else ""
+        )
         club_nom = (
             team.get("nom_equipe")
             or club.get("nom")
-            or (classement.get("id_engagement") or {}).get("nom")
+            or classement_nom
             or data.get("nom")
             or ""
         )
@@ -559,10 +575,12 @@ def _build_default_get_presentation(
 
         short_ans = f"Engagement {resource_id} : {label_equipe}."
 
+        raw_comp_ref = data.get("idCompetition")
+        comp_ref_nom = raw_comp_ref.get("nom") if isinstance(raw_comp_ref, dict) else ""
         comp_nom = (
             team.get("competition")
             or team.get("competition_origine_nom")
-            or (data.get("idCompetition") or {}).get("nom")
+            or comp_ref_nom
             or ""
         )
         poule_nom = poule.get("nom") or ""
@@ -597,8 +615,11 @@ def _build_default_get_presentation(
         detail = f"Date : {date_m} {heure_m}.".strip()
     elif type_name == "salle":
         nom = data.get("libelle") or data.get("nom") or f"Salle {resource_id}"
+        raw_commune = data.get("commune")
         commune = (
-            (data.get("commune") or {}).get("libelle") or data.get("commune") or ""
+            raw_commune.get("libelle")
+            if isinstance(raw_commune, dict)
+            else (str(raw_commune) if raw_commune else "")
         )
         short_ans = f"Salle {nom} ({commune})." if commune else f"Salle {nom}."
         detail = (
