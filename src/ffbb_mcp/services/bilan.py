@@ -238,8 +238,11 @@ async def ffbb_saison_bilan_service(
         classements = poule_data.get("classements") or []
         poule_phase_added = False
         for entry in classements:
-            eng = entry.get("id_engagement") or {}
-            entry_eng_id = str(eng.get("id", ""))
+            raw_eng = entry.get("id_engagement")
+            eng = raw_eng if isinstance(raw_eng, dict) else {}
+            entry_eng_id = str(
+                eng.get("id") or (raw_eng if raw_eng is not None else "")
+            )
             if entry_eng_id not in eng_ids:
                 continue
 
@@ -548,8 +551,11 @@ async def _build_bilan_payload(
         for entry in classements:
             if not isinstance(entry, dict):
                 continue
-            eng = entry.get("id_engagement") or {}
-            entry_eng_id = str(eng.get("id", ""))
+            raw_eng = entry.get("id_engagement")
+            eng = raw_eng if isinstance(raw_eng, dict) else {}
+            entry_eng_id = str(
+                eng.get("id") or (raw_eng if raw_eng is not None else "")
+            )
             entry_org_id = str(entry.get("organisme_id", ""))
 
             if entry_eng_id in eng_ids_here:

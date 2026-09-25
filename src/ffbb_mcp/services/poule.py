@@ -397,11 +397,13 @@ async def format_poule_response(poule_data: dict) -> dict[str, Any]:
     formatted_classements = []
     for c in classements or []:
         c = clean_serialized_data(c)
-        eng = c.get("id_engagement") or {}
+        raw_eng = c.get("id_engagement")
+        eng = raw_eng if isinstance(raw_eng, dict) else {}
         nom = eng.get("nom", "")
         num = eng.get("numero_equipe")
         c["equipe"] = format_team_name(nom, num)
-        logo_id = (eng.get("logo") or {}).get("id")
+        logo_val = eng.get("logo")
+        logo_id = logo_val.get("id") if isinstance(logo_val, dict) else None
         c["logo_url"] = (
             f"https://api.ffbb.com/assets/{logo_id}?height=220&fit=contain&format=avif"
             if logo_id
@@ -572,7 +574,8 @@ async def ffbb_get_classement_service(
         for c in raw:
             if not isinstance(c, dict):
                 continue
-            eng = c.get("id_engagement") or {}
+            raw_eng = c.get("id_engagement")
+            eng = raw_eng if isinstance(raw_eng, dict) else {}
             nom_equipe = eng.get("nom", "")
             num_equipe = eng.get("numero_equipe")
             org_id = str(c.get("organisme_id") or eng.get("organisme_id") or "")
@@ -807,7 +810,8 @@ async def find_team_poule_service(
         poule_data = await get_poule_service(p_id)
         for c in poule_data.get("classements") or []:
             c_org_id = str(c.get("organisme_id") or "")
-            c_eng = c.get("id_engagement") or {}
+            raw_c_eng = c.get("id_engagement")
+            c_eng = raw_c_eng if isinstance(raw_c_eng, dict) else {}
             c_name = _normalize_name(c_eng.get("nom") or c.get("organisme_nom") or "")
             target_norm = _normalize_name(club_nom)
             if (org_id and c_org_id == org_id) or (
@@ -944,8 +948,13 @@ def resolve_opponent_from_poule(
     candidates: list[dict[str, Any]] = []
 
     for c in classements:
-        c_eng = c.get("id_engagement") or {}
-        c_eng_id = str(c_eng.get("id") or "") if c_eng.get("id") is not None else None
+        raw_eng = c.get("id_engagement")
+        c_eng = raw_eng if isinstance(raw_eng, dict) else {}
+        c_eng_id = (
+            str(c_eng.get("id") or "")
+            if c_eng.get("id") is not None
+            else (str(raw_eng) if raw_eng is not None else None)
+        )
         c_org_id = (
             str(c.get("organisme_id") or "")
             if c.get("organisme_id") is not None
@@ -1210,8 +1219,9 @@ async def get_engagement_service(
                         target_names.add(str(club_info["nom"]))
 
                     for c in poule_data.get("classements") or []:
-                        c_eng = c.get("id_engagement") or {}
-                        if str(c_eng.get("id") or "") == eng_id_str:
+                        raw_c_eng = c.get("id_engagement")
+                        c_eng = raw_c_eng if isinstance(raw_c_eng, dict) else {}
+                        if str(c_eng.get("id") or raw_c_eng or "") == eng_id_str:
                             classement_info = c
                             if c_eng.get("nom"):
                                 target_names.add(str(c_eng["nom"]))
@@ -1227,12 +1237,11 @@ async def get_engagement_service(
                             val_to_cast = num_eq
                         elif team_info and team_info.get("numero_equipe"):
                             val_to_cast = team_info["numero_equipe"]
-                        elif classement_info and (
-                            classement_info.get("id_engagement") or {}
-                        ).get("numero_equipe"):
-                            val_to_cast = (
-                                classement_info.get("id_engagement") or {}
-                            ).get("numero_equipe")
+                        elif classement_info:
+                            raw_ci_eng = classement_info.get("id_engagement")
+                            ci_eng = raw_ci_eng if isinstance(raw_ci_eng, dict) else {}
+                            if ci_eng.get("numero_equipe"):
+                                val_to_cast = ci_eng.get("numero_equipe")
                         if val_to_cast is not None:
                             eq_num_int = int(val_to_cast)
                     except (ValueError, TypeError):
