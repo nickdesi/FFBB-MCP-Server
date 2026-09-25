@@ -438,58 +438,59 @@ async def resolve_team_strict(
     if eff_num is not None:
         strategies.append(f"filter_team_number_{eff_num}")
         num_str = str(eff_num)
+
+        def _cand_nom(c: dict[str, Any]) -> str:
+            return str(c.get("nom_equipe") or c.get("nom") or "")
+
         exact_num = [
             c
             for c in candidates
             if str(c.get("numero_equipe") or "").strip() == num_str
-            or str(c.get("nom") or "").endswith(f"- {num_str}")
-            or str(c.get("nom") or "").endswith(f"-{num_str}")
+            or _cand_nom(c).endswith(f"- {num_str}")
+            or _cand_nom(c).endswith(f"-{num_str}")
         ]
         if exact_num:
             candidates = exact_num
-        elif eff_num == 1:
-            # Équipe fanion demandée (équipe 1) sans numéro explicite FFBB
-            # 1. Éliminer les équipes qui portent explicitement un numéro de réserve (2, 3, ...)
-            potential_team_1 = [
+        elif eff_num is not None and eff_num >= 1:
+            # Équipe n°N demandée sans numéro explicite FFBB : filtrer les équipes
+            # qui ne portent pas explicitement un autre numéro
+            potential_teams = [
                 c
                 for c in candidates
-                if str(c.get("numero_equipe") or "").strip() in ("", "1")
+                if str(c.get("numero_equipe") or "").strip() in ("", str(eff_num))
                 and not any(
-                    str(c.get("nom") or "").endswith(f"- {n}")
-                    or str(c.get("nom") or "").endswith(f"-{n}")
-                    for n in range(2, 10)
+                    _cand_nom(c).endswith(f"- {n}") or _cand_nom(c).endswith(f"-{n}")
+                    for n in range(1, 10)
+                    if n != eff_num
                 )
             ]
-            if len(potential_team_1) == 1:
-                # Équipe unique sans numéro explicite
-                potential_team_1[0].setdefault(
+            from ffbb_mcp.services.division import resolve_team_by_division_rank
+
+            if len(potential_teams) == 1:
+                # Cas historique : une seule équipe sans numéro explicite.
+                potential_teams[0].setdefault(
                     "note",
                     "équipe sans numéro explicite, correspond potentiellement à ce numéro",
                 )
-                candidates = potential_team_1
-            elif len(potential_team_1) > 1:
-                # Plusieurs équipes sans numéro explicite :
-                # Appliquer la hiérarchie par niveau de compétition (National > Régional > Départemental)
-                from ffbb_mcp.services.division import get_competition_level_rank
-
-                ranked = sorted(
-                    potential_team_1, key=get_competition_level_rank, reverse=True
-                )
-                best_rank = get_competition_level_rank(ranked[0])
-                second_rank = get_competition_level_rank(ranked[1])
-                if best_rank > second_rank:
-                    strategies.append("fallback_highest_division_as_team_1")
-                    ranked[0].setdefault(
-                        "note",
-                        "équipe fanion (équipe 1) résolue par hiérarchie de niveau de compétition",
-                    )
-                    candidates = [ranked[0]]
-                else:
-                    candidates = ranked
+                candidates = potential_teams
             else:
-                candidates = []
+                chosen, tied = resolve_team_by_division_rank(potential_teams, eff_num)
+                if chosen is not None:
+                    if eff_num == 1:
+                        strategies.append("fallback_highest_division_as_team_1")
+                        note = "équipe fanion (équipe 1) résolue par hiérarchie de niveau de compétition"
+                    else:
+                        strategies.append(
+                            f"fallback_division_hierarchy_as_team_{eff_num}"
+                        )
+                        note = f"équipe réserve (équipe {eff_num}) résolue par hiérarchie de niveau de compétition"
+                    chosen.setdefault("note", note)
+                    candidates = [chosen]
+                elif tied:
+                    candidates = tied
+                else:
+                    candidates = []
         else:
-            # Si aucune équipe ne porte ce numéro
             candidates = []
 
     # Dédupliquer les phases successives

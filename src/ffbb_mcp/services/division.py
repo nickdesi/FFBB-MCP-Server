@@ -268,3 +268,94 @@ def get_competition_level_rank(candidate: dict[str, Any]) -> int:
     if comp_type == "COUPE" or "COUPE" in comp_nom:
         return 500
     return 100
+
+
+def rank_candidates_by_division(
+    candidates: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Trie les candidats par rang hiérarchique de division (décroissant : National > Régional > Départemental).
+
+    Déduplique strictement les phases successives d'une même équipe (même nom,
+    même numéro, même base de compétition) pour éviter qu'une phase 2
+    n'usurpe le rang d'une équipe réserve. Deux divisions distinctes
+    (bases différentes, ex: RMU15 Brassage vs Départementale) ne sont JAMAIS
+    fusionnées ici : c'est `resolve_team_by_division_rank` qui les ordonne.
+    """
+    if len(candidates) <= 1:
+        return list(candidates)
+
+    try:
+        from .common import _normalize_name
+        from .search import (
+            _extract_base_competition_name,
+            _is_coupe_competition,
+            _phase_sort_key,
+        )
+
+        groups: dict[tuple[str, bool, str, str], list[dict[str, Any]]] = {}
+        for c in candidates:
+            team_name = _normalize_name(
+                str(c.get("nom_equipe") or c.get("nom") or c.get("team_label") or "")
+            )
+            comp_name = str(c.get("competition") or c.get("competition_code") or "")
+            is_coupe = _is_coupe_competition(comp_name, c.get("competition_type"))
+            base_comp = _extract_base_competition_name(comp_name)
+            numero = str(c.get("numero_equipe") or "").strip()
+            groups.setdefault((team_name, is_coupe, base_comp, numero), []).append(c)
+
+        cleaned: list[dict[str, Any]] = []
+        for group in groups.values():
+            if len(group) == 1:
+                cleaned.append(group[0])
+            else:
+                cleaned.append(max(group, key=_phase_sort_key))
+    except Exception:
+        cleaned = candidates
+
+    def _sort_key(c: dict[str, Any]) -> tuple[int, int]:
+        rank = get_competition_level_rank(c)
+        comp_nom = str(c.get("competition") or c.get("competition_code") or "").upper()
+        comp_type = str(c.get("competition_type") or "").upper()
+        is_coupe = 0 if ("COUPE" in comp_nom or comp_type == "COUPE") else 1
+        return (rank, is_coupe)
+
+    return sorted(cleaned, key=_sort_key, reverse=True)
+
+
+def resolve_team_by_division_rank(
+    candidates: list[dict[str, Any]],
+    team_number: int,
+) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    """Résout une équipe par son rang dans la hiérarchie des divisions quand aucun numéro explicite n'existe.
+
+    team_number: 1 pour équipe fanion, 2 pour 1ère réserve, 3 pour 2ème réserve, etc.
+
+    Retourne:
+      - (selected_candidate, []) si le rang identifie sans ambiguïté l'équipe demandée.
+      - (None, tied_candidates) si plusieurs équipes sont à égalité sur ce niveau de division (ambiguïté réelle).
+      - (None, []) si le numéro demandé dépasse le nombre d'équipes disponibles (not found).
+    """
+    if team_number < 1:
+        return None, []
+
+    ranked = rank_candidates_by_division(candidates)
+    target_idx = team_number - 1
+    if target_idx < 0 or target_idx >= len(ranked):
+        return None, []
+
+    cand_at_idx = ranked[target_idx]
+    cand_rank = get_competition_level_rank(cand_at_idx)
+
+    # Vérifier l'absence d'égalité bloquante avec les équipes adjacentes
+    prev_ok = (target_idx == 0) or (
+        get_competition_level_rank(ranked[target_idx - 1]) > cand_rank
+    )
+    next_ok = (target_idx == len(ranked) - 1) or (
+        cand_rank > get_competition_level_rank(ranked[target_idx + 1])
+    )
+
+    if prev_ok and next_ok:
+        return cand_at_idx, []
+
+    tied = [c for c in ranked if get_competition_level_rank(c) == cand_rank]
+    return None, tied

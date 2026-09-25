@@ -12,6 +12,10 @@ from ffbb_mcp.services.club import (
     _parse_division_code,
     ffbb_equipes_club_service,
 )
+from ffbb_mcp.services.division import (
+    rank_candidates_by_division,
+    resolve_team_by_division_rank,
+)
 from ffbb_mcp.services.poule import find_team_poule_service
 from ffbb_mcp.services.search import ffbb_resolve_team_service
 
@@ -499,3 +503,88 @@ async def test_find_team_poule_service_rencontres_fallback(monkeypatch):
     assert res.get("poule_id") == "202"
     assert res.get("poule_nom") == "Poule B"
     assert res.get("team_label") == "CLUB U15 - 1"
+
+
+# ---------------------------------------------------------------------------
+# 9. Non-régression : ranking par division pour équipes jeunes sans suffixe
+# (JEANNE D'ARC DE VICHY, U15M, numero_equipe == "" pour les deux engagements)
+# ---------------------------------------------------------------------------
+
+
+def _vichy_candidates():
+    return [
+        {
+            "engagement_id": "200000005347050",
+            "competition": "RMU15 Brassage",
+            "competition_code": "RMU15",
+            "competition_type": "PLAT",
+            "team_label": "U15M",
+            "nom_equipe": "JEANNE D ARC DE VICHY",
+            "numero_equipe": "",
+            "categorie": "U15",
+            "sexe": "M",
+        },
+        {
+            "engagement_id": "200000005358356",
+            "competition": "Départementale masculine U15",
+            "competition_code": "DMU15",
+            "competition_type": "DIV",
+            "team_label": "U15M",
+            "nom_equipe": "JEANNE D ARC DE VICHY",
+            "numero_equipe": "",
+            "categorie": "U15",
+            "sexe": "M",
+        },
+    ]
+
+
+def test_rank_candidates_by_division_vichy_keeps_both_sorted():
+    ranked = rank_candidates_by_division(_vichy_candidates())
+    assert [c["engagement_id"] for c in ranked] == [
+        "200000005347050",
+        "200000005358356",
+    ]
+
+
+def test_resolve_team_by_division_rank_vichy():
+    cands = _vichy_candidates()
+    chosen1, tied1 = resolve_team_by_division_rank(cands, 1)
+    assert tied1 == []
+    assert chosen1 is not None
+    assert chosen1["engagement_id"] == "200000005347050"
+
+    chosen2, tied2 = resolve_team_by_division_rank(cands, 2)
+    assert tied2 == []
+    assert chosen2 is not None
+    assert chosen2["engagement_id"] == "200000005358356"
+
+    chosen3, tied3 = resolve_team_by_division_rank(cands, 3)
+    assert chosen3 is None
+    assert tied3 == []
+
+
+def test_resolve_team_by_division_rank_tie_returns_ambiguous():
+    # Deux engagements au même niveau (départemental) mais portés par des
+    # noms d'équipe distincts : la dédup stricte des phases les conserve,
+    # et l'égalité de rang doit renvoyer une ambiguïté réelle.
+    tied_cands = [
+        {
+            "engagement_id": "a",
+            "competition": "Départementale masculine U15 Poule A",
+            "competition_code": "DMU15",
+            "competition_type": "DIV",
+            "nom_equipe": "CLUB X EQUIPE A",
+            "numero_equipe": "",
+        },
+        {
+            "engagement_id": "b",
+            "competition": "Départementale masculine U15 Poule B",
+            "competition_code": "DMU15",
+            "competition_type": "DIV",
+            "nom_equipe": "CLUB X EQUIPE B",
+            "numero_equipe": "",
+        },
+    ]
+    chosen, tied = resolve_team_by_division_rank(tied_cands, 1)
+    assert chosen is None
+    assert {c["engagement_id"] for c in tied} == {"a", "b"}

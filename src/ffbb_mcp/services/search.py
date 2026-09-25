@@ -97,31 +97,64 @@ def _deduplicate_same_team_phases(candidates: list[dict]) -> list[dict]:
     """Déduplique les candidats qui sont la même équipe au sein de la MÊME compétition (phases successives).
 
     Ne déduplique JAMAIS si les candidats appartiennent à des compétitions ou types de compétition distincts
-    (ex: Championnat vs Coupe ARA).
+    (ex: Championnat vs Coupe ARA), ni si un même nom d'équipe sans suffixe couvre
+    deux divisions de niveaux différents (ex: RMU15 Brassage régional vs
+    Départementale U15 — fanion vs réserve).
     """
     if len(candidates) <= 1:
         return candidates
 
-    # Regrouper par (team_name, is_coupe, base_competition_name)
-    # Les phases d'un même championnat pour une même équipe partagent (nom_equipe, False)
-    groups: dict[tuple[str, bool, str], list[dict]] = {}
-    for c in candidates:
-        team_name = _normalize_name(c.get("nom_equipe") or c.get("team_label") or "")
-        comp_name = c.get("competition") or c.get("competition_code") or ""
-        comp_type = c.get("competition_type")
-        is_coupe = _is_coupe_competition(comp_name, comp_type)
-        base_comp = _extract_base_competition_name(comp_name)
+    from ffbb_mcp.services.division import get_competition_level_rank
 
-        key = (team_name, is_coupe, base_comp if is_coupe else "")
-        groups.setdefault(key, []).append(c)
+    # 1) Regrouper par (team_name, numero) — même équipe présumée.
+    first_groups: dict[tuple[str, str], list[dict]] = {}
+    for c in candidates:
+        team_name = _normalize_name(
+            c.get("nom_equipe") or c.get("nom") or c.get("team_label") or ""
+        )
+        numero = str(c.get("numero_equipe") or "").strip()
+        first_groups.setdefault((team_name, numero), []).append(c)
 
     deduped: list[dict] = []
-    for group in groups.values():
+    for (_team, _num), group in first_groups.items():
         if len(group) == 1:
             deduped.append(group[0])
-        else:
-            best = max(group, key=_phase_sort_key)
-            deduped.append(best)
+            continue
+
+        # 2) Partition par is_coupe : championnat vs coupe ne fusionnent jamais.
+        coupe_groups: dict[bool, list[dict]] = {}
+        for c in group:
+            comp_name = c.get("competition") or c.get("competition_code") or ""
+            is_coupe = _is_coupe_competition(comp_name, c.get("competition_type"))
+            coupe_groups.setdefault(is_coupe, []).append(c)
+
+        for _is_coupe, cg in coupe_groups.items():
+            if len(cg) == 1:
+                deduped.append(cg[0])
+                continue
+            # 3) Familles de niveau confiantes (rank >= 1000 : National/Régional/Départemental).
+            # Un rang < 1000 (fallback générique, métadonnées minimales des vieux tests)
+            # est un joker : il ne crée pas une nouvelle famille à lui seul.
+            families: dict[int, list[dict]] = {}
+            for c in cg:
+                try:
+                    rank = get_competition_level_rank(c)
+                except Exception:
+                    rank = 0
+                fam = rank // 1000 if rank >= 1000 else 0
+                families.setdefault(fam, []).append(c)
+            confident_fams = sorted(f for f in families if f >= 1)
+            if len(confident_fams) <= 1:
+                # Même famille (ou jokers uniquement) → phases successives : garder la meilleure.
+                best = max(cg, key=_phase_sort_key)
+                deduped.append(best)
+            else:
+                # Plusieurs niveaux réels distincts (ex: régional vs départemental) →
+                # équipes distinctes (fanion vs réserve) : garder la meilleure par niveau,
+                # niveau le plus élevé en premier (cohérent avec find_team_candidates).
+                for _fam, members in sorted(families.items(), reverse=True):
+                    best = max(members, key=_phase_sort_key)
+                    deduped.append(best)
 
     return deduped
 

@@ -576,39 +576,49 @@ async def _resolve_team_equipes(
 
     if len(equipes) > 1 and eff_num is not None:
         want = str(eff_num)
+
+        def _team_nom(e: dict[str, Any]) -> str:
+            return str(e.get("nom_equipe") or e.get("nom") or "")
+
         filtered = [
-            e for e in equipes if (e.get("numero_equipe") or "").strip() == want
+            e
+            for e in equipes
+            if (e.get("numero_equipe") or "").strip() == want
+            or _team_nom(e).endswith(f"- {want}")
+            or _team_nom(e).endswith(f"-{want}")
         ]
-        if not filtered and eff_num == 1:
-            # Équipe fanion demandée : filtrer les équipes sans numéro de réserve (2, 3...)
+        if not filtered and eff_num is not None and eff_num >= 1:
+            # Équipe n°N demandée sans numéro explicite FFBB : filtrer les équipes
+            # qui ne portent pas explicitement un autre numéro
             potential = [
                 e
                 for e in equipes
                 if not (e.get("numero_equipe") or "").strip()
                 and not any(
-                    str(e.get("nom") or "").endswith(f"- {n}")
-                    or str(e.get("nom") or "").endswith(f"-{n}")
-                    for n in range(2, 10)
+                    _team_nom(e).endswith(f"- {n}") or _team_nom(e).endswith(f"-{n}")
+                    for n in range(1, 10)
+                    if n != eff_num
                 )
             ]
-            if len(potential) == 1:
-                filtered = potential
-            elif len(potential) > 1:
-                from .division import get_competition_level_rank
+            from .division import resolve_team_by_division_rank
 
-                ranked = sorted(potential, key=get_competition_level_rank, reverse=True)
-                if get_competition_level_rank(ranked[0]) > get_competition_level_rank(
-                    ranked[1]
-                ):
-                    filtered = [ranked[0]]
-                else:
-                    filtered = ranked
+            if len(potential) == 1:
+                # Une seule équipe sans numéro explicite : comportement historique.
+                filtered = potential
             else:
-                filtered = []
-        elif not filtered:
-            filtered = [
-                e for e in equipes if not (e.get("numero_equipe") or "").strip()
-            ]
+                chosen, tied = resolve_team_by_division_rank(potential, eff_num)
+                if chosen is not None:
+                    note = (
+                        "équipe fanion (équipe 1) résolue par hiérarchie de niveau de compétition"
+                        if eff_num == 1
+                        else f"équipe réserve (équipe {eff_num}) résolue par hiérarchie de niveau de compétition"
+                    )
+                    chosen.setdefault("note", note)
+                    filtered = [chosen]
+                elif tied:
+                    filtered = tied
+                else:
+                    filtered = []
         if not filtered:
             all_available = sorted(
                 list(
