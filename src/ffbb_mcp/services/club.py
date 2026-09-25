@@ -366,6 +366,22 @@ def _match_team_name(
     return has_trailing_num
 
 
+def _team_has_explicit_number(eq: dict) -> bool:
+    """Dit si une équipe résolue porte un numéro natif explicite.
+
+    Vérifie le champ FFBB ``numero_equipe`` puis le suffixe "- N" du nom
+    d'équipe. Les équipes jeunes départagées par hiérarchie de division
+    (numero_equipe == "" et nom sans suffixe, ex: Vichy U15M fanion/réserve)
+    n'ont PAS de numéro natif : leurs rencontres FFBB s'affichent sous un
+    nom sans suffixe, que le filtrage par nom doit accepter quel que soit
+    le ``numero_equipe`` demandé.
+    """
+    if str(eq.get("numero_equipe") or "").strip():
+        return True
+    nom = str(eq.get("nom_equipe") or eq.get("nom") or "")
+    return any(nom.endswith(f"- {n}") or nom.endswith(f"-{n}") for n in range(1, 10))
+
+
 async def _resolve_team_equipes(
     *,
     club_name: str | None,
@@ -758,6 +774,23 @@ async def _fetch_poule_matches(
                     numero_equipe_match,
                     is_organisme_nom_normalized=True,
                 )
+                if not is_my_team and not _team_has_explicit_number(eq):
+                    # Équipe sans numéro natif (ex: réserve départagée par
+                    # div_rank) : ses rencontres FFBB ne portent pas de
+                    # suffixe "- N" — accepter les noms sans suffixe.
+                    # La poule étant déjà celle de l'équipe résolue, il n'y
+                    # a pas d'ambiguïté avec une autre équipe du club.
+                    is_my_team = _match_team_name(
+                        str(m.get("nomEquipe1", "")),
+                        organisme_nom_norm,
+                        1,
+                        is_organisme_nom_normalized=True,
+                    ) or _match_team_name(
+                        str(m.get("nomEquipe2", "")),
+                        organisme_nom_norm,
+                        1,
+                        is_organisme_nom_normalized=True,
+                    )
 
             if is_my_team:
                 matches.append((m, eq))
@@ -1333,10 +1366,27 @@ async def ffbb_last_result_service(
         if rencontre_detail:
             dernier.update(rencontre_detail)
 
-    _numero_equipe_match = int(numero_equipe) if numero_equipe is not None else None
-    est_domicile = _match_team_name(
-        str(dernier.get("nomEquipe1", "")), str(organisme_nom), _numero_equipe_match
-    )
+    eng1 = dernier.get("idEngagementEquipe1")
+    eng2 = dernier.get("idEngagementEquipe2")
+    id_eng1 = eng1.get("id") if isinstance(eng1, dict) else eng1
+    id_eng2 = eng2.get("id") if isinstance(eng2, dict) else eng2
+    my_eng_id = str(source_eq.get("engagement_id") or source_eq.get("team_id") or "")
+
+    if my_eng_id and id_eng1 and my_eng_id == str(id_eng1):
+        est_domicile = True
+    elif my_eng_id and id_eng2 and my_eng_id == str(id_eng2):
+        est_domicile = False
+    else:
+        _numero_equipe_match = int(numero_equipe) if numero_equipe is not None else None
+        est_domicile = _match_team_name(
+            str(dernier.get("nomEquipe1", "")), str(organisme_nom), _numero_equipe_match
+        )
+        if not est_domicile and not _team_has_explicit_number(source_eq):
+            # Équipe sans numéro natif (ex: réserve départagée par div_rank) :
+            # son nom de rencontre ne porte pas de suffixe "- N".
+            est_domicile = _match_team_name(
+                str(dernier.get("nomEquipe1", "")), str(organisme_nom), 1
+            )
 
     def _safe_int(val: Any) -> int | None:
         if val is None or val in ("", "None"):
@@ -1358,8 +1408,6 @@ async def ffbb_last_result_service(
         score_nous is not None and score_eux is not None and score_nous > score_eux
     )
 
-    eng1 = dernier.get("idEngagementEquipe1")
-    eng2 = dernier.get("idEngagementEquipe2")
     num1 = _engagement_numero(eng1)
     num2 = _engagement_numero(eng2)
 
