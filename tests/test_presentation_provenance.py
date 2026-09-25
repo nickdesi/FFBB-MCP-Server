@@ -554,7 +554,7 @@ class TestServerToolsPresentation:
                 numero_equipe=1,
             )
             assert res["status"] == "ok"
-            assert "data" in res
+            assert "team" in res
             assert "presentation" in res
             assert "provenance" in res
             assert "10 victoires, 2 défaites" in res["presentation"]["short_answer"]

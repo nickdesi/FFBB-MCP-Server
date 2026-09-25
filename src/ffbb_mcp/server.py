@@ -86,6 +86,31 @@ def track_tool_usage(tool_name: str):
 logger = logging.getLogger("ffbb-mcp")
 
 
+def _require_club_identifier(
+    *,
+    organisme_id: Any = None,
+    club_name: Any = None,
+    engagement_id: Any = None,
+    poule_id: Any = None,
+    competition_id: Any = None,
+) -> None:
+    """Valide qu'au moins un identifiant de club est fourni.
+
+    Lève McpError avec un message explicite au lieu de laisser passer
+    None comme chaîne de recherche (qui produirait 'Club None introuvable').
+    """
+    if not any(
+        v is not None and str(v).strip() not in ("", "None")
+        for v in (organisme_id, club_name, engagement_id, poule_id, competition_id)
+    ):
+        from ffbb_mcp.services.common import McpError
+
+        raise McpError(
+            "Paramètre manquant : fournir au moins un identifiant de club "
+            "(organisme_id, club_name, engagement_id, poule_id ou competition_id)."
+        )
+
+
 # Enveloppes de ffbb_last_result/next_match exploitables dans team_summary :
 # "ok" (match trouvé) ou "no_upcoming_match" (vide explicite avec présentation).
 # Les enveloppes d'erreur (ambiguous/not_found/error) ne doivent pas passer
@@ -433,6 +458,13 @@ async def ffbb_bilan(
 
     Outil prioritaire pour 'quel est le bilan de X ?' ou 'résultats de U11M1'.
     """
+    _require_club_identifier(
+        organisme_id=organisme_id,
+        club_name=club_name,
+        engagement_id=engagement_id,
+        poule_id=poule_id,
+        competition_id=competition_id,
+    )
     try:
         await _safe_report_progress(ctx, 0, total=3, message="Résolution du club…")
         effective_refresh = force_refresh
@@ -1043,13 +1075,14 @@ async def ffbb_get_saisons(
     """Liste des saisons FFBB (référentiel temporel).
 
     Retourne la liste complète des saisons FFBB sous forme `list[dict]` triée
-    chronologiquement, chaque entrée contenant `season_id`, `label`, `debut`, `fin`,
-    `enCours` (calculé via `debut <= today <= fin`). Lecture seule, idempotent,
+    chronologiquement, chaque entrée contenant `id`, `libelle`, `debut`, `fin`,
+    `enCours` (booléen, calculé via `debut <= today <= fin`), `code`, `actif`
+    et `within_date_range` (booléen). Lecture seule, idempotent,
     sans effet de bord ni écriture. Cache SWR avec TTL long (≈24h) ;
     `force_refresh=True` contourne le cache pour données fraîches et
     `active_only=True` filtre côté serveur pour ne garder que la saison active.
 
-    Utilise cet outil pour récupérer les `season_id` disponibles avant d'appeler
+    Utilise cet outil pour récupérer les `id` de saison disponibles avant d'appeler
     `ffbb_bilan`, `ffbb_club` ou `ffbb_team_summary` avec un filtre de saison.
     Ne pas utiliser pour obtenir un classement, un calendrier ou un bilan — utilise
     `ffbb_club(action="classement")` ou `ffbb_bilan` à la place ; pour la version
@@ -1285,6 +1318,13 @@ async def ffbb_team_summary(
 
     Résout NM3, PNM, NF1, etc. vers la bonne équipe. En cas d'ambiguïté, suggère les candidats.
     """
+    _require_club_identifier(
+        organisme_id=organisme_id,
+        club_name=club_name,
+        engagement_id=engagement_id,
+        poule_id=poule_id,
+        competition_id=competition_id,
+    )
     try:
         await _safe_report_progress(ctx, 0, total=3, message="Résolution de l'équipe…")
         parsed_cat = parse_categorie(categorie) if categorie else None
@@ -1455,10 +1495,33 @@ async def ffbb_team_summary(
         summary_dict = (
             (bilan.get("bilan_total") or {}) if isinstance(bilan, dict) else {}
         )
-        v_count = summary_dict.get("victoires", 0)
-        d_count = summary_dict.get("defaites", 0)
-        dyn_str = f" (dynamique : {dynamique_data})" if dynamique_data else ""
-        short_ans = f"Bilan pour {team_name_str} : {v_count} victoires, {d_count} défaites{dyn_str}."
+        v_count = summary_dict.get("victoires")
+        if v_count is None:
+            v_count = summary_dict.get("gagnes", 0)
+        d_count = summary_dict.get("defaites")
+        if d_count is None:
+            d_count = summary_dict.get("perdus", 0)
+        n_count = summary_dict.get("nuls", 0)
+        # Formater la dynamique en texte lisible (jamais de repr dict brut)
+        dyn_str = ""
+        if isinstance(dynamique_data, dict):
+            forme_str = dynamique_data.get("forme_str", "")
+            serie = dynamique_data.get("serie_actuelle", {})
+            serie_label = serie.get("label", "") if isinstance(serie, dict) else ""
+            parts = []
+            if forme_str:
+                parts.append(f"forme {forme_str}")
+            if serie_label:
+                parts.append(serie_label)
+            if parts:
+                dyn_str = f" ({', '.join(parts)})"
+        v_label = "victoire" if v_count == 1 else "victoires"
+        d_label = "défaite" if d_count == 1 else "défaites"
+        bilan_phrase = f"{v_count} {v_label}, {d_count} {d_label}"
+        if n_count:
+            n_label = "nul" if n_count == 1 else "nuls"
+            bilan_phrase += f", {n_count} {n_label}"
+        short_ans = f"Bilan pour {team_name_str} : {bilan_phrase}{dyn_str}."
 
         detail_parts = []
         if isinstance(last_match, dict) and "presentation" in last_match:
@@ -1510,26 +1573,6 @@ async def ffbb_team_summary(
             "next_match": cleaned_next_match,
             "summary": bilan.get("bilan_total") if isinstance(bilan, dict) else None,
             "dynamique": dynamique_data,
-            "data": {
-                "team": team_data,
-                "phase_courante": bilan.get("phase_courante")
-                if isinstance(bilan, dict)
-                else None,
-                "summary": bilan.get("bilan_total")
-                if isinstance(bilan, dict)
-                else None,
-                "dynamique": dynamique_data,
-                "last_match": (
-                    last_match.get("data", {}).get("match")
-                    if isinstance(last_match, dict) and "data" in last_match
-                    else cleaned_last_match
-                ),
-                "next_match": (
-                    next_match.get("data", {}).get("match")
-                    if isinstance(next_match, dict) and "data" in next_match
-                    else cleaned_next_match
-                ),
-            },
             "presentation": presentation,
             "provenance": provenance,
         }

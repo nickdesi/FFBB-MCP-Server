@@ -103,7 +103,6 @@ async def test_team_summary_drops_ambiguous_next_envelope():
         )
 
     assert res["next_match"] is None
-    assert res["data"]["next_match"] is None
     assert res["presentation"]["detail_line"] == "Aucun match récent ou programmé."
 
 

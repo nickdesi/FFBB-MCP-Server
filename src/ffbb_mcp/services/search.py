@@ -876,6 +876,54 @@ async def _search_generic(
     )
 
 
+def _score_organisme_relevance(r: dict[str, Any], query: str) -> float:
+    """Calcule un score de pertinence pour classer un organisme par rapport à la requête.
+
+    Priorise les correspondances exactes/partielles sur la commune et le nom du club.
+    """
+    q_norm = _normalize_name(query)
+    if not q_norm:
+        return 0.0
+    nom_val = _normalize_name(r.get("nom", ""))
+    commune_obj = r.get("commune")
+    commune_val = _normalize_name(
+        commune_obj.get("libelle", "")
+        if isinstance(commune_obj, dict)
+        else (str(commune_obj) if commune_obj else "")
+    )
+    code_val = str(r.get("code", "")).upper().strip()
+
+    # Match exact prioritaire sur le code club ou le nom
+    if code_val and code_val == query.upper().strip():
+        return 200.0
+    if q_norm == nom_val:
+        return 100.0
+
+    score = 0.0
+    if q_norm in nom_val:
+        score += 60.0
+    elif nom_val in q_norm and len(nom_val) >= 4:
+        score += 30.0
+
+    if q_norm == commune_val:
+        score += 80.0
+    elif q_norm in commune_val:
+        score += 50.0
+    elif commune_val and commune_val in q_norm:
+        score += 30.0
+
+    score += jaro_winkler_similarity(q_norm, nom_val) * 10.0
+    if commune_val:
+        score += jaro_winkler_similarity(q_norm, commune_val) * 10.0
+
+    q_words = set(q_norm.split())
+    target_words = set(nom_val.split()) | set(commune_val.split())
+    if q_words:
+        score += (len(q_words & target_words) / len(q_words)) * 15.0
+
+    return score
+
+
 async def search_organismes_service(
     nom: str,
     limit: int = 20,
@@ -912,6 +960,14 @@ async def search_organismes_service(
 
     if results and any(_is_entente_name(o.get("nom")) for o in results):
         results = await filter_inactive_ententes(results, force_refresh=force_refresh)
+
+    # Réordonnancement de pertinence si aucun tri explicite n'a été demandé
+    if results and not sort:
+        results.sort(
+            key=lambda r: _score_organisme_relevance(r, nom),
+            reverse=True,
+        )
+
     return results
 
 
@@ -1802,14 +1858,24 @@ async def ffbb_find_team_candidates_service(
                         )
                         heure_raw = target_m.get("heure")
                         horaire_flag = target_m.get("horaire")
-                        if horaire_flag in ("0", 0):
+                        heure_str_raw = str(heure_raw or "").strip()
+                        if horaire_flag in ("0", 0) or heure_str_raw[:5] in (
+                            "00:00",
+                            "00h00",
+                            "0",
+                        ):
                             heure_str = "Horaire à fixer"
                         elif heure_raw:
-                            heure_str = str(heure_raw)[:5].replace(":", "h")
+                            heure_str = heure_str_raw[:5].replace(":", "h")
                         elif len(date_m) >= 16 and " " in date_m:
                             time_part = date_m.split()[1][:5]
-                            heure_str = time_part.replace(":", "h")
+                            if time_part in ("00:00", "00h00"):
+                                heure_str = "Horaire à fixer"
+                            else:
+                                heure_str = time_part.replace(":", "h")
                         else:
+                            heure_str = "Horaire à fixer"
+                        if heure_str in ("00h00", "00:00"):
                             heure_str = "Horaire à fixer"
 
                         next_match_info = {

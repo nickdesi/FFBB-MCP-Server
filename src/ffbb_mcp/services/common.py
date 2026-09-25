@@ -859,12 +859,11 @@ def handle_api_error(e: Exception) -> McpError:
             content_type = getattr(e.response, "headers", {}).get("content-type", "")
             if "application/json" in content_type:
                 detail = (
-                    "Accès FFBB refusé par Directus (403). Cause probable : "
-                    "la compétition ou ressource demandée appartient à une saison archivée "
-                    "et n'est plus accessible avec le token courant. "
-                    "Action conseillée : utilisez ffbb_saisons() pour vérifier la saison "
-                    "en cours, puis relancez votre recherche avec un identifiant de la "
-                    "saison actuelle."
+                    "Accès FFBB refusé par Directus (403). Causes possibles : "
+                    "l'identifiant demandé est invalide ou inexistant, ou la ressource "
+                    "appartient à une saison archivée non accessible avec le token courant. "
+                    "Action conseillée : vérifiez l'identifiant avec ffbb_search, "
+                    "ou utilisez ffbb_saisons() pour la saison en cours."
                 )
             else:
                 detail = (
@@ -910,12 +909,11 @@ def handle_api_error(e: Exception) -> McpError:
                 )
             else:
                 detail = (
-                    "Accès FFBB refusé par Directus (403). Cause probable : "
-                    "la compétition ou ressource demandée appartient à une saison archivée "
-                    "et n'est plus accessible avec le token courant. "
-                    "Action conseillée : utilisez ffbb_saisons() pour vérifier la saison "
-                    "en cours, puis relancez votre recherche avec un identifiant de la "
-                    "saison actuelle."
+                    "Accès FFBB refusé par Directus (403). Causes possibles : "
+                    "l'identifiant demandé est invalide ou inexistant, ou la ressource "
+                    "appartient à une saison archivée non accessible avec le token courant. "
+                    "Action conseillée : vérifiez l'identifiant avec ffbb_search, "
+                    "ou utilisez ffbb_saisons() pour la saison en cours."
                 )
             return McpError(error=ErrorData(code=INTERNAL_ERROR, message=detail))
         if sdk_status == 429:

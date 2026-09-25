@@ -251,8 +251,15 @@ async def fetch_club_matches(
                 elif len(h_clean) == 2:
                     time_str = f"{h_clean}:00"
                 elif " " in date_raw and ":" in date_raw.split(" ")[1]:
-                    time_str = date_raw.split(" ")[1][:5]
+                    time_cand = date_raw.split(" ")[1][:5]
+                    time_str = (
+                        "Horaire à fixer"
+                        if time_cand in ("00:00", "00h00")
+                        else time_cand
+                    )
                 else:
+                    time_str = "Horaire à fixer"
+                if time_str in ("00:00", "00h00"):
                     time_str = "Horaire à fixer"
 
             match_data = {
