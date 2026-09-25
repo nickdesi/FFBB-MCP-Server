@@ -67,6 +67,7 @@ from .division import (
     _filter_teams_by_competition,
     _parse_division_code,
 )
+from .poule_opponent import resolve_opponent_from_poule
 from .search import ffbb_resolve_team_service, resolve_club_and_org  # noqa: F401
 
 logger = logging.getLogger("ffbb-mcp")
@@ -1043,7 +1044,7 @@ async def ffbb_next_match_service(
     opp_eng_id: str | None = None
     opp_num_eq: str | None = None
     if poule_id_match and opp_team_name:
-        from .poule import get_poule_service, resolve_opponent_from_poule
+        from .poule import get_poule_service
 
         try:
             poule_data = await get_poule_service(poule_id_match)
@@ -1452,7 +1453,7 @@ async def ffbb_last_result_service(
     opp_eng_id: str | None = None
     opp_num_eq: str | None = None
     if poule_id_last and opp_team_name:
-        from .poule import get_poule_service, resolve_opponent_from_poule
+        from .poule import get_poule_service
 
         try:
             poule_data = await get_poule_service(poule_id_last)

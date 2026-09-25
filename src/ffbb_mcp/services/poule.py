@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import re
 from typing import Any
 
 from mcp.types import INTERNAL_ERROR, ErrorData
@@ -22,14 +21,12 @@ async def get_client_async(*args, **kwargs):
 from ffbb_mcp.utils import (
     clean_serialized_data,
     format_team_name,
-    jaro_winkler_similarity,
     resolve_relation_field,
     serialize_model,
 )
 
 from .common import (
     _cache_set,
-    _clean_team_for_match,
     _coerce_numeric_id,
     _dedupe_inflight,
     _dedupe_inflight_detail,
@@ -42,193 +39,29 @@ from .common import (
     _swr_serve,
     _with_ffbb_semaphore,
 )
+from .poule_lives import (
+    _fetch_lives,
+    _is_live_match,
+    get_lives_service,
+)
+from .poule_opponent import resolve_opponent_from_poule
 
 logger = logging.getLogger("ffbb-mcp")
 
-
-async def _fetch_lives() -> list[dict]:
-    client = await get_client_async()
-    lives = await _with_ffbb_semaphore(
-        _safe_call_with_inflight(
-            "Lives (Matchs en cours)", lambda: client.get_lives_async()
-        )
-    )
-    lives_list = lives if isinstance(lives, list) else []
-    result = [serialize_model(live) for live in lives_list]
-    from .salle import _enrich_matches_with_salle_details
-
-    await _enrich_matches_with_salle_details(result)
-    _cache_set(state.cache_lives, "lives", result, "lives")
-    return result
-
-
-def _is_live_match(m: dict[str, Any]) -> bool:
-    """Détermine si un match de l'API FFBB Live est réellement en cours de jeu."""
-    if not isinstance(m, dict):
-        return False
-    status = str(m.get("match_status") or m.get("status") or "").upper().strip()
-    cur_status = str(m.get("current_status") or "").upper().strip()
-    period = m.get("current_period")
-    clock = m.get("clock")
-
-    # Matchs programmés futurs ou terminés/annulés
-    if status in (
-        "SCHEDULED",
-        "COMPLETE",
-        "FINISHED",
-        "TERMINE",
-        "TERMINEE",
-        "ABANDONED",
-        "ANNULE",
-        "REPORTE",
-    ):
-        return status == "SCHEDULED" and (
-            period is not None or cur_status in ("LIVE", "IN_PROGRESS", "EN_COURS")
-        )
-
-    if status in (
-        "LIVE",
-        "IN_PROGRESS",
-        "EN_COURS",
-        "LIVE_STREAMING",
-    ) or cur_status in (
-        "LIVE",
-        "IN_PROGRESS",
-        "EN_COURS",
-    ):
-        return True
-
-    if (
-        status.startswith("QUARTER")
-        or status.startswith("PERIOD")
-        or "TIME" in status
-        or "TEMPS" in status
-        or "OVERTIME" in status
-    ):
-        return True
-
-    return period is not None or (
-        clock is not None and str(clock).strip() not in ("", "00:00")
-    )
-
-
-async def get_lives_service(
-    include_scheduled: bool = False,
-    *,
-    organisme_id: int | str | None = None,
-    club_name: str | None = None,
-    categorie: str | None = None,
-    numero_equipe: int | None = None,
-    engagement_id: int | str | None = None,
-    include_calendar_fallback: bool = True,
-) -> list[dict]:
-    ttl = _read_positive_int_env("FFBB_CACHE_TTL_LIVES", get_static_ttl("lives"))
-    raw_lives = await _swr_serve(state.cache_lives, "lives", "lives", ttl, _fetch_lives)
-    target_requested = any(
-        value is not None and value != ""
-        for value in (organisme_id, club_name, categorie, numero_equipe, engagement_id)
-    )
-    if not target_requested:
-        if include_scheduled or not raw_lives:
-            return raw_lives
-        return [m for m in raw_lives if _is_live_match(m)]
-
-    target_engagement = str(engagement_id or "")
-    target_organisme = str(organisme_id or "")
-
-    def _match_id(value: Any) -> str:
-        # Les rencontres portent les ids dans des dicts (idEngagementEquipe1.id) :
-        # str(dict) ne matcherait jamais l'id demandé.
-        if isinstance(value, dict):
-            value = value.get("id")
-        return str(value or "")
-
-    def matches_target(match: dict[str, Any]) -> bool:
-        engagement_values = {
-            _match_id(match.get(key))
-            for key in (
-                "engagement_id",
-                "id_engagement",
-                "idEngagementEquipe1",
-                "idEngagementEquipe2",
-            )
-        }
-        organisme_values = {
-            _match_id(match.get(key))
-            for key in (
-                "organisme_id",
-                "id_organisme",
-                "idOrganismeEquipe1",
-                "idOrganismeEquipe2",
-            )
-        }
-        team_names = " ".join(
-            str(match.get(key) or "")
-            for key in (
-                "equipe1",
-                "equipe2",
-                "nomEquipe1",
-                "nomEquipe2",
-                "team_label",
-            )
-        )
-        if target_engagement and target_engagement in engagement_values:
-            return True
-        if target_organisme and target_organisme in organisme_values:
-            return True
-        if club_name and _normalize_name(club_name) in _normalize_name(team_names):
-            return True
-        return not (target_engagement or target_organisme or club_name)
-
-    selected = [
-        dict(match)
-        for match in raw_lives
-        if matches_target(match) and (include_scheduled or _is_live_match(match))
-    ]
-    for match in selected:
-        if _is_live_match(match):
-            match.setdefault("canonical_status", "live")
-            match.setdefault("temporal_status", "live")
-            match.setdefault("status_confidence", "high")
-            match.setdefault(
-                "status_explanation",
-                "Statut live explicitement remonté par la FFBB.",
-            )
-
-    if not include_calendar_fallback:
-        return selected
-
-    from .calendar import get_calendrier_club_service
-
-    # Le fallback calendrier doit respecter include_scheduled : avec ["live"]
-    # seul, une poule sans match en cours n'apportait jamais les programmés.
-    calendar_kwargs: dict[str, Any] = {
-        "status_filter": ["live", "scheduled"] if include_scheduled else ["live"],
-        "scope": "team" if engagement_id or categorie or numero_equipe else "club",
-    }
-    for key, value in (
-        ("organisme_id", organisme_id),
-        ("club_name", club_name),
-        ("categorie", categorie),
-        ("numero_equipe", numero_equipe),
-        ("engagement_id", engagement_id),
-    ):
-        if value is not None and value != "":
-            calendar_kwargs[key] = value
-
-    calendar = await get_calendrier_club_service(**calendar_kwargs)
-    calendar_items = calendar.get("items", []) if isinstance(calendar, dict) else []
-    known_ids = {
-        str(match.get("id") or match.get("match_id") or "") for match in selected
-    }
-    for match in calendar_items:
-        match_id = str(match.get("id") or match.get("match_id") or "")
-        if match_id and match_id in known_ids:
-            continue
-        selected.append(match)
-        if match_id:
-            known_ids.add(match_id)
-    return selected
+__all__ = [
+    "_fetch_lives",
+    "_is_live_match",
+    "ffbb_get_classement_service",
+    "find_team_poule_service",
+    "format_poule_response",
+    "get_competition_service",
+    "get_engagement_service",
+    "get_lives_service",
+    "get_organisme_service",
+    "get_poule_service",
+    "get_saisons_service",
+    "resolve_opponent_from_poule",
+]
 
 
 _SAISONS_FIELDS = ["id", "libelle", "code", "actif", "debut", "fin", "enCours"]
@@ -857,264 +690,6 @@ async def find_team_poule_service(
         ),
         "competition_id": comp_id_str,
         "competition_nom": comp_nom,
-    }
-
-
-def resolve_opponent_from_poule(
-    poule_data: dict[str, Any],
-    opponent_name: str,
-) -> dict[str, Any]:
-    """Résout l'adversaire d'un match (Étape 3 ID-first) à partir des équipes de sa poule.
-
-    Recherche déterministe dans les classements (ou rencontres) de la poule déjà chargée.
-    Retourne l'engagement_id et l'organisme_id réels de l'adversaire sans nouvelle recherche externe.
-    Si la confiance est inférieure à 0.8, renvoie un statut ambigu sans décision arbitraire.
-    """
-    if not poule_data or not opponent_name:
-        return {
-            "status": "not_found",
-            "resolved_id": None,
-            "engagement_id": None,
-            "organisme_id": None,
-            "nom": None,
-            "numero_equipe": None,
-            "confidence": 0.0,
-            "match_strategy": [],
-            "ambiguous_candidates": [],
-            "message": "Données de poule ou nom d'adversaire manquant.",
-        }
-
-    classements = poule_data.get("classements") or []
-    # Fallback si classements vides : reconstruire les équipes depuis les rencontres
-    if not classements and poule_data.get("rencontres"):
-        seen_noms = set()
-        virtual_classements = []
-        for r in poule_data.get("rencontres", []):
-            for side in ("1", "2"):
-                nom = r.get(f"nomEquipe{side}")
-                eng_id = r.get(f"idEngagementEquipe{side}")
-                org_id = (
-                    r.get(f"idOrganismeEquipe{side}")
-                    or r.get(f"id_organisme_{side}")
-                    or r.get(f"idOrganisme{side}")
-                )
-                if nom and nom not in seen_noms:
-                    seen_noms.add(nom)
-                    virtual_classements.append(
-                        {
-                            "id_engagement": {"id": eng_id, "nom": nom},
-                            "organisme_nom": nom,
-                            "organisme_id": str(org_id) if org_id is not None else None,
-                        }
-                    )
-        classements = virtual_classements
-
-    if not classements:
-        return {
-            "status": "not_found",
-            "resolved_id": None,
-            "engagement_id": None,
-            "organisme_id": None,
-            "nom": None,
-            "numero_equipe": None,
-            "confidence": 0.0,
-            "match_strategy": [],
-            "ambiguous_candidates": [],
-            "message": "Poule sans équipes répertoriées dans les classements ou rencontres.",
-        }
-
-    raw_opp = str(opponent_name).strip()
-    norm_opp = _normalize_name(raw_opp)
-    clean_opp = _clean_team_for_match(raw_opp)
-
-    # Détection d'un numéro d'équipe à la fin (1 à 9 uniquement pour ne pas confondre avec un département ex: 42, 38)
-    num_match = re.search(r"[-_\s]+([1-9])$", raw_opp)
-    target_num = num_match.group(1) if num_match else None
-    base_raw_opp = (
-        re.sub(r"[-_\s]+([1-9])$", "", raw_opp).strip() if target_num else raw_opp
-    )
-    base_clean_opp = _clean_team_for_match(base_raw_opp)
-
-    candidates: list[dict[str, Any]] = []
-
-    for c in classements:
-        c_eng, c_eng_id = resolve_relation_field(c, "id_engagement")
-        c_org_id = (
-            str(c.get("organisme_id") or "")
-            if c.get("organisme_id") is not None
-            else None
-        )
-        c_nom = str(c_eng.get("nom") or c.get("organisme_nom") or "")
-        c_num = str(c_eng.get("numero_equipe") or c_eng.get("numero_equ") or "").strip()
-        c_norm = _normalize_name(c_nom)
-        c_clean = _clean_team_for_match(c_nom)
-
-        # 1. Correspondance exacte brute
-        if c_nom.upper() == raw_opp.upper():
-            return {
-                "status": "resolved",
-                "resolved_id": c_eng_id,
-                "engagement_id": c_eng_id,
-                "organisme_id": c_org_id,
-                "nom": c_nom,
-                "numero_equipe": c_num or None,
-                "confidence": 1.0,
-                "match_strategy": ["poule_classement_exact"],
-                "ambiguous_candidates": [],
-            }
-
-        # Vérification de cohérence du numéro d'équipe
-        num_consistent = True
-        if (target_num and c_num and target_num != c_num) or (
-            target_num and not c_num and target_num != "1"
-        ):
-            num_consistent = False
-
-        if not num_consistent:
-            continue
-
-        # 2. Correspondance normalisée complète
-        if c_norm == norm_opp or (c_num and f"{c_norm} {c_num}" == norm_opp):
-            return {
-                "status": "resolved",
-                "resolved_id": c_eng_id,
-                "engagement_id": c_eng_id,
-                "organisme_id": c_org_id,
-                "nom": c_nom,
-                "numero_equipe": c_num or None,
-                "confidence": 1.0,
-                "match_strategy": ["poule_classement_normalized_exact"],
-                "ambiguous_candidates": [],
-            }
-
-        # 3. Correspondance nettoyée (préfixes CTC / IE retirés)
-        if c_clean == clean_opp or (c_num and f"{c_clean} {c_num}" == clean_opp):
-            candidates.append(
-                {
-                    "engagement_id": c_eng_id,
-                    "organisme_id": c_org_id,
-                    "nom": c_nom,
-                    "numero_equipe": c_num or None,
-                    "score": 0.98,
-                    "strategy": "poule_classement_cleaned_exact",
-                }
-            )
-            continue
-
-        # 4. Correspondance de base sans numéro
-        if c_clean == base_clean_opp or (
-            c_num and f"{c_clean} {c_num}" == base_clean_opp
-        ):
-            candidates.append(
-                {
-                    "engagement_id": c_eng_id,
-                    "organisme_id": c_org_id,
-                    "nom": c_nom,
-                    "numero_equipe": c_num or None,
-                    "score": 0.95,
-                    "strategy": "poule_classement_base_exact",
-                }
-            )
-            continue
-
-        # 5. Inclusion sous-chaîne
-        if base_clean_opp in c_clean or c_clean in base_clean_opp:
-            ratio = min(len(base_clean_opp), len(c_clean)) / max(
-                len(base_clean_opp), len(c_clean)
-            )
-            score = 0.85 + (0.10 * ratio)
-            candidates.append(
-                {
-                    "engagement_id": c_eng_id,
-                    "organisme_id": c_org_id,
-                    "nom": c_nom,
-                    "numero_equipe": c_num or None,
-                    "score": round(score, 3),
-                    "strategy": "poule_classement_inclusion",
-                }
-            )
-            continue
-
-        # 6. Approximatif Jaro-Winkler
-        jw = jaro_winkler_similarity(c_clean, clean_opp)
-        if jw >= 0.75:
-            candidates.append(
-                {
-                    "engagement_id": c_eng_id,
-                    "organisme_id": c_org_id,
-                    "nom": c_nom,
-                    "numero_equipe": c_num or None,
-                    "score": round(jw, 3),
-                    "strategy": "poule_classement_fuzzy",
-                }
-            )
-
-    if not candidates:
-        return {
-            "status": "not_found",
-            "resolved_id": None,
-            "engagement_id": None,
-            "organisme_id": None,
-            "nom": None,
-            "numero_equipe": None,
-            "confidence": 0.0,
-            "match_strategy": [],
-            "ambiguous_candidates": [],
-            "message": f"Aucun adversaire correspondant à '{opponent_name}' dans la poule.",
-        }
-
-    # Tri par score décroissant
-    candidates.sort(key=lambda x: x["score"], reverse=True)
-    best = candidates[0]
-
-    # Vérification d'ambiguïté si plusieurs candidats proches (< 0.10)
-    if len(candidates) > 1:
-        second = candidates[1]
-        if (best["score"] - second["score"]) < 0.10:
-            return {
-                "status": "ambiguous",
-                "resolved_id": None,
-                "engagement_id": None,
-                "organisme_id": None,
-                "nom": None,
-                "numero_equipe": None,
-                "confidence": best["score"],
-                "match_strategy": ["poule_ambiguous"],
-                "ambiguous_candidates": candidates[:3],
-                "message": (
-                    f"Ambiguïté dans la poule entre plusieurs équipes pour '{opponent_name}'. "
-                    "Confirmation utilisateur requise."
-                ),
-            }
-
-    # Garde-fou seuil 0.8 : suspension si confiance insuffisante
-    if best["score"] < 0.80:
-        return {
-            "status": "ambiguous",
-            "resolved_id": None,
-            "engagement_id": None,
-            "organisme_id": None,
-            "nom": None,
-            "numero_equipe": None,
-            "confidence": best["score"],
-            "match_strategy": ["poule_low_confidence"],
-            "ambiguous_candidates": [best],
-            "message": (
-                f"Confiance insuffisante ({best['score']}) pour '{opponent_name}'. "
-                "Confirmation requise."
-            ),
-        }
-
-    return {
-        "status": "resolved",
-        "resolved_id": best["engagement_id"],
-        "engagement_id": best["engagement_id"],
-        "organisme_id": best["organisme_id"],
-        "nom": best["nom"],
-        "numero_equipe": best["numero_equipe"],
-        "confidence": best["score"],
-        "match_strategy": [best["strategy"]],
-        "ambiguous_candidates": [],
     }
 
 
