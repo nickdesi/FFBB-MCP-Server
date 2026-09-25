@@ -253,19 +253,26 @@ def compute_team_dynamique(
         )
 
     # Tendance
-    if ratio_global_victoires is not None:
-        if ratio_5 >= ratio_global_victoires + 15:
-            tendance = "En nette hausse ↗️"
-        elif ratio_5 <= ratio_global_victoires - 15:
+    if len(played_matches) < 3:
+        tendance = "Stable ➡️"
+    else:
+        if ratio_global_victoires is None and played_matches:
+            total_v = sum(1 for m in played_matches if m["resultat"] == "V")
+            ratio_global_victoires = round(total_v / len(played_matches) * 100, 1)
+
+        if ratio_global_victoires is not None:
+            if ratio_5 >= ratio_global_victoires + 15:
+                tendance = "En nette hausse ↗️"
+            elif ratio_5 <= ratio_global_victoires - 15:
+                tendance = "En baisse ↘️"
+            else:
+                tendance = "Stable ➡️"
+        elif ratio_5 >= 60.0:
+            tendance = "En hausse ↗️"
+        elif ratio_5 <= 40.0:
             tendance = "En baisse ↘️"
         else:
             tendance = "Stable ➡️"
-    elif ratio_5 >= 60.0:
-        tendance = "En hausse ↗️"
-    elif ratio_5 <= 40.0:
-        tendance = "En baisse ↘️"
-    else:
-        tendance = "Stable ➡️"
 
     # Matchs sérialisables
     matchs_models = [

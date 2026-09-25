@@ -27,6 +27,7 @@ from ffbb_mcp.services.common import (
     ErrorData,
     McpError,
     _extract_phase_num,
+    _match_team_name,
     _normalize_name,
     disambiguate_clubs_by_category,
     get_primary_club,
@@ -564,30 +565,6 @@ async def ffbb_find_team_candidates_service(
                     force_refresh=force_refresh,
                 )
                 if matches:
-                    for m, _ in matches:
-                        m_nom1 = str(m.get("nomEquipe1") or "")
-                        m_nom2 = str(m.get("nomEquipe2") or "")
-                        for cand_nom in (m_nom1, m_nom2):
-                            cand_nom_clean = cand_nom.strip()
-                            if (
-                                club_nom.lower() in cand_nom_clean.lower()
-                                or "ctc" in cand_nom_clean.lower()
-                                or "entente" in cand_nom_clean.lower()
-                            ):
-                                if cand_num is None or cand_num == 1:
-                                    if not any(
-                                        cand_nom_clean.endswith(f"- {n}")
-                                        for n in range(2, 10)
-                                    ):
-                                        nom_officiel = cand_nom_clean
-                                        break
-                                elif cand_nom_clean.endswith(
-                                    f"- {cand_num}"
-                                ) or cand_nom_clean.endswith(f"-{cand_num}"):
-                                    nom_officiel = cand_nom_clean
-                                    break
-                        if nom_officiel != (t.get("nom_equipe") or club_nom):
-                            break
 
                     def _match_sort_key(item: tuple[dict, dict]) -> str:
                         m = item[0]
@@ -609,13 +586,39 @@ async def ffbb_find_team_candidates_service(
                     )
 
                     if target_m:
-                        m1 = target_m.get("nomEquipe1") or ""
-                        m2 = target_m.get("nomEquipe2") or ""
-                        is_dom = (
-                            nom_officiel.lower() in m1.lower()
-                            or club_nom.lower() in m1.lower()
+                        m1 = str(target_m.get("nomEquipe1") or "").strip()
+                        m2 = str(target_m.get("nomEquipe2") or "").strip()
+
+                        # Déterminer quel côté du match correspond à notre équipe
+                        eng1 = target_m.get("idEngagementEquipe1")
+                        eng2 = target_m.get("idEngagementEquipe2")
+                        id_eng1 = str(
+                            eng1.get("id") if isinstance(eng1, dict) else (eng1 or "")
                         )
+                        id_eng2 = str(
+                            eng2.get("id") if isinstance(eng2, dict) else (eng2 or "")
+                        )
+
+                        cand_eng_id = str(
+                            t.get("engagement_id") or t.get("team_id") or ""
+                        )
+
+                        if cand_eng_id and id_eng1 and cand_eng_id == id_eng1:
+                            is_dom = True
+                        elif cand_eng_id and id_eng2 and cand_eng_id == id_eng2:
+                            is_dom = False
+                        else:
+                            if _match_team_name(m1, club_nom, cand_num):
+                                is_dom = True
+                            elif _match_team_name(m2, club_nom, cand_num):
+                                is_dom = False
+                            else:
+                                is_dom = club_nom.lower() in m1.lower()
+
                         adv = m2 if is_dom else m1
+                        our_match_team = m1 if is_dom else m2
+                        if our_match_team:
+                            nom_officiel = our_match_team
                         date_m = str(
                             target_m.get("date_rencontre") or target_m.get("date") or ""
                         )

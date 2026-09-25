@@ -344,7 +344,7 @@ def build_match_presentation(
                 short = f"{clean_team} a battu {clean_opp} {team_score} à {opp_score}."
                 outcome = "Victoire"
             elif team_score < opp_score:
-                short = f"{clean_team} s'est incliné face à {clean_opp} {opp_score} à {team_score}."
+                short = f"{clean_team} s'est incliné face à {clean_opp} {team_score} à {opp_score}."
                 outcome = "Défaite"
             else:
                 short = f"Match nul entre {clean_team} et {clean_opp} {team_score} à {opp_score}."

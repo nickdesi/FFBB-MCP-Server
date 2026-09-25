@@ -71,21 +71,31 @@ def _build_default_get_presentation(
 ) -> dict[str, Any]:
     """Construit un bloc de présentation par défaut pour ffbb_get."""
     if type_name == "competition":
-        nom = data.get("nom") or f"Compétition {resource_id}"
-        poules = data.get("poules") or []
-        short_ans = f"Compétition '{nom}' ({len(poules)} poule(s))."
-        code = data.get("code") or ""
-        raw_saison = data.get("saison")
-        saison_lbl = (
-            raw_saison.get("libelle")
-            if isinstance(raw_saison, dict)
-            else (str(raw_saison) if raw_saison else "")
+        nom = (
+            data.get("nom")
+            or data.get("competition_nom")
+            or f"Compétition {resource_id}"
         )
-        detail = (
-            f"Code: {code} · Saison: {saison_lbl}."
-            if code or saison_lbl
-            else "Détails de la compétition."
-        )
+        poule_nom = data.get("poule_nom")
+        club_nom = data.get("club")
+        if data.get("status") == "found" and poule_nom:
+            short_ans = f"Compétition '{nom}' : poule '{poule_nom}' résolue pour {club_nom or 'le club'}."
+            detail = f"Poule: {poule_nom} (ID: {data.get('poule_id')}) · Club: {club_nom or 'Non précisé'}."
+        else:
+            poules = data.get("poules") or []
+            short_ans = f"Compétition '{nom}' ({len(poules)} poule(s))."
+            code = data.get("code") or ""
+            raw_saison = data.get("saison")
+            saison_lbl = (
+                raw_saison.get("libelle")
+                if isinstance(raw_saison, dict)
+                else (str(raw_saison) if raw_saison else "")
+            )
+            detail = (
+                f"Code: {code} · Saison: {saison_lbl}."
+                if code or saison_lbl
+                else "Détails de la compétition."
+            )
     elif type_name == "organisme":
         nom = data.get("nom") or f"Organisme {resource_id}"
         code = data.get("code") or ""
