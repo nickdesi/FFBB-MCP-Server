@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from mcp.shared.exceptions import McpError
@@ -419,3 +419,173 @@ async def test_explain_tiebreak_rules_poule_fallback():
         assert "warning" in res["poule"]
         assert res["applied_tiebreaks"] == []
         assert "Article 28" in res["summary"]
+
+
+def test_clean_serialized_data_converts_python_repr_and_none_strings():
+    """Vérifie le nettoyage des représentations Python et des chaînes 'None'."""
+    from ffbb_mcp.utils import clean_serialized_data
+
+    raw = {
+        "id_poule": "{'id': '200000003055787'}",
+        "competitionId": "{'id': '200000002897769', 'competition_origine': '200000002897769'}",
+        "score_domicile": "None",
+        "nested": [
+            {"score": "None", "val": 42},
+            "{'key': 'value'}",
+        ],
+    }
+    cleaned = clean_serialized_data(raw)
+    assert isinstance(cleaned["id_poule"], dict)
+    assert cleaned["id_poule"]["id"] == "200000003055787"
+    assert isinstance(cleaned["competitionId"], dict)
+    assert cleaned["competitionId"]["competition_origine"] == "200000002897769"
+    assert cleaned["score_domicile"] is None
+    assert cleaned["nested"][0]["score"] is None
+    assert isinstance(cleaned["nested"][1], dict)
+    assert cleaned["nested"][1]["key"] == "value"
+
+
+@pytest.mark.asyncio
+async def test_format_poule_response_sanitizes_scores_and_ids():
+    """Vérifie que format_poule_response nettoie les scores des matchs non joués et les IDs dict/str."""
+    from ffbb_mcp.services.poule import format_poule_response
+
+    raw_poule = {
+        "id": "200000003055787",
+        "nom": "Poule A",
+        "classements": [
+            {
+                "id": "1",
+                "id_poule": "{'id': '200000003055787'}",
+                "nomEquipe": "MONTJOIE",
+                "points": 2,
+            }
+        ],
+        "rencontres": [
+            {
+                "id": "m1",
+                "id_poule": "{'id': '200000003055787'}",
+                "competitionId": "{'id': '200000002897769', 'competition_origine': '200000002897769'}",
+                "nomEquipe1": "MONTJOIE",
+                "nomEquipe2": "CMPJM",
+                "resultatEquipe1": "None",
+                "resultatEquipe2": "None",
+                "joue": 0,
+            }
+        ],
+    }
+    res = await format_poule_response(raw_poule)
+    # Vérification Item A (objets dict réels, pas chaînes repr)
+    assert isinstance(res["classements"][0]["id_poule"], dict)
+    assert res["classements"][0]["id_poule"]["id"] == "200000003055787"
+    assert isinstance(res["rencontres"][0]["competitionId"], dict)
+    assert res["rencontres"][0]["competitionId"]["id"] == "200000002897769"
+
+    # Vérification Item B (null JSON natif, pas chaîne 'None')
+    assert res["rencontres"][0]["resultatEquipe1"] is None
+    assert res["rencontres"][0]["resultatEquipe2"] is None
+
+    # Vérification Item C (présence bloc de présentation)
+    assert "presentation" in res
+    assert "short_answer" in res["presentation"]
+    assert "Poule Poule A" in res["presentation"]["short_answer"]
+
+
+@pytest.mark.asyncio
+async def test_ffbb_get_poule_deduplication_via_call_tool():
+    """Vérifie que ffbb_get émet un résumé court dans content[0] et les données complètes dans structured_content."""
+    from ffbb_mcp.server import mcp
+
+    fake_poule = {
+        "id": "100",
+        "nom": "Poule C",
+        "classements": [{"nomEquipe": "Team 1", "points": 10}],
+        "rencontres": [{"id": "m1", "joue": 1}],
+    }
+    with patch(
+        "ffbb_mcp.server.get_poule_service",
+        AsyncMock(return_value=fake_poule),
+    ):
+        result = await mcp.call_tool("ffbb_get", {"id": "100", "type": "poule"})
+        content_list = result.content if hasattr(result, "content") else result[0]
+        assert content_list
+        text = content_list[0].text
+        # Ne doit pas commencer par '{' (pas de dump JSON dupliqué dans content)
+        assert not text.strip().startswith("{")
+        assert "Poule Poule C" in text
+        # structured_content doit contenir les données complètes
+        assert hasattr(result, "structured_content") and result.structured_content
+        assert result.structured_content["id"] == "100"
+        assert len(result.structured_content["rencontres"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_ffbb_resolve_team_no_candidates_duplication():
+    """Vérifie que candidates n'est pas dupliqué dans resolution."""
+    from ffbb_mcp.services.search import ffbb_resolve_team_service
+
+    cands = [
+        {"engagement_id": "1", "nom_equipe": "E1", "competition": "C1"},
+        {"engagement_id": "2", "nom_equipe": "E2", "competition": "C2"},
+    ]
+    with patch(
+        "ffbb_mcp.strict_resolver.resolve_team_strict",
+        AsyncMock(
+            return_value=MagicMock(
+                status="ambiguous",
+                selected=None,
+                candidates=cands,
+                club_resolu={"nom": "Test Club"},
+                ambiguity_message="Plusieurs équipes trouvées",
+                clarification_prompt="Précisez",
+                model_dump=lambda: {"status": "ambiguous", "candidates": cands},
+            )
+        ),
+    ):
+        res = await ffbb_resolve_team_service(club_name="Test Club", categorie="U15M")
+        assert res["status"] == "ambiguous"
+        assert "candidates" in res
+        assert len(res["candidates"]) == 2
+        # Élimination de la duplication dans resolution
+        assert "candidates" not in res["resolution"]
+
+
+def test_lighten_competition_hit_prunes_bloat():
+    """Vérifie que _lighten_competition_hit supprime les engagements des poules et allège organisateur."""
+    from ffbb_mcp.services.search import _lighten_competition_hit
+
+    heavy_hit = {
+        "id": "comp1",
+        "nom": "Championnat Régional",
+        "code": "CR01",
+        "poules": [
+            {
+                "id": "p1",
+                "nom": "Poule A",
+                "code": "PA",
+                "engagements": [{"id": f"e{i}", "team": "Team"} for i in range(15)],
+            },
+            {
+                "id": "p2",
+                "nom": "Poule B",
+                "code": "PB",
+                "engagements": [{"id": f"e{i}", "team": "Team"} for i in range(15)],
+            },
+        ],
+        "organisateur": {
+            "id": "org1",
+            "nom": "Ligue Régionale",
+            "code": "LIG01",
+            "type": "LIGUE",
+            "nested_stuff": {"huge": "payload"},
+        },
+    }
+    light = _lighten_competition_hit(heavy_hit)
+    assert light["id"] == "comp1"
+    assert len(light["poules"]) == 2
+    # engagements doit avoir été allégé / supprimé de chaque poule
+    assert "engagements" not in light["poules"][0]
+    assert light["poules"][0]["nom"] == "Poule A"
+    # organisateur doit être allégé aux champs clés
+    assert "nested_stuff" not in light["organisateur"]
+    assert light["organisateur"]["nom"] == "Ligue Régionale"

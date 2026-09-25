@@ -191,10 +191,18 @@ async def ffbb_saison_bilan_service(
         dict.fromkeys(str(e.get("poule_id")) for e in equipes if e.get("poule_id"))
     )
     if not poule_ids:
+        from ffbb_mcp.presentation import format_source_label
+
         return {
             "status": "not_found",
             "message": "Aucune poule associée à cette équipe.",
             "club_resolu": club_resolu,
+            "presentation": {
+                "short_answer": f"Aucune poule trouvée pour cette équipe ({club_name or organisme_id}).",
+                "detail_line": "Vérifiez la catégorie ou les engagements du club.",
+                "source_label": format_source_label(),
+                "warnings": ["Aucune poule associée."],
+            },
         }
 
     async def _fetch_poule(pid: str) -> dict[str, Any] | Exception:
@@ -311,6 +319,27 @@ async def ffbb_saison_bilan_service(
         else ""
     )
 
+    from ffbb_mcp.presentation import format_source_label
+
+    g = totaux.get("gagnes", 0)
+    p = totaux.get("perdus", 0)
+    j = totaux.get("match_joues", 0)
+    cat_str = resolved_categorie or categorie or ""
+    vic_str = f"{g} victoire{'s' if g > 1 else ''}"
+    def_str = f"{p} défaite{'s' if p > 1 else ''}"
+    short_ans = f"Bilan de saison pour {club_nom} ({cat_str}) : {vic_str}, {def_str} ({j} match(s))."
+    detail = (
+        f"{len(phases)} phase(s) analysée(s) : {', '.join(competitions_incluses[:3])}."
+        if phases
+        else "Aucune phase."
+    )
+    presentation = {
+        "short_answer": short_ans,
+        "detail_line": detail,
+        "source_label": format_source_label(),
+        "warnings": [],
+    }
+
     return {
         "status": "ok",
         "club": club_nom,
@@ -320,6 +349,7 @@ async def ffbb_saison_bilan_service(
         "saison_terminee": saison_terminee,
         "competitions_incluses": competitions_incluses,
         "phases": phases,
+        "presentation": presentation,
         "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
     }
 
@@ -682,6 +712,27 @@ async def _build_bilan_payload(
             ratio_global_victoires=tot_ratio,
         )
 
+    from ffbb_mcp.presentation import format_source_label
+
+    gagnes_count = int(totaux.get("gagnes", 0))
+    perdus_count = int(totaux.get("perdus", 0))
+    joues_count = int(totaux.get("match_joues", 0))
+    cat_str = categorie or "Toutes catégories"
+    vic_str = f"{gagnes_count} victoire{'s' if gagnes_count > 1 else ''}"
+    def_str = f"{perdus_count} défaite{'s' if perdus_count > 1 else ''}"
+    short_ans = f"Bilan pour {club_nom} ({cat_str}) : {vic_str}, {def_str} ({joues_count} match(s) joué(s))."
+    detail = (
+        f"{len(phases)} phase(s) analysée(s) : {', '.join(competitions_incluses[:3])}."
+        if phases
+        else "Aucune phase enregistrée."
+    )
+    presentation = {
+        "short_answer": short_ans,
+        "detail_line": detail,
+        "source_label": format_source_label(),
+        "warnings": [],
+    }
+
     res_dict = {
         "club": club_nom,
         "categorie": categorie or "",
@@ -692,6 +743,7 @@ async def _build_bilan_payload(
         "competitions_incluses": competitions_incluses,
         "equipes_bilan": equipes_bilan,
         "phases": phases,
+        "presentation": presentation,
         "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
     }
     return BilanResponse(**res_dict).model_dump(by_alias=True)  # type: ignore[arg-type]

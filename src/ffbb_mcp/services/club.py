@@ -1676,12 +1676,19 @@ async def ffbb_head_to_head_service(
     )
     if err_a:
         status_a = err_a.get("status") or "not_found"
+        msg_a = err_a.get("message", "Équipe A introuvable")
         return {
             "status": status_a,
             "error": f"Équipe A ({eff_club_a or eff_org_id_a or eff_eng_a}) introuvable",
-            "message": err_a.get("message", "Équipe A introuvable"),
+            "message": msg_a,
             "details": err_a,
             "candidates": err_a.get("candidates", []),
+            "presentation": {
+                "short_answer": f"Équipe A ({eff_club_a or eff_org_id_a or eff_eng_a}) introuvable.",
+                "detail_line": msg_a,
+                "source_label": format_source_label(),
+                "warnings": [msg_a],
+            },
         }
 
     err_b, eq_b, club_res_b = await _resolve_team_equipes(
@@ -1758,12 +1765,19 @@ async def ffbb_head_to_head_service(
 
     if err_b:
         status_b = err_b.get("status") or "not_found"
+        msg_b = err_b.get("message", "Équipe B introuvable")
         return {
             "status": status_b,
             "error": f"Équipe B ({eff_club_b or eff_org_id_b or eff_eng_b}) introuvable",
-            "message": err_b.get("message", "Équipe B introuvable"),
+            "message": msg_b,
             "details": err_b,
             "candidates": err_b.get("candidates", []),
+            "presentation": {
+                "short_answer": f"Équipe B ({eff_club_b or eff_org_id_b or eff_eng_b}) introuvable.",
+                "detail_line": msg_b,
+                "source_label": format_source_label(),
+                "warnings": [msg_b],
+            },
         }
 
     nom_a = (club_res_a or {}).get("nom") or eff_club_a or "Équipe A"

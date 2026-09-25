@@ -1,3 +1,5 @@
+import ast
+import contextlib
 import re
 import sys
 import unicodedata
@@ -15,14 +17,49 @@ _DIACRITICS = {
 }
 
 
+def clean_serialized_data(data: Any) -> Any:
+    """Nettoie les artefacts de sérialisation amont (Directus/Pydantic) :
+
+    - Remplace les chaînes littérales 'None' ou 'null' par None (null JSON).
+    - Parse les représentations Python de dicts ("{'id': ...}") en vrais dicts JSON.
+    - Récursif sur dicts et listes.
+    """
+    if data is None:
+        return None
+    if isinstance(data, str):
+        if data in ("None", "null"):
+            return None
+        if data.startswith("{") and data.endswith("}"):
+            with contextlib.suppress(Exception):
+                parsed = ast.literal_eval(data)
+                if isinstance(parsed, (dict, list)):
+                    return clean_serialized_data(parsed)
+        return data
+    if isinstance(data, dict):
+        return {k: clean_serialized_data(v) for k, v in data.items()}
+    if isinstance(data, list):
+        return [clean_serialized_data(item) for item in data]
+    return data
+
+
 def serialize_model(obj: Any) -> JSONValue:
-    """Convertit un objet FFBB en dict JSON-serializable."""
+    """Convertit un objet FFBB en dict JSON-serializable et assaini."""
     if obj is None:
         return None
 
     # Fast path: exact primitive types
     obj_type = type(obj)
-    if obj_type is str or obj_type is int or obj_type is float or obj_type is bool:
+    if obj_type is str:
+        if obj in ("None", "null"):
+            return None
+        if obj.startswith("{") and obj.endswith("}"):
+            with contextlib.suppress(Exception):
+                parsed = ast.literal_eval(obj)
+                if isinstance(parsed, (dict, list)):
+                    return clean_serialized_data(parsed)
+        return obj
+
+    if obj_type is int or obj_type is float or obj_type is bool:
         return obj
 
     if obj_type is dict:
@@ -32,17 +69,20 @@ def serialize_model(obj: Any) -> JSONValue:
 
     # Pydantic v2 fast path: model_dump(mode="json") is natively JSON-safe in Rust/C
     if (dump_fn := getattr(obj, "model_dump", None)) is not None:
-        return dump_fn(mode="json")
+        return clean_serialized_data(dump_fn(mode="json"))
 
     if (dict_fn := getattr(obj, "dict", None)) is not None:  # Pydantic v1
-        return dict_fn()
+        return clean_serialized_data(dict_fn())
 
     # Fallback: isinstance pour supporter les sous-classes (ex: IntEnum)
     if isinstance(obj, (str, int, float, bool)):
-        return obj
+        return clean_serialized_data(obj)
 
     if (val := getattr(obj, "__dict__", None)) is not None:
-        return {k: serialize_model(v) for k, v in val.items() if not k.startswith("_")}
+        cleaned = {
+            k: serialize_model(v) for k, v in val.items() if not k.startswith("_")
+        }
+        return clean_serialized_data(cleaned)
 
     return str(obj)
 

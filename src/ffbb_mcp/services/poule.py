@@ -20,6 +20,7 @@ async def get_client_async(*args, **kwargs):
 
 
 from ffbb_mcp.utils import (
+    clean_serialized_data,
     format_team_name,
     jaro_winkler_similarity,
     serialize_model,
@@ -395,6 +396,7 @@ async def format_poule_response(poule_data: dict) -> dict[str, Any]:
     classements = poule_data.get("classements") or []
     formatted_classements = []
     for c in classements or []:
+        c = clean_serialized_data(c)
         eng = c.get("id_engagement") or {}
         nom = eng.get("nom", "")
         num = eng.get("numero_equipe")
@@ -410,12 +412,19 @@ async def format_poule_response(poule_data: dict) -> dict[str, Any]:
     rencontres = poule_data.get("rencontres") or []
     formatted_rencontres = []
     for m in rencontres or []:
+        m = clean_serialized_data(m)
         eng1 = m.get("idEngagementEquipe1") or {}
         eng2 = m.get("idEngagementEquipe2") or {}
         num1 = eng1.get("numeroEquipe") if isinstance(eng1, dict) else None
         num2 = eng2.get("numeroEquipe") if isinstance(eng2, dict) else None
         m["nomEquipe1"] = format_team_name(m.get("nomEquipe1", ""), num1)
         m["nomEquipe2"] = format_team_name(m.get("nomEquipe2", ""), num2)
+        # Assurer que les scores de rencontres non jouées sont None (null JSON) et non "None"
+        if m.get("joue") in (0, "0"):
+            if m.get("resultatEquipe1") in ("None", None, ""):
+                m["resultatEquipe1"] = None
+            if m.get("resultatEquipe2") in ("None", None, ""):
+                m["resultatEquipe2"] = None
         formatted_rencontres.append(m)
 
     from .salle import _enrich_matches_with_salle_details
@@ -434,11 +443,20 @@ async def format_poule_response(poule_data: dict) -> dict[str, Any]:
     if not poule_libelle:
         pid = poule_data.get("id")
         poule_libelle = f"Poule {pid}" if pid else "Poule"
+
+    from ffbb_mcp.presentation import format_source_label
+
     res: dict[str, Any] = {
         "id": str(poule_data.get("id")) if poule_data.get("id") is not None else None,
         "nom": poule_libelle,
         "classements": formatted_classements,
         "rencontres": formatted_rencontres,
+        "presentation": {
+            "short_answer": f"Poule {poule_libelle} : {len(formatted_classements)} équipe(s) classée(s), {len(formatted_rencontres)} rencontre(s).",
+            "detail_line": f"{len(formatted_classements)} équipe(s), {len(formatted_rencontres)} match(s) au calendrier.",
+            "source_label": format_source_label(),
+            "warnings": [],
+        },
         "_meta": _freshness_meta(
             cache="poule",
             ttl_seconds=poule_data.get("_ttl_seconds"),

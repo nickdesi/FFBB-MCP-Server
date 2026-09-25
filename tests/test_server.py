@@ -246,9 +246,13 @@ async def test_ffbb_get_competition_via_call_tool():
         mock_svc.assert_called_once_with(competition_id="42")
         content_list = result.content if hasattr(result, "content") else result[0]
         assert content_list, "MCPServer doit renvoyer au moins un TextContent"
-        payload = json.loads(content_list[0].text)
-        # Le payload peut être soit l'objet direct, soit enveloppé sous "result".
-        obj = payload.get("result", payload) if isinstance(payload, dict) else payload
+        if hasattr(result, "structured_content") and result.structured_content:
+            obj = result.structured_content
+        else:
+            payload = json.loads(content_list[0].text)
+            obj = (
+                payload.get("result", payload) if isinstance(payload, dict) else payload
+            )
         assert obj["nom"] == "Coupe du Puy-de-Dôme"
 
 

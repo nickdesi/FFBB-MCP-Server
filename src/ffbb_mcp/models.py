@@ -180,6 +180,10 @@ class BilanResponse(BaseModel):
         default=None,
         description="Profil tactique avancé : rangs attaque/défense, style de jeu, clutch index et bilans domicile/extérieur.",
     )
+    presentation: dict[str, Any] | None = Field(
+        default=None,
+        description="Bloc de synthèse textuelle pour l'assistant conversationnel.",
+    )
     meta: dict[str, Any] = Field(
         default_factory=dict,
         alias="_meta",

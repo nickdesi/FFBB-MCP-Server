@@ -499,6 +499,73 @@ async def ffbb_bilan(
 # ---------------------------------------------------------------------------
 
 
+def _build_default_get_presentation(
+    type_name: str, resource_id: int | str, data: dict[str, Any]
+) -> dict[str, Any]:
+    from ffbb_mcp.presentation import format_source_label
+
+    if type_name == "competition":
+        nom = data.get("nom") or f"Compétition {resource_id}"
+        poules = data.get("poules") or []
+        short_ans = f"Compétition '{nom}' ({len(poules)} poule(s))."
+        code = data.get("code") or ""
+        saison_lbl = (data.get("saison") or {}).get("libelle") or ""
+        detail = (
+            f"Code: {code} · Saison: {saison_lbl}."
+            if code or saison_lbl
+            else "Détails de la compétition."
+        )
+    elif type_name == "organisme":
+        nom = data.get("nom") or f"Organisme {resource_id}"
+        code = data.get("code") or ""
+        short_ans = (
+            f"Club / Organisme : {nom} ({code})."
+            if code
+            else f"Club / Organisme : {nom}."
+        )
+        commune = (data.get("commune") or {}).get("libelle") or ""
+        detail = f"Ville : {commune}." if commune else "Détails de l'organisme."
+    elif type_name == "engagement":
+        nom = data.get("nom") or data.get("nom_equipe") or f"Engagement {resource_id}"
+        short_ans = f"Engagement {resource_id} : {nom}."
+        comp_nom = (data.get("idCompetition") or {}).get("nom") or ""
+        detail = (
+            f"Compétition : {comp_nom}." if comp_nom else "Détails de l'engagement."
+        )
+    elif type_name == "rencontre":
+        nom1 = data.get("nomEquipe1") or "Équipe 1"
+        nom2 = data.get("nomEquipe2") or "Équipe 2"
+        s1 = data.get("resultatEquipe1")
+        s2 = data.get("resultatEquipe2")
+        score_str = f" ({s1}-{s2})" if s1 is not None and s2 is not None else ""
+        short_ans = f"Rencontre {resource_id} : {nom1} vs {nom2}{score_str}."
+        date_m = data.get("date_rencontre") or data.get("date") or ""
+        heure_m = data.get("heure") or ""
+        detail = f"Date : {date_m} {heure_m}.".strip()
+    elif type_name == "salle":
+        nom = data.get("libelle") or data.get("nom") or f"Salle {resource_id}"
+        commune = (
+            (data.get("commune") or {}).get("libelle") or data.get("commune") or ""
+        )
+        short_ans = f"Salle {nom} ({commune})." if commune else f"Salle {nom}."
+        detail = (
+            f"Adresse : {data.get('adresse', '')}."
+            if data.get("adresse")
+            else "Détails de la salle."
+        )
+    else:
+        nom = data.get("nom") or data.get("libelle") or str(resource_id)
+        short_ans = f"Ressource {type_name} {resource_id} : {nom}."
+        detail = f"Détails récupérés pour le type '{type_name}'."
+
+    return {
+        "short_answer": short_ans,
+        "detail_line": detail,
+        "source_label": format_source_label(),
+        "warnings": [],
+    }
+
+
 @mcp.tool(
     name="ffbb_get",
     title="Ressource FFBB par identifiant",
@@ -565,27 +632,33 @@ async def ffbb_get(
     try:
         if type == "competition":
             if club:
-                return await find_team_poule_service(
+                res = await find_team_poule_service(
                     competition_id=id, organisme_id_or_name=club
                 )
-            return await get_competition_service(competition_id=id)
+            else:
+                res = await get_competition_service(competition_id=id)
         elif type == "poule":
             effective_refresh = force_refresh
             poule_data = await get_poule_service(id, force_refresh=effective_refresh)
-            return await format_poule_response(poule_data)
+            res = await format_poule_response(poule_data)
         elif type == "organisme":
-            return await get_organisme_service(organisme_id=id)
+            res = await get_organisme_service(organisme_id=id)
         elif type == "engagement":
-            return await get_engagement_service(id, force_refresh=force_refresh)
+            res = await get_engagement_service(id, force_refresh=force_refresh)
         elif type == "rencontre":
-            return await get_rencontre_service(id)
+            res = await get_rencontre_service(id)
         elif type == "officiel":
-            return await get_officiel_service(id)
+            res = await get_officiel_service(id)
         elif type == "entraineur":
-            return await get_entraineur_service(id)
+            res = await get_entraineur_service(id)
         elif type == "salle":
-            return await get_salle_service(id)
-        return {"error": f"Type inconnu: {type}"}
+            res = await get_salle_service(id)
+        else:
+            return {"error": f"Type inconnu: {type}"}
+
+        if isinstance(res, dict) and "presentation" not in res:
+            res["presentation"] = _build_default_get_presentation(type, id, res)
+        return res
     except Exception as e:
         raise handle_api_error(e) from e
 

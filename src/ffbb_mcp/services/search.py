@@ -713,11 +713,41 @@ _ALL_CANDIDATE_SEARCH_INDEXES = [
 ]
 
 
-def _build_search_results(results: Any, limit: int, offset: int = 0) -> list[dict]:
+def _lighten_competition_hit(hit: dict[str, Any]) -> dict[str, Any]:
+    """Allège un résultat de recherche de compétition pour limiter l'empreinte réseau/tokens.
+
+    Supprime les listes d'engagements imbriquées dans chaque poule et les listes
+    lourdes dupliquées dans organisateur (accessibles exhaustivement via ffbb_get).
+    """
+    if not isinstance(hit, dict):
+        return hit
+    item = dict(hit)
+    if "organisateur" in item and isinstance(item["organisateur"], dict):
+        org = item["organisateur"]
+        item["organisateur"] = {
+            "id": org.get("id"),
+            "nom": org.get("nom"),
+            "code": org.get("code"),
+            "type": org.get("type"),
+        }
+    if "poules" in item and isinstance(item["poules"], list):
+        item["poules"] = [
+            {"id": p.get("id"), "nom": p.get("nom")}
+            for p in item["poules"]
+            if isinstance(p, dict)
+        ]
+    return item
+
+
+def _build_search_results(
+    results: Any, limit: int, offset: int = 0, type_name: str | None = None
+) -> list[dict]:
     """Construit la liste de résultats et attache _total_hits si pagination/troncature."""
     if not results or not getattr(results, "hits", None):
         return []
     result_list = [serialize_model(hit) for hit in results.hits[:limit]]
+    if type_name == "competitions":
+        result_list = [_lighten_competition_hit(hit) for hit in result_list]
     total = getattr(results, "estimated_total_hits", None)
     if total is not None:
         for item in result_list:
@@ -784,7 +814,9 @@ async def _search_generic(
                     )
                 )
                 if direct_res is not None and getattr(direct_res, "hits", None):
-                    return _build_search_results(direct_res, limit, offset)
+                    return _build_search_results(
+                        direct_res, limit, offset, type_name=type_name
+                    )
             except Exception:
                 pass
 
@@ -859,6 +891,8 @@ async def _search_generic(
 
         res0 = results.results[0]
         hits = [serialize_model(h) for h in res0.hits]
+        if type_name == "competitions":
+            hits = [_lighten_competition_hit(h) for h in hits]
         total = getattr(res0, "estimated_total_hits", len(hits))
         if total is not None:
             for item in hits:
@@ -1109,6 +1143,8 @@ async def multi_search_service(
                 total_hits = int((total_hits or 0) + est)
             for hit in res.hits:
                 item = serialize_model(hit)
+                if "competitions" in category:
+                    item = _lighten_competition_hit(item)
                 item["_type"] = category
                 output.append(item)
                 if len(output) >= fetch_limit:
@@ -1293,6 +1329,19 @@ async def ffbb_search_service(
     )
 
 
+def _dump_resolution_without_candidates(res: Any) -> dict[str, Any]:
+    """Extrait le dump de la résolution en éliminant 'candidates' pour éviter la duplication."""
+    if not hasattr(res, "model_dump") or not callable(res.model_dump):
+        return {}
+    try:
+        dumped = res.model_dump(exclude={"candidates"})
+    except TypeError:
+        dumped = res.model_dump()
+    if isinstance(dumped, dict):
+        return {k: v for k, v in dumped.items() if k != "candidates"}
+    return {}
+
+
 async def ffbb_resolve_team_service(
     club_name: str | None = None,
     organisme_id: int | str | None = None,
@@ -1397,7 +1446,7 @@ async def ffbb_resolve_team_service(
             "club_resolu": res.club_resolu,
             "presentation": presentation,
             "provenance": provenance,
-            "resolution": res.model_dump(),
+            "resolution": _dump_resolution_without_candidates(res),
         }
     elif res.status == ResponseStatus.AMBIGUOUS:
         ambig_block = build_ambiguous_presentation(
@@ -1414,7 +1463,7 @@ async def ffbb_resolve_team_service(
             "club_resolu": res.club_resolu,
             "presentation": ambig_block["presentation"],
             "provenance": ambig_block["provenance"],
-            "resolution": res.model_dump(),
+            "resolution": _dump_resolution_without_candidates(res),
         }
     else:
         provenance = build_provenance_block(
@@ -1437,7 +1486,7 @@ async def ffbb_resolve_team_service(
             "club_resolu": res.club_resolu,
             "presentation": presentation,
             "provenance": provenance,
-            "resolution": res.model_dump(),
+            "resolution": _dump_resolution_without_candidates(res),
         }
 
 
@@ -2004,12 +2053,22 @@ async def ffbb_find_team_candidates_service(
     candidates.sort(key=_cand_sort_key, reverse=True)
 
     if not candidates:
+        from ffbb_mcp.presentation import format_source_label
+
         return {
             "status": "not_found",
             "club": club_resolu,
             "candidates": [],
             "ambiguity": f"Aucun engagement ne correspond aux critères spécifiés ({categorie}).",
             "clarification_prompt": None,
+            "presentation": {
+                "short_answer": f"Aucune équipe candidate trouvée pour {club_nom} ({categorie or ''}).".strip(),
+                "detail_line": "Vérifiez l'orthographe du club ou la catégorie demandée.",
+                "source_label": format_source_label(),
+                "warnings": [
+                    f"Aucun engagement ne correspond aux critères ({categorie})."
+                ],
+            },
         }
 
     status = "ambiguous"
@@ -2054,10 +2113,26 @@ async def ffbb_find_team_candidates_service(
         )
         clarification_prompt = "\n".join(lines)
 
+    from ffbb_mcp.presentation import format_source_label
+
+    short_ans = f"{len(candidates)} équipe(s) candidate(s) trouvée(s) pour {club_nom}."
+    detail = (
+        f"Meilleure correspondance : {candidates[0]['nom_equipe']} ({candidates[0]['competition_name']})."
+        if candidates
+        else ""
+    )
+    presentation = {
+        "short_answer": short_ans,
+        "detail_line": detail,
+        "source_label": format_source_label(),
+        "warnings": [],
+    }
+
     return {
         "status": status,
         "club": club_resolu,
         "total_candidates": len(candidates),
         "candidates": candidates,
         "clarification_prompt": clarification_prompt,
+        "presentation": presentation,
     }
