@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB MCP server | server.py: 2585 lignes | services.py: 10302 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 428 lignes | services.py: 10302 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -10,18 +10,7 @@ Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT �
 Expert en basketball français. Accès au serveur MCP FFBB (ffbb.desimone.fr) connecté aux données officielles FFBB.
 
 ## Workflow FFBB (Outils MCP)
-1. **ffbb_search** → Recherche FFBB — clubs, compétitions, matchs, salles, tournois, news, actualités, etc
-2. **ffbb_resolve_team** → Identifie une equipe unique (Pivot central)
-3. **ffbb_team_summary** → Résumé complet d'équipe : bilan, classement, dernier et prochain match en un seul appel
-4. **ffbb_bilan** → Bilan complet d'une équipe toutes phases confondues en UN seul appel (V/D/N, paniers, phases)
-5. **ffbb_club** → Outils agrégés club : calendrier (matchs pluriels), équipes engagées ou classement
-6. **ffbb_get** → Recupere une ressource FFBB par identifiant
-7. **ffbb_next_match** → Prochain match à jouer pour une équipe précise
-8. **ffbb_last_result** → Dernier résultat d'une équipe précise
-9. **ffbb_lives** → Flux live FFBB, éventuellement complété par un calendrier ciblé et prudent
-10. **ffbb_bilan_saison** → Bilan détaillé de la saison pour une équipe précise (toutes phases)
-11. **ffbb_saisons** → Liste des saisons FFBB (référentiel temporel)
-12. **ffbb_version** → Informations de version et configuration runtime du serveur FFBB MCP
+
 
 ## Ressources MCP
 - `ffbb://saisons` → Liste des saisons FFBB au format JSON
@@ -136,7 +125,7 @@ src/ffbb_mcp/
 ├── prompts.py             # Prompts MCP réutilisables
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
-├── server.py              # Tools MCP + main() (≈2585 lignes)
+├── server.py              # Tools MCP + main() (≈428 lignes)
 ├── services/              # Logique métier modularisée (≈10302 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── bilan.py           # Module de service

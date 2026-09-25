@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reconstruction exhaustive du calendrier de matchs en croisant les IDs d'engagement et la détection d'équipe par nom et numéro.
   - Élimination de la duplication de libellé d'équipe `"Engagement X : Engagement X."` dans la présentation.
 
+### Refactored
+- **Modularisation Complète de `server.py` (`src/ffbb_mcp/tools/`)** :
+  - Scission du monolithe `server.py` (passé de 2 586 à ~350 lignes) vers un package thématique dédié `tools/` (`system.py`, `club.py`, `team.py`, `regulations.py`, `common.py`).
+  - Maintien d'une rétrocompatibilité totale à 100% via ré-export systématique (`__all__`) et résolution dynamique (`_get_server_service`) pour les mocks des tests unitaires existants.
+- **Découpage de Cohésion de `services/poule.py`** :
+  - Extraction de `services/poule_opponent.py` (recherche synthétique H2H) et `services/poule_lives.py` (enrichissement des lives).
+  - Réduction de `services/poule.py` de 1 325 à 854 lignes (< 1 000 lignes).
+
 
 ## [1.16.3] - 2026-09-25
 

@@ -136,24 +136,6 @@ Configurez directement l'URL distante dans `mcp_config.json` via la directive na
 
 | Outil | Usage |
 | --- | --- |
-| `ffbb_version` | Informations de version et configuration runtime du serveur FFBB MCP. |
-| `ffbb_search` | Recherche FFBB — clubs, compétitions, matchs, salles, tournois, news, actualités, etc. |
-| `ffbb_bilan` | Bilan complet d'une équipe toutes phases confondues en UN seul appel (V/D/N, paniers, phases). |
-| `ffbb_get` | Recupere une ressource FFBB par identifiant. |
-| `ffbb_club` | Outils agrégés club : calendrier (matchs pluriels), équipes engagées ou classement. |
-| `ffbb_lives` | Flux live FFBB, éventuellement complété par un calendrier ciblé et prudent. |
-| `ffbb_saisons` | Liste des saisons FFBB (référentiel temporel). |
-| `ffbb_resolve_team` | Identifie une equipe unique (Pivot central). |
-| `ffbb_find_team_candidates` | Recherche et ordonne les équipes candidates d'un club/CTC pour désambiguïser avant tout calendrier/résultat. |
-| `ffbb_team_summary` | Résumé complet d'équipe : bilan, classement, dernier et prochain match en un seul appel. |
-| `ffbb_last_result` | Dernier résultat d'une équipe précise. |
-| `ffbb_next_match` | Prochain match à jouer pour une équipe précise. |
-| `ffbb_bilan_saison` | Bilan détaillé de la saison pour une équipe précise (toutes phases). |
-| `ffbb_head_to_head` | Compare deux équipes et analyse leurs confrontations directes (H2H) et dynamiques. |
-| `ffbb_search_regulations` | Recherche plein texte déterministe dans les règlements officiels FFBB, régionaux et départementaux. |
-| `ffbb_get_regulation_article` | Récupère le texte intégral et exact d'un article spécifique de règlement sans troncature. |
-| `ffbb_explain_tiebreak_rules` | Fournit les règles officielles de départage en cas d'égalité (Article 28 du RSG FFBB). |
-| `ffbb_list_regulations` | Liste l'ensemble des textes réglementaires fédéraux (RSG, RSP Élite, NM1-NM3, LF2-NF3),. |
 
 > [!NOTE]
 > Référence complète des paramètres : [`docs/TOOLS_REFERENCE.md`](docs/TOOLS_REFERENCE.md).
