@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.16.2] - 2026-09-25
+
+### Fixed
+- **Résolution Déterministe de Club (`club_name`)** : Correction critique de la désambiguïsation Meilisearch par nom officiel complet (ex: "LA MONTJOIE SAINT DENIS EN VAL" résout désormais immédiatement vers `organisme_id=10017`).
+- **Tri de Pertinence Meilisearch (`ffbb_search`)** : Ré-ordonnancement basé sur la correspondance exacte de commune et de préfixe lexical ("LA MONTJOIE SAINT DENIS EN VAL" classé 1er sur "Saint-Denis-en-Val").
+- **Dédoublement des Payloads MCP (`sse_patch.py`)** :
+  - Dans `FuncMetadata.convert_result`, pour tout outil retournant un bloc de présentation (`short_answer`), `content` n'émet plus que le résumé textuel humain (277 o vs 7,5 Ko de JSON répété), évitant le clonage du JSON géant entre `content` et `structured_content`.
+  - Épuration de `_clean_match_item` dans `ffbb_team_summary` pour exclure `data`, `presentation`, `provenance`, évitant la ré-imbrication de données de match au sein du payload.
+  - Déduplication de `face_a_face` dans `ffbb_head_to_head` (conserve les métriques statistiques sans dupliquer la liste brute des matchs).
+  - Suppression de l'enveloppe `wrap_output=True` sur `ffbb_bilan` (`dict[str, Any]`), éliminant l'imbrication artificielle `{"result": {...}}`.
+- **Validation & Clarté des Erreurs** :
+  - `_require_club_identifier` : Erreur explicite `Paramètre manquant` listant les identifiants admissibles (`organisme_id`, `club_name`, `engagement_id`, `poule_id`, `competition_id`).
+  - Erreur 403 Directus : Message explicite exposant les 2 causes réelles (identifiant invalide/inexistant ou saison archivée).
+  - `ffbb_team_summary` : Décompte des défaites exact (1D) et élimination définitive de toute interpolation de dictionnaire Python brut dans `short_answer`.
+  - Normalisation des horaires de matchs suspects (`"00:00"`, `"00h00"`, non confirmés) en `"Horaire à fixer"`.
+
 ## [1.16.1] - 2026-09-23
 
 ### Fixed
