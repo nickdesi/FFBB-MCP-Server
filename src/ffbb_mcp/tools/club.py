@@ -39,6 +39,51 @@ from .common import (
 logger = logging.getLogger("ffbb-mcp")
 
 
+async def _resolve_engagement_club_poule(
+    engagement_id: int | str,
+) -> tuple[str | None, str | None, int | None]:
+    """Résout (organisme_id, poule_id, numero_equipe) depuis un engagement.
+
+    Un engagement = l'inscription d'une équipe dans une phase de championnat,
+    donc une et une seule poule : déréférencement déterministe (clé absolue).
+    Retourne (None, None, None) si l'engagement est introuvable.
+    Le numéro d'équipe n'est remonté que s'il est > 1 (convention : None = fanion).
+    """
+    try:
+        from ffbb_mcp.client import FFBBClientFactory
+
+        _client = await FFBBClientFactory.get_client_async()
+        _data = await _client.get_engagement_async(str(engagement_id).strip())
+    except Exception:
+        logger.debug(
+            "Résolution engagement_id échouée",
+            exc_info=True,
+        )
+        return None, None, None
+    if _data is None:
+        return None, None, None
+
+    def _as_id(value: Any) -> str | None:
+        if isinstance(value, dict):
+            value = value.get("id")
+        return str(value) if value else None
+
+    _num: int | None = None
+    _raw_num = getattr(_data, "numeroEquipe", None)
+    if _raw_num is not None:
+        try:
+            _parsed = int(str(_raw_num))
+        except (TypeError, ValueError):
+            _parsed = None
+        if _parsed and _parsed > 1:
+            _num = _parsed
+    return (
+        _as_id(getattr(_data, "idOrganisme", None)),
+        _as_id(getattr(_data, "idPoule", None)),
+        _num,
+    )
+
+
 @track_tool_usage("ffbb_club")
 async def ffbb_club(
     action: Annotated[
@@ -329,6 +374,14 @@ async def ffbb_club(
                 else resolved_clubs[0].get("organisme_id")
             )
 
+        # Cohérence engagement_id (BUG #5, sweep) : un engagement seul suffit à
+        # retrouver l'organisme — même pattern que calendrier/classement/bilan.
+        # Strictement extensif : ne s'applique que si ni organisme_id ni club_name.
+        if not target_org_id and not club_name and engagement_id is not None:
+            _eq_org, _, _ = await _resolve_engagement_club_poule(engagement_id)
+            if _eq_org:
+                target_org_id = _eq_org
+
         if action == "equipes":
             if not target_org_id:
                 return [
@@ -353,6 +406,19 @@ async def ffbb_club(
         elif action == "classement":
             effective_poule_id = poule_id
             target_num = numero_equipe if numero_equipe and numero_equipe > 1 else None
+
+            # BUG #5 : résolution directe via engagement_id (clé absolue).
+            # Priorité : poule_id explicite > engagement_id > club + categorie.
+            if not effective_poule_id and engagement_id is not None:
+                _eng_org, _eng_poule, _eng_num = await _resolve_engagement_club_poule(
+                    engagement_id
+                )
+                if _eng_poule:
+                    effective_poule_id = _eng_poule
+                if _eng_org and not target_org_id:
+                    target_org_id = _eng_org
+                if target_num is None and _eng_num is not None:
+                    target_num = _eng_num
 
             if not effective_poule_id and target_org_id:
                 search_filtre = effective_filtre
@@ -398,7 +464,13 @@ async def ffbb_club(
                     {
                         "error": (
                             f"Impossible de résoudre automatiquement la poule pour ce club "
-                            f"(filtre: '{effective_filtre}'). "
+                            f"(filtre: '{effective_filtre}'"
+                            + (
+                                f", engagement_id: '{engagement_id}'"
+                                if engagement_id is not None
+                                else ""
+                            )
+                            + "). "
                             "Précise la catégorie (ex: categorie='NM3') ou utilise ffbb_club(action='equipes') "
                             "pour trouver l'identifiant exact de la poule (poule_id)."
                         )

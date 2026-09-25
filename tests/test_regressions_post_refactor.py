@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -181,3 +181,109 @@ def test_ffbb_get_competition_with_club_presentation():
     assert "Poule A" in pres["short_answer"]
     assert "0 poule(s)" not in pres["short_answer"]
     assert "200000003056266" in pres["detail_line"]
+
+
+@pytest.mark.asyncio
+async def test_ffbb_club_classement_resolves_poule_via_engagement_id():
+    """BUG #5: ffbb_club(action='classement') doit résoudre la poule depuis le seul engagement_id."""
+    from ffbb_mcp.server import ffbb_club
+
+    eng = MagicMock()
+    eng.idOrganisme = 9220
+    eng.idPoule = 200000003056266
+    eng.numeroEquipe = 1
+    eng_client = MagicMock()
+    eng_client.get_engagement_async = AsyncMock(return_value=eng)
+
+    mock_classement = AsyncMock(
+        return_value=[{"position": 23, "equipe": "JEANNE D'ARC DE VICHY"}]
+    )
+
+    with (
+        patch(
+            "ffbb_mcp.client.FFBBClientFactory.get_client_async",
+            new_callable=AsyncMock,
+            return_value=eng_client,
+        ),
+        patch(
+            "ffbb_mcp.server.ffbb_get_classement_service",
+            mock_classement,
+        ),
+    ):
+        res = await ffbb_club(
+            action="classement",
+            engagement_id="200000005346860",
+        )
+
+    mock_classement.assert_called_once_with(
+        poule_id="200000003056266",
+        force_refresh=False,
+        target_organisme_id="9220",
+        target_num=None,
+    )
+    assert res == [{"position": 23, "equipe": "JEANNE D'ARC DE VICHY"}]
+
+
+@pytest.mark.asyncio
+async def test_ffbb_club_classement_unknown_engagement_returns_error():
+    """BUG #5: engagement_id introuvable → erreur explicite, sans crash."""
+    from ffbb_mcp.server import ffbb_club
+
+    eng_client = MagicMock()
+    eng_client.get_engagement_async = AsyncMock(return_value=None)
+
+    with patch(
+        "ffbb_mcp.client.FFBBClientFactory.get_client_async",
+        new_callable=AsyncMock,
+        return_value=eng_client,
+    ):
+        res = await ffbb_club(
+            action="classement",
+            engagement_id="000000000000000",
+        )
+
+    assert isinstance(res, list)
+    assert "200000003056266" not in str(res)
+    assert "engagement_id" in res[0]["error"]
+    assert "equipes" in res[0]["error"]
+
+
+@pytest.mark.asyncio
+async def test_ffbb_club_equipes_resolves_org_via_engagement_id():
+    """BUG #5 (sweep): ffbb_club(action='equipes') doit accepter le seul engagement_id."""
+    from ffbb_mcp.server import ffbb_club
+
+    eng = MagicMock()
+    eng.idOrganisme = 9220
+    eng.idPoule = 200000003056266
+    eng.numeroEquipe = 1
+    eng_client = MagicMock()
+    eng_client.get_engagement_async = AsyncMock(return_value=eng)
+
+    fake_equipes = [
+        {"engagement_id": "200000005346860", "nom_equipe": "JEANNE D'ARC DE VICHY"}
+    ]
+    mock_equipes = AsyncMock(return_value=fake_equipes)
+
+    with (
+        patch(
+            "ffbb_mcp.client.FFBBClientFactory.get_client_async",
+            new_callable=AsyncMock,
+            return_value=eng_client,
+        ),
+        patch(
+            "ffbb_mcp.server.ffbb_equipes_club_service",
+            mock_equipes,
+        ),
+    ):
+        res = await ffbb_club(
+            action="equipes",
+            engagement_id="200000005346860",
+        )
+
+    mock_equipes.assert_called_once_with(
+        organisme_id="9220",
+        filtre=None,
+        force_refresh=False,
+    )
+    assert res == fake_equipes

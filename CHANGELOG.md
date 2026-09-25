@@ -27,12 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Inversion Équipe/Adversaire dans `ffbb_find_team_candidates` (Bug #1)** :
   - Détermination déterministe du côté domicile/extérieur via correspondance d'identifiants d'engagement (`idEngagementEquipe1`, `idEngagementEquipe2`) et `_match_team_name`.
   - Élimination de la boucle heuristique erronée qui capturait l'adversaire (notamment CTC/entente) comme nom d'équipe cible.
-- **Ordre des Scores en Cas de Défaite dans les Présentations (Bug #2)** :
-  - Correction dans `build_match_presentation` (`presentation.py`) pour toujours formater `{team_score} à {opp_score}` (score de l'équipe cible en premier), éliminant l'inversion trompeuse (ex: 34 à 63 au lieu de 63 à 34).
+- **Ordre des Scores dans les Présentations (Bug #2)** :
+  - Dans `build_match_presentation` (`presentation.py`), le score affiché suit désormais toujours la convention FFBB : `{home_score} à {away_score}` (domicile puis extérieur, quel que soit le camp de l'équipe cible). Le verdict (victoire/défaite/nul) reste calculé sur le score de l'équipe cible.
 - **Harmonisation du Calcul de Tendance / Dynamique (Bug #3)** :
   - Dans `compute_team_dynamique` (`dynamique.py`), fixation de la tendance à `"Stable ➡️"` sur les échantillons réduits (< 3 matchs) et calcul automatique du ratio global de saison à partir des matchs joués si non fourni en amont (`ffbb_head_to_head` vs `ffbb_bilan`).
 - **Présentation de Compétition Ciblée par Club dans `ffbb_get` (Bug #4)** :
   - Formatage explicite de la poule et de la compétition résolues lors de l'appel `ffbb_get(type="competition", club=...)` plutôt que le libellé générique erroné `"0 poule(s)"`.
+- **Résolution de Poule via `engagement_id` dans `ffbb_club` (Bug #5)** :
+  - `ffbb_club(action="classement")` résout désormais la poule directement depuis le seul `engagement_id` (déréférencement déterministe engagement → poule, un engagement appartenant à une et une seule poule), avec remontée de l'organisme et du numéro d'équipe pour préserver le marquage `is_target` — au même titre que `ffbb_bilan`, `ffbb_next_match`, `ffbb_last_result` et `ffbb_team_summary`.
+  - `ffbb_club(action="equipes")` accepte également le seul `engagement_id` (résolution de l'organisme) : factorisation dans le helper partagé `_resolve_engagement_club_poule` (`tools/club.py`). Priorité : `poule_id` explicite > `engagement_id` > `club + categorie`.
 
 ### Refactored
 - **Modularisation Complète de `server.py` (`src/ffbb_mcp/tools/`)** :
