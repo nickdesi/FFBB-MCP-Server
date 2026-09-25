@@ -49,8 +49,6 @@ from .regulations import (
 from .salle import get_salle_service
 from .search import (
     _extract_club_key_word,
-    ffbb_find_team_candidates_service,
-    ffbb_resolve_team_service,
     ffbb_search_service,
     filter_inactive_ententes,
     get_entraineur_service,
@@ -60,6 +58,10 @@ from .search import (
     resolve_club_and_org,
     resolve_poule_id_service,
     search_organismes_service,
+)
+from .team_resolver import (
+    ffbb_find_team_candidates_service,
+    ffbb_resolve_team_service,
 )
 from .warmup import warmup_cache_service
 

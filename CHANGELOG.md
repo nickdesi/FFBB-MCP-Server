@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Découpage de Cohésion de `services/poule.py`** :
   - Extraction de `services/poule_opponent.py` (recherche synthétique H2H) et `services/poule_lives.py` (enrichissement des lives).
   - Réduction de `services/poule.py` de 1 325 à 854 lignes (< 1 000 lignes).
+- **Découpage de Cohésion de `services/search.py` (`src/ffbb_mcp/services/team_resolver.py`)** :
+  - Extraction de `ffbb_resolve_team_service`, `ffbb_find_team_candidates_service`, `_deduplicate_same_team_phases` et des algorithmes de désambiguïsation d'équipes vers un module dédié `services/team_resolver.py`.
+  - Réduction de `services/search.py` de 2 372 à 1 568 lignes, recentré sur la recherche Meilisearch/Directus et la résolution d'organismes.
+  - Préservation intégrale de la rétrocompatibilité des imports et herméticité totale des mocks avec dispatch dynamique.
 
 
 ## [1.16.3] - 2026-09-25
