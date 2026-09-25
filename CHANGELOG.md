@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.16.4] - 2026-09-25
+
+### Fixed
+- **Transmission et Réécriture des Filtres Meilisearch (`ffbb_search`)** :
+  - Résolution du bug critique où `filter_by` était ignoré silencieusement par court-circuit de délégation.
+  - Réécriture automatique des alias de champs vers les attributs imbriqués réels de Meilisearch (`codePostal` $\rightarrow$ `commune.codePostal`, `ville` $\rightarrow$ `commune.libelle`, `departement` $\rightarrow$ `commune.departement`).
+  - Neutralisation des termes de recherche génériques (`"basket"`, `"club"`) lorsque `filter_by` est actif afin de ne pas filtrer indûment les entités officielles.
+  - Coupure de l'injection du fallback Directus non filtré lorsque `filter_by` ou `sort` est spécifié.
+- **Tri Alphabétique Déterministe (`ffbb_search`)** :
+  - Préservation stricte de l'ordre retourné par Meilisearch en désactivant le re-ranking local Python par score de pertinence quand le paramètre `sort` est actif.
+  - Normalisation des clés de tri (`nom` $\rightarrow$ `libelle` pour les salles).
+- **Parité et Synchronisation des Index de Recherche (`ffbb_search`)** :
+  - Alignement du schéma `Literal` sur les 12 index Meilisearch réels, incluant désormais `news`, `galeries` et `rss`.
+  - Rejet pédagogique immédiat avec `McpError(INVALID_PARAMS)` pour `communes` (guidage vers `filter_by`) et pour `officiels`/`entraineurs` (guidage vers `ffbb_get`).
+- **Enrichissement des Engagements & Calendrier (`ffbb_get(type="engagement")`)** :
+  - Support robuste des clés relationnelles Directus scalaires ou imbriquées `{"id": ...}` (`_extract_id`).
+  - Reconstruction exhaustive du calendrier de matchs en croisant les IDs d'engagement et la détection d'équipe par nom et numéro.
+  - Élimination de la duplication de libellé d'équipe `"Engagement X : Engagement X."` dans la présentation.
+
+
 ## [1.16.3] - 2026-09-25
 
 ### Fixed
