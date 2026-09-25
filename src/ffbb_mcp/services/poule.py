@@ -589,7 +589,13 @@ async def ffbb_get_classement_service(
                 else:
                     is_target = True
 
-            logo_id = c.get("organisme_logo_id") or (eng.get("logo") or {}).get("id")
+            raw_logo = eng.get("logo")
+            eng_logo_id = (
+                raw_logo.get("id")
+                if isinstance(raw_logo, dict)
+                else (str(raw_logo) if raw_logo else None)
+            )
+            logo_id = c.get("organisme_logo_id") or eng_logo_id
             logo_url = (
                 f"https://api.ffbb.com/assets/{logo_id}?height=220&fit=contain&format=avif"
                 if logo_id
@@ -771,10 +777,17 @@ async def find_team_poule_service(
         for eng in org_data.get("engagements") or []:
             if not isinstance(eng, dict):
                 continue
-            comp = eng.get("idCompetition") or {}
-            if str(comp.get("id")) == comp_id_str:
-                poule = eng.get("idPoule") or {}
-                poule_id = str(poule.get("id"))
+            raw_comp = eng.get("idCompetition")
+            comp = raw_comp if isinstance(raw_comp, dict) else {}
+            comp_id_val = comp.get("id") if isinstance(raw_comp, dict) else raw_comp
+            if str(comp_id_val or "") == comp_id_str:
+                raw_poule = eng.get("idPoule")
+                poule = raw_poule if isinstance(raw_poule, dict) else {}
+                poule_id = str(
+                    poule.get("id")
+                    if isinstance(raw_poule, dict)
+                    else (raw_poule or "")
+                )
                 poule_nom = poule.get("nom")
                 if not poule_nom:
                     comp_data = await get_competition_service(comp_id_str)
@@ -784,7 +797,12 @@ async def find_team_poule_service(
                             break
                 comp_nom = comp.get("nom") or ""
                 num = eng.get("numeroEquipe") or ""
-                cat = (comp.get("categorie") or {}).get("code", "")
+                raw_cat = comp.get("categorie")
+                cat = (
+                    raw_cat.get("code", "")
+                    if isinstance(raw_cat, dict)
+                    else (str(raw_cat) if raw_cat else "")
+                )
                 sexe = comp.get("sexe", "")
                 team_label = f"{cat}{sexe}{num}".strip()
                 return {
