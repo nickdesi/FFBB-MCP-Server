@@ -93,9 +93,11 @@ async def test_server_tool_signatures():
 
     assert search_props.get("type", {}).get("type") == "string"
     assert set(search_props.get("type", {}).get("enum", [])) >= {
-        "officiels",
-        "entraineurs",
-        "communes",
+        "organismes",
+        "competitions",
+        "news",
+        "galeries",
+        "rss",
     }
 
 

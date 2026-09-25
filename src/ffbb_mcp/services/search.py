@@ -213,9 +213,9 @@ _SEARCH_TYPE_METHOD: dict[str, str] = {
     "tournois": "search_tournois_async",
     "engagements": "search_engagements_async",
     "formations": "search_formations_async",
-    "officiels": "search_officiels_async",
-    "entraineurs": "search_entraineurs_async",
-    "communes": "search_communes_async",
+    "news": "search_news",
+    "galeries": "search_galeries",
+    "rss": "search_rss",
 }
 
 
@@ -746,6 +746,84 @@ _ALL_CANDIDATE_SEARCH_INDEXES = [
 ]
 
 
+_GENERIC_SEARCH_TERMS = {
+    "",
+    "basket",
+    "basketball",
+    "club",
+    "clubs",
+    "tous",
+    "all",
+    "ffbb",
+}
+
+
+def _rewrite_filter_for_index(filter_by: str | None, type_name: str) -> str | None:
+    """Réécrit les alias de champs utilisateur/doc vers les vrais attributs Meilisearch.
+
+    Ex: 'codePostal = "45560"' -> 'commune.codePostal = "45560"' pour organismes/salles.
+    """
+    if not filter_by:
+        return None
+    s = filter_by
+    if type_name in {
+        "organismes",
+        "rencontres",
+        "salles",
+        "terrains",
+        "tournois",
+        "engagements",
+    }:
+        s = re.sub(
+            r"(?<!commune\.)(?<!communeClubPro\.)\bcodePostal\b",
+            "commune.codePostal",
+            s,
+        )
+        s = re.sub(
+            r"(?<!commune\.)(?<!communeClubPro\.)\bdepartement\b",
+            "commune.departement",
+            s,
+        )
+        s = re.sub(
+            r"(?<!commune\.)(?<!communeClubPro\.)\bville\b",
+            "commune.libelle",
+            s,
+        )
+    elif type_name == "formations":
+        s = re.sub(r"\bcodePostal\b", "postal_code", s)
+        s = re.sub(r"\bville\b", "place", s)
+    return s
+
+
+def _rewrite_sort_for_index(sort: list[str] | None, type_name: str) -> list[str] | None:
+    """Réécrit les alias de tri vers les attributs triables de l'index Meilisearch."""
+    if not sort:
+        return None
+    rewritten: list[str] = []
+    for s in sort:
+        if type_name in {
+            "organismes",
+            "salles",
+            "terrains",
+            "tournois",
+            "engagements",
+        }:
+            s = re.sub(
+                r"(?<!commune\.)(?<!communeClubPro\.)\bcodePostal\b",
+                "commune.codePostal",
+                s,
+            )
+            s = re.sub(
+                r"(?<!commune\.)(?<!communeClubPro\.)\bville\b",
+                "commune.libelle",
+                s,
+            )
+        if type_name == "salles":
+            s = re.sub(r"\bnom:", "libelle:", s)
+        rewritten.append(s)
+    return rewritten
+
+
 def _lighten_competition_hit(hit: dict[str, Any]) -> dict[str, Any]:
     """Allège un résultat de recherche de compétition pour limiter l'empreinte réseau/tokens.
 
@@ -778,7 +856,12 @@ def _build_search_results(
     """Construit la liste de résultats et attache _total_hits si pagination/troncature."""
     if not results or not getattr(results, "hits", None):
         return []
-    result_list = [serialize_model(hit) for hit in results.hits[:limit]]
+    raw_hits = results.hits
+    if offset and len(raw_hits) > offset:
+        raw_hits = raw_hits[offset : offset + limit]
+    else:
+        raw_hits = raw_hits[:limit]
+    result_list = [serialize_model(hit) for hit in raw_hits]
     if type_name == "competitions":
         result_list = [_lighten_competition_hit(hit) for hit in result_list]
     total = getattr(results, "estimated_total_hits", None)
@@ -801,17 +884,22 @@ async def _search_generic(
     from ffbb_data_client.models import MultiSearchQuery
 
     normalized_query = normalize_query(query)
-    filter_part = filter_by or ""
-    sort_part = ",".join(sort) if sort else ""
+    safe_filter = _rewrite_filter_for_index(filter_by, type_name)
+    safe_sort = _rewrite_sort_for_index(sort, type_name)
+
+    filter_part = safe_filter or ""
+    sort_part = ",".join(safe_sort) if safe_sort else ""
     cache_key = f"search:{type_name}:{normalized_query}:{limit}:{offset}:{filter_part}:{sort_part}"
 
     async def _fetch() -> list[dict[str, Any]]:
         client = await get_client_async()
 
         # Si une méthode de recherche directe existe sur le client (ex: search_organismes_async)
+        # Note: on ne délègue à direct_method que si elle supporte les filtres/tris/offsets demandés
         method_name = _SEARCH_TYPE_METHOD.get(type_name)
         direct_method: Any = getattr(client, method_name, None) if method_name else None
-        if direct_method and callable(direct_method):
+        can_use_direct = offset == 0
+        if direct_method and callable(direct_method) and can_use_direct:
             try:
                 import inspect
 
@@ -834,35 +922,65 @@ async def _search_generic(
                 if "limit" in params:
                     call_kwargs["limit"] = limit
 
-                async def _invoke_direct() -> Any:
-                    res: Any = direct_method(**call_kwargs)
-                    if inspect.isawaitable(res):
-                        return await res  # type: ignore[no-any-return]
-                    return res
+                filter_list = [safe_filter] if safe_filter else None
+                if safe_filter:
+                    if "filter" in params:
+                        call_kwargs["filter"] = filter_list
+                    else:
+                        can_use_direct = False
 
-                direct_res = await _with_ffbb_semaphore(
-                    _safe_call_with_inflight(
-                        f"Search direct {type_name}: {query}",
-                        _invoke_direct,
+                if safe_sort:
+                    if "sort" in params:
+                        call_kwargs["sort"] = safe_sort
+                    else:
+                        can_use_direct = False
+
+                if can_use_direct:
+
+                    async def _invoke_direct() -> Any:
+                        res: Any = direct_method(**call_kwargs)
+                        if inspect.isawaitable(res):
+                            return await res  # type: ignore[no-any-return]
+                        return res
+
+                    direct_res = await _with_ffbb_semaphore(
+                        _safe_call_with_inflight(
+                            f"Search direct {type_name}: {query}",
+                            _invoke_direct,
+                        )
                     )
+                    if (
+                        direct_res is not None
+                        and getattr(direct_res, "hits", None) is not None
+                        and len(direct_res.hits) > 0
+                    ):
+                        return _build_search_results(
+                            direct_res, limit, offset, type_name=type_name
+                        )
+            except Exception as e:
+                logger.debug(
+                    "Échec recherche directe %s, repli Meilisearch: %s",
+                    type_name,
+                    e,
                 )
-                if direct_res is not None and getattr(direct_res, "hits", None):
-                    return _build_search_results(
-                        direct_res, limit, offset, type_name=type_name
-                    )
-            except Exception:
-                pass
 
         index_uid = _SEARCH_INDEX_MAP.get(type_name, type_name)
-        filter_list = [filter_by] if filter_by else None
+        filter_list = [safe_filter] if safe_filter else None
+        search_q = normalized_query
+        if safe_filter and normalize_query(query) in _GENERIC_SEARCH_TERMS:
+            # Si le filtre est actif et la requête est un terme générique (ex: "basket"),
+            # Meilisearch ne matcherait pas les clubs dont le nom ne contient pas ce terme.
+            # On cherche avec q="" pour laisser le filtre opérer pleinement.
+            search_q = ""
+
         q = [
             MultiSearchQuery(
                 index_uid=index_uid,
-                q=normalized_query,
+                q=search_q,
                 limit=limit,
                 offset=offset,
                 filter=filter_list,
-                sort=sort,
+                sort=safe_sort,
             )
         ]
 
@@ -893,17 +1011,19 @@ async def _search_generic(
         ):
             # Fallback : essayer les variantes de requête
             fallbacks = _build_fallback_queries(query)
+            if safe_filter and search_q and "" not in fallbacks:
+                fallbacks.append("")
             for fb in fallbacks:
-                if fb == query:
+                if fb == query or (not fb and not search_q):
                     continue
                 q_fb = [
                     MultiSearchQuery(
                         index_uid=index_uid,
-                        q=normalize_query(fb),
+                        q=normalize_query(fb) if fb else "",
                         limit=limit,
                         offset=offset,
                         filter=filter_list,
-                        sort=sort,
+                        sort=safe_sort,
                     )
                 ]
                 results = await _with_ffbb_semaphore(
@@ -926,11 +1046,18 @@ async def _search_generic(
         hits = [serialize_model(h) for h in res0.hits]
         if type_name == "competitions":
             hits = [_lighten_competition_hit(h) for h in hits]
-        total = getattr(res0, "estimated_total_hits", len(hits))
-        if total is not None:
-            for item in hits:
-                item["_total_hits"] = total
-                item["_offset"] = offset
+        total_val = getattr(res0, "estimated_total_hits", None)
+        if total_val is not None:
+            try:
+                total = int(total_val)
+            except (TypeError, ValueError):
+                total = len(hits)
+        else:
+            total = len(hits)
+
+        for item in hits:
+            item["_total_hits"] = total
+            item["_offset"] = offset
         return hits
 
     return await _dedupe_inflight(
@@ -1015,7 +1142,11 @@ async def search_organismes_service(
     has_confident = (
         any(is_club_match_confident(r, nom) for r in results) if results else False
     )
-    if not results or is_code or not has_confident or len(results) < limit:
+    if (
+        not filter_by
+        and not sort
+        and (not results or is_code or not has_confident or len(results) < limit)
+    ):
         directus_results = await _search_organismes_directus(nom, limit=limit)
         if directus_results:
             existing_ids = {str(r.get("id") or r.get("organisme_id")) for r in results}
@@ -1042,13 +1173,48 @@ def _build_multi_search_queries(
     active_indexes: list[str],
     normalized_query: str,
     limit: int,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
 ) -> list[Any]:
     from ffbb_data_client.models import MultiSearchQuery
 
     primary_limit = min(limit, max(2, (limit + 2) // 3))
     secondary_limit = min(limit, max(1, (limit + 9) // 10))
 
-    return [
+    inv_map = {v: k for k, v in _SEARCH_INDEX_MAP.items()}
+
+    queries: list[Any] = []
+    for idx in active_indexes:
+        type_name = inv_map.get(
+            idx, idx.replace("ffbbserver_", "").replace("ffbbsite_", "")
+        )
+        idx_filter = (
+            _rewrite_filter_for_index(filter_by, type_name) if filter_by else None
+        )
+        if (
+            idx_filter
+            and "commune." in idx_filter
+            and type_name in ("competitions", "formations", "news", "galeries", "rss")
+        ):
+            continue
+
+        idx_sort = _rewrite_sort_for_index(sort, type_name) if sort else None
+        search_q = normalized_query
+        if idx_filter and normalized_query in _GENERIC_SEARCH_TERMS:
+            search_q = ""
+
+        queries.append(
+            MultiSearchQuery(
+                index_uid=idx,
+                q=search_q,
+                limit=primary_limit
+                if idx in _PRIMARY_SEARCH_INDEXES
+                else secondary_limit,
+                filter=[idx_filter] if idx_filter else None,
+                sort=idx_sort,
+            )
+        )
+    return queries or [
         MultiSearchQuery(
             index_uid=idx,
             q=normalized_query,
@@ -1063,6 +1229,8 @@ async def _execute_multi_search_with_self_healing(
     nom: str,
     normalized_query: str,
     limit: int,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
 ) -> Any:
     """Exécute un multi-search Meilisearch avec auto-découverte et boucle de self-healing."""
     from ffbb_data_client.models import MultiSearchQuery
@@ -1085,7 +1253,9 @@ async def _execute_multi_search_with_self_healing(
             state.active_search_indexes = list(_ALL_CANDIDATE_SEARCH_INDEXES)
 
     active_indexes = list(state.active_search_indexes)
-    queries = _build_multi_search_queries(active_indexes, normalized_query, limit)
+    queries = _build_multi_search_queries(
+        active_indexes, normalized_query, limit, filter_by=filter_by, sort=sort
+    )
 
     def _call_ms(q_list: Any) -> Any:
         if hasattr(client, "multi_search_async") and callable(
@@ -1131,7 +1301,7 @@ async def _execute_multi_search_with_self_healing(
         # Cristallisation des index sains en mémoire
         state.active_search_indexes = healthy_indexes
         recovered_queries = _build_multi_search_queries(
-            healthy_indexes, normalized_query, limit
+            healthy_indexes, normalized_query, limit, filter_by=filter_by, sort=sort
         )
         return await _with_ffbb_semaphore(
             _safe_call_with_inflight(
@@ -1145,10 +1315,16 @@ async def multi_search_service(
     nom: str,
     limit: int = 20,
     offset: int = 0,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
     force_refresh: bool = False,
 ) -> list[dict[str, Any]]:
     normalized_query = normalize_query(nom)
-    cache_key = f"multi_search:{normalized_query}:{limit}:{offset}"
+    filter_part = filter_by or ""
+    sort_part = ",".join(sort) if sort else ""
+    cache_key = (
+        f"multi_search:{normalized_query}:{limit}:{offset}:{filter_part}:{sort_part}"
+    )
 
     async def _fetch() -> list[dict[str, Any]]:
         client = await get_client_async()
@@ -1159,6 +1335,8 @@ async def multi_search_service(
             nom=nom,
             normalized_query=normalized_query,
             limit=fetch_limit,
+            filter_by=filter_by,
+            sort=sort,
         )
 
         if not getattr(raw, "results", None):
@@ -1324,7 +1502,12 @@ async def ffbb_search_service(
 
     if type == "all":
         result = await multi_search_service(
-            nom=query, limit=limit, offset=offset, force_refresh=force_refresh
+            nom=query,
+            limit=limit,
+            offset=offset,
+            filter_by=filter_by,
+            sort=sort,
+            force_refresh=force_refresh,
         )
         if not isinstance(result, list):
             return []
@@ -1353,6 +1536,30 @@ async def ffbb_search_service(
             force_refresh=force_refresh,
         )
         return _add_truncation_meta(result, limit=limit, offset=offset, sort=sort)
+
+    from mcp.types import INVALID_PARAMS
+
+    if type == "communes":
+        raise McpError(
+            error=ErrorData(
+                code=INVALID_PARAMS,
+                message=(
+                    "Pour rechercher par commune ou ville, utilisez type='organismes' ou type='salles' "
+                    "avec filter_by='commune.libelle = \"...\"' ou filter_by='commune.codePostal = \"...\"'."
+                ),
+            )
+        )
+
+    if type in ("officiels", "entraineurs"):
+        raise McpError(
+            error=ErrorData(
+                code=INVALID_PARAMS,
+                message=(
+                    f"La recherche textuelle multi-critères n'est pas disponible pour '{type}' (aucun index Meilisearch public). "
+                    f"Utilisez ffbb_get(type='{type[:-1]}', id=...) pour consulter une fiche par son identifiant."
+                ),
+            )
+        )
 
     raise McpError(
         error=ErrorData(

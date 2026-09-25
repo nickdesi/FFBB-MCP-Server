@@ -332,9 +332,9 @@ async def ffbb_search(
             "tournois",
             "engagements",
             "formations",
-            "officiels",
-            "entraineurs",
-            "communes",
+            "news",
+            "galeries",
+            "rss",
         ],
         Field(
             description=("Type de données. 'all' cherche partout (défaut)."),
@@ -359,19 +359,20 @@ async def ffbb_search(
     ] = None,
     sort: Annotated[
         list[str] | None,
-        Field(description="Tri Meilisearch (ex: ['libelle:asc'])."),
+        Field(description="Tri Meilisearch (ex: ['nom:asc'])."),
     ] = None,
     force_refresh: Annotated[
         bool,
         Field(description="Si True, force le rafraîchissement des données."),
     ] = False,
 ) -> dict[str, Any] | list[dict[str, Any]]:
-    """Recherche FFBB — clubs, compétitions, matchs, salles, tournois, etc.
+    """Recherche FFBB — clubs, compétitions, matchs, salles, tournois, news, actualités, etc.
 
     - type='all' → recherche globale (meilleur point d'entrée).
     - type='organismes' → clubs uniquement.
     - type='competitions' → compétitions uniquement.
     - type='salles' → salles / gymnases.
+    - type='news' / 'galeries' / 'rss' → actualités et médias.
     - filter_by='codePostal = "63000"' → filtrage par code postal ou critères Meilisearch.
 
     Résultats contiennent un 'id' à utiliser avec ffbb_get ou ffbb_club.
@@ -526,11 +527,63 @@ def _build_default_get_presentation(
         commune = (data.get("commune") or {}).get("libelle") or ""
         detail = f"Ville : {commune}." if commune else "Détails de l'organisme."
     elif type_name == "engagement":
-        nom = data.get("nom") or data.get("nom_equipe") or f"Engagement {resource_id}"
-        short_ans = f"Engagement {resource_id} : {nom}."
-        comp_nom = (data.get("idCompetition") or {}).get("nom") or ""
+        from ffbb_mcp.utils import format_team_name
+
+        raw_team = data.get("team")
+        team: dict[str, Any] = raw_team if isinstance(raw_team, dict) else {}
+        raw_club = data.get("club")
+        club: dict[str, Any] = raw_club if isinstance(raw_club, dict) else {}
+        raw_classement = data.get("classement")
+        classement: dict[str, Any] = (
+            raw_classement if isinstance(raw_classement, dict) else {}
+        )
+        raw_poule = data.get("poule")
+        poule: dict[str, Any] = raw_poule if isinstance(raw_poule, dict) else {}
+
+        club_nom = (
+            team.get("nom_equipe")
+            or club.get("nom")
+            or (classement.get("id_engagement") or {}).get("nom")
+            or data.get("nom")
+            or ""
+        )
+        team_label = team.get("team_label") or ""
+        num_eq = data.get("numero_equipe") or team.get("numero_equipe")
+        label_equipe = (
+            format_team_name(club_nom, num_eq)
+            if club_nom
+            else f"Engagement {resource_id}"
+        )
+        if team_label and team_label not in label_equipe:
+            label_equipe = f"{label_equipe} ({team_label})"
+
+        short_ans = f"Engagement {resource_id} : {label_equipe}."
+
+        comp_nom = (
+            team.get("competition")
+            or team.get("competition_origine_nom")
+            or (data.get("idCompetition") or {}).get("nom")
+            or ""
+        )
+        poule_nom = poule.get("nom") or ""
+        total_matchs = data.get("total_matchs")
+
+        detail_parts: list[str] = []
+        if comp_nom:
+            if poule_nom:
+                detail_parts.append(f"Compétition : {comp_nom} ({poule_nom})")
+            else:
+                detail_parts.append(f"Compétition : {comp_nom}")
+        elif poule_nom:
+            detail_parts.append(f"Poule : {poule_nom}")
+
+        if total_matchs is not None and total_matchs > 0:
+            detail_parts.append(f"{total_matchs} match(s) au calendrier")
+
         detail = (
-            f"Compétition : {comp_nom}." if comp_nom else "Détails de l'engagement."
+            " · ".join(detail_parts) + "."
+            if detail_parts
+            else "Détails de l'engagement."
         )
     elif type_name == "rencontre":
         nom1 = data.get("nomEquipe1") or "Équipe 1"

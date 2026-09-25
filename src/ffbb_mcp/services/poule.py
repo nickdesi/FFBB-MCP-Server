@@ -1148,9 +1148,15 @@ async def get_engagement_service(
             return {"error": f"Engagement '{eng_id_str}' introuvable."}
 
         eng_dict = serialize_model(eng) or {}
-        org_id = str(eng_dict.get("idOrganisme") or "")
-        comp_id = str(eng_dict.get("idCompetition") or "")
-        poule_id = str(eng_dict.get("idPoule") or "")
+
+        def _extract_id(val: Any) -> str:
+            if isinstance(val, dict):
+                return str(val.get("id") or "")
+            return str(val or "") if val is not None else ""
+
+        org_id = _extract_id(eng_dict.get("idOrganisme"))
+        comp_id = _extract_id(eng_dict.get("idCompetition"))
+        poule_id = _extract_id(eng_dict.get("idPoule"))
         num_eq = eng_dict.get("numeroEquipe") or None
 
         club_info: dict[str, Any] | None = None
@@ -1212,14 +1218,56 @@ async def get_engagement_service(
                             if c.get("organisme_nom"):
                                 target_names.add(str(c["organisme_nom"]))
 
+                    from .calendar import _match_team_name_local
+
+                    eq_num_int: int | None = None
+                    try:
+                        val_to_cast = None
+                        if num_eq is not None:
+                            val_to_cast = num_eq
+                        elif team_info and team_info.get("numero_equipe"):
+                            val_to_cast = team_info["numero_equipe"]
+                        elif classement_info and (
+                            classement_info.get("id_engagement") or {}
+                        ).get("numero_equipe"):
+                            val_to_cast = (
+                                classement_info.get("id_engagement") or {}
+                            ).get("numero_equipe")
+                        if val_to_cast is not None:
+                            eq_num_int = int(val_to_cast)
+                    except (ValueError, TypeError):
+                        eq_num_int = None
+
                     for m in poule_data.get("rencontres") or []:
-                        id1 = str(m.get("idEngagementEquipe1") or "")
-                        id2 = str(m.get("idEngagementEquipe2") or "")
-                        n1 = m.get("nomEquipe1") or ""
-                        n2 = m.get("nomEquipe2") or ""
-                        if eng_id_str in (id1, id2) or (
-                            target_names and (n1 in target_names or n2 in target_names)
-                        ):
+                        eng1 = m.get("idEngagementEquipe1")
+                        eng2 = m.get("idEngagementEquipe2")
+                        id1 = str(
+                            eng1.get("id")
+                            if isinstance(eng1, dict)
+                            else (eng1 or m.get("id_engagement_equipe1") or "")
+                        )
+                        id2 = str(
+                            eng2.get("id")
+                            if isinstance(eng2, dict)
+                            else (eng2 or m.get("id_engagement_equipe2") or "")
+                        )
+                        n1 = m.get("nomEquipe1") or m.get("nom_equipe1") or ""
+                        n2 = m.get("nomEquipe2") or m.get("nom_equipe2") or ""
+
+                        is_match = False
+                        if eng_id_str in (id1, id2):
+                            is_match = True
+                        elif target_names:
+                            for tname in target_names:
+                                if _match_team_name_local(
+                                    n1, tname, eq_num_int
+                                ) or _match_team_name_local(n2, tname, eq_num_int):
+                                    is_match = True
+                                    break
+                                if n1 == tname or n2 == tname:
+                                    is_match = True
+                                    break
+                        if is_match:
                             matches.append(m)
             except Exception as e:
                 logger.warning(
