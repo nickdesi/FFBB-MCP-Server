@@ -358,12 +358,7 @@ def _resolve_ententes(
         if _is_entente_name(nom) and key_word_norm in nom_norm:
             additions.append(_build_club_candidate(ent_org, nom))
             existing_ids.add(oid)
-            logger.debug(
-                "ffbb_resolve: entente détectée '%s' (id=%s) pour club_name='%s'",
-                nom,
-                oid,
-                club_name,
-            )
+            logger.debug("ffbb_resolve: entente candidate détectée")
 
     return additions
 
@@ -410,8 +405,7 @@ async def filter_inactive_ententes(
             return oid, is_active
         except Exception:
             logger.debug(
-                "Erreur lors de la vérification des équipes de l'entente %s",
-                oid,
+                "Erreur lors de la vérification des équipes d'une entente",
                 exc_info=True,
             )
             return oid, False
@@ -426,11 +420,7 @@ async def filter_inactive_ententes(
         nom = str(item.get("nom") or item.get("libelle") or "")
         oid = str(item.get("organisme_id") or item.get("id") or "").strip()
         if _is_entente_name(nom) and not active_map.get(oid, False):
-            logger.info(
-                "Entente inactive exclue (0 équipe engagée): %s (id=%s)",
-                nom,
-                oid,
-            )
+            logger.debug("Entente inactive exclue (0 équipe engagée)")
             continue
         filtered.append(item)
 
