@@ -183,6 +183,48 @@ def _is_entente_name(nom: str | None) -> bool:
     )
 
 
+_PREFIX_CLEAN_RE = re.compile(r"^(IE\s*-\s*|CTC\s+|ENT\.\s*|ENTENTE\s+)", re.IGNORECASE)
+
+
+def _clean_team_for_match(name: str) -> str:
+    """Nettoie les préfixes inter-clubs (CTC, IE, ENT) pour matching normalisé."""
+    norm = _normalize_name(name)
+    return _PREFIX_CLEAN_RE.sub("", norm).strip()
+
+
+def _match_team_name(
+    nom_equipe_rencontre: str,
+    organisme_nom: str,
+    numero_equipe: int | None = None,
+    is_organisme_nom_normalized: bool = False,
+) -> bool:
+    """Détermine si un libellé d'équipe de rencontre correspond à un club et un numéro."""
+    nom_norm = _normalize_name(nom_equipe_rencontre)
+    club_norm = (
+        organisme_nom if is_organisme_nom_normalized else _normalize_name(organisme_nom)
+    )
+    if not nom_norm or not club_norm:
+        return False
+    if club_norm not in nom_norm:
+        return False
+
+    search_num = numero_equipe if numero_equipe is not None else 1
+    str_num = str(search_num)
+
+    has_trailing_num = (
+        nom_norm.endswith(f"- {str_num}")
+        or nom_norm.endswith(f" {str_num}")
+        or nom_norm.endswith(f"-{str_num}")
+        or nom_norm.endswith(f"_{str_num}")
+    )
+
+    if search_num == 1:
+        has_digit = bool(_NUMERIC_EXTRACT_PATTERN.search(nom_norm))
+        return has_trailing_num or not has_digit
+
+    return has_trailing_num
+
+
 def is_real_ambiguity(
     resolved_clubs: list[dict[str, Any]], club_name: str | None
 ) -> bool:

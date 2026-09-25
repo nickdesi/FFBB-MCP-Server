@@ -37,6 +37,7 @@ from .common import _PARIS_TZ as _TZ
 from .common import (
     _detect_phase_type,
     _is_horaire_renseigne,
+    _match_team_name,
     _normalize_name,
     _parse_dt,
 )
@@ -74,34 +75,7 @@ def _dedup_equipes_by_engagement_local(
     return deduped
 
 
-def _match_team_name_local(
-    nom_equipe_rencontre: str,
-    organisme_nom: str,
-    numero_equipe: int | None,
-    is_organisme_nom_normalized: bool = False,
-) -> bool:
-    from .common import _NUMERIC_EXTRACT_PATTERN
-
-    nom_norm = _normalize_name(nom_equipe_rencontre)
-    club_norm = (
-        organisme_nom if is_organisme_nom_normalized else _normalize_name(organisme_nom)
-    )
-    if not nom_norm or not club_norm:
-        return False
-    if club_norm not in nom_norm:
-        return False
-    search_num = numero_equipe if numero_equipe is not None else 1
-    str_num = str(search_num)
-    has_trailing = (
-        nom_norm.endswith(f"- {str_num}")
-        or nom_norm.endswith(f" {str_num}")
-        or nom_norm.endswith(f"-{str_num}")
-        or nom_norm.endswith(f"_{str_num}")
-    )
-    if search_num == 1:
-        has_digit = bool(_NUMERIC_EXTRACT_PATTERN.search(nom_norm))
-        return has_trailing or not has_digit
-    return has_trailing
+_match_team_name_local = _match_team_name
 
 
 async def _build_calendar_matches(

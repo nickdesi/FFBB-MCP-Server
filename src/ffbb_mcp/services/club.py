@@ -48,12 +48,12 @@ from .calendar import (
     get_calendrier_club_service,  # noqa: F401
 )
 from .common import (
-    _NUMERIC_EXTRACT_PATTERN,
     _PARIS_TZ,
     _compute_match_statut,
     _detect_phase_type,
     _freshness_meta,
     _is_horaire_renseigne,
+    _match_team_name,
     _normalize_name,
     _parse_dt,
 )
@@ -332,38 +332,6 @@ async def ffbb_equipes_club_service(
     if _eq_key is not None:
         state.cache_equipes[_eq_key] = copy.deepcopy(filtered_teams)
     return filtered_teams
-
-
-def _match_team_name(
-    nom_equipe_rencontre: str,
-    organisme_nom: str,
-    numero_equipe: int | None,
-    is_organisme_nom_normalized: bool = False,
-) -> bool:
-    nom_norm = _normalize_name(nom_equipe_rencontre)
-    club_norm = (
-        organisme_nom if is_organisme_nom_normalized else _normalize_name(organisme_nom)
-    )
-    if not nom_norm or not club_norm:
-        return False
-    if club_norm not in nom_norm:
-        return False
-
-    search_num = numero_equipe if numero_equipe is not None else 1
-    str_num = str(search_num)
-
-    has_trailing_num = (
-        nom_norm.endswith(f"- {str_num}")
-        or nom_norm.endswith(f" {str_num}")
-        or nom_norm.endswith(f"-{str_num}")
-        or nom_norm.endswith(f"_{str_num}")
-    )
-
-    if search_num == 1:
-        has_digit = bool(_NUMERIC_EXTRACT_PATTERN.search(nom_norm))
-        return has_trailing_num or not has_digit
-
-    return has_trailing_num
 
 
 def _team_has_explicit_number(eq: dict) -> bool:

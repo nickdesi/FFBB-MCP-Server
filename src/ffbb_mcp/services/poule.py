@@ -23,16 +23,19 @@ from ffbb_mcp.utils import (
     clean_serialized_data,
     format_team_name,
     jaro_winkler_similarity,
+    resolve_relation_field,
     serialize_model,
 )
 
 from .common import (
     _cache_set,
+    _clean_team_for_match,
     _coerce_numeric_id,
     _dedupe_inflight,
     _dedupe_inflight_detail,
     _detect_phase_type,
     _freshness_meta,
+    _match_team_name,
     _normalize_name,
     _safe_call,
     _safe_call_with_inflight,
@@ -397,13 +400,11 @@ async def format_poule_response(poule_data: dict) -> dict[str, Any]:
     formatted_classements = []
     for c in classements or []:
         c = clean_serialized_data(c)
-        raw_eng = c.get("id_engagement")
-        eng = raw_eng if isinstance(raw_eng, dict) else {}
+        eng, _ = resolve_relation_field(c, "id_engagement")
         nom = eng.get("nom", "")
         num = eng.get("numero_equipe")
         c["equipe"] = format_team_name(nom, num)
-        logo_val = eng.get("logo")
-        logo_id = logo_val.get("id") if isinstance(logo_val, dict) else None
+        _, logo_id = resolve_relation_field(eng, "logo")
         c["logo_url"] = (
             f"https://api.ffbb.com/assets/{logo_id}?height=220&fit=contain&format=avif"
             if logo_id
@@ -574,8 +575,7 @@ async def ffbb_get_classement_service(
         for c in raw:
             if not isinstance(c, dict):
                 continue
-            raw_eng = c.get("id_engagement")
-            eng = raw_eng if isinstance(raw_eng, dict) else {}
+            eng, _ = resolve_relation_field(c, "id_engagement")
             nom_equipe = eng.get("nom", "")
             num_equipe = eng.get("numero_equipe")
             org_id = str(c.get("organisme_id") or eng.get("organisme_id") or "")
@@ -589,12 +589,7 @@ async def ffbb_get_classement_service(
                 else:
                     is_target = True
 
-            raw_logo = eng.get("logo")
-            eng_logo_id = (
-                raw_logo.get("id")
-                if isinstance(raw_logo, dict)
-                else (str(raw_logo) if raw_logo else None)
-            )
+            _, eng_logo_id = resolve_relation_field(eng, "logo")
             logo_id = c.get("organisme_logo_id") or eng_logo_id
             logo_url = (
                 f"https://api.ffbb.com/assets/{logo_id}?height=220&fit=contain&format=avif"
@@ -660,9 +655,6 @@ async def ffbb_get_classement_service(
                         ) in _normalize_name(eq_name):
                             # Vérifie aussi le numéro si fourni
                             if target_num_str:
-                                # Extrait le numéro de l'équipe depuis eq_name
-                                from ffbb_mcp.services.club import _match_team_name
-
                                 if _match_team_name(
                                     eq_name,
                                     target_nom,
@@ -777,17 +769,10 @@ async def find_team_poule_service(
         for eng in org_data.get("engagements") or []:
             if not isinstance(eng, dict):
                 continue
-            raw_comp = eng.get("idCompetition")
-            comp = raw_comp if isinstance(raw_comp, dict) else {}
-            comp_id_val = comp.get("id") if isinstance(raw_comp, dict) else raw_comp
+            comp, comp_id_val = resolve_relation_field(eng, "idCompetition")
             if str(comp_id_val or "") == comp_id_str:
-                raw_poule = eng.get("idPoule")
-                poule = raw_poule if isinstance(raw_poule, dict) else {}
-                poule_id = str(
-                    poule.get("id")
-                    if isinstance(raw_poule, dict)
-                    else (raw_poule or "")
-                )
+                poule, poule_id_val = resolve_relation_field(eng, "idPoule")
+                poule_id = str(poule_id_val or "")
                 poule_nom = poule.get("nom")
                 if not poule_nom:
                     comp_data = await get_competition_service(comp_id_str)
@@ -797,12 +782,8 @@ async def find_team_poule_service(
                             break
                 comp_nom = comp.get("nom") or ""
                 num = eng.get("numeroEquipe") or ""
-                raw_cat = comp.get("categorie")
-                cat = (
-                    raw_cat.get("code", "")
-                    if isinstance(raw_cat, dict)
-                    else (str(raw_cat) if raw_cat else "")
-                )
+                cat_dict, cat_scalar = resolve_relation_field(comp, "categorie")
+                cat = str(cat_dict.get("code") or cat_scalar or "")
                 sexe = comp.get("sexe", "")
                 team_label = f"{cat}{sexe}{num}".strip()
                 return {
@@ -828,8 +809,7 @@ async def find_team_poule_service(
         poule_data = await get_poule_service(p_id)
         for c in poule_data.get("classements") or []:
             c_org_id = str(c.get("organisme_id") or "")
-            raw_c_eng = c.get("id_engagement")
-            c_eng = raw_c_eng if isinstance(raw_c_eng, dict) else {}
+            c_eng, _ = resolve_relation_field(c, "id_engagement")
             c_name = _normalize_name(c_eng.get("nom") or c.get("organisme_nom") or "")
             target_norm = _normalize_name(club_nom)
             if (org_id and c_org_id == org_id) or (
@@ -878,14 +858,6 @@ async def find_team_poule_service(
         "competition_id": comp_id_str,
         "competition_nom": comp_nom,
     }
-
-
-_PREFIX_CLEAN_RE = re.compile(r"^(IE\s*-\s*|CTC\s+|ENT\.\s*|ENTENTE\s+)", re.IGNORECASE)
-
-
-def _clean_team_for_match(name: str) -> str:
-    norm = _normalize_name(name)
-    return _PREFIX_CLEAN_RE.sub("", norm).strip()
 
 
 def resolve_opponent_from_poule(
@@ -966,13 +938,7 @@ def resolve_opponent_from_poule(
     candidates: list[dict[str, Any]] = []
 
     for c in classements:
-        raw_eng = c.get("id_engagement")
-        c_eng = raw_eng if isinstance(raw_eng, dict) else {}
-        c_eng_id = (
-            str(c_eng.get("id") or "")
-            if c_eng.get("id") is not None
-            else (str(raw_eng) if raw_eng is not None else None)
-        )
+        c_eng, c_eng_id = resolve_relation_field(c, "id_engagement")
         c_org_id = (
             str(c.get("organisme_id") or "")
             if c.get("organisme_id") is not None
@@ -1237,16 +1203,13 @@ async def get_engagement_service(
                         target_names.add(str(club_info["nom"]))
 
                     for c in poule_data.get("classements") or []:
-                        raw_c_eng = c.get("id_engagement")
-                        c_eng = raw_c_eng if isinstance(raw_c_eng, dict) else {}
-                        if str(c_eng.get("id") or raw_c_eng or "") == eng_id_str:
+                        c_eng, c_eng_id = resolve_relation_field(c, "id_engagement")
+                        if c_eng_id == eng_id_str:
                             classement_info = c
                             if c_eng.get("nom"):
                                 target_names.add(str(c_eng["nom"]))
                             if c.get("organisme_nom"):
                                 target_names.add(str(c["organisme_nom"]))
-
-                    from .calendar import _match_team_name_local
 
                     eq_num_int: int | None = None
                     try:
@@ -1286,9 +1249,9 @@ async def get_engagement_service(
                             is_match = True
                         elif target_names:
                             for tname in target_names:
-                                if _match_team_name_local(
+                                if _match_team_name(
                                     n1, tname, eq_num_int
-                                ) or _match_team_name_local(n2, tname, eq_num_int):
+                                ) or _match_team_name(n2, tname, eq_num_int):
                                     is_match = True
                                     break
                                 if n1 == tname or n2 == tname:

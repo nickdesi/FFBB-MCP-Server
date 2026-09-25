@@ -42,6 +42,28 @@ def clean_serialized_data(data: Any) -> Any:
     return data
 
 
+def resolve_relation_field(
+    data: dict[str, Any] | None, field: str
+) -> tuple[dict[str, Any], str | None]:
+    """Extrait de façon sûre (dict_entity, scalar_id) d'un champ relationnel Directus.
+
+    Directus renvoie soit un objet imbriqué {'id': '...', ...} (expand),
+    soit un scalaire '...' / int (non expand), soit None.
+    Garantit que le 1er élément retourné est STRICTEMENT un dict, évitant tout AttributeError sur .get().
+    """
+    if not isinstance(data, dict):
+        return {}, None
+    val = data.get(field)
+    if isinstance(val, dict):
+        raw_id = val.get("id")
+        id_str = str(raw_id) if raw_id is not None else None
+        return val, id_str
+    if val is not None and val != "":
+        id_str = str(val)
+        return {}, id_str
+    return {}, None
+
+
 def serialize_model(obj: Any) -> JSONValue:
     """Convertit un objet FFBB en dict JSON-serializable et assaini."""
     if obj is None:

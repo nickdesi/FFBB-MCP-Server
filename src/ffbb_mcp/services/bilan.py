@@ -23,7 +23,7 @@ from pydantic import ValidationError
 
 from ffbb_mcp._state import state
 from ffbb_mcp.models import BilanResponse
-from ffbb_mcp.utils import parse_categorie
+from ffbb_mcp.utils import parse_categorie, resolve_relation_field
 
 from .common import (
     _BILAN_STAT_FIELDS,
@@ -238,12 +238,8 @@ async def ffbb_saison_bilan_service(
         classements = poule_data.get("classements") or []
         poule_phase_added = False
         for entry in classements:
-            raw_eng = entry.get("id_engagement")
-            eng = raw_eng if isinstance(raw_eng, dict) else {}
-            entry_eng_id = str(
-                eng.get("id") or (raw_eng if raw_eng is not None else "")
-            )
-            if entry_eng_id not in eng_ids:
+            _, entry_eng_id = resolve_relation_field(entry, "id_engagement")
+            if (entry_eng_id or "") not in eng_ids:
                 continue
 
             if poule_phase_added:
@@ -551,14 +547,10 @@ async def _build_bilan_payload(
         for entry in classements:
             if not isinstance(entry, dict):
                 continue
-            raw_eng = entry.get("id_engagement")
-            eng = raw_eng if isinstance(raw_eng, dict) else {}
-            entry_eng_id = str(
-                eng.get("id") or (raw_eng if raw_eng is not None else "")
-            )
+            eng, entry_eng_id = resolve_relation_field(entry, "id_engagement")
             entry_org_id = str(entry.get("organisme_id", ""))
 
-            if entry_eng_id in eng_ids_here:
+            if (entry_eng_id or "") in eng_ids_here:
                 pass
             elif entry_org_id in org_ids_str:
                 logger.debug("ffbb_bilan: fallback org_id utilisé")
@@ -567,9 +559,9 @@ async def _build_bilan_payload(
 
             stats = _extract_and_accumulate_bilan(entry, totaux)
 
-            num_equipe = eng_to_num.get(entry_eng_id) or str(
-                eng.get("numero_equipe") or ""
-            )
+            num_equipe = (
+                eng_to_num.get(entry_eng_id) if entry_eng_id else None
+            ) or str(eng.get("numero_equipe") or "")
 
             phases.append(
                 {
