@@ -193,3 +193,118 @@ async def test_find_team_candidates_formats_placeholder_time_as_horaire_a_fixer(
         cand = res["candidates"][0]
         assert cand["next_match"] is not None
         assert cand["next_match"]["heure"] == "Horaire à fixer"
+
+
+@pytest.mark.asyncio
+async def test_team_summary_match_items_have_no_nested_data_or_presentation():
+    """Vérifie que last_match et next_match dans ffbb_team_summary ne ré-imbriquent pas
+    data, presentation, provenance ou team."""
+    mock_resolve = AsyncMock(
+        return_value={
+            "status": "resolved",
+            "team": {"team_label": "SEM1", "engagement_id": "200000005343882"},
+            "club_resolu": {"organisme_id": 10017, "nom": "LA MONTJOIE"},
+        }
+    )
+    mock_bilan = AsyncMock(
+        return_value={
+            "status": "ok",
+            "phase_courante": {"competition": "Régionale 3 Masculine"},
+            "bilan_total": {"gagnes": 0, "perdus": 1, "nuls": 0},
+        }
+    )
+    mock_last = AsyncMock(
+        return_value={
+            "status": "ok",
+            "data": {
+                "team": {"name": "LA MONTJOIE"},
+                "match": {
+                    "context_label": "Dernier match",
+                    "home_team": "ASJ",
+                    "away_team": "LA MONTJOIE",
+                },
+            },
+            "presentation": {"short_answer": "Défaite 65 à 70."},
+            "provenance": {"source": "ffbb_api_live"},
+            "score_domicile": 70,
+            "score_exterieur": 65,
+            "date": "2026-09-20",
+        }
+    )
+    mock_next = AsyncMock(
+        return_value={
+            "status": "ok",
+            "data": {
+                "team": {"name": "LA MONTJOIE"},
+                "match": {
+                    "context_label": "Prochain match",
+                    "home_team": "LA MONTJOIE",
+                    "away_team": "CMPJM",
+                },
+            },
+            "presentation": {"short_answer": "Prochain match contre CMPJM."},
+            "provenance": {"source": "ffbb_api_live"},
+            "date": "2026-09-27",
+            "adversaire": "CMPJM",
+        }
+    )
+
+    with (
+        patch("ffbb_mcp.server.ffbb_resolve_team_service", mock_resolve),
+        patch("ffbb_mcp.server.ffbb_bilan_service", mock_bilan),
+        patch("ffbb_mcp.server.ffbb_last_result_service", mock_last),
+        patch("ffbb_mcp.server.ffbb_next_match_service", mock_next),
+    ):
+        res = await ffbb_team_summary(
+            engagement_id="200000005343882",
+        )
+        assert res["status"] == "ok"
+        lm = res["last_match"]
+        nm = res["next_match"]
+        for item in (lm, nm):
+            assert "data" not in item
+            assert "presentation" not in item
+            assert "provenance" not in item
+            assert "team" not in item
+            assert "club_resolu" not in item
+            assert "status" not in item
+        assert lm["date"] == "2026-09-20"
+        assert lm["score_domicile"] == 70
+        assert nm["adversaire"] == "CMPJM"
+
+
+@pytest.mark.asyncio
+async def test_fastmcp_structured_content_deduplication():
+    """Vérifie que convert_result sérialise un texte concis dans content[0]
+    quand le dictionnaire contient une présentation, au lieu de dupliquer tout le JSON."""
+    from ffbb_mcp.server import mcp
+
+    tool = mcp._tool_manager.get_tool("ffbb_team_summary")
+    dummy_res = {
+        "status": "ok",
+        "team": {"nom_equipe": "SEM1"},
+        "summary": {"match_joues": 1, "gagnes": 0, "perdus": 1},
+        "presentation": {
+            "short_answer": "Bilan pour SEM1 : 0 victoires, 1 défaite.",
+            "detail_line": "Dernier match perdu.",
+        },
+        "provenance": {"source": "ffbb_api_live"},
+    }
+    converted = tool.fn_metadata.convert_result(dummy_res)
+    assert len(converted.content) == 1
+    text = converted.content[0].text
+    # content doit être le résumé textuel humain (pas un JSON dump)
+    assert text.startswith("Bilan pour SEM1")
+    assert not text.startswith("{")
+    # structured_content doit contenir l'intégralité des données structurées
+    assert converted.structured_content["team"]["nom_equipe"] == "SEM1"
+    assert converted.structured_content["summary"]["match_joues"] == 1
+
+
+@pytest.mark.asyncio
+async def test_ffbb_bilan_wrap_output_is_false():
+    """Vérifie que ffbb_bilan n'a pas wrap_output=True, évitant l'enveloppe {'result': ...}."""
+    from ffbb_mcp.server import mcp
+
+    tool = mcp._tool_manager.get_tool("ffbb_bilan")
+    assert tool.fn_metadata.wrap_output is False

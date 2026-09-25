@@ -1868,10 +1868,21 @@ async def ffbb_head_to_head_service(
         "bilan_h2h": h2h_data["bilan_h2h"],
     }
 
+    # Éviter de dupliquer la liste brute des matchs à la fois dans head_to_head
+    # et dans face_a_face : face_a_face conserve toutes ses métriques chiffrées.
+    face_a_face_stats = {k: v for k, v in h2h_data.items() if k != "matchs"}
+
+    presentation = {
+        "short_answer": h2h_data["bilan_h2h"],
+        "detail_line": " · ".join(narrative_points) if narrative_points else "",
+        "source_label": format_source_label(),
+        "warnings": [fallback_warning] if fallback_warning else [],
+    }
+
     result = {
         "status": "ok",
         "head_to_head": h2h_formatted,
-        "face_a_face": h2h_data,
+        "face_a_face": face_a_face_stats,
         "equipe_a": {
             "nom": nom_a,
             "club_resolu": club_res_a,
@@ -1885,6 +1896,7 @@ async def ffbb_head_to_head_service(
             "profil": profil_b,
         },
         "points_cles_llm": narrative_points,
+        "presentation": presentation,
         "_meta": _freshness_meta(cache="poule", force_refresh_supported=True),
     }
     if fallback_warning:

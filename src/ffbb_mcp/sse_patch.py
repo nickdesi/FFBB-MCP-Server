@@ -202,6 +202,17 @@ def apply_fastmcp_json_formatting_patch() -> None:
             # Sérialiser toute la liste en un seul bloc TextContent contenant un JSON array standard
             json_text = pydantic_core.to_json(result, fallback=str, indent=2).decode()
             return [TextContent(type="text", text=json_text)]
+        if (
+            isinstance(result, dict)
+            and "presentation" in result
+            and isinstance(result["presentation"], dict)
+        ):
+            pres = result["presentation"]
+            short_ans = str(pres.get("short_answer") or "").strip()
+            detail = str(pres.get("detail_line") or "").strip()
+            if short_ans:
+                text = f"{short_ans}\n{detail}".strip() if detail else short_ans
+                return [TextContent(type="text", text=text)]
         return orig_convert(result)
 
     fm._convert_to_content = _standardized_convert_to_content  # type: ignore[assignment]

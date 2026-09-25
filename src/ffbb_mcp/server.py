@@ -25,7 +25,7 @@ if not hasattr(Tool, "outputSchema"):
     Tool.outputSchema = property(lambda self: self.output_schema)  # type: ignore[attr-defined]
 from pydantic import Field
 
-from ffbb_mcp.models import BilanResponse, CalendrierMatch
+from ffbb_mcp.models import CalendrierMatch
 
 from . import __version__ as _PACKAGE_VERSION
 from .metrics import record_tool_call
@@ -453,7 +453,7 @@ async def ffbb_bilan(
         Field(description="Si True, contourne le cache."),
     ] = False,
     ctx: Context | None = None,
-) -> dict[str, Any] | BilanResponse:
+) -> dict[str, Any]:
     """Bilan complet d'une équipe toutes phases confondues en UN seul appel (V/D/N, paniers, phases).
 
     Outil prioritaire pour 'quel est le bilan de X ?' ou 'résultats de U11M1'.
@@ -1473,7 +1473,17 @@ async def ffbb_team_summary(
             cleaned = {
                 k: v
                 for k, v in match_data.items()
-                if k not in ("club_resolu", "team", "_meta", "status") and v is not None
+                if k
+                not in (
+                    "club_resolu",
+                    "team",
+                    "_meta",
+                    "status",
+                    "data",
+                    "presentation",
+                    "provenance",
+                )
+                and v is not None
             }
             return cleaned or None
 
