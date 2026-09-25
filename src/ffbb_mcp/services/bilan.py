@@ -376,18 +376,15 @@ async def _build_bilan_payload(
     from .search import resolve_club_and_org
 
     if not club_name and not organisme_id and engagement_id:
-        from ..client import FFBBClientFactory
+        from .common import resolve_engagement_refs
 
-        client = await FFBBClientFactory.get_client_async()
-        try:
-            eng_data = await client.get_engagement_async(str(engagement_id).strip())
-            if eng_data and eng_data.idOrganisme:
-                organisme_id = str(eng_data.idOrganisme)
-        except Exception as exc:
+        refs = await resolve_engagement_refs(engagement_id)
+        if refs["organisme_id"]:
+            organisme_id = refs["organisme_id"]
+        else:
             logger.error(
-                "Erreur résolution engagement %s dans bilan: %s",
+                "Engagement %s introuvable dans bilan, poursuite sans organisme résolu",
                 engagement_id,
-                exc,
             )
 
     resolved_clubs, org_data = await resolve_club_and_org(

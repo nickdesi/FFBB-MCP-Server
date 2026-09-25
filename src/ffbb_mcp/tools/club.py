@@ -24,6 +24,7 @@ from ffbb_mcp.services.common import (
     disambiguate_clubs_by_category,
     get_primary_club,
     is_real_ambiguity,
+    resolve_engagement_refs,
 )
 from ffbb_mcp.services.division import _parse_division_code
 from ffbb_mcp.utils import parse_categorie
@@ -37,51 +38,6 @@ from .common import (
 )
 
 logger = logging.getLogger("ffbb-mcp")
-
-
-async def _resolve_engagement_club_poule(
-    engagement_id: int | str,
-) -> tuple[str | None, str | None, int | None]:
-    """Résout (organisme_id, poule_id, numero_equipe) depuis un engagement.
-
-    Un engagement = l'inscription d'une équipe dans une phase de championnat,
-    donc une et une seule poule : déréférencement déterministe (clé absolue).
-    Retourne (None, None, None) si l'engagement est introuvable.
-    Le numéro d'équipe n'est remonté que s'il est > 1 (convention : None = fanion).
-    """
-    try:
-        from ffbb_mcp.client import FFBBClientFactory
-
-        _client = await FFBBClientFactory.get_client_async()
-        _data = await _client.get_engagement_async(str(engagement_id).strip())
-    except Exception:
-        logger.debug(
-            "Résolution engagement_id échouée",
-            exc_info=True,
-        )
-        return None, None, None
-    if _data is None:
-        return None, None, None
-
-    def _as_id(value: Any) -> str | None:
-        if isinstance(value, dict):
-            value = value.get("id")
-        return str(value) if value else None
-
-    _num: int | None = None
-    _raw_num = getattr(_data, "numeroEquipe", None)
-    if _raw_num is not None:
-        try:
-            _parsed = int(str(_raw_num))
-        except (TypeError, ValueError):
-            _parsed = None
-        if _parsed and _parsed > 1:
-            _num = _parsed
-    return (
-        _as_id(getattr(_data, "idOrganisme", None)),
-        _as_id(getattr(_data, "idPoule", None)),
-        _num,
-    )
 
 
 @track_tool_usage("ffbb_club")
@@ -245,22 +201,9 @@ async def ffbb_club(
         # Action calendrier : le service gère résolution + ambiguïté en interne
         if action == "calendrier":
             if not organisme_id and not club_name and engagement_id is not None:
-                try:
-                    from ffbb_mcp.client import FFBBClientFactory
-
-                    _eng_client = await FFBBClientFactory.get_client_async()
-                    _eng_data = await _eng_client.get_engagement_async(
-                        str(engagement_id).strip()
-                    )
-                    if _eng_data is not None and getattr(
-                        _eng_data, "idOrganisme", None
-                    ):
-                        organisme_id = str(_eng_data.idOrganisme)
-                except Exception:
-                    logger.debug(
-                        "Résolution organisme depuis engagement_id échouée",
-                        exc_info=True,
-                    )
+                _cal_refs = await resolve_engagement_refs(engagement_id)
+                if _cal_refs["organisme_id"]:
+                    organisme_id = _cal_refs["organisme_id"]
             if not organisme_id and not club_name:
                 return {
                     "status": "error",
@@ -324,13 +267,17 @@ async def ffbb_club(
 
         # Actions equipes / classement : pré-résolution nécessaire
         target_org_id = organisme_id
+        resolve_org_data: dict[str, Any] | None = None
+        first_resolved_id: str | None = None
         if not target_org_id and club_name:
-            resolved_clubs, _ = await resolve_club_svc(
+            resolved_clubs, resolve_org_data = await resolve_club_svc(
                 club_name=club_name,
                 organisme_id=None,
                 categorie=effective_filtre,
                 limit=3,
             )
+            if resolved_clubs:
+                first_resolved_id = str(resolved_clubs[0].get("organisme_id") or "")
 
             if not resolved_clubs:
                 return [
@@ -378,9 +325,9 @@ async def ffbb_club(
         # retrouver l'organisme — même pattern que calendrier/classement/bilan.
         # Strictement extensif : ne s'applique que si ni organisme_id ni club_name.
         if not target_org_id and not club_name and engagement_id is not None:
-            _eq_org, _, _ = await _resolve_engagement_club_poule(engagement_id)
-            if _eq_org:
-                target_org_id = _eq_org
+            _eq_refs = await resolve_engagement_refs(engagement_id)
+            if _eq_refs["organisme_id"]:
+                target_org_id = _eq_refs["organisme_id"]
 
         if action == "equipes":
             if not target_org_id:
@@ -389,9 +336,23 @@ async def ffbb_club(
                         "error": "organisme_id requis pour l'action 'equipes' (la résolution du club_name a échoué)."
                     }
                 ]
+            # Thread org_data déjà résolu ci-dessus : évite un 2e fetch organisme.
+            # Gardes : club primaire == premier résolu (pas d'autre équipe substituée
+            # par la désambiguïsation) et pas de force_refresh (données fraîches exigées).
+            threadable_org_data = (
+                resolve_org_data
+                if (
+                    resolve_org_data
+                    and not force_refresh
+                    and first_resolved_id
+                    and str(target_org_id) == first_resolved_id
+                )
+                else None
+            )
             result = await equipes_svc(
                 organisme_id=target_org_id,
                 filtre=effective_filtre,
+                org_data=threadable_org_data,
                 force_refresh=force_refresh,
             )
             if not result:
@@ -410,15 +371,13 @@ async def ffbb_club(
             # BUG #5 : résolution directe via engagement_id (clé absolue).
             # Priorité : poule_id explicite > engagement_id > club + categorie.
             if not effective_poule_id and engagement_id is not None:
-                _eng_org, _eng_poule, _eng_num = await _resolve_engagement_club_poule(
-                    engagement_id
-                )
-                if _eng_poule:
-                    effective_poule_id = _eng_poule
-                if _eng_org and not target_org_id:
-                    target_org_id = _eng_org
-                if target_num is None and _eng_num is not None:
-                    target_num = _eng_num
+                _eng_refs = await resolve_engagement_refs(engagement_id)
+                if _eng_refs["poule_id"]:
+                    effective_poule_id = _eng_refs["poule_id"]
+                if _eng_refs["organisme_id"] and not target_org_id:
+                    target_org_id = _eng_refs["organisme_id"]
+                if target_num is None and _eng_refs["numero_equipe"] is not None:
+                    target_num = _eng_refs["numero_equipe"]
 
             if not effective_poule_id and target_org_id:
                 search_filtre = effective_filtre

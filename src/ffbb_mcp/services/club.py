@@ -369,25 +369,15 @@ async def _resolve_team_equipes(
 
     if not club_name and not organisme_id:
         if engagement_id:
-            from ..client import FFBBClientFactory
+            from .common import resolve_engagement_refs
 
-            client = await FFBBClientFactory.get_client_async()
-            try:
-                eng_data = await client.get_engagement_async(str(engagement_id).strip())
-            except Exception as e:
-                logger.error(
-                    "Erreur lors de la récupération de l'engagement %s: %s",
-                    engagement_id,
-                    e,
-                )
-                eng_data = None
-
-            if eng_data and eng_data.idOrganisme:
-                organisme_id = str(eng_data.idOrganisme)
-                if competition_id is None and eng_data.idCompetition:
-                    competition_id = eng_data.idCompetition
-                if poule_id is None and eng_data.idPoule:
-                    poule_id = eng_data.idPoule
+            refs = await resolve_engagement_refs(engagement_id)
+            if refs["organisme_id"]:
+                organisme_id = refs["organisme_id"]
+                if competition_id is None and refs["competition_id"]:
+                    competition_id = refs["competition_id"]
+                if poule_id is None and refs["poule_id"]:
+                    poule_id = refs["poule_id"]
             else:
                 return (
                     {

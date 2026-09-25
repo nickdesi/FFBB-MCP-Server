@@ -35,7 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Formatage explicite de la poule et de la compétition résolues lors de l'appel `ffbb_get(type="competition", club=...)` plutôt que le libellé générique erroné `"0 poule(s)"`.
 - **Résolution de Poule via `engagement_id` dans `ffbb_club` (Bug #5)** :
   - `ffbb_club(action="classement")` résout désormais la poule directement depuis le seul `engagement_id` (déréférencement déterministe engagement → poule, un engagement appartenant à une et une seule poule), avec remontée de l'organisme et du numéro d'équipe pour préserver le marquage `is_target` — au même titre que `ffbb_bilan`, `ffbb_next_match`, `ffbb_last_result` et `ffbb_team_summary`.
-  - `ffbb_club(action="equipes")` accepte également le seul `engagement_id` (résolution de l'organisme) : factorisation dans le helper partagé `_resolve_engagement_club_poule` (`tools/club.py`). Priorité : `poule_id` explicite > `engagement_id` > `club + categorie`.
+  - `ffbb_club(action="equipes")` accepte également le seul `engagement_id` (résolution de l'organisme) et réutilise l'`org_data` déjà résolu quand c'est sûr (club primaire == premier résolu, hors `force_refresh`) au lieu de refetcher l'organisme — 1 appel API économisé sur cache froid.
+  - Factorisation des 4 copies du pattern engagement → organisme (`tools/club.py` calendrier, `services/club.py`, `services/bilan.py`) dans le helper partagé `resolve_engagement_refs` (`services/common.py`). Priorité : `poule_id` explicite > `engagement_id` > `club + categorie`.
 
 ### Refactored
 - **Modularisation Complète de `server.py` (`src/ffbb_mcp/tools/`)** :

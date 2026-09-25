@@ -36,6 +36,7 @@ async def test_ffbb_club_equipes_auto_resolution():
         mock_equipes.assert_called_once_with(
             organisme_id=123,
             filtre=None,
+            org_data=None,
             force_refresh=True,
         )
         assert result == [{"id": "team1", "nom": "U11M1"}]
@@ -247,6 +248,7 @@ async def test_ffbb_club_no_ambiguity_when_exact_match_and_ententes():
         mock_equipes.assert_called_once_with(
             organisme_id="9282",
             filtre=None,
+            org_data=None,
             force_refresh=False,
         )
 

@@ -225,6 +225,57 @@ def _match_team_name(
     return has_trailing_num
 
 
+async def resolve_engagement_refs(
+    engagement_id: int | str,
+) -> dict[str, Any]:
+    """Déréférence un engagement FFBB vers ses ids club/poule/compétition.
+
+    Un engagement = l'inscription d'une équipe dans une phase de championnat,
+    donc une et une seule poule : résolution déterministe (clé absolue).
+    Ne lève jamais : retourne un dict aux valeurs None si introuvable/erreur.
+    Clés : organisme_id (str|None), poule_id (str|None), competition_id (valeur
+    brute telle que renvoyée par l'API), numero_equipe (int|None, uniquement si
+    > 1 — convention : None = fanion).
+    """
+    empty: dict[str, Any] = {
+        "organisme_id": None,
+        "poule_id": None,
+        "competition_id": None,
+        "numero_equipe": None,
+    }
+    try:
+        from ffbb_mcp.client import FFBBClientFactory
+
+        client = await FFBBClientFactory.get_client_async()
+        data = await client.get_engagement_async(str(engagement_id).strip())
+    except Exception:
+        logger.debug("Résolution engagement_id échouée", exc_info=True)
+        return empty
+    if data is None:
+        return empty
+
+    def _as_id(value: Any) -> str | None:
+        if isinstance(value, dict):
+            value = value.get("id")
+        return str(value) if value else None
+
+    numero: int | None = None
+    raw_num = getattr(data, "numeroEquipe", None)
+    if raw_num is not None:
+        try:
+            parsed = int(str(raw_num))
+        except (TypeError, ValueError):
+            parsed = None
+        if parsed and parsed > 1:
+            numero = parsed
+    return {
+        "organisme_id": _as_id(getattr(data, "idOrganisme", None)),
+        "poule_id": _as_id(getattr(data, "idPoule", None)),
+        "competition_id": getattr(data, "idCompetition", None),
+        "numero_equipe": numero,
+    }
+
+
 def is_real_ambiguity(
     resolved_clubs: list[dict[str, Any]], club_name: str | None
 ) -> bool:

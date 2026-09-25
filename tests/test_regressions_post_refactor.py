@@ -284,6 +284,108 @@ async def test_ffbb_club_equipes_resolves_org_via_engagement_id():
     mock_equipes.assert_called_once_with(
         organisme_id="9220",
         filtre=None,
+        org_data=None,
         force_refresh=False,
     )
     assert res == fake_equipes
+
+
+@pytest.mark.asyncio
+async def test_ffbb_club_equipes_threads_resolved_org_data():
+    """Opti: ffbb_club(action='equipes') réutilise l'org_data déjà résolu (1 fetch évité)."""
+    from ffbb_mcp.server import ffbb_club
+
+    fake_org_data = {
+        "nom": "JEANNE D'ARC DE VICHY",
+        "engagements": [{"id": "200000005346860"}],
+    }
+    mock_resolve = AsyncMock(
+        return_value=(
+            [{"organisme_id": 9220, "nom": "JEANNE D'ARC DE VICHY"}],
+            fake_org_data,
+        )
+    )
+    fake_equipes = [{"engagement_id": "200000005346860"}]
+    mock_equipes = AsyncMock(return_value=fake_equipes)
+
+    with (
+        patch("ffbb_mcp.server.resolve_club_and_org", mock_resolve),
+        patch("ffbb_mcp.server.ffbb_equipes_club_service", mock_equipes),
+    ):
+        res = await ffbb_club(action="equipes", club_name="JA Vichy")
+
+    mock_equipes.assert_called_once_with(
+        organisme_id=9220,
+        filtre=None,
+        org_data=fake_org_data,
+        force_refresh=False,
+    )
+    assert res == fake_equipes
+
+
+@pytest.mark.asyncio
+async def test_ffbb_club_equipes_no_threading_on_force_refresh():
+    """Opti: force_refresh=True → pas de réutilisation d'org_data (fraîcheur exigée)."""
+    from ffbb_mcp.server import ffbb_club
+
+    fake_org_data = {"nom": "JA Vichy", "engagements": []}
+    mock_resolve = AsyncMock(
+        return_value=([{"organisme_id": 9220, "nom": "JA Vichy"}], fake_org_data)
+    )
+    mock_equipes = AsyncMock(return_value=[{"engagement_id": "1"}])
+
+    with (
+        patch("ffbb_mcp.server.resolve_club_and_org", mock_resolve),
+        patch("ffbb_mcp.server.ffbb_equipes_club_service", mock_equipes),
+    ):
+        await ffbb_club(action="equipes", club_name="JA Vichy", force_refresh=True)
+
+    mock_equipes.assert_called_once_with(
+        organisme_id=9220,
+        filtre=None,
+        org_data=None,
+        force_refresh=True,
+    )
+
+
+@pytest.mark.asyncio
+async def test_resolve_engagement_refs_handles_scalar_and_dict_ids():
+    """Opti: le helper partagé normalise ids scalaires et dicts {"id": ...}."""
+    from ffbb_mcp.services.common import resolve_engagement_refs
+
+    eng = MagicMock()
+    eng.idOrganisme = {"id": "9220"}
+    eng.idPoule = "200000003056266"
+    eng.idCompetition = {"id": "200000002898047"}
+    eng.numeroEquipe = 2
+    eng_client = MagicMock()
+    eng_client.get_engagement_async = AsyncMock(return_value=eng)
+
+    with patch(
+        "ffbb_mcp.client.FFBBClientFactory.get_client_async",
+        new_callable=AsyncMock,
+        return_value=eng_client,
+    ):
+        refs = await resolve_engagement_refs("200000005346860")
+
+    assert refs == {
+        "organisme_id": "9220",
+        "poule_id": "200000003056266",
+        "competition_id": {"id": "200000002898047"},
+        "numero_equipe": 2,
+    }
+
+    eng_client.get_engagement_async = AsyncMock(return_value=None)
+    with patch(
+        "ffbb_mcp.client.FFBBClientFactory.get_client_async",
+        new_callable=AsyncMock,
+        return_value=eng_client,
+    ):
+        missing = await resolve_engagement_refs("000000000000000")
+
+    assert missing == {
+        "organisme_id": None,
+        "poule_id": None,
+        "competition_id": None,
+        "numero_equipe": None,
+    }
