@@ -391,10 +391,29 @@ la logique de désambiguïsation (U11M1, U13F-2, etc.).
 
 ### `ffbb_saisons`
 
-**Description** : Liste les saisons sportives disponibles dans la base FFBB.
+**Description** : Liste les saisons sportives disponibles dans la base FFBB (référentiel temporel).
 
 - **Arguments** :
-  - `active_only` (boolean, défaut: `false`) : Si `true`, ne retourne que la saison en cours (ex: 2024-2025).
+  - `active_only` (boolean, défaut: `false`) : Si `true`, ne retourne que la saison en cours (ex: 2026-2027).
+  - `force_refresh` (boolean, défaut: `false`) : Si `true`, contourne le cache.
+
+- **Retour** :
+  ```jsonc
+  [
+    {
+      "id": "1037",
+      "season_id": "1037",             // alias identique à 'id' pour compatibilité
+      "libelle": "Saison 2026-2027",
+      "label": "Saison 2026-2027",     // alias identique à 'libelle' pour compatibilité
+      "debut": "2026-07-01",
+      "fin": "2027-06-30",
+      "code": "26-27",
+      "actif": true,
+      "enCours": true,
+      "within_date_range": true
+    }
+  ]
+  ```
 
 ### `ffbb_version`
 

@@ -308,3 +308,114 @@ async def test_ffbb_bilan_wrap_output_is_false():
 
     tool = mcp._tool_manager.get_tool("ffbb_bilan")
     assert tool.fn_metadata.wrap_output is False
+
+
+@pytest.mark.asyncio
+async def test_ffbb_saisons_aliases():
+    """Vérifie que chaque saison expose à la fois id/season_id et libelle/label."""
+    from ffbb_mcp.services.poule import get_saisons_service
+
+    mock_client = AsyncMock()
+    mock_client.get_saisons_async.return_value = [
+        {
+            "id": 1037,
+            "libelle": "Saison 2026-2027",
+            "actif": True,
+            "debut": "2026-07-01",
+            "fin": "2027-06-30",
+        }
+    ]
+
+    with patch(
+        "ffbb_mcp.services.poule.get_client_async", AsyncMock(return_value=mock_client)
+    ):
+        saisons = await get_saisons_service(active_only=True, force_refresh=True)
+        assert len(saisons) > 0
+        s = saisons[0]
+        assert "id" in s
+        assert "season_id" in s
+        assert str(s["id"]) == str(s["season_id"])
+        assert "libelle" in s
+        assert "label" in s
+        assert s["libelle"] == s["label"]
+
+
+@pytest.mark.asyncio
+async def test_explain_tiebreak_rules_with_poule_id():
+    """Vérifie que explain_tiebreak_rules_service calcule concrètement les égalités d'une poule."""
+    from ffbb_mcp.services.regulations import explain_tiebreak_rules_service
+
+    mock_poule = {
+        "id": "1001",
+        "nom": "Poule A",
+        "competition": "Régionale 2",
+        "rencontres": [
+            {
+                "id": "r1",
+                "nomEquipe1": "Team Alpha",
+                "resultatEquipe1": "75",
+                "nomEquipe2": "Team Beta",
+                "resultatEquipe2": "70",
+                "numeroJournee": "1",
+            }
+        ],
+    }
+    mock_classements = [
+        {
+            "position": 1,
+            "equipe": "Team Alpha",
+            "points": 2,
+            "difference": 5,
+            "quotient": 1.07,
+        },
+        {
+            "position": 2,
+            "equipe": "Team Beta",
+            "points": 2,
+            "difference": -5,
+            "quotient": 0.93,
+        },
+    ]
+
+    with (
+        patch(
+            "ffbb_mcp.services.poule.get_poule_service",
+            AsyncMock(return_value=mock_poule),
+        ),
+        patch(
+            "ffbb_mcp.services.poule.ffbb_get_classement_service",
+            AsyncMock(return_value=mock_classements),
+        ),
+    ):
+        res = await explain_tiebreak_rules_service(poule_id=1001)
+
+        assert res["poule_id"] == 1001
+        assert res["poule"]["nom"] == "Poule A"
+        assert len(res["applied_tiebreaks"]) == 1
+        group = res["applied_tiebreaks"][0]
+        assert group["points"] == 2
+        assert group["nombre_equipes"] == 2
+        assert group["statut"] == "confrontation_directe_jouee"
+        assert (
+            "Team Alpha devance Team Beta au point-average particulier"
+            in group["explication"]
+        )
+        assert "1 situation(s) d'égalité" in res["summary"]
+        assert "presentation" in res
+        assert "short_answer" in res["presentation"]
+
+
+@pytest.mark.asyncio
+async def test_explain_tiebreak_rules_poule_fallback():
+    """Vérifie le repli gracieux si les données de poule sont indisponibles."""
+    from ffbb_mcp.services.regulations import explain_tiebreak_rules_service
+
+    with patch(
+        "ffbb_mcp.services.poule.get_poule_service",
+        AsyncMock(side_effect=Exception("Poule introuvable")),
+    ):
+        res = await explain_tiebreak_rules_service(poule_id=999999)
+        assert res["poule_id"] == 999999
+        assert "warning" in res["poule"]
+        assert res["applied_tiebreaks"] == []
+        assert "Article 28" in res["summary"]

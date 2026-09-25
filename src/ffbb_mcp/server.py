@@ -1075,15 +1075,16 @@ async def ffbb_get_saisons(
     """Liste des saisons FFBB (référentiel temporel).
 
     Retourne la liste complète des saisons FFBB sous forme `list[dict]` triée
-    chronologiquement, chaque entrée contenant `id`, `libelle`, `debut`, `fin`,
-    `enCours` (booléen, calculé via `debut <= today <= fin`), `code`, `actif`
-    et `within_date_range` (booléen). Lecture seule, idempotent,
-    sans effet de bord ni écriture. Cache SWR avec TTL long (≈24h) ;
-    `force_refresh=True` contourne le cache pour données fraîches et
-    `active_only=True` filtre côté serveur pour ne garder que la saison active.
+    chronologiquement, chaque entrée contenant `id` (et alias `season_id`),
+    `libelle` (et alias `label`), `debut`, `fin`, `enCours` (booléen, calculé
+    via `debut <= today <= fin`), `code`, `actif` et `within_date_range`
+    (booléen). Lecture seule, idempotent, sans effet de bord ni écriture.
+    Cache SWR avec TTL long (≈24h) ; `force_refresh=True` contourne le cache
+    pour données fraîches et `active_only=True` filtre côté serveur pour ne
+    garder que la saison active.
 
-    Utilise cet outil pour récupérer les `id` de saison disponibles avant d'appeler
-    `ffbb_bilan`, `ffbb_club` ou `ffbb_team_summary` avec un filtre de saison.
+    Utilise cet outil pour récupérer les `id` / `season_id` de saison disponibles avant
+    d'appeler `ffbb_bilan`, `ffbb_club` ou `ffbb_team_summary` avec un filtre de saison.
     Ne pas utiliser pour obtenir un classement, un calendrier ou un bilan — utilise
     `ffbb_club(action="classement")` ou `ffbb_bilan` à la place ; pour la version
     du serveur, utilise `ffbb_version`.

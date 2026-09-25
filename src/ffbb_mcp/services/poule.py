@@ -249,6 +249,11 @@ async def _fetch_saisons(active_only: bool) -> list[dict]:
     for s in saisons_list:
         d = serialize_model(s)
         if isinstance(d, dict):
+            # Aliases season_id & label pour cohérence avec les paramètres MCP et attentes clients
+            if "id" in d and "season_id" not in d:
+                d["season_id"] = str(d["id"])
+            if "libelle" in d and "label" not in d:
+                d["label"] = str(d["libelle"])
             debut = str(d.get("debut") or d.get("dateDebut") or "")
             fin = str(d.get("fin") or d.get("dateFin") or "")
             is_within_range = bool(debut and fin and debut <= today_str <= fin)

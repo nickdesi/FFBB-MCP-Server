@@ -390,10 +390,29 @@ la logique de désambiguïsation (U11M1, U13F-2, etc.).
 
 ### `ffbb_saisons`
 
-**Description** : Liste les saisons sportives disponibles dans la base FFBB.
+**Description** : Liste les saisons sportives disponibles dans la base FFBB (référentiel temporel).
 
 - **Arguments** :
-  - `active_only` (boolean, défaut: `false`) : Si `true`, ne retourne que la saison en cours (ex: 2024-2025).
+  - `active_only` (boolean, défaut: `false`) : Si `true`, ne retourne que la saison en cours (ex: 2026-2027).
+  - `force_refresh` (boolean, défaut: `false`) : Si `true`, contourne le cache.
+
+- **Retour** :
+  ```jsonc
+  [
+    {
+      "id": "1037",
+      "season_id": "1037",             // alias identique à 'id' pour compatibilité
+      "libelle": "Saison 2026-2027",
+      "label": "Saison 2026-2027",     // alias identique à 'libelle' pour compatibilité
+      "debut": "2026-07-01",
+      "fin": "2027-06-30",
+      "code": "26-27",
+      "actif": true,
+      "enCours": true,
+      "within_date_range": true
+    }
+  ]
+  ```
 
 ### `ffbb_version`
 
@@ -775,25 +794,39 @@ Cette suite d'outils s'appuie sur le moteur réglementaire SQLite FTS5 (`src/ffb
 
 ### 3. `ffbb_explain_tiebreak_rules`
 
-**Description** : Fournit une explication certifiée des règles officielles de départage en cas d'égalité selon l'Article 28 du RSG FFBB 2026-2027.
+**Description** : Fournit les règles officielles de départage en cas d'égalité selon l'Article 28 du RSG FFBB. Avec `poule_id`, applique directement l'analyse aux équipes ex æquo et aux confrontations directes de la poule indiquée.
 
 **Arguments** :
-- `context` (string, défaut `"general"`) : Contexte spécifique de la demande (`"general"`, `"two_teams"`, `"three_or_more_teams"`, `"forfeit_impact"`).
-- `level` (string, optionnel) : Niveau de la compétition (`"federal"`, `"regional"`, `"departmental"`).
-- `comite_code` (string, optionnel) : Code départemental éventuel.
+- `poule_id` (integer, optionnel) : ID de la poule FFBB pour appliquer concrètement les règles de départage à son classement actuel.
+- `season` (string, défaut `"2026-2027"`) : Saison sportive.
 
 **Retour** :
 ```jsonc
 {
-  "status": "ok",
-  "rule_reference": "Article 28 du RSG FFBB (2026-2027)",
-  "context": "two_teams",
-  "steps": [
-    "1. Goal-average particulier : points marqués / encaissés lors des confrontations directes entre les deux équipes.",
-    "2. Goal-average général (quotient) : total des points marqués divisé par le total des points encaissés sur l'ensemble de la poule.",
-    "3. Meilleure attaque générale : total des points marqués sur la poule."
+  "season": "2026-2027",
+  "regulation_source": "RSG FFBB (Article 28)",
+  "summary": "Application des règles de départage...",
+  "full_text": "Article 28 - Départage en cas d'égalité...",
+  "poule_id": 200000003055787,
+  "poule": {
+    "id": 200000003055787,
+    "nom": "Poule A",
+    "competition": "Régionale Masculine Seniors - Division 2"
+  },
+  "applied_tiebreaks": [
+    {
+      "points": 2,
+      "nombre_equipes": 4,
+      "equipes": [ /* équipes ex æquo avec position, points, différence, quotient */ ],
+      "confrontations_directes": [ /* rencontres jouées entre ces équipes */ ],
+      "statut": "mini_championnat",
+      "explication": "Égalité multiple (4 équipes à 2 pts) : départage provisoire à la différence générale..."
+    }
   ],
-  "forfeit_rule": "Tout forfait entraîne zéro point et l'exclusion du calcul de goal-average particulier."
+  "presentation": {
+    "short_answer": "Poule A : 2 situation(s) d'égalité de points analysée(s)...",
+    "detail_line": "2 groupe(s) d'équipes à égalité"
+  }
 }
 ```
 
