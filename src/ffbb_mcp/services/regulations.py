@@ -94,6 +94,8 @@ async def get_regulation_article_service(
             "content": art.content,
             "topics": art.topics,
             "source_url": art.source_url,
+            "content_nature": getattr(art, "content_nature", "official_transcription"),
+            "disclaimer": getattr(art, "disclaimer", None),
         },
     }
 
@@ -356,6 +358,7 @@ async def list_regulations_service(season: str = "2026-2027") -> dict[str, Any]:
         "season": season,
         "scope": "national",
         "total_documents": len(docs),
+        "documents": docs,
         "jurisdictions": docs,
         "note": (
             "Le Règlement Sportif Général (RSG FFBB) s'applique par défaut sur tout le territoire national français. "

@@ -59,6 +59,14 @@ class RegulationArticle(BaseModel):
     content_hash: str = Field(
         default="", description="Hash SHA-256 du contenu de l'article pour traçabilité"
     )
+    content_nature: str = Field(
+        default="official_transcription",
+        description="Nature du texte : 'official_transcription' (verbatim officiel), 'editorial_summary' (synthèse indicative), 'unverified_synthesis' (non vérifié)",
+    )
+    disclaimer: str | None = Field(
+        default="Information réglementaire indicative issue des règlements FFBB indexés. Les textes officiels publiés au bulletin officiel FFBB font seuls foi.",
+        description="Avertissement juridique sur la nature et la portée du texte",
+    )
     is_current_for_query: bool = Field(
         default=True, description="Indique si l'article est d'actualité pour la requête"
     )

@@ -165,7 +165,19 @@ async def ffbb_equipes_club_service(
                 numero_equipe = str(numero_equipe)
 
         categorie_code = cat.get("code", "") or ""
-        sexe_suffix = "M" if sexe_field == "M" else "F" if sexe_field == "F" else ""
+        is_mixte = (
+            sexe_field in ("MIXTE", "X", "M/F", "MIX")
+            or "MIXTE" in nom_comp.upper()
+            or comp_code.startswith(("DX", "RX", "NX"))
+        )
+        if sexe_field == "M":
+            sexe_suffix = "M"
+        elif sexe_field == "F":
+            sexe_suffix = "F"
+        elif is_mixte:
+            sexe_suffix = "X"
+        else:
+            sexe_suffix = ""
 
         base_cat = f"{categorie_code}{sexe_suffix}".strip()
         num_suffix = numero_equipe or ""
@@ -1801,16 +1813,27 @@ async def ffbb_head_to_head_service(
             },
         }
 
-    nom_a: str = str(
-        (club_res_a.get("nom") if isinstance(club_res_a, dict) else None)
-        or eff_club_a
-        or "Équipe A"
-    )
-    nom_b: str = str(
-        (club_res_b.get("nom") if isinstance(club_res_b, dict) else None)
-        or eff_club_b
-        or "Équipe B"
-    )
+    def _extract_team_display_name(
+        eq_list: list[dict[str, Any]], club_info: Any, fallback: str
+    ) -> str:
+        if eq_list:
+            t = eq_list[0]
+            nom_eq = t.get("nom_equipe")
+            if nom_eq and str(nom_eq).strip():
+                return str(nom_eq).strip()
+            num = t.get("numero_equipe")
+            base_nom = (
+                club_info.get("nom") if isinstance(club_info, dict) else None
+            ) or fallback
+            if num and str(num) not in ("1", "None", ""):
+                return f"{base_nom} - {num}"
+            return str(base_nom)
+        return str(
+            (club_info.get("nom") if isinstance(club_info, dict) else None) or fallback
+        )
+
+    nom_a: str = _extract_team_display_name(eq_a, club_res_a, eff_club_a or "Équipe A")
+    nom_b: str = _extract_team_display_name(eq_b, club_res_b, eff_club_b or "Équipe B")
 
     poules_a = {str(e["poule_id"]) for e in eq_a if e.get("poule_id")}
     poules_b = {str(e["poule_id"]) for e in eq_b if e.get("poule_id")}

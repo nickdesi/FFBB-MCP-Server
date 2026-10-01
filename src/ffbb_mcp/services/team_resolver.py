@@ -46,14 +46,31 @@ _PHASE_PATTERN = re.compile(
 )
 
 
+def _is_mock(val: Any) -> bool:
+    return hasattr(val, "mock_calls") or hasattr(val, "_mock_self")
+
+
 def _get_search_service(name: str, fallback: Any) -> Any:
-    """Résout dynamiquement un service depuis search ou services pour compatibilité des mocks."""
-    mod = sys.modules.get("ffbb_mcp.services.search")
-    if mod and hasattr(mod, name):
-        return getattr(mod, name)
-    mod_svc = sys.modules.get("ffbb_mcp.services")
-    if mod_svc and hasattr(mod_svc, name):
-        return getattr(mod_svc, name)
+    """Résout dynamiquement un service depuis search, club ou services pour compatibilité des mocks."""
+    for mod_name in [
+        "ffbb_mcp.services.search",
+        "ffbb_mcp.services",
+        "ffbb_mcp.services.club",
+    ]:
+        mod = sys.modules.get(mod_name)
+        if mod and hasattr(mod, name):
+            val = getattr(mod, name)
+            if _is_mock(val):
+                return val
+    # Si aucun mock actif trouvé, chercher dans search puis club puis services
+    for mod_name in [
+        "ffbb_mcp.services.search",
+        "ffbb_mcp.services.club",
+        "ffbb_mcp.services",
+    ]:
+        mod = sys.modules.get(mod_name)
+        if mod and hasattr(mod, name):
+            return getattr(mod, name)
     return fallback
 
 
@@ -183,6 +200,14 @@ def _determine_niveau_label(comp_name: str, comp_type: str, raw_niveau: Any) -> 
             "R3",
             "PNM",
             "PNF",
+            "PRM",
+            "PRF",
+            "PRÉ NATIONALE",
+            "PRE NATIONALE",
+            "PRÉ-NATIONALE",
+            "PRE-NATIONALE",
+            "PRÉNATIONALE",
+            "PRENATIONALE",
             "RÉGION",
             "REGION",
             "REGIONAL",
@@ -503,6 +528,49 @@ async def ffbb_find_team_candidates_service(
                     continue
 
         matching_teams.append(t)
+
+    # 3. Filtrage strict de division si une division canonique a été spécifiée
+    if target_div:
+        strict_div_matching: list[dict[str, Any]] = []
+        for t in matching_teams:
+            c_code = t.get("competition_code")
+            c_nom = t.get("competition")
+            c_cat = (t.get("categorie") or "").upper().strip()
+            c_sexe = (t.get("sexe") or "").upper().strip()
+
+            is_youth_match = bool(
+                target_div.canonical_age
+                and (
+                    c_cat == target_div.canonical_age
+                    or c_cat == target_div.canonical_code
+                )
+                and (not target_div.sex or not c_sexe or c_sexe == target_div.sex)
+            )
+            if (
+                is_youth_match
+                or registry.is_compatible(categorie, c_code, c_nom)
+                or registry.is_compatible(
+                    categorie, t.get("categorie"), t.get("nom") or t.get("team_label")
+                )
+            ):
+                strict_div_matching.append(t)
+
+        if not strict_div_matching:
+            all_labels = [
+                str(t["team_label"]) for t in all_teams if t.get("team_label")
+            ]
+            return {
+                "status": "not_found",
+                "message": (
+                    f"Aucune équipe du club '{club_nom}' n'est engagée dans la division '{categorie}' "
+                    f"(canonique: {target_div.canonical_code}). Aucun rapprochement vers une autre division n'est autorisé."
+                ),
+                "club": club_resolu,
+                "candidates": [],
+                "alternatives": [{"label": lbl} for lbl in sorted(set(all_labels))],
+                "clarification_prompt": None,
+            }
+        matching_teams = strict_div_matching
 
     if not matching_teams and (req_age or req_sexe):
         return {

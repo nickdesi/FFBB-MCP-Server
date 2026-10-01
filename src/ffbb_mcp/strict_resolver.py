@@ -337,7 +337,9 @@ async def resolve_team_strict(
     # PRIORITÉ 4 : Catégorie normalisée & Division exacte (SANS APPROXIMATION)
     # -----------------------------------------------------------------------
     parsed_req = parse_categorie(categorie) if categorie else None
-    target_div = registry.lookup(categorie) if categorie else None
+    target_div, div_team_num = (
+        registry.lookup_with_team_number(categorie) if categorie else (None, None)
+    )
     has_category_metadata = any(
         bool(c.get("categorie") or c.get("competition") or c.get("competition_code"))
         for c in all_teams
@@ -432,8 +434,11 @@ async def resolve_team_strict(
     # Numéro d'équipe
     # -----------------------------------------------------------------------
     eff_num = numero_equipe
-    if eff_num is None and parsed_req and parsed_req.numero_equipe is not None:
-        eff_num = parsed_req.numero_equipe
+    if eff_num is None:
+        if parsed_req and parsed_req.numero_equipe is not None:
+            eff_num = parsed_req.numero_equipe
+        elif div_team_num is not None:
+            eff_num = div_team_num
 
     if eff_num is not None:
         strategies.append(f"filter_team_number_{eff_num}")
@@ -520,13 +525,20 @@ async def resolve_team_strict(
         )
 
     if len(candidates) == 1:
+        # La hiérarchie fanion officielle (équipe 1 dans la division la plus élevée)
+        # est un comportement métier certain (confidence 1.0)
+        has_approximate_fallback = any(
+            "fallback" in s and s != "fallback_highest_division_as_team_1"
+            for s in strategies
+        )
+        confidence_val = 0.8 if has_approximate_fallback else 1.0
         return TeamResolutionResult(
             status=ResponseStatus.OK,
             selected=candidates[0],
             candidates=candidates,
             club_resolu=club_resolu,
             match_strategy=strategies,
-            confidence=1.0,
+            confidence=confidence_val,
         )
 
     # Plusieurs candidats subsistent -> ambiguïté réelle

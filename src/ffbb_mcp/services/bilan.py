@@ -412,7 +412,9 @@ async def _build_bilan_payload(
             "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
         }
 
-    from .club import ffbb_equipes_club_service as _eq_svc  # lazy
+    import ffbb_mcp.services.club as club_module
+
+    _eq_svc = club_module.ffbb_equipes_club_service
 
     eq_tasks = []
     for oid in target_org_ids:
@@ -712,7 +714,18 @@ async def _build_bilan_payload(
     gagnes_count = int(totaux.get("gagnes", 0))
     perdus_count = int(totaux.get("perdus", 0))
     joues_count = int(totaux.get("match_joues", 0))
-    cat_str = categorie or "Toutes catégories"
+    resolved_team_label = None
+    if equipes and len(equipes) == 1:
+        resolved_team_label = equipes[0].get("team_label") or equipes[0].get(
+            "nom_equipe"
+        )
+    elif engagement_id is not None and equipes:
+        for eq in equipes:
+            if str(eq.get("engagement_id") or eq.get("team_id")) == str(engagement_id):
+                resolved_team_label = eq.get("team_label") or eq.get("nom_equipe")
+                break
+
+    cat_str = categorie or resolved_team_label or "Toutes catégories"
     vic_str = f"{gagnes_count} victoire{'s' if gagnes_count > 1 else ''}"
     def_str = f"{perdus_count} défaite{'s' if perdus_count > 1 else ''}"
     short_ans = f"Bilan pour {club_nom} ({cat_str}) : {vic_str}, {def_str} ({joues_count} match(s) joué(s))."
@@ -730,7 +743,7 @@ async def _build_bilan_payload(
 
     res_dict = {
         "club": club_nom,
-        "categorie": categorie or "",
+        "categorie": categorie or resolved_team_label or "",
         "bilan_total": totaux,
         "dynamique": main_dynamique,
         "phase_courante": phase_courante,

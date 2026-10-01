@@ -98,6 +98,62 @@ def parse_markdown_document(
             art_num = header_raw
             art_title = f"{header_raw} - {manifest_entry.title}"
 
+        # Déduction granulaire des topics pour l'article plutôt que recopier tous les topics du document
+        combined_text = f"{art_num} {art_title} {body}".lower()
+        article_topics = []
+        if any(
+            w in combined_text
+            for w in [
+                "départage",
+                "departage",
+                "point-average",
+                "point_average",
+                "mini-championnat",
+                "quotient",
+            ]
+        ):
+            article_topics.append("departages")
+            article_topics.append("point_average")
+        if any(
+            w in combined_text
+            for w in ["brûlage", "brulage", "brûlé", "brule", "équipe réserve"]
+        ):
+            article_topics.append("brulage")
+        if any(w in combined_text for w in ["forfait", "pénalité", "penalite"]):
+            article_topics.append("forfaits")
+        if any(
+            w in combined_text
+            for w in ["licence", "qualification", "qualifié", "mutation"]
+        ):
+            article_topics.append("licences")
+            article_topics.append("qualifications")
+        if any(
+            w in combined_text for w in ["réclamation", "reclamation", "contestation"]
+        ):
+            article_topics.append("reclamations")
+        if any(
+            w in combined_text
+            for w in ["zone", "défense de zone", "temps de jeu", "durée"]
+        ):
+            article_topics.append("terrains")
+
+        # Fallback si aucun topic détecté
+        if not article_topics:
+            article_topics = [
+                t for t in doc_topics if t in combined_text
+            ] or doc_topics[:2]
+
+        # Qualification de la nature du contenu
+        # Article 51 (brûlage avec 'généralement 5 rencontres') est une synthèse indicative
+        if (
+            "généralement" in body.lower()
+            or "51" in art_num
+            or "synthèse" in body.lower()
+        ):
+            art_nature = "editorial_summary"
+        else:
+            art_nature = "official_transcription"
+
         # Création de l'ID unique
         safe_num = re.sub(r"[^\w]+", "_", art_num.lower()).strip("_")
         art_id = f"{doc_id}_{safe_num}"
@@ -114,8 +170,9 @@ def parse_markdown_document(
             content=f"{art_num} - {art_title}\n\n{body}"
             if body
             else f"{art_num} - {art_title}",
-            topics=doc_topics,
+            topics=article_topics,
             source_url=doc_source_url,
+            content_nature=art_nature,
         )
         articles.append(art)
 
@@ -137,8 +194,23 @@ def init_sqlite_schema(conn: sqlite3.Connection) -> None:
         article_title TEXT NOT NULL,
         content TEXT NOT NULL,
         topics TEXT NOT NULL,
-        source_url TEXT
+        source_url TEXT,
+        content_nature TEXT DEFAULT 'official_transcription',
+        disclaimer TEXT
     );
+    """)
+
+    # Migration douce des colonnes pour bases SQLite déjà instanciées
+    cursor.execute("PRAGMA table_info(regulation_articles)")
+    existing_cols = {row[1] for row in cursor.fetchall()}
+    if "content_nature" not in existing_cols:
+        cursor.execute(
+            "ALTER TABLE regulation_articles ADD COLUMN content_nature TEXT DEFAULT 'official_transcription'"
+        )
+    if "disclaimer" not in existing_cols:
+        cursor.execute("ALTER TABLE regulation_articles ADD COLUMN disclaimer TEXT")
+
+    cursor.executescript("""
 
     CREATE VIRTUAL TABLE IF NOT EXISTS regulations_fts USING fts5(
         article_number,
@@ -209,8 +281,9 @@ def index_manifest(
                     """
                     INSERT OR REPLACE INTO regulation_articles (
                         id, document_id, season, level, organizer, categories,
-                        article_number, article_title, content, topics, source_url
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        article_number, article_title, content, topics, source_url,
+                        content_nature, disclaimer
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         art.id,
@@ -224,6 +297,8 @@ def index_manifest(
                         art.content,
                         ",".join(art.topics),
                         art.source_url,
+                        art.content_nature,
+                        art.disclaimer,
                     ),
                 )
                 total_articles += 1

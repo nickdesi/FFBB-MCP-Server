@@ -195,6 +195,7 @@ class RegulationsEngine:
         sql = """
         SELECT a.id, a.document_id, a.season, a.level, a.organizer, a.categories,
                a.article_number, a.article_title, a.content, a.topics, a.source_url,
+               a.content_nature, a.disclaimer,
                bm25(regulations_fts, 5.0, 10.0, 1.0, 5.0, 1.0, 1.0) as rank
         FROM regulations_fts f
         JOIN regulation_articles a ON f.rowid = a.rowid
@@ -233,6 +234,17 @@ class RegulationsEngine:
 
         results = []
         for row in rows:
+            keys = row.keys() if hasattr(row, "keys") else []
+            c_nature = (
+                row["content_nature"]
+                if "content_nature" in keys and row["content_nature"]
+                else "official_transcription"
+            )
+            disc = (
+                row["disclaimer"]
+                if "disclaimer" in keys and row["disclaimer"]
+                else None
+            )
             art = RegulationArticle(
                 id=row["id"],
                 document_id=row["document_id"],
@@ -245,6 +257,8 @@ class RegulationsEngine:
                 content=row["content"],
                 topics=row["topics"].split(",") if row["topics"] else [],
                 source_url=row["source_url"],
+                content_nature=c_nature,
+                disclaimer=disc,
             )
             # FTS5 bm25 renvoie un score négatif (plus petit = plus pertinent)
             base_score = round(abs(float(row["rank"])), 2)
@@ -313,7 +327,9 @@ class RegulationsEngine:
             return []
         return [
             {
+                "id": r["document_id"],
                 "document_id": r["document_id"],
+                "title": r["document_id"].replace("_", " ").title(),
                 "season": r["season"],
                 "level": r["level"],
                 "organizer": r["organizer"],
@@ -337,7 +353,8 @@ class RegulationsEngine:
         cursor = self._conn.cursor()
         sql = """
         SELECT id, document_id, season, level, organizer, categories,
-               article_number, article_title, content, topics, source_url
+               article_number, article_title, content, topics, source_url,
+               content_nature, disclaimer
         FROM regulation_articles
         WHERE season = ?
         """
@@ -366,6 +383,14 @@ class RegulationsEngine:
         if not row:
             return None
 
+        keys = row.keys() if hasattr(row, "keys") else []
+        c_nature = (
+            row["content_nature"]
+            if "content_nature" in keys and row["content_nature"]
+            else "official_transcription"
+        )
+        disc = row["disclaimer"] if "disclaimer" in keys and row["disclaimer"] else None
+
         return RegulationArticle(
             id=row["id"],
             document_id=row["document_id"],
@@ -378,6 +403,8 @@ class RegulationsEngine:
             content=row["content"],
             topics=row["topics"].split(",") if row["topics"] else [],
             source_url=row["source_url"],
+            content_nature=c_nature,
+            disclaimer=disc,
         )
 
     def close(self) -> None:

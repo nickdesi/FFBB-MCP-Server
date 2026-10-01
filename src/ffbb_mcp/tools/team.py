@@ -11,6 +11,7 @@ from pydantic import Field
 if TYPE_CHECKING:
     from mcp.server import MCPServer
 
+from ffbb_mcp.aliases_registry import get_aliases_registry
 from ffbb_mcp.presentation import (
     build_provenance_block,
     format_source_label,
@@ -138,8 +139,11 @@ async def ffbb_bilan(
         await _safe_report_progress(ctx, 0, total=3, message="Résolution du club…")
         effective_refresh = force_refresh
         effective_cat = categorie
+        reg = get_aliases_registry()
+        is_known_div = bool(categorie and reg.lookup(categorie) is not None)
         if (
-            numero_equipe is not None
+            not is_known_div
+            and numero_equipe is not None
             and numero_equipe > 1
             and categorie
             and str(numero_equipe) not in categorie
@@ -379,8 +383,11 @@ async def ffbb_team_summary(
         await _safe_report_progress(ctx, 0, total=3, message="Résolution de l'équipe…")
         parsed_cat = parse_categorie(categorie) if categorie else None
         effective_cat = categorie
+        reg = get_aliases_registry()
+        is_known_div = bool(categorie and reg.lookup(categorie) is not None)
         if (
-            parsed_cat
+            not is_known_div
+            and parsed_cat
             and parsed_cat.numero_equipe is None
             and numero_equipe is not None
         ):
@@ -611,6 +618,11 @@ async def ffbb_team_summary(
             "warnings": [],
         }
 
+        is_cache_hit = (
+            not force_refresh
+            and isinstance(bilan, dict)
+            and bool(bilan.get("_meta", {}).get("cache_hit"))
+        )
         resource_ids = {
             "organisme_id": str(effective_org_id) if effective_org_id else None,
             "engagement_id": str(engagement_id) if engagement_id else None,
@@ -618,8 +630,8 @@ async def ffbb_team_summary(
             "poule_id": str(poule_id) if poule_id else None,
         }
         provenance = build_provenance_block(
-            source="ffbb_api_live",
-            cache_status="miss" if force_refresh else "hit",
+            source="cache" if is_cache_hit else "ffbb_api_live",
+            cache_status="hit" if is_cache_hit else "miss",
             resource_ids=resource_ids,
         )
 

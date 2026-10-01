@@ -114,18 +114,36 @@ class AliasesRegistry:
 
     def lookup(self, query: str | None) -> CanonicalDivision | None:
         """Résout une division ou catégorie demandée par l'utilisateur."""
+        div, _ = self.lookup_with_team_number(query)
+        return div
+
+    def lookup_with_team_number(
+        self, query: str | None
+    ) -> tuple[CanonicalDivision | None, int | None]:
+        """Résout une division et extrait un éventuel numéro d'équipe suffixé (ex: 'NM31' -> NM3, 1)."""
         if not query:
-            return None
+            return None, None
 
         k_norm = normalize_alias_key(query)
         if k_norm in self._exact_alias_index:
-            return self._exact_alias_index[k_norm]
+            return self._exact_alias_index[k_norm], None
 
         k_comp = compact_alias_key(query)
         if k_comp in self._compact_alias_index:
-            return self._compact_alias_index[k_comp]
+            return self._compact_alias_index[k_comp], None
 
-        return None
+        # Recherche avec découpage d'un numéro d'équipe terminal (ex: "NM3 1", "NM31", "PNM-2", "RM22")
+        s = query.strip()
+        for cut in (1, 2):
+            if len(s) > cut and s[-cut:].isdigit():
+                suffix = s[-cut:]
+                base = s[:-cut].rstrip(" -_")
+                if base:
+                    div = self.lookup(base)
+                    if div is not None:
+                        return div, int(suffix)
+
+        return None, None
 
     def is_compatible(
         self,
@@ -137,7 +155,7 @@ class AliasesRegistry:
         if not requested:
             return True
 
-        target = self.lookup(requested)
+        target, _ = self.lookup_with_team_number(requested)
         if target is None:
             # Code ou division non répertoriée dans le registre : vérifier stricte correspondance textuelle
             req_comp = compact_alias_key(requested)
