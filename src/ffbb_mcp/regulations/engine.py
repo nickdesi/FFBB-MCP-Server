@@ -12,6 +12,8 @@ import unicodedata
 from pathlib import Path
 from typing import Any
 
+from ffbb_mcp.utils import _DIACRITICS
+
 from .indexer import index_manifest
 from .models import RegulationArticle, RegulationSearchResult
 
@@ -20,9 +22,9 @@ logger = logging.getLogger(__name__)
 
 def _strip_accents(text: str) -> str:
     """Normalise une chaîne en minuscules sans accents pour le matching sémantique."""
-    return "".join(
-        c for c in unicodedata.normalize("NFD", text) if unicodedata.category(c) != "Mn"
-    ).lower()
+    if text.isascii():
+        return text.lower()
+    return unicodedata.normalize("NFD", text).translate(_DIACRITICS).lower()
 
 
 def find_default_manifest_path() -> Path | None:
