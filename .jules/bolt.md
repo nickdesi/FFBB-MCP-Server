@@ -78,3 +78,6 @@
 ## 2024-05-24 - [Avoid `encode('ascii', 'ignore')` for accent stripping]
 **Learning:** Using `.encode('ascii', 'ignore')` after `unicodedata.normalize("NFD", text)` is extremely fast for stripping accents, but it introduces functional regressions by removing *all* non-ASCII characters (e.g., currency symbols, special typographies), not just the diacritical marks.
 **Action:** When stripping accents, use `str.translate` with a precomputed mapping of 'Mn' (Mark, Nonspacing) category characters to `None`. This is safe and still provides a massive speedup over manual list comprehensions iterating over characters.
+## 2024-05-14 - [False Positive in Code Review for Imports]
+**Learning:** Automated code review tools may incorrectly flag imported constants (like `_DIACRITICS`) as undefined if they were already present in another file (like `ffbb_mcp.utils`) but not modified or included in the patch diff.
+**Action:** Always rely on actual test execution (e.g., `uv run pytest`) to definitively prove the validity of imports and functional correctness, rather than trusting static review assumptions about missing definitions.

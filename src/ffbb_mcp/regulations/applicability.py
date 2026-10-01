@@ -6,6 +6,8 @@ import re
 import unicodedata
 from typing import TYPE_CHECKING, Any
 
+from ffbb_mcp.utils import _DIACRITICS
+
 from .engine import RegulationsEngine, get_regulations_engine
 
 if TYPE_CHECKING:
@@ -58,9 +60,9 @@ HIERARCHY_LEVELS = {
 
 
 def _strip_accents(text: str) -> str:
-    return "".join(
-        c for c in unicodedata.normalize("NFD", text) if unicodedata.category(c) != "Mn"
-    ).lower()
+    if text.isascii():
+        return text.lower()
+    return unicodedata.normalize("NFD", text).translate(_DIACRITICS).lower()
 
 
 def is_sensitive_topic(text: str) -> bool:
