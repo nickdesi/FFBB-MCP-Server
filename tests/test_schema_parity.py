@@ -15,6 +15,8 @@ from ffbb_data_client.config import (
     MEILISEARCH_INDEX_TOURNOIS,
 )
 from ffbb_data_client.data import load_discovery_artefact
+from ffbb_data_client.models.field_set import FieldSet
+from ffbb_data_client.models.query_fields_manager import QueryFieldsManager
 
 from ffbb_mcp.services.poule import _SAISONS_FIELDS
 
@@ -39,6 +41,43 @@ class TestSchemaParity:
                 f"Le champ '{field}' configuré dans _SAISONS_FIELDS n'existe pas dans le schéma Directus ({valid_props})"
             )
 
+    def test_core_entities_query_fields_conform_to_openapi(self):
+        """Vérifie que les projections de champs racine utilisées par le client existent dans les schémas OpenAPI."""
+        openapi = load_discovery_artefact("openapi.json")
+        schemas = openapi.get("components", {}).get("schemas", {})
+
+        checks = [
+            (
+                "ItemsFfbbserverSaisons",
+                QueryFieldsManager.get_saison_fields(FieldSet.DEFAULT),
+            ),
+            (
+                "ItemsFfbbserverCompetitions",
+                QueryFieldsManager.get_competition_fields(FieldSet.DEFAULT),
+            ),
+            (
+                "ItemsFfbbserverOrganismes",
+                QueryFieldsManager.get_organisme_fields(FieldSet.DEFAULT),
+            ),
+            (
+                "ItemsFfbbserverOrganismes",
+                QueryFieldsManager.get_organisme_search_fields(),
+            ),
+            ("ItemsFfbbserverOrganismes", QueryFieldsManager.get_equipes_fields()),
+        ]
+
+        for schema_name, fields in checks:
+            schema = schemas.get(schema_name, {})
+            assert schema, f"Schéma '{schema_name}' introuvable dans openapi.json"
+            valid_props = set(schema.get("properties", {}).keys())
+
+            for field_path in fields:
+                root_property = field_path.split(".")[0]
+                assert root_property in valid_props, (
+                    f"Champ '{root_property}' (de '{field_path}') absent du schéma '{schema_name}' "
+                    f"parmi les propriétés {sorted(valid_props)}"
+                )
+
     def test_meilisearch_indexes_are_available(self):
         """Vérifie que tous les index Meilisearch interrogés sont marqués comme disponibles."""
         indexes_artefact = load_discovery_artefact("indexes.json")
@@ -59,6 +98,37 @@ class TestSchemaParity:
                 f"L'index Meilisearch '{idx}' n'est pas disponible dans les artefacts de découverte"
             )
 
+    def test_meilisearch_key_attributes_exist(self):
+        """Vérifie que les attributs essentiels pour les outils MCP sont présents dans les index Meilisearch."""
+        indexes_artefact = load_discovery_artefact("indexes.json")
+        index_list = indexes_artefact.get("indexes", [])
+        index_keys = {
+            item["indexUid"]: set(item.get("sampleKeys", []))
+            for item in index_list
+            if "indexUid" in item
+        }
+
+        # Pour les organismes, 'id', 'nom', 'code' sont nécessaires pour la résolution de club
+        assert "nom" in index_keys.get(MEILISEARCH_INDEX_ORGANISMES, set()), (
+            "L'attribut 'nom' est absent de l'index Meilisearch organismes"
+        )
+        assert "code" in index_keys.get(MEILISEARCH_INDEX_ORGANISMES, set()), (
+            "L'attribut 'code' est absent de l'index Meilisearch organismes"
+        )
+
+        # Pour les compétitions, 'nom' et 'id' sont obligatoires
+        assert "nom" in index_keys.get(MEILISEARCH_INDEX_COMPETITIONS, set()), (
+            "L'attribut 'nom' est absent de l'index Meilisearch competitions"
+        )
+
+        # Pour les rencontres, les équipes et l'id sont indispensables
+        assert "nomEquipe1" in index_keys.get(MEILISEARCH_INDEX_RENCONTRES, set()), (
+            "L'attribut 'nomEquipe1' est absent de l'index Meilisearch rencontres"
+        )
+        assert "nomEquipe2" in index_keys.get(MEILISEARCH_INDEX_RENCONTRES, set()), (
+            "L'attribut 'nomEquipe2' est absent de l'index Meilisearch rencontres"
+        )
+
     def test_directus_collections_exist_in_discovery(self):
         """Vérifie que les collections Directus principales existent dans collections.json."""
         collections_artefact = load_discovery_artefact("collections.json")
@@ -75,6 +145,8 @@ class TestSchemaParity:
             "ffbbserver_salles",
             "ffbbserver_terrains",
             "ffbbserver_tournois",
+            "ffbbserver_officiels",
+            "ffbbserver_entraineurs",
         ]
 
         for col in required_collections:
