@@ -1,0 +1,392 @@
+# Registre canonique versionné des alias de compétitions, divisions et catégories FFBB
+version: "1.0.0"
+
+aliases:
+  NM1:
+    canonical_code: "NM1"
+    aliases:
+      - "NM1"
+      - "N1M"
+      - "Nationale 1"
+      - "Nationale 1 Masculine"
+      - "Nationale Masculine 1"
+    level: "federal"
+    sex: "M"
+    requires_exact_competition: true
+    is_senior: true
+
+  NM2:
+    canonical_code: "NM2"
+    aliases:
+      - "NM2"
+      - "N2M"
+      - "Nationale 2"
+      - "Nationale 2 Masculine"
+      - "Nationale Masculine 2"
+    level: "federal"
+    sex: "M"
+    requires_exact_competition: true
+    is_senior: true
+
+  NM3:
+    canonical_code: "NM3"
+    aliases:
+      - "NM3"
+      - "N3M"
+      - "Nationale 3"
+      - "Nationale 3 Masculine"
+      - "Nationale Masculine 3"
+    level: "federal"
+    sex: "M"
+    requires_exact_competition: true
+    is_senior: true
+
+  NF1:
+    canonical_code: "NF1"
+    aliases:
+      - "NF1"
+      - "N1F"
+      - "Nationale 1 Féminine"
+      - "Nationale Féminine 1"
+    level: "federal"
+    sex: "F"
+    requires_exact_competition: true
+    is_senior: true
+
+  NF2:
+    canonical_code: "NF2"
+    aliases:
+      - "NF2"
+      - "N2F"
+      - "Nationale 2 Féminine"
+      - "Nationale Féminine 2"
+    level: "federal"
+    sex: "F"
+    requires_exact_competition: true
+    is_senior: true
+
+  NF3:
+    canonical_code: "NF3"
+    aliases:
+      - "NF3"
+      - "N3F"
+      - "Nationale 3 Féminine"
+      - "Nationale Féminine 3"
+    level: "federal"
+    sex: "F"
+    requires_exact_competition: true
+    is_senior: true
+
+  LF2:
+    canonical_code: "LF2"
+    aliases:
+      - "LF2"
+      - "Ligue 2 Féminine"
+      - "Ligue Féminine 2"
+      - "L2F"
+    level: "professional"
+    sex: "F"
+    requires_exact_competition: true
+    is_senior: true
+
+  PNM:
+    canonical_code: "PNM"
+    aliases:
+      - "PNM"
+      - "Pré Nationale Masculine"
+      - "Pre Nationale Masculine"
+      - "Pré-Nationale Masculine"
+      - "Pre-Nationale Masculine"
+      - "PRM"
+      - "Régionale 1 Masculine"
+      - "RM1"
+    level: "regional"
+    sex: "M"
+    requires_exact_competition: true
+    is_senior: true
+
+  PNF:
+    canonical_code: "PNF"
+    aliases:
+      - "PNF"
+      - "Pré Nationale Féminine"
+      - "Pre Nationale Féminine"
+      - "Pré-Nationale Féminine"
+      - "PRF"
+      - "Régionale 1 Féminine"
+      - "RF1"
+    level: "regional"
+    sex: "F"
+    requires_exact_competition: true
+    is_senior: true
+
+  RM2:
+    canonical_code: "RM2"
+    aliases:
+      - "RM2"
+      - "R2M"
+      - "R2"
+      - "Régionale 2 Masculine"
+      - "Regionale 2 Masculine"
+    level: "regional"
+    sex: "M"
+    requires_exact_competition: true
+    is_senior: true
+
+  RF2:
+    canonical_code: "RF2"
+    aliases:
+      - "RF2"
+      - "R2F"
+      - "Régionale 2 Féminine"
+      - "Regionale 2 Féminine"
+    level: "regional"
+    sex: "F"
+    requires_exact_competition: true
+    is_senior: true
+
+  RM3:
+    canonical_code: "RM3"
+    aliases:
+      - "RM3"
+      - "R3M"
+      - "R3"
+      - "Régionale 3 Masculine"
+      - "Regionale 3 Masculine"
+    level: "regional"
+    sex: "M"
+    requires_exact_competition: true
+    is_senior: true
+
+  RF3:
+    canonical_code: "RF3"
+    aliases:
+      - "RF3"
+      - "R3F"
+      - "Régionale 3 Féminine"
+      - "Regionale 3 Féminine"
+    level: "regional"
+    sex: "F"
+    requires_exact_competition: true
+    is_senior: true
+
+  ELITE_2:
+    canonical_code: "ELIT2"
+    aliases:
+      - "Élite 2"
+      - "Elite 2"
+      - "ELIT2"
+      - "ELITE 2"
+    level: "pro"
+    sex: "M"
+    requires_exact_competition: true
+    is_senior: true
+
+  PRO_B:
+    canonical_code: "PROB"
+    aliases:
+      - "Pro B"
+      - "PRO B"
+      - "PROB"
+    level: "pro"
+    sex: "M"
+    requires_exact_competition: true
+    is_senior: true
+
+  BETCLIC_ELITE:
+    canonical_code: "ELITE"
+    aliases:
+      - "Betclic Élite"
+      - "Betclic Elite"
+      - "Élite"
+      - "Elite"
+    level: "pro"
+    sex: "M"
+    requires_exact_competition: true
+    is_senior: true
+
+  ESPOIRS_ELITE:
+    canonical_code: "ESPOIRS"
+    aliases:
+      - "Espoirs"
+      - "Espoirs Élite"
+      - "Espoirs Elite"
+      - "Espoirs Élite 2"
+      - "Espoirs Elite 2"
+      - "Espoirs Pro B"
+    level: "pro"
+    sex: "M"
+    requires_exact_competition: true
+    is_senior: false
+    is_espoir: true
+
+  DM1:
+    canonical_code: "DM1"
+    aliases:
+      - "DM1"
+      - "D1M"
+      - "D1"
+      - "Départementale 1 Masculine"
+      - "Departementale 1 Masculine"
+    level: "departmental"
+    sex: "M"
+    requires_exact_competition: true
+    is_senior: true
+
+  DF1:
+    canonical_code: "DF1"
+    aliases:
+      - "DF1"
+      - "D1F"
+      - "Départementale 1 Féminine"
+      - "Departementale 1 Féminine"
+    level: "departmental"
+    sex: "F"
+    requires_exact_competition: true
+    is_senior: true
+
+  DM2:
+    canonical_code: "DM2"
+    aliases:
+      - "DM2"
+      - "D2M"
+      - "D2"
+      - "Départementale 2 Masculine"
+      - "Departementale 2 Masculine"
+    level: "departmental"
+    sex: "M"
+    requires_exact_competition: true
+    is_senior: true
+
+  DF2:
+    canonical_code: "DF2"
+    aliases:
+      - "DF2"
+      - "D2F"
+      - "Départementale 2 Féminine"
+      - "Departementale 2 Féminine"
+    level: "departmental"
+    sex: "F"
+    requires_exact_competition: true
+    is_senior: true
+
+  DM3:
+    canonical_code: "DM3"
+    aliases:
+      - "DM3"
+      - "D3M"
+      - "D3"
+      - "Départementale 3 Masculine"
+      - "Departementale 3 Masculine"
+    level: "departmental"
+    sex: "M"
+    requires_exact_competition: true
+    is_senior: true
+
+  DF3:
+    canonical_code: "DF3"
+    aliases:
+      - "DF3"
+      - "D3F"
+      - "Départementale 3 Féminine"
+      - "Departementale 3 Féminine"
+    level: "departmental"
+    sex: "F"
+    requires_exact_competition: true
+    is_senior: true
+
+  U13M:
+    canonical_code: "U13M"
+    aliases:
+      - "U13M"
+      - "U13 Masculin"
+      - "U13 Garçons"
+      - "U13 Garcons"
+      - "Benjamins"
+    canonical_age: "U13"
+    sex: "M"
+    requires_team_number_if_multiple: true
+    is_senior: false
+
+  U13F:
+    canonical_code: "U13F"
+    aliases:
+      - "U13F"
+      - "U13 Féminin"
+      - "U13 Filles"
+      - "Benjamines"
+    canonical_age: "U13"
+    sex: "F"
+    requires_team_number_if_multiple: true
+    is_senior: false
+
+  U15M:
+    canonical_code: "U15M"
+    aliases:
+      - "U15M"
+      - "U15 Masculin"
+      - "U15 Garçons"
+      - "U15 Garcons"
+      - "Minimes Masculins"
+    canonical_age: "U15"
+    sex: "M"
+    requires_team_number_if_multiple: true
+    is_senior: false
+
+  U15F:
+    canonical_code: "U15F"
+    aliases:
+      - "U15F"
+      - "U15 Féminin"
+      - "U15 Filles"
+      - "Minimes Filles"
+    canonical_age: "U15"
+    sex: "F"
+    requires_team_number_if_multiple: true
+    is_senior: false
+
+  U18M:
+    canonical_code: "U18M"
+    aliases:
+      - "U18M"
+      - "U18 Masculin"
+      - "U18 Garçons"
+      - "Cadets"
+    canonical_age: "U18"
+    sex: "M"
+    requires_team_number_if_multiple: true
+    is_senior: false
+
+  U18F:
+    canonical_code: "U18F"
+    aliases:
+      - "U18F"
+      - "U18 Féminin"
+      - "U18 Filles"
+      - "Cadettes"
+    canonical_age: "U18"
+    sex: "F"
+    requires_team_number_if_multiple: true
+    is_senior: false
+
+  U21M:
+    canonical_code: "U21M"
+    aliases:
+      - "U21M"
+      - "U21 Masculin"
+      - "Juniors Masculins"
+    canonical_age: "U21"
+    sex: "M"
+    requires_team_number_if_multiple: true
+    is_senior: false
+
+  U21F:
+    canonical_code: "U21F"
+    aliases:
+      - "U21F"
+      - "U21 Féminin"
+      - "Juniors Filles"
+    canonical_age: "U21"
+    sex: "F"
+    requires_team_number_if_multiple: true
+    is_senior: false

@@ -225,6 +225,9 @@ ENV_DESCRIPTIONS = {
     "FFBB_REGULATIONS_MANIFEST": "Chemin explicite vers le fichier manifest.yaml des règlements sportifs",
     "FFBB_DATA_DIR": "Répertoire racine contenant les données statiques (ex: regulations, cache)",
     "MCP_STATELESS_HTTP": "Activer le mode stateless HTTP MCP spec 2026-07-28 sans session (défaut : true)",
+    "GIT_SHA": "Commit SHA Git déployé exposé dans ffbb_version et /health",
+    "BUILD_SHA": "Build SHA de l'image conteneurisée",
+    "COMMIT_SHA": "Alias de commit SHA pour les déploiements CI/CD",
 }
 
 

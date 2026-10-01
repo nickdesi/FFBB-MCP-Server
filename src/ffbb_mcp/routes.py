@@ -11,7 +11,7 @@ import logging
 import os
 import platform
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from mcp.server import MCPServer
@@ -169,34 +169,36 @@ def register_routes(mcp: MCPServer) -> None:
         hours = int((uptime_s % 86400) // 3600)
         minutes = int((uptime_s % 3600) // 60)
         seconds = int(uptime_s % 60)
-        return OrjsonResponse(
-            {
-                "status": summary["status"],
-                "service": "ffbb-mcp",
-                "version": _PACKAGE_VERSION,
-                "transport": "streamable-http",
-                "spec": "2026-07-28",
-                "uptime_seconds": round(uptime_s, 1),
-                "uptime_human": f"{days}j {hours:02d}:{minutes:02d}:{seconds:02d}",
-                "api_calls_total": summary["api_calls_total"],
-                "api_calls_success": summary["api_calls_success"],
-                "api_errors_total": summary["api_errors_total"],
-                "api_error_rate": round(summary["api_error_rate"], 4),
-                "api_avg_latency_ms": round(
-                    summary["api_avg_latency_seconds"] * 1000, 2
-                ),
-                "api_inflight_requests": summary["api_inflight_requests"],
-                "cache_hits_total": summary["cache_hits_total"],
-                "cache_misses_total": summary["cache_misses_total"],
-                "cache_hit_ratio_global": round(summary["cache_hit_ratio_global"], 4),
-                "timestamp": datetime.datetime.now(datetime.UTC)
-                .replace(tzinfo=None)
-                .isoformat()
-                + "Z",
-                "python_version": platform.python_version(),
-                "public_url": _get_public_base_url(),
-            }
-        )
+        from ffbb_mcp.tools.system import get_build_sha
+
+        build_sha = get_build_sha()
+        health_payload: dict[str, Any] = {
+            "status": summary["status"],
+            "service": "ffbb-mcp",
+            "version": _PACKAGE_VERSION,
+            "build_sha": build_sha,
+            "git_sha": build_sha,
+            "transport": "streamable-http",
+            "spec": "2026-07-28",
+            "uptime_seconds": round(uptime_s, 1),
+            "uptime_human": f"{days}j {hours:02d}:{minutes:02d}:{seconds:02d}",
+            "api_calls_total": summary["api_calls_total"],
+            "api_calls_success": summary["api_calls_success"],
+            "api_errors_total": summary["api_errors_total"],
+            "api_error_rate": round(summary["api_error_rate"], 4),
+            "api_avg_latency_ms": round(summary["api_avg_latency_seconds"] * 1000, 2),
+            "api_inflight_requests": summary["api_inflight_requests"],
+            "cache_hits_total": summary["cache_hits_total"],
+            "cache_misses_total": summary["cache_misses_total"],
+            "cache_hit_ratio_global": round(summary["cache_hit_ratio_global"], 4),
+            "timestamp": datetime.datetime.now(datetime.UTC)
+            .replace(tzinfo=None)
+            .isoformat()
+            + "Z",
+            "python_version": platform.python_version(),
+            "public_url": _get_public_base_url(),
+        }
+        return OrjsonResponse(health_payload)
 
     @mcp.custom_route("/metrics", methods=["GET"])  # type: ignore[untyped-decorator]
     async def metrics(_request: Request) -> Response:

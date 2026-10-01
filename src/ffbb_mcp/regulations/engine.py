@@ -90,6 +90,7 @@ class RegulationsEngine:
         self.db_path = db_path
         self.manifest_path = manifest_path or find_default_manifest_path()
         self._conn: sqlite3.Connection | None = None
+        self._manifest_titles_cache: dict[str, str] | None = None
         self._ensure_initialized()
 
     def _ensure_initialized(self) -> None:
@@ -298,6 +299,23 @@ class RegulationsEngine:
 
         return results
 
+    def _get_manifest_titles(self) -> dict[str, str]:
+        """Charge les titres officiels des documents déclarés dans le manifeste."""
+        if hasattr(self, "_manifest_titles_cache") and self._manifest_titles_cache:
+            return self._manifest_titles_cache
+        titles: dict[str, str] = {}
+        if self.manifest_path and self.manifest_path.exists():
+            with contextlib.suppress(Exception):
+                import yaml
+
+                with open(self.manifest_path, encoding="utf-8") as f:
+                    m = yaml.safe_load(f) or {}
+                    for d in m.get("documents", []):
+                        if isinstance(d, dict) and "id" in d and "title" in d:
+                            titles[d["id"]] = str(d["title"])
+        self._manifest_titles_cache = titles
+        return titles
+
     def list_available_documents(
         self, season: str = "2026-2027"
     ) -> list[dict[str, Any]]:
@@ -327,11 +345,15 @@ class RegulationsEngine:
         except sqlite3.OperationalError as e:
             logger.error(f"Erreur SQL list_available_documents: {e}")
             return []
+
+        manifest_titles = self._get_manifest_titles()
         return [
             {
                 "id": r["document_id"],
                 "document_id": r["document_id"],
-                "title": r["document_id"].replace("_", " ").title(),
+                "title": manifest_titles.get(
+                    r["document_id"], r["document_id"].replace("_", " ").title()
+                ),
                 "season": r["season"],
                 "level": r["level"],
                 "organizer": r["organizer"],

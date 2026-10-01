@@ -57,13 +57,33 @@ class CanonicalDivision(BaseModel):
     requires_team_number_if_multiple: bool = False
 
 
+def find_default_aliases_path() -> Path:
+    """Résout de façon résiliente le chemin vers competition_aliases.yaml en dev, package ou Docker."""
+    import os
+
+    candidates = [
+        Path(__file__).parent / "data" / "competition_aliases.yaml",
+        Path("/app/data/competition_aliases.yaml"),
+        Path(os.environ.get("FFBB_DATA_DIR", "/app/data")) / "competition_aliases.yaml",
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "ffbb_mcp"
+        / "data"
+        / "competition_aliases.yaml",
+        Path(__file__).resolve().parents[2] / "data" / "competition_aliases.yaml",
+        Path("/app/src/ffbb_mcp/data/competition_aliases.yaml"),
+    ]
+    for p in candidates:
+        if p.exists():
+            return p
+    return Path(__file__).parent / "data" / "competition_aliases.yaml"
+
+
 class AliasesRegistry:
     """Registre en mémoire avec index inversé pour une recherche rapide et stricte."""
 
     def __init__(self, yaml_path: Path | None = None) -> None:
-        self.yaml_path = yaml_path or (
-            Path(__file__).parent / "data" / "competition_aliases.yaml"
-        )
+        self.yaml_path = yaml_path or find_default_aliases_path()
         self.divisions: dict[str, CanonicalDivision] = {}
         self._exact_alias_index: dict[str, CanonicalDivision] = {}
         self._compact_alias_index: dict[str, CanonicalDivision] = {}

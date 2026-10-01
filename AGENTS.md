@@ -185,6 +185,7 @@ Avant push/tag/release :
 | Variable | Défaut | Usage |
 |----------|--------|-------|
 | `XDG_CACHE_HOME` | `` | Dossier racine pour stocker les fichiers de cache persistants (ex: acronymes, benchmark) |
+| `FFBB_DATA_DIR` | `/app/data` | Répertoire racine contenant les données statiques (ex: regulations, cache) |
 | `MCP_MODE` | `stdio` | Mode de transport (`stdio` / `streamable-http`) |
 | `MCP_STATELESS_HTTP` | `true` | Activer le mode stateless HTTP MCP spec 2026-07-28 sans session (défaut : true) |
 | `ENABLE_DNS_PROTECTION` | `` | Activer/désactiver explicitement la protection contre le DNS rebinding |
@@ -194,7 +195,6 @@ Avant push/tag/release :
 | `FFBB_SERVICE_CACHE_PERSIST` | `1` | Activer la persistance des caches service sur disque (SQLite) entre redémarrages |
 | `FFBB_KNOWN_CLUB_IDS` | `` | Override JSON de la liste d'organisme_id connus pour les prompts MCP (fallback : _DEFAULT_KNOWN_CLUB_IDS) |
 | `FFBB_REGULATIONS_MANIFEST` | `` | Chemin explicite vers le fichier manifest.yaml des règlements sportifs |
-| `FFBB_DATA_DIR` | `` | Répertoire racine contenant les données statiques (ex: regulations, cache) |
 | `FFBB_WARMUP_API_KEY` | `` | Clé d'API secrète requise pour déclencher le warmup via l'endpoint HTTP `/warmup` |
 | `FFBB_WARMUP_MAX_ORGANISMES` | `50` | Nombre maximum d'organismes à charger lors d'un cycle de warmup |
 | `PUBLIC_URL` | `https://ffbb.desimone.fr` | URL publique pour liens/sitemap |
@@ -211,6 +211,9 @@ Avant push/tag/release :
 | `FFBB_SWR_MAX_TASKS` | `32` | Nombre max de tâches SWR concurrentes (défaut : 32) |
 | `FFBB_WARMUP_ORGANISMES` | `` | Liste d'organisme_id séparés par des virgules à préchauffer au démarrage |
 | `FFBB_WARMUP_CONCURRENCY` | `5` | Concurrence maximale lors du préchauffage du cache |
+| `GIT_SHA` | `` | Commit SHA Git déployé exposé dans ffbb_version et /health |
+| `BUILD_SHA` | `` | Build SHA de l'image conteneurisée |
+| `COMMIT_SHA` | `` | Alias de commit SHA pour les déploiements CI/CD |
 | `FFBB_ENABLE_BENCHMARK` | — | Activer endpoint `/benchmark/run` (sécurité) |
 | `FFBB_POULE_FETCH_CONCURRENCY` | — | Concurrence max fetch poules |
 | `FFBB_CACHE_TTL_*` | — | TTL par type de cache (voir cache_strategy.py) |

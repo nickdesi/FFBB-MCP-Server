@@ -196,16 +196,35 @@ def _build_default_get_presentation(
     }
 
 
+def get_build_sha() -> str | None:
+    """Retourne le SHA de commit Git déployé ou de build."""
+    sha = (
+        os.environ.get("GIT_SHA")
+        or os.environ.get("BUILD_SHA")
+        or os.environ.get("COMMIT_SHA")
+    )
+    if sha and sha != "unknown":
+        return sha[:7]
+    try:
+        import subprocess
+
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL
+        ).strip()[:7]
+    except Exception:
+        return None
+
+
 @track_tool_usage("ffbb_version")
 async def ffbb_version() -> dict[str, Any]:
     """Informations de version et configuration runtime du serveur FFBB MCP.
 
     Retourne `dict` compact et typé `{package_version, mcp_sdk_version,
-    python_version, transport, cache_ttls}` ; lecture seule, idempotent, sans
+    python_version, transport, cache_ttls, build_sha, git_sha}` ; lecture seule, idempotent, sans
     appel réseau externe ni effet de bord, <10ms.
     """
     mode = os.environ.get("MCP_MODE", "stdio").lower()
-    return {
+    res: dict[str, Any] = {
         "package_version": _PACKAGE_VERSION,
         "mcp_sdk_version": _sdk_version("mcp"),
         "python_version": platform.python_version(),
@@ -214,6 +233,11 @@ async def ffbb_version() -> dict[str, Any]:
         else "stdio",
         "cache_ttls": get_cache_ttls(),
     }
+    sha = get_build_sha()
+    if sha:
+        res["build_sha"] = sha
+        res["git_sha"] = sha
+    return res
 
 
 @track_tool_usage("ffbb_search")

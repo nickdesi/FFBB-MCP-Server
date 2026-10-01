@@ -20,6 +20,8 @@ RUN uv sync --frozen --no-dev --no-editable
 
 FROM python:3.14-slim
 
+ARG GIT_SHA="unknown"
+ENV GIT_SHA=${GIT_SHA}
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV MCP_MODE=streamable-http
@@ -31,11 +33,10 @@ WORKDIR /app
 ENV HOME=/app
 
 COPY --from=builder /opt/venv /opt/venv
+COPY src/ ./src/
 COPY assets/ ./assets/
 COPY website/ ./website/
 COPY data/ ./data/
-
-
 
 # Création du répertoire de données persistant
 RUN mkdir -p /app/data

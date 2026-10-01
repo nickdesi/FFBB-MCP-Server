@@ -26,6 +26,7 @@ tools/skill_router/
 
 # Runtime data
 data/*
+!data/competition_aliases.yaml
 !data/regulations/
 !data/regulations/**
 
