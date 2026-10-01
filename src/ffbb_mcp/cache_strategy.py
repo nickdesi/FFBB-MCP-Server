@@ -97,7 +97,7 @@ def get_rencontre_ttl(rencontre_data: dict | None = None) -> int:
     # Match futur
     if is_in_match_window():
         return 300
-    return 3_600
+    return 86_400 if not is_post_match_cooling() else 1_800
 
 
 # TTLs statiques pour les autres caches
@@ -108,8 +108,11 @@ def get_static_ttl(cache_name: str) -> int:
     if (val := _STATIC_TTLS.get(cache_name)) is not None:
         return val
 
-    if cache_name == "bilan" or cache_name == "classement":
-        return 900 if is_in_match_window() else 3_600
+    if cache_name == "classement":
+        return 300 if is_in_match_window() else 86_400
+
+    if cache_name == "bilan":
+        return 300 if is_in_match_window() else 3_600
 
     if cache_name == "calendrier":
         if is_in_match_window():

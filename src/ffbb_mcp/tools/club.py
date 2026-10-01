@@ -49,7 +49,11 @@ async def ffbb_club(
             "classement",
         ],
         Field(
-            description="Action : 'calendrier' (matchs pluriels/restants), 'equipes' ou 'classement'."
+            description=(
+                "Action : 'calendrier' (matchs pluriels/restants), 'equipes' ou 'classement'. "
+                "Pour 'classement' : Classement seul d'une poule ou d'un club. "
+                "Utiliser uniquement si poule_id est connu et que team_summary n'a pas été appelé."
+            )
         ),
     ] = "calendrier",
     organisme_id: Annotated[
@@ -180,7 +184,10 @@ async def ffbb_club(
         Field(description="Regroupement : competition, team ou date."),
     ] = None,
 ) -> list[dict[str, Any]] | list[CalendrierMatch] | dict[str, Any]:
-    """Outils agrégés club : calendrier (matchs pluriels), équipes engagées ou classement."""
+    """Outils agrégés club : calendrier (matchs pluriels), équipes engagées ou classement.
+
+    Pour 'classement' : Classement seul d'une poule ou d'un club. Utiliser uniquement si poule_id est connu et que team_summary n'a pas été appelé.
+    """
     cal_svc = _get_server_service(
         "get_calendrier_club_service", get_calendrier_club_service
     )

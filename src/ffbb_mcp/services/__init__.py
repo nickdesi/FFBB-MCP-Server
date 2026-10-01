@@ -31,6 +31,7 @@ from .common import (
 from .poule import (
     ffbb_get_classement_service,
     find_team_poule_service,
+    format_compact_classement,
     format_poule_response,
     get_competition_service,
     get_engagement_service,
@@ -92,6 +93,7 @@ __all__ = [
     "ffbb_search_service",
     "filter_inactive_ententes",
     "find_team_poule_service",
+    "format_compact_classement",
     "format_poule_response",
     "get_cache_ttls",
     "get_calendrier_club_service",

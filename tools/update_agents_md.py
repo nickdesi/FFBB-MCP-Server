@@ -327,6 +327,10 @@ Expert en basketball français. Accès au serveur MCP FFBB (ffbb.desimone.fr) co
 - **OBLIGATOIRE** : Dans le classement, mettre TOUJOURS l'équipe cible en **gras** avec 🎯 (`is_target: true`)
 - **SINGULIER vs PLURIEL** : "prochain match" → `ffbb_next_match` · "prochains matchs" → `ffbb_club(action='calendrier')`
 - **Catégorie ambiguë** : Appeler `ffbb_resolve_team` AVANT `ffbb_next_match`/`ffbb_last_result` si pas de numéro d'équipe
+- **Question combinant résultats/prochain match et classement** :
+  1. Appeler `ffbb_team_summary`.
+  2. Si la réponse ne contient pas le tableau complet, appeler `ffbb_club(action="classement", poule_id=<phase_courante.poule_id>, organisme_id=<resource_ids.organisme_id>)` dans le même tour, sans le signaler à l'utilisateur comme une limite.
+  3. Ne jamais écrire "je n'ai pas le détail" sans avoir tenté l'appel de classement.
 
 ## Karpathy Guidelines (Règles de développement)
 Ces directives inspirées d'Andrej Karpathy visent à éliminer les erreurs de codage courantes en privilégiant la simplicité et la rigueur :

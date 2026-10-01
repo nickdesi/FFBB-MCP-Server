@@ -53,6 +53,7 @@ __all__ = [
     "_is_live_match",
     "ffbb_get_classement_service",
     "find_team_poule_service",
+    "format_compact_classement",
     "format_poule_response",
     "get_competition_service",
     "get_engagement_service",
@@ -861,3 +862,282 @@ async def get_engagement_service(
         cache_name="engagement",
         cache=state.cache_engagement,
     )
+
+
+def format_compact_classement(
+    classement_list: list[dict[str, Any]] | None,
+    poule_data: dict[str, Any] | None = None,
+    *,
+    detail: bool = False,
+    target_organisme_id: int | str | None = None,
+    target_num: int | str | None = None,
+) -> dict[str, Any]:
+    """Construit la représentation compacte du classement (cols, rows, target_pos, departage).
+
+    Trie selon l'art. 28 du RSG (point-average particulier / confrontations directes,
+    différence particulière, quotient général).
+    Élimine logos et champs nuls/zéro par défaut (sauf si detail=True).
+    Si classement vide/non démarré, renvoie rows=[] et warning 'classement_indisponible'.
+    """
+    import re
+    from collections import defaultdict
+
+    base_cols = ["pos", "equipe", "pts", "j", "g", "p", "diff"]
+
+    if not classement_list:
+        return {
+            "cols": list(base_cols),
+            "rows": [],
+            "target_pos": None,
+            "warning": "classement_indisponible",
+        }
+
+    def _norm_t(name: str) -> str:
+        return re.sub(r"[^a-z0-9]", "", (name or "").lower())
+
+    # Extraire les rencontres jouées de la poule pour le départage direct Art. 28
+    played_matches: list[dict[str, Any]] = []
+    if isinstance(poule_data, dict):
+        for r in poule_data.get("rencontres") or []:
+            if not isinstance(r, dict):
+                continue
+            sc1 = r.get("resultatEquipe1")
+            sc2 = r.get("resultatEquipe2")
+            if (
+                sc1 is not None
+                and sc2 is not None
+                and str(sc1).isdigit()
+                and str(sc2).isdigit()
+            ):
+                played_matches.append(
+                    {
+                        "eq1": str(r.get("nomEquipe1") or ""),
+                        "sc1": int(sc1),
+                        "eq2": str(r.get("nomEquipe2") or ""),
+                        "sc2": int(sc2),
+                    }
+                )
+
+    # Grouper par points pour identifier les égalités
+    points_groups: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    for c in classement_list:
+        if not isinstance(c, dict):
+            continue
+        try:
+            pts_val = int(c.get("points") or 0)
+        except (ValueError, TypeError):
+            pts_val = 0
+        points_groups[pts_val].append(c)
+
+    has_any_tie = any(len(teams) > 1 for teams in points_groups.values())
+    used_h2h = False
+
+    # Tri par groupe de points selon RSG Art. 28
+    sorted_teams: list[dict[str, Any]] = []
+    for pts in sorted(points_groups.keys(), reverse=True):
+        group = points_groups[pts]
+        if len(group) == 1:
+            sorted_teams.append(group[0])
+            continue
+
+        # Égalité à 2 équipes (Art. 28.2)
+        if len(group) == 2:
+            t1, t2 = group[0], group[1]
+            n1 = _norm_t(t1.get("equipe") or t1.get("nom") or "")
+            n2 = _norm_t(t2.get("equipe") or t2.get("nom") or "")
+
+            # Chercher confrontations directes
+            h2h: list[dict[str, Any]] = []
+            for m in played_matches:
+                m1 = _norm_t(m["eq1"])
+                m2 = _norm_t(m["eq2"])
+                if (m1 == n1 and m2 == n2) or (m1 == n2 and m2 == n1):
+                    h2h.append(m)
+
+            if h2h:
+                used_h2h = True
+                wins_1 = 0
+                wins_2 = 0
+                diff_1 = 0
+                for m in h2h:
+                    m1 = _norm_t(m["eq1"])
+                    is_t1_first = m1 == n1
+                    s1 = m["sc1"] if is_t1_first else m["sc2"]
+                    s2 = m["sc2"] if is_t1_first else m["sc1"]
+                    diff_1 += s1 - s2
+                    if s1 > s2:
+                        wins_1 += 1
+                    elif s2 > s1:
+                        wins_2 += 1
+
+                if wins_1 > wins_2:
+                    sorted_teams.extend([t1, t2])
+                elif wins_2 > wins_1:
+                    sorted_teams.extend([t2, t1])
+                elif diff_1 > 0:
+                    sorted_teams.extend([t1, t2])
+                elif diff_1 < 0:
+                    sorted_teams.extend([t2, t1])
+                else:
+                    # Départage quotient / différence générale
+                    d1 = int(t1.get("difference") or 0)
+                    d2 = int(t2.get("difference") or 0)
+                    if d1 >= d2:
+                        sorted_teams.extend([t1, t2])
+                    else:
+                        sorted_teams.extend([t2, t1])
+            else:
+                # Aucune confrontation directe : différence générale puis quotient
+                d1 = int(t1.get("difference") or 0)
+                d2 = int(t2.get("difference") or 0)
+                if d1 >= d2:
+                    sorted_teams.extend([t1, t2])
+                else:
+                    sorted_teams.extend([t2, t1])
+
+        # Égalité à 3+ équipes (Art. 28.3 - Mini-championnat)
+        else:
+            names = {_norm_t(t.get("equipe") or t.get("nom") or ""): t for t in group}
+            # Chercher matchs du mini-championnat
+            mini_h2h: list[dict[str, Any]] = []
+            for m in played_matches:
+                m1 = _norm_t(m["eq1"])
+                m2 = _norm_t(m["eq2"])
+                if m1 in names and m2 in names:
+                    mini_h2h.append(m)
+
+            if mini_h2h:
+                used_h2h = True
+                mini_stats: dict[str, dict[str, int]] = {
+                    nm: {"pts": 0, "diff": 0, "for": 0} for nm in names
+                }
+                for m in mini_h2h:
+                    m1 = _norm_t(m["eq1"])
+                    m2 = _norm_t(m["eq2"])
+                    sc1 = m["sc1"]
+                    sc2 = m["sc2"]
+                    mini_stats[m1]["for"] += sc1
+                    mini_stats[m1]["diff"] += sc1 - sc2
+                    mini_stats[m2]["for"] += sc2
+                    mini_stats[m2]["diff"] += sc2 - sc1
+                    if sc1 > sc2:
+                        mini_stats[m1]["pts"] += 2
+                        mini_stats[m2]["pts"] += 1
+                    elif sc2 > sc1:
+                        mini_stats[m2]["pts"] += 2
+                        mini_stats[m1]["pts"] += 1
+
+                def _mini_sort_key(
+                    t: dict[str, Any],
+                    _stats: dict[str, dict[str, int]] = mini_stats,
+                ) -> tuple[int, int, int, int]:
+                    nm = _norm_t(t.get("equipe") or t.get("nom") or "")
+                    st = _stats.get(nm, {"pts": 0, "diff": 0, "for": 0})
+                    gen_diff = int(t.get("difference") or 0)
+                    return (st["pts"], st["diff"], gen_diff, st["for"])
+
+                sorted_group = sorted(group, key=_mini_sort_key, reverse=True)
+                sorted_teams.extend(sorted_group)
+            else:
+
+                def _gen_sort_key(t: dict[str, Any]) -> tuple[int, int]:
+                    gen_diff = int(t.get("difference") or 0)
+                    gen_marques = int(t.get("paniers_marques") or 0)
+                    return (gen_diff, gen_marques)
+
+                sorted_group = sorted(group, key=_gen_sort_key, reverse=True)
+                sorted_teams.extend(sorted_group)
+
+    # Déterminer la valeur de departage (RSG Art. 28)
+    departage: str | None = None
+    if has_any_tie:
+        departage = "confrontation" if used_h2h else "quotient"
+
+    # Vérification des colonnes détaillées si detail=True
+    detail_col_defs = [
+        ("penalites_arbitrage", "penalites_arbitrage"),
+        ("penalites_entraineur", "penalites_entraineur"),
+        ("penalites_diverses", "penalites_diverses"),
+        ("nombre_forfaits", "forfaits"),
+        ("nombre_defauts", "defauts"),
+        ("point_initiaux", "point_initiaux"),
+        ("logo_url", "logo_url"),
+    ]
+
+    active_detail_cols: list[tuple[str, str]] = []
+    if detail:
+        for attr_key, col_label in detail_col_defs:
+            if any(
+                t.get(attr_key) is not None
+                and t.get(attr_key) != 0
+                and t.get(attr_key) != ""
+                for t in sorted_teams
+            ):
+                active_detail_cols.append((attr_key, col_label))
+
+    cols = list(base_cols)
+    for _, col_label in active_detail_cols:
+        cols.append(col_label)
+
+    rows: list[list[Any]] = []
+    target_pos: int | None = None
+    target_org_str = (
+        str(target_organisme_id) if target_organisme_id is not None else None
+    )
+    target_num_str = str(target_num) if target_num is not None else None
+
+    for idx, t in enumerate(sorted_teams):
+        pos = idx + 1
+        eq_name = str(t.get("equipe") or t.get("nom") or "")
+        try:
+            pts = int(t.get("points") or 0)
+        except (ValueError, TypeError):
+            pts = 0
+        try:
+            j = int(t.get("match_joues") or 0)
+        except (ValueError, TypeError):
+            j = 0
+        try:
+            g = int(t.get("gagnes") or 0)
+        except (ValueError, TypeError):
+            g = 0
+        try:
+            p = int(t.get("perdus") or 0)
+        except (ValueError, TypeError):
+            p = 0
+        try:
+            diff = int(t.get("difference") or 0)
+        except (ValueError, TypeError):
+            diff = 0
+
+        # Identification de l'équipe cible
+        is_target = bool(t.get("is_target"))
+        if not is_target and target_org_str:
+            t_org = str(t.get("organisme_id") or "")
+            if t_org == target_org_str:
+                if target_num_str:
+                    t_num = str(t.get("numero_equipe") or "")
+                    if t_num == target_num_str or not t_num:
+                        is_target = True
+                else:
+                    is_target = True
+
+        if is_target and target_pos is None:
+            target_pos = pos
+
+        row: list[Any] = [pos, eq_name, pts, j, g, p, diff]
+        for attr_key, _ in active_detail_cols:
+            val = t.get(attr_key)
+            row.append(val if val is not None else 0)
+
+        rows.append(row)
+
+    res: dict[str, Any] = {
+        "cols": cols,
+        "rows": rows,
+        "target_pos": target_pos,
+    }
+    if departage is not None:
+        res["departage"] = departage
+
+    return res

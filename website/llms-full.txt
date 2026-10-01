@@ -19,12 +19,15 @@ Il repose sur une architecture modulaire :
 ## 2. Spécification Détaillée des 17 Outils MCP
 
 ### `ffbb_team_summary`
-- **Description** : Résumé tout-en-un d'une équipe (position au classement, victoires/défaites, dernier match et prochain match).
+- **Description** : 1 appel pour bilan + classement complet + dernier/prochain match d'une équipe. Préférer cet outil pour toute question combinant résultats et classement.
 - **Paramètres** :
   - `club_name` (str, optionnel) : Nom du club.
   - `organisme_id` (str|int, optionnel) : Identifiant FFBB du club.
   - `categorie` (str, optionnel) : Catégorie d'équipe (ex: `"U13M"`, `"SeniorM"`).
   - `numero_equipe` (int, optionnel) : Numéro d'équipe.
+  - `include` (list[str], optionnel) : Blocs à inclure (`"bilan"`, `"last"`, `"next"`, `"classement"`, `"dynamique"`). Défaut: `["bilan", "last", "next", "classement"]`.
+  - `detail` (bool, optionnel) : Si true, inclut colonnes détaillées et métadonnées complètes. Défaut: false.
+  - `force_refresh` (bool, optionnel) : Contourne le cache si true.
 
 ### `ffbb_lives`
 - **Description** : Liste en temps réel de toutes les rencontres en cours avec scores par quart-temps et temps forts (cache 15s).
@@ -46,11 +49,12 @@ Il repose sur une architecture modulaire :
   - `categorie` (str, optionnel) : Catégorie d'équipe.
 
 ### `ffbb_club`
-- **Description** : Informations complètes sur un club (coordonnées, liste des équipes, gymnases rattachés, calendrier complet des matchs).
+- **Description** : Informations complètes sur un club (coordonnées, liste des équipes, gymnases rattachés, calendrier complet des matchs, classement de poule). Utiliser l'action classement uniquement si poule_id est connu et que team_summary n'a pas été appelé.
 - **Paramètres** :
   - `organisme_id` (str|int, optionnel).
   - `club_name` (str, optionnel).
-  - `action` (str, défaut `"details"`) : `"details"`, `"equipes"`, `"salles"`, `"calendrier"`.
+  - `poule_id` (str|int, optionnel) : Requis pour `action="classement"`.
+  - `action` (str, défaut `"details"`) : `"details"`, `"equipes"`, `"salles"`, `"calendrier"`, `"classement"`.
 
 ### `ffbb_search`
 - **Description** : Recherche plein texte Meilisearch multi-index (clubs, compétitions, salles, matchs, tournois 3x3).

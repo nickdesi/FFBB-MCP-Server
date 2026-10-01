@@ -124,7 +124,7 @@ Le serveur a été refondu pour proposer des outils polyvalents qui réduisent l
   - `action` (enum, requis) : L'opération à effectuer.
     - `calendrier` : Récupère TOUS les matchs (passés et futurs) du club.
     - `equipes` : Liste les équipes engagées par le club (inclut les `poule_id` nécessaires pour d'autres outils).
-    - `classement` : Récupère le classement d'une poule spécifique.
+    - `classement` : Récupère le classement d'une poule spécifique (utiliser uniquement si `poule_id` est connu et que `team_summary` n'a pas été appelé).
   - `organisme_id` (integer, optionnel) : ID du club (préféré pour la précision).
   - `club_name` (string, optionnel) : Nom du club (utilisé si l'ID est inconnu).
   - `filtre` (string, optionnel) : Filtre textuel pour la catégorie (ex: "U13", "U11M", "Senior F", "NM1").
@@ -337,45 +337,51 @@ la logique de désambiguïsation (U11M1, U13F-2, etc.).
 
 ### `ffbb_team_summary`
 
-**Description** : Fournit en **un seul appel** un résumé complet et agent-friendly pour une équipe de club :
+**Description** : **1 appel pour bilan + classement complet + dernier/prochain match d'une équipe.** Préférer cet outil pour toute question combinant résultats et classement. Fournit en un seul appel :
 
 - bilan global (toutes phases confondues),
-- phase courante et son classement,
+- phase courante avec **tableau de classement compact** (cols/rows, target_pos, départage RSG Art. 28),
 - dernier match joué,
-- prochain match à venir.
+- prochain match à venir,
+- `presentation.short_answer` synthétisant position, points, bilan et prochain match (date, heure, salle).
 
 **Arguments** :
 
 - `club_name` (string, optionnel) : Nom du club (ex: `"Stade Clermontois"`).
 - `organisme_id` (integer|string, optionnel) : ID FFBB du club (plus fiable que `club_name`).
 - `categorie` (string, optionnel mais fortement recommandé) : Catégorie + genre + numéro d'équipe (ex: `"U11M1"`, `"U13F2"`, `"U15M"`, `"Senior"`).
+- `numero_equipe` (integer, optionnel) : Numéro d'équipe (`1`, `2`...).
+- `include` (array[string], optionnel, défaut: `["bilan", "last", "next", "classement"]`) : Blocs de données à inclure. Valeurs supportées : `"bilan"`, `"last"`, `"next"`, `"classement"`, `"dynamique"`. `"dynamique"` (forme, moyennes) est optionnel pour minimiser l'empreinte token.
+- `detail` (boolean, défaut: `false`) : Si `true`, active les colonnes détaillées du classement (`penalites_*`, `forfaits`, `points_initiaux`) et les métadonnées complètes.
+- `force_refresh` (boolean, défaut: `false`) : Contourne le cache si `true`.
 
 > Au moins l'un de `club_name` ou `organisme_id` doit être fourni.
 
-**Retour** : un objet JSON structuré :
+**Format compact du classement (`classement`)** :
 
-- `team` : métadonnées sur l'équipe (label, poule(s), niveau, sexe, etc.).
-- `phase_courante` : phase considérée comme actuelle, avec son classement.
-- `last_match` : dernier match joué (ou `null` s'il n'y en a pas).
-- `next_match` : prochain match à venir (ou `null` s'il n'y en a pas).
-- `summary` : bilan global (toutes phases) tel que calculé par `ffbb_bilan`.
+```json
+{
+  "cols": ["pos", "equipe", "pts", "j", "g", "p", "diff"],
+  "rows": [
+    [1, "OUEST LYONNAIS BASKET - 2", 4, 2, 2, 0, 49],
+    [2, "STADE CLERMONTOIS BASKET AUVERGNE - 1", 3, 2, 1, 1, 12]
+  ],
+  "target_pos": 2,
+  "departage": "confrontation"
+}
+```
+
+**Règle pour les agents** :
+Pour toute question combinant résultats/prochain match et classement :
+1. Appeler `ffbb_team_summary`.
+2. Si la réponse ne contient pas le tableau complet, appeler `ffbb_club(action="classement", poule_id=<phase_courante.poule_id>, organisme_id=<resource_ids.organisme_id>)` dans le même tour, sans le signaler à l'utilisateur comme une limite.
+3. Ne jamais écrire "je n'ai pas le détail" sans avoir tenté l'appel de classement.
 
 **Exemple d'appel** :
 
 ```json
-{ "club_name": "Stade Clermontois", "categorie": "U11M1" }
+{ "club_name": "Stade Clermontois", "categorie": "SEM1" }
 ```
-
-**Exemple d'usage agent** :
-
-1. Appeler directement `ffbb_team_summary` pour répondre à :
-   - "Quel est le bilan du Stade Clermontois U11M1 ?",
-   - "Quel est leur prochain match ?",
-   - "Quel a été leur dernier résultat ?".
-2. Lire :
-   - `summary` pour le bilan global (V/D/N, points marqués/encaissés, etc.),
-   - `phase_courante` pour le classement pertinent,
-   - `last_match` et `next_match` pour construire la réponse en langage naturel.
 
 ---
 

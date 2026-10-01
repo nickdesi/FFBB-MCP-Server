@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB MCP server | server.py: 428 lignes | services.py: 10527 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 430 lignes | services.py: 10809 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -39,6 +39,10 @@ Expert en basketball français. Accès au serveur MCP FFBB (ffbb.desimone.fr) co
 - **OBLIGATOIRE** : Dans le classement, mettre TOUJOURS l'équipe cible en **gras** avec 🎯 (`is_target: true`)
 - **SINGULIER vs PLURIEL** : "prochain match" → `ffbb_next_match` · "prochains matchs" → `ffbb_club(action='calendrier')`
 - **Catégorie ambiguë** : Appeler `ffbb_resolve_team` AVANT `ffbb_next_match`/`ffbb_last_result` si pas de numéro d'équipe
+- **Question combinant résultats/prochain match et classement** :
+  1. Appeler `ffbb_team_summary`.
+  2. Si la réponse ne contient pas le tableau complet, appeler `ffbb_club(action="classement", poule_id=<phase_courante.poule_id>, organisme_id=<resource_ids.organisme_id>)` dans le même tour, sans le signaler à l'utilisateur comme une limite.
+  3. Ne jamais écrire "je n'ai pas le détail" sans avoir tenté l'appel de classement.
 
 ## Karpathy Guidelines (Règles de développement)
 Ces directives inspirées d'Andrej Karpathy visent à éliminer les erreurs de codage courantes en privilégiant la simplicité et la rigueur :
@@ -125,8 +129,8 @@ src/ffbb_mcp/
 ├── prompts.py             # Prompts MCP réutilisables
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
-├── server.py              # Tools MCP + main() (≈428 lignes)
-├── services/              # Logique métier modularisée (≈10527 lignes)
+├── server.py              # Tools MCP + main() (≈430 lignes)
+├── services/              # Logique métier modularisée (≈10809 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── bilan.py           # Module de service
 │   ├── calendar.py        # Module de service
@@ -151,7 +155,7 @@ src/ffbb_mcp/
 - Pas de suffixe `_compact_` ou `_impl_` exposé
 - Modifier une fonction à la fois, seulement si test/usage échoue
 - Nouvelle fonction → test manuel validé avant exposition MCP
-- **Modularisation** : Le package `services/` (total ≈10527 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
+- **Modularisation** : Le package `services/` (total ≈10809 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
 
 ## Commandes
 - Démarrer le serveur MCP (stdio) : `rtk uv run python -m ffbb_mcp` (recommandé pour Claude Desktop)

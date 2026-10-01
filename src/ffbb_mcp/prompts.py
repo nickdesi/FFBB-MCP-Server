@@ -248,20 +248,12 @@ _RULES_CLASSEMENT = """\
 
 ### Partie 1 — Workflow (quelle séquence d'appels ?)
 
-TOUJOURS suivre cette séquence, sans exception :
+Pour toute question combinant résultats/prochain match et classement :
+1. Appeler `ffbb_team_summary` (renvoie désormais bilan + prochain match + classement compact en 1 seul appel).
+2. Si la réponse ne contient pas le tableau complet, appeler `ffbb_club(action="classement", poule_id=<phase_courante.poule_id>, organisme_id=<resource_ids.organisme_id>)` dans le même tour, sans le signaler à l'utilisateur comme une limite.
+3. Ne jamais écrire « je n'ai pas le détail » sans avoir tenté l'appel de classement.
 
-1. **ÉTAPE 1 — Déterminer la portée demandée.**
-    → Sans phase précise : tenter `ffbb_team_summary` (organisme_id + categorie) et utiliser son classement complet s'il est présent.
-    → Si une phase précise est demandée : passer directement à l'étape 2, même si `ffbb_team_summary` réussirait.
-    → Si l'équipe n'est pas résolue ou si le classement manque : passer à l'étape 2.
-
-2. **ÉTAPE 2 — Appeler `ffbb_bilan`** (organisme_id + categorie).
-   → Lister toutes les phases disponibles avec leur `poule_id`.
-   → Sans précision de phase → prendre la phase au numéro le plus élevé (ex: Phase 3 > Phase 1).
-   → Avec précision (ex: "Phase 3") → matcher le nom de compétition ou le label.
-
-3. **ÉTAPE 3 — Appeler `ffbb_get(id=poule_id, type="poule")`**.
-   → Retourne le classement complet et fiable.
+- **Si une phase précise est demandée** : Identifier la phase cible via `ffbb_bilan` pour obtenir le `poule_id` correspondant, puis appeler `ffbb_club(action="classement", poule_id=...)` ou `ffbb_get(type="poule")`.
 
 ⚠️ **INTERDICTION** : Ne jamais passer `phase=X` à `ffbb_club(action='classement')` pour
 résoudre une phase spécifique — non fiable. L'appel automagique sans paramètre de phase

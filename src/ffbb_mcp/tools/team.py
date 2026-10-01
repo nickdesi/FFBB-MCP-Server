@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from mcp.server.mcpserver import Context  # noqa: TC002
@@ -19,10 +20,13 @@ from ffbb_mcp.presentation import (
 from ffbb_mcp.services import (
     ffbb_bilan_service,
     ffbb_find_team_candidates_service,
+    ffbb_get_classement_service,
     ffbb_last_result_service,
     ffbb_next_match_service,
     ffbb_resolve_team_service,
     ffbb_saison_bilan_service,
+    format_compact_classement,
+    get_poule_service,
 )
 from ffbb_mcp.services.common import McpError
 from ffbb_mcp.utils import parse_categorie
@@ -34,6 +38,8 @@ from .common import (
     handle_api_error,
     track_tool_usage,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _require_club_identifier(
@@ -355,13 +361,25 @@ async def ffbb_team_summary(
         int | str | None,
         Field(description="ID de la saison FFBB (optionnel)."),
     ] = None,
+    include: Annotated[
+        list[str] | None,
+        Field(
+            description="Sections à inclure : 'bilan', 'last', 'next', 'classement', 'dynamique'. Défaut: ['bilan', 'last', 'next', 'classement']."
+        ),
+    ] = None,
+    detail: Annotated[
+        bool,
+        Field(
+            description="Si True, inclut les colonnes détaillées du classement (pénalités, forfaits, logos)."
+        ),
+    ] = False,
     force_refresh: Annotated[
         bool,
         Field(description="Si True, force un rafraichissement des donnees"),
     ] = False,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
-    """Résumé complet d'équipe : bilan, classement, dernier et prochain match en un seul appel.
+    """1 appel pour bilan + classement complet + dernier/prochain match d'une équipe. Préférer cet outil pour toute question combinant résultats et classement.
 
     Résout NM3, PNM, NF1, etc. vers la bonne équipe. En cas d'ambiguïté, suggère les candidats.
     """
@@ -372,12 +390,29 @@ async def ffbb_team_summary(
         poule_id=poule_id,
         competition_id=competition_id,
     )
+
+    effective_include: set[str] = (
+        set(include) if include is not None else {"bilan", "last", "next", "classement"}
+    )
+    if isinstance(include, str):
+        effective_include = {s.strip() for s in include.split(",")}
+
+    want_bilan = "bilan" in effective_include
+    want_last = "last" in effective_include
+    want_next = "next" in effective_include
+    want_classement = "classement" in effective_include
+    want_dynamique = "dynamique" in effective_include
+
     resolve_svc = _get_server_service(
         "ffbb_resolve_team_service", ffbb_resolve_team_service
     )
     bilan_svc = _get_server_service("ffbb_bilan_service", ffbb_bilan_service)
     last_svc = _get_server_service("ffbb_last_result_service", ffbb_last_result_service)
     next_svc = _get_server_service("ffbb_next_match_service", ffbb_next_match_service)
+    classement_svc = _get_server_service(
+        "ffbb_get_classement_service", ffbb_get_classement_service
+    )
+    poule_svc = _get_server_service("get_poule_service", get_poule_service)
 
     try:
         await _safe_report_progress(ctx, 0, total=3, message="Résolution de l'équipe…")
@@ -424,19 +459,16 @@ async def ffbb_team_summary(
             except (TypeError, ValueError):  # fmt: skip
                 resolved_num = numero_equipe or 1
 
-        # last_result et next_match nécessitent organisme_id
         effective_org_id = resolved_org_id
-
         if not effective_org_id:
             return {"error": "Impossible de résoudre le club"}
 
-        # La présence de `categorie` ne doit pas conditionner ces appels : quand
-        # l'équipe est désambiguïsée par engagement_id/poule_id seuls (ex: brassage
-        # U13M), les services sous-jacents résolvent très bien sans catégorie
-        # (filtre engagement_id). Sans cela, next_match restait null alors que
-        # find_team_candidates trouvait le match via le même engagement.
         has_team_context = (
             bool(categorie) or engagement_id is not None or resolved_team is not None
+        )
+
+        effective_poule_id = poule_id or (
+            resolved_team.get("poule_id") if isinstance(resolved_team, dict) else None
         )
 
         if effective_org_id and has_team_context:
@@ -444,8 +476,7 @@ async def ffbb_team_summary(
                 ctx, 1, total=3, message="Récupération bilan et matchs en parallèle…"
             )
 
-        # Lancer bilan + last_result + next_match en parallèle
-        # On passe effective_org_id au lieu de club_name pour éviter une double résolution
+        # Lancer les coroutines en parallèle
         bilan_coro = bilan_svc(
             club_name=None,
             organisme_id=effective_org_id,
@@ -458,8 +489,16 @@ async def ffbb_team_summary(
             force_refresh=force_refresh,
         )
 
-        if effective_org_id and has_team_context:
-            last_coro = last_svc(
+        async def _safe_run(coro):
+            if coro is None:
+                return None
+            try:
+                return await coro
+            except Exception as ex:
+                return ex
+
+        last_coro = (
+            last_svc(
                 organisme_id=effective_org_id,
                 categorie=categorie,
                 numero_equipe=resolved_num,
@@ -470,7 +509,12 @@ async def ffbb_team_summary(
                 season_id=season_id,
                 force_refresh=force_refresh,
             )
-            next_coro = next_svc(
+            if (want_last and effective_org_id and has_team_context)
+            else None
+        )
+
+        next_coro = (
+            next_svc(
                 organisme_id=effective_org_id,
                 categorie=categorie,
                 numero_equipe=resolved_num,
@@ -481,29 +525,196 @@ async def ffbb_team_summary(
                 season_id=season_id,
                 force_refresh=force_refresh,
             )
-            gather_results = await asyncio.gather(
-                bilan_coro, last_coro, next_coro, return_exceptions=True
+            if (want_next and effective_org_id and has_team_context)
+            else None
+        )
+
+        cl_coro = (
+            classement_svc(
+                poule_id=effective_poule_id,
+                force_refresh=force_refresh,
+                target_organisme_id=effective_org_id,
+                target_num=resolved_num,
             )
-            raw_bilan: Any = gather_results[0]
-            raw_last: Any = gather_results[1]
-            raw_next: Any = gather_results[2]
-            # Normaliser les exceptions et types en dicts d'erreur / None.
-            # Seules les enveloppes exploitables sont retenues ("ok", ou
-            # "no_upcoming_match" qui porte un message explicite) : les
-            # enveloppes d'erreur (ambiguous/not_found/error) ne doivent pas
-            # passer pour des matchs.
-            bilan = (
-                raw_bilan if isinstance(raw_bilan, dict) else {"error": str(raw_bilan)}
-            )
-            last_match = _accepted_match_envelope(raw_last)
-            next_match = _accepted_match_envelope(raw_next)
-        else:
-            raw_bilan = await bilan_coro
-            bilan = (
-                raw_bilan if isinstance(raw_bilan, dict) else {"error": str(raw_bilan)}
-            )
-            last_match = None
-            next_match = None
+            if (want_classement and effective_poule_id)
+            else None
+        )
+
+        poule_coro = (
+            poule_svc(effective_poule_id, force_refresh=force_refresh)
+            if (want_classement and effective_poule_id)
+            else None
+        )
+
+        gather_results = await asyncio.gather(
+            _safe_run(bilan_coro),
+            _safe_run(last_coro),
+            _safe_run(next_coro),
+            _safe_run(cl_coro),
+            _safe_run(poule_coro),
+            return_exceptions=True,
+        )
+
+        raw_bilan: Any = gather_results[0]
+        raw_last: Any = gather_results[1]
+        raw_next: Any = gather_results[2]
+        raw_classement: Any = gather_results[3]
+        raw_poule_data: Any = gather_results[4]
+
+        bilan = raw_bilan if isinstance(raw_bilan, dict) else {"error": str(raw_bilan)}
+        last_match = _accepted_match_envelope(raw_last)
+        next_match = _accepted_match_envelope(raw_next)
+
+        # Si le poule_id n'était pas connu au départ, le résoudre depuis bilan.phase_courante
+        phase_courante = (
+            bilan.get("phase_courante") if isinstance(bilan, dict) else None
+        )
+        if (
+            want_classement
+            and not effective_poule_id
+            and isinstance(phase_courante, dict)
+        ):
+            effective_poule_id = phase_courante.get("poule_id")
+            if effective_poule_id:
+                try:
+                    gather_res = await asyncio.gather(
+                        classement_svc(
+                            poule_id=effective_poule_id,
+                            force_refresh=force_refresh,
+                            target_organisme_id=effective_org_id,
+                            target_num=resolved_num,
+                        ),
+                        poule_svc(effective_poule_id, force_refresh=force_refresh),
+                        return_exceptions=True,
+                    )
+                    c_res = gather_res[0] if len(gather_res) > 0 else None
+                    p_res = gather_res[1] if len(gather_res) > 1 else None
+                    raw_classement = c_res if isinstance(c_res, list) else []
+                    raw_poule_data = p_res if isinstance(p_res, dict) else None
+                except Exception as exc:
+                    logger.debug("Erreur récupération classement post-bilan: %s", exc)
+                    raw_classement = []
+                    raw_poule_data = None
+
+        classement_items = raw_classement if isinstance(raw_classement, list) else []
+        poule_data = raw_poule_data if isinstance(raw_poule_data, dict) else None
+
+        # Construire le classement compact (RSG Art. 28)
+        compact_classement = format_compact_classement(
+            classement_list=classement_items,
+            poule_data=poule_data,
+            detail=detail,
+            target_organisme_id=effective_org_id,
+            target_num=resolved_num,
+        )
+
+        # 4. Cohérence et retry automatique côté serveur
+        warnings_list: list[str] = []
+        bilan_pos = (
+            phase_courante.get("position") if isinstance(phase_courante, dict) else None
+        )
+        bilan_j = (
+            phase_courante.get("match_joues")
+            if isinstance(phase_courante, dict)
+            else None
+        )
+        target_pos = compact_classement.get("target_pos")
+        target_j = None
+        if compact_classement.get("rows") and target_pos is not None:
+            for row in compact_classement["rows"]:
+                if len(row) > 3 and row[0] == target_pos:
+                    target_j = row[3]
+                    break
+
+        incoherence_position = False
+        if bilan_pos is not None and target_pos is not None:
+            try:
+                if int(bilan_pos) != int(target_pos):
+                    incoherence_position = True
+            except (ValueError, TypeError):
+                pass
+
+        if bilan_j is not None and target_j is not None:
+            try:
+                if int(bilan_j) != int(target_j):
+                    incoherence_position = True
+            except (ValueError, TypeError):
+                pass
+
+        if incoherence_position:
+            warnings_list.append("incoherence_position")
+            if not force_refresh:
+                # Retry côté serveur avec force_refresh=True
+                try:
+                    bilan = await bilan_svc(
+                        club_name=None,
+                        organisme_id=effective_org_id,
+                        categorie=effective_cat or categorie,
+                        engagement_id=engagement_id,
+                        competition_id=competition_id,
+                        competition_type=competition_type,
+                        poule_id=poule_id,
+                        season_id=season_id,
+                        force_refresh=True,
+                    )
+                    phase_courante = (
+                        bilan.get("phase_courante") if isinstance(bilan, dict) else None
+                    )
+                    if want_classement and effective_poule_id:
+                        gather_ref = await asyncio.gather(
+                            classement_svc(
+                                poule_id=effective_poule_id,
+                                force_refresh=True,
+                                target_organisme_id=effective_org_id,
+                                target_num=resolved_num,
+                            ),
+                            poule_svc(effective_poule_id, force_refresh=True),
+                            return_exceptions=True,
+                        )
+                        c_ref = gather_ref[0] if len(gather_ref) > 0 else None
+                        p_ref = gather_ref[1] if len(gather_ref) > 1 else None
+                        classement_items = c_ref if isinstance(c_ref, list) else []
+                        poule_data = p_ref if isinstance(p_ref, dict) else None
+                        compact_classement = format_compact_classement(
+                            classement_list=classement_items,
+                            poule_data=poule_data,
+                            detail=detail,
+                            target_organisme_id=effective_org_id,
+                            target_num=resolved_num,
+                        )
+                        target_pos = compact_classement.get("target_pos")
+                except Exception as exc:
+                    logger.debug("Erreur retry force_refresh team_summary: %s", exc)
+
+        # Warning poule incomplète ou non démarrée
+        if (
+            want_classement
+            and not compact_classement.get("rows")
+            and "classement_indisponible" not in warnings_list
+        ):
+            warnings_list.append("classement_indisponible")
+
+        # 5. Phases multiples (autres_phases)
+        autres_phases: list[dict[str, Any]] = []
+        if isinstance(bilan, dict):
+            all_phases = bilan.get("phases") or []
+            cur_pid_str = str(effective_poule_id or "")
+            seen_pids = {cur_pid_str} if cur_pid_str else set()
+            for p in all_phases:
+                if not isinstance(p, dict):
+                    continue
+                p_pid = str(p.get("poule_id") or "")
+                p_num = str(p.get("numero_equipe") or "")
+                if resolved_num and p_num and p_num != str(resolved_num):
+                    continue
+                if p_pid and p_pid not in seen_pids:
+                    seen_pids.add(p_pid)
+                    autres_phases.append(
+                        {
+                            "poule_id": p_pid,
+                            "label": p.get("competition") or f"Poule {p_pid}",
+                        }
+                    )
 
         await _safe_report_progress(ctx, 3, total=3, message="Résumé prêt.")
         team_data = (
@@ -514,7 +725,7 @@ async def ffbb_team_summary(
         )
 
         dynamique_data = None
-        if isinstance(bilan, dict):
+        if want_dynamique and isinstance(bilan, dict):
             eq_bilans = bilan.get("equipes_bilan")
             num_str = str(resolved_num)
             if isinstance(eq_bilans, dict) and isinstance(eq_bilans.get(num_str), dict):
@@ -522,9 +733,6 @@ async def ffbb_team_summary(
             if dynamique_data is None:
                 dynamique_data = bilan.get("dynamique")
 
-        # Nettoyage chirurgical des redondances (anti-verbosité) :
-        # On extrait uniquement les détails propres aux matchs en évitant
-        # de répéter club_resolu (3x), team (2x), _meta (3x) et status.
         def _clean_match_item(m: dict[str, Any] | None) -> dict[str, Any] | None:
             if not isinstance(m, dict):
                 return None
@@ -547,8 +755,8 @@ async def ffbb_team_summary(
             }
             return cleaned or None
 
-        cleaned_last_match = _clean_match_item(last_match)
-        cleaned_next_match = _clean_match_item(next_match)
+        cleaned_last_match = _clean_match_item(last_match) if want_last else None
+        cleaned_next_match = _clean_match_item(next_match) if want_next else None
 
         team_name_str = (
             (team_data.get("team_label") if isinstance(team_data, dict) else None)
@@ -568,9 +776,10 @@ async def ffbb_team_summary(
         if d_count is None:
             d_count = summary_dict.get("perdus", 0)
         n_count = summary_dict.get("nuls", 0)
-        # Formater la dynamique en texte lisible (jamais de repr dict brut)
+
+        # Formater la dynamique en texte lisible (seulement si demandée)
         dyn_str = ""
-        if isinstance(dynamique_data, dict):
+        if want_dynamique and isinstance(dynamique_data, dict):
             forme_str = dynamique_data.get("forme_str", "")
             raw_serie = dynamique_data.get("serie_actuelle")
             serie = raw_serie if isinstance(raw_serie, dict) else {}
@@ -582,13 +791,100 @@ async def ffbb_team_summary(
                 parts.append(serie_label)
             if parts:
                 dyn_str = f" ({', '.join(parts)})"
+
         v_label = "victoire" if v_count == 1 else "victoires"
         d_label = "défaite" if d_count == 1 else "défaites"
         bilan_phrase = f"{v_count} {v_label}, {d_count} {d_label}"
         if n_count:
             n_label = "nul" if n_count == 1 else "nuls"
             bilan_phrase += f", {n_count} {n_label}"
-        short_ans = f"Bilan pour {team_name_str} : {bilan_phrase}{dyn_str}."
+
+        # 7. presentation.short_answer : position, points et prochain match complet
+        target_pts = None
+        if compact_classement.get("rows") and target_pos is not None:
+            for row in compact_classement["rows"]:
+                if len(row) > 2 and row[0] == target_pos:
+                    target_pts = row[2]
+                    break
+
+        pos_pts_parts: list[str] = []
+        if target_pos is not None:
+            pos_label = "1er" if target_pos == 1 else f"{target_pos}e"
+            pos_pts_parts.append(pos_label)
+        if target_pts is not None:
+            pts_label = f"{target_pts} pt" if target_pts == 1 else f"{target_pts} pts"
+            pos_pts_parts.append(pts_label)
+
+        pos_pts_str = f" ({', '.join(pos_pts_parts)})" if pos_pts_parts else ""
+        short_ans = (
+            f"Bilan pour {team_name_str}{pos_pts_str} : {bilan_phrase}{dyn_str}."
+        )
+
+        if (
+            next_match
+            and isinstance(next_match, dict)
+            and next_match.get("status") != "no_upcoming_match"
+        ):
+            raw_match = next_match.get("match")
+            inner_m: dict[str, Any] = raw_match if isinstance(raw_match, dict) else {}
+            next_adv = (
+                next_match.get("adversaire")
+                or inner_m.get("adversaire")
+                or next_match.get("nomEquipe2")
+            )
+            next_is_home = (
+                next_match.get("domicile")
+                if next_match.get("domicile") is not None
+                else inner_m.get("domicile")
+            )
+            next_date = (
+                next_match.get("date")
+                or next_match.get("date_reelle")
+                or inner_m.get("date")
+            )
+            next_heure = (
+                next_match.get("heure")
+                or next_match.get("heure_reelle")
+                or inner_m.get("heure")
+            )
+            raw_salle = next_match.get("salle_details") or inner_m.get("salle_details")
+            salle_info: dict[str, Any] = (
+                raw_salle if isinstance(raw_salle, dict) else {}
+            )
+            next_lieu = (
+                salle_info.get("nom")
+                or salle_info.get("libelle")
+                or next_match.get("nomSalle")
+                or inner_m.get("nomSalle")
+                or next_match.get("lieu")
+                or inner_m.get("lieu")
+            )
+            next_ville = (
+                salle_info.get("ville")
+                or salle_info.get("commune")
+                or next_match.get("villeSalle")
+                or inner_m.get("villeSalle")
+                or next_match.get("ville")
+                or inner_m.get("ville")
+            )
+
+            if next_adv:
+                verb = (
+                    "reçoit"
+                    if next_is_home is True
+                    else ("se déplace chez" if next_is_home is False else "face à")
+                )
+                dt_parts = []
+                if next_date:
+                    dt_parts.append(f"le {next_date}")
+                if next_heure:
+                    dt_parts.append(f"à {next_heure}")
+                dt_phrase = f" {' '.join(dt_parts)}" if dt_parts else ""
+                venue_parts = [p for p in (next_lieu, next_ville) if p]
+                venue_phrase = f" ({', '.join(venue_parts)})" if venue_parts else ""
+                short_ans += (
+                    f" Prochain match : {verb} {next_adv}{dt_phrase}{venue_phrase}."
+                )
 
         detail_parts = []
         if isinstance(last_match, dict) and "presentation" in last_match:
@@ -615,19 +911,20 @@ async def ffbb_team_summary(
             "short_answer": short_ans,
             "detail_line": detail_line,
             "source_label": format_source_label(),
-            "warnings": [],
+            "warnings": warnings_list,
         }
 
+        meta_obj = bilan.get("_meta") if isinstance(bilan, dict) else None
         is_cache_hit = (
             not force_refresh
-            and isinstance(bilan, dict)
-            and bool(bilan.get("_meta", {}).get("cache_hit"))
+            and isinstance(meta_obj, dict)
+            and bool(meta_obj.get("cache_hit"))
         )
         resource_ids = {
             "organisme_id": str(effective_org_id) if effective_org_id else None,
             "engagement_id": str(engagement_id) if engagement_id else None,
             "competition_id": str(competition_id) if competition_id else None,
-            "poule_id": str(poule_id) if poule_id else None,
+            "poule_id": str(effective_poule_id) if effective_poule_id else None,
         }
         provenance = build_provenance_block(
             source="cache" if is_cache_hit else "ffbb_api_live",
@@ -635,19 +932,27 @@ async def ffbb_team_summary(
             resource_ids=resource_ids,
         )
 
-        return {
+        res_payload: dict[str, Any] = {
             "status": "ok",
             "team": team_data,
-            "phase_courante": bilan.get("phase_courante")
-            if isinstance(bilan, dict)
-            else None,
-            "last_match": cleaned_last_match,
-            "next_match": cleaned_next_match,
-            "summary": bilan.get("bilan_total") if isinstance(bilan, dict) else None,
-            "dynamique": dynamique_data,
-            "presentation": presentation,
-            "provenance": provenance,
+            "phase_courante": phase_courante,
+            "last_match": cleaned_last_match if want_last else None,
+            "next_match": cleaned_next_match if want_next else None,
         }
+        if want_bilan:
+            res_payload["summary"] = (
+                bilan.get("bilan_total") if isinstance(bilan, dict) else None
+            )
+        if want_classement:
+            res_payload["classement"] = compact_classement
+        if want_dynamique:
+            res_payload["dynamique"] = dynamique_data
+        if autres_phases:
+            res_payload["autres_phases"] = autres_phases
+
+        res_payload["presentation"] = presentation
+        res_payload["provenance"] = provenance
+        return res_payload
 
     except Exception as e:
         raise handle_api_error(e) from e

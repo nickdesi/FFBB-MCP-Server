@@ -13,10 +13,10 @@
 - Package PyPI : https://pypi.org/project/ffbb-data-client/
 
 ## 17 Outils MCP Disponibles
-1. `ffbb_team_summary` : Synthèse complète en un seul appel (bilan, position au classement, dernier match joué, prochain match).
+1. `ffbb_team_summary` : 1 appel pour bilan + classement complet + dernier/prochain match d'une équipe. Préférer cet outil pour toute question combinant résultats et classement.
 2. `ffbb_lives` : Scores en direct, statut et temps forts des rencontres du week-end sur toutes les divisions françaises.
 3. `ffbb_bilan` : Bilan victoires / défaites exhaustif, points marqués/encaissés et goal-average d'une équipe.
-4. `ffbb_club` : Fiche détaillée d'un club (gymnases, équipes engagées, calendriers des matchs, coordonnées).
+4. `ffbb_club` : Fiche détaillée d'un club (gymnases, équipes engagées, calendriers des matchs). Pour le classement : utiliser uniquement si poule_id est connu et que team_summary n'a pas été appelé.
 5. `ffbb_search` : Recherche universelle multi-index Meilisearch (clubs, compétitions, tournois 3x3, gymnases, arbitres).
 6. `ffbb_next_match` : Prochaine rencontre programmée (date, heure, adversaire, adresse du gymnase).
 7. `ffbb_last_result` : Dernier résultat et score officiel enregistré pour une équipe.
