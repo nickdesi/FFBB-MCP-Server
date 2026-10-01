@@ -235,7 +235,7 @@ async def test_team_summary_1_call_next_match_and_classement_6_equipes():
         # Classement compact présent avec 6 équipes
         assert "classement" in res
         cl = res["classement"]
-        assert cl["cols"] == ["pos", "equipe", "pts", "j", "g", "p", "diff"]
+        assert cl["cols"] == ["pos", "equipe", "pts", "j", "g", "p", "pm", "pe", "diff"]
         assert len(cl["rows"]) == 6
         assert cl["target_pos"] == 2
         # Équipe cible en position 2
@@ -243,6 +243,9 @@ async def test_team_summary_1_call_next_match_and_classement_6_equipes():
         assert target_row[0] == 2
         assert "STADE CLERMONTOIS" in target_row[1]
         assert target_row[2] == 3  # pts
+        assert target_row[6] == 140  # pm
+        assert target_row[7] == 128  # pe
+        assert target_row[8] == 12  # diff
 
         # Dynamique absente par défaut
         assert "dynamique" not in res
@@ -593,10 +596,20 @@ async def test_detail_parameter_in_compact_classement():
         },
     ]
 
-    # Sans detail : strict cols pos, equipe, pts, j, g, p, diff
+    # Sans detail : strict cols pos, equipe, pts, j, g, p, pm, pe, diff
     compact = format_compact_classement(teams, detail=False)
-    assert compact["cols"] == ["pos", "equipe", "pts", "j", "g", "p", "diff"]
-    assert len(compact["rows"][0]) == 7
+    assert compact["cols"] == [
+        "pos",
+        "equipe",
+        "pts",
+        "j",
+        "g",
+        "p",
+        "pm",
+        "pe",
+        "diff",
+    ]
+    assert len(compact["rows"][0]) == 9
 
     # Avec detail : 'forfaits' et 'logo_url' actifs car non nuls
     detailed = format_compact_classement(teams, detail=True)

@@ -361,10 +361,10 @@ la logique de désambiguïsation (U11M1, U13F-2, etc.).
 
 ```json
 {
-  "cols": ["pos", "equipe", "pts", "j", "g", "p", "diff"],
+  "cols": ["pos", "equipe", "pts", "j", "g", "p", "pm", "pe", "diff"],
   "rows": [
-    [1, "OUEST LYONNAIS BASKET - 2", 4, 2, 2, 0, 49],
-    [2, "STADE CLERMONTOIS BASKET AUVERGNE - 1", 3, 2, 1, 1, 12]
+    [1, "OUEST LYONNAIS BASKET - 2", 4, 2, 2, 0, 160, 111, 49],
+    [2, "STADE CLERMONTOIS BASKET AUVERGNE - 1", 3, 2, 1, 1, 140, 128, 12]
   ],
   "target_pos": 2,
   "departage": "confrontation"

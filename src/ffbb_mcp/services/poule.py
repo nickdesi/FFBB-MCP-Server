@@ -882,7 +882,7 @@ def format_compact_classement(
     import re
     from collections import defaultdict
 
-    base_cols = ["pos", "equipe", "pts", "j", "g", "p", "diff"]
+    base_cols = ["pos", "equipe", "pts", "j", "g", "p", "pm", "pe", "diff"]
 
     if not classement_list:
         return {
@@ -1109,6 +1109,28 @@ def format_compact_classement(
             diff = int(t.get("difference") or 0)
         except (ValueError, TypeError):
             diff = 0
+        try:
+            raw_pm = (
+                t.get("paniers_marques")
+                if t.get("paniers_marques") is not None
+                else (t.get("marques") if t.get("marques") is not None else t.get("pm"))
+            )
+            pm = int(raw_pm) if raw_pm is not None else 0
+        except (ValueError, TypeError):
+            pm = 0
+        try:
+            raw_pe = (
+                t.get("paniers_encaisses")
+                if t.get("paniers_encaisses") is not None
+                else (
+                    t.get("encaisses")
+                    if t.get("encaisses") is not None
+                    else t.get("pe")
+                )
+            )
+            pe = int(raw_pe) if raw_pe is not None else 0
+        except (ValueError, TypeError):
+            pe = 0
 
         # Identification de l'équipe cible
         is_target = bool(t.get("is_target"))
@@ -1125,7 +1147,7 @@ def format_compact_classement(
         if is_target and target_pos is None:
             target_pos = pos
 
-        row: list[Any] = [pos, eq_name, pts, j, g, p, diff]
+        row: list[Any] = [pos, eq_name, pts, j, g, p, pm, pe, diff]
         for attr_key, _ in active_detail_cols:
             val = t.get(attr_key)
             row.append(val if val is not None else 0)
