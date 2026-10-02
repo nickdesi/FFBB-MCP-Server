@@ -18,6 +18,8 @@ async def get_client_async(*args, **kwargs):
     return await ffbb_mcp.client.get_client_async(*args, **kwargs)
 
 
+import re
+
 from ffbb_mcp.utils import (
     clean_serialized_data,
     format_team_name,
@@ -44,8 +46,6 @@ from .poule_lives import (
     _is_live_match,
     get_lives_service,
 )
-import re
-
 from .poule_opponent import resolve_opponent_from_poule
 
 logger = logging.getLogger("ffbb-mcp")
@@ -884,7 +884,6 @@ def format_compact_classement(
     Élimine logos et champs nuls/zéro par défaut (sauf si detail=True).
     Si classement vide/non démarré, renvoie rows=[] et warning 'classement_indisponible'.
     """
-    import re
     from collections import defaultdict
 
     base_cols = ["pos", "equipe", "pts", "j", "g", "p", "pm", "pe", "diff"]
