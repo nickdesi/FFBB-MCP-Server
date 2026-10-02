@@ -44,9 +44,14 @@ from .poule_lives import (
     _is_live_match,
     get_lives_service,
 )
+import re
+
 from .poule_opponent import resolve_opponent_from_poule
 
 logger = logging.getLogger("ffbb-mcp")
+
+# ⚡ Bolt: Pre-compiled regex for fast-path text normalization in loops
+_NORM_PATTERN = re.compile(r"[^a-z0-9]")
 
 __all__ = [
     "_fetch_lives",
@@ -893,7 +898,7 @@ def format_compact_classement(
         }
 
     def _norm_t(name: str) -> str:
-        return re.sub(r"[^a-z0-9]", "", (name or "").lower())
+        return _NORM_PATTERN.sub("", (name or "").lower())
 
     # Extraire les rencontres jouées de la poule pour le départage direct Art. 28
     played_matches: list[dict[str, Any]] = []
