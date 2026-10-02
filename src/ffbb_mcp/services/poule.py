@@ -18,6 +18,8 @@ async def get_client_async(*args, **kwargs):
     return await ffbb_mcp.client.get_client_async(*args, **kwargs)
 
 
+import re
+
 from ffbb_mcp.utils import (
     clean_serialized_data,
     format_team_name,
@@ -47,6 +49,9 @@ from .poule_lives import (
 from .poule_opponent import resolve_opponent_from_poule
 
 logger = logging.getLogger("ffbb-mcp")
+
+# ⚡ Bolt: Pre-compiled regex for fast-path text normalization in loops
+_NORM_PATTERN = re.compile(r"[^a-z0-9]")
 
 __all__ = [
     "_fetch_lives",
@@ -879,7 +884,6 @@ def format_compact_classement(
     Élimine logos et champs nuls/zéro par défaut (sauf si detail=True).
     Si classement vide/non démarré, renvoie rows=[] et warning 'classement_indisponible'.
     """
-    import re
     from collections import defaultdict
 
     base_cols = ["pos", "equipe", "pts", "j", "g", "p", "pm", "pe", "diff"]
@@ -893,7 +897,7 @@ def format_compact_classement(
         }
 
     def _norm_t(name: str) -> str:
-        return re.sub(r"[^a-z0-9]", "", (name or "").lower())
+        return _NORM_PATTERN.sub("", (name or "").lower())
 
     # Extraire les rencontres jouées de la poule pour le départage direct Art. 28
     played_matches: list[dict[str, Any]] = []
