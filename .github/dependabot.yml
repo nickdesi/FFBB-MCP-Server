@@ -1,28 +1,10 @@
 version: 2
 updates:
-  # Keep GitHub Actions pinned SHAs up to date
-  - package-ecosystem: "github-actions"
+  - package-ecosystem: "pip"
     directory: "/"
     schedule:
-      interval: "weekly"
-
-  # Keep documentation site dependencies up to date
-  - package-ecosystem: "npm"
-    directory: "/website-docs"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-
-  # Keep Docker base image up to date
-  - package-ecosystem: "docker"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-
-  # Keep pre-commit hooks up to date
-  - package-ecosystem: "pre-commit"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
+      interval: "daily"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "security"
