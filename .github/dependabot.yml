@@ -8,3 +8,5 @@ updates:
     labels:
       - "dependencies"
       - "security"
+    ignore:
+      - dependency-name: "ffbb-data-client"

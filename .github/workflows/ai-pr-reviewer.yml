@@ -28,6 +28,7 @@ jobs:
   review:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    if: github.actor != 'dependabot[bot]' && !contains(github.actor, '[bot]')
 
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
