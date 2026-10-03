@@ -1,5 +1,4 @@
 import ast
-import contextlib
 import re
 import sys
 import unicodedata
@@ -26,18 +25,21 @@ def clean_serialized_data(data: Any) -> Any:
     """
     if data is None:
         return None
-    if isinstance(data, str):
+    data_type = type(data)
+    if data_type is str:
         if data in ("None", "null"):
             return None
         if data.startswith("{") and data.endswith("}"):
-            with contextlib.suppress(Exception):
+            try:
                 parsed = ast.literal_eval(data)
-                if isinstance(parsed, (dict, list)):
+                if type(parsed) is dict or type(parsed) is list:
                     return clean_serialized_data(parsed)
+            except Exception:
+                pass
         return data
-    if isinstance(data, dict):
+    if data_type is dict:
         return {k: clean_serialized_data(v) for k, v in data.items()}
-    if isinstance(data, list):
+    if data_type is list:
         return [clean_serialized_data(item) for item in data]
     return data
 
@@ -75,10 +77,12 @@ def serialize_model(obj: Any) -> JSONValue:
         if obj in ("None", "null"):
             return None
         if obj.startswith("{") and obj.endswith("}"):
-            with contextlib.suppress(Exception):
+            try:
                 parsed = ast.literal_eval(obj)
-                if isinstance(parsed, (dict, list)):
+                if type(parsed) is dict or type(parsed) is list:
                     return clean_serialized_data(parsed)
+            except Exception:
+                pass
         return obj
 
     if obj_type is int or obj_type is float or obj_type is bool:
