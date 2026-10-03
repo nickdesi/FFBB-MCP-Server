@@ -84,3 +84,6 @@
 ## 2026-10-21 - Fast-path Text Normalization via Module Level Regex Compilation
 **Learning:** In CPython, when applying a regular expression replacement inside a loop or inner function (such as `re.sub(r"[^a-z0-9]", "", text)`), pre-compiling the regex at the module level completely bypasses the overhead of Python's internal regex cache lookups and string parsing. In micro-benchmarks, this yields ~30-40% speedup for simple text normalization functions.
 **Action:** When a regular expression is executed frequently, particularly within O(N) or O(N^2) data processing loops (like formatting rankings or normalizing strings), always hoist the regex compilation to the module level.
+## 2026-10-25 - Avoid contextlib.suppress in hot paths
+**Learning:** In CPython, using `with contextlib.suppress(Exception):` incurs significant execution overhead compared to a standard `try...except Exception: pass` block due to the context manager protocol (`__enter__` and `__exit__` evaluation). In performance-critical string parsing or data normalization loops, this overhead can be substantial (over 10x slower for the suppression operation itself).
+**Action:** Replace `contextlib.suppress` with explicit `try...except` blocks in performance-critical code paths such as serialization, data cleaning, or heavily executed algorithmic loops.
