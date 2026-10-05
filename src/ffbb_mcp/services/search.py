@@ -649,8 +649,12 @@ _GENERIC_SEARCH_TERMS = {
 
 
 # ⚡ Bolt: Pre-compile regex for performance
-_RE_CODE_POSTAL_COMMUNE = re.compile(r"(?<!commune\.)(?<!communeClubPro\.)\bcodePostal\b")
-_RE_DEPARTEMENT_COMMUNE = re.compile(r"(?<!commune\.)(?<!communeClubPro\.)\bdepartement\b")
+_RE_CODE_POSTAL_COMMUNE = re.compile(
+    r"(?<!commune\.)(?<!communeClubPro\.)\bcodePostal\b"
+)
+_RE_DEPARTEMENT_COMMUNE = re.compile(
+    r"(?<!commune\.)(?<!communeClubPro\.)\bdepartement\b"
+)
 _RE_VILLE_COMMUNE = re.compile(r"(?<!commune\.)(?<!communeClubPro\.)\bville\b")
 _RE_CODE_POSTAL = re.compile(r"\bcodePostal\b")
 _RE_VILLE = re.compile(r"\bville\b")
