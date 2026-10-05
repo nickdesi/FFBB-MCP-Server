@@ -648,6 +648,15 @@ _GENERIC_SEARCH_TERMS = {
 }
 
 
+# ⚡ Bolt: Pre-compile regex for performance
+_RE_CODE_POSTAL_COMMUNE = re.compile(r"(?<!commune\.)(?<!communeClubPro\.)\bcodePostal\b")
+_RE_DEPARTEMENT_COMMUNE = re.compile(r"(?<!commune\.)(?<!communeClubPro\.)\bdepartement\b")
+_RE_VILLE_COMMUNE = re.compile(r"(?<!commune\.)(?<!communeClubPro\.)\bville\b")
+_RE_CODE_POSTAL = re.compile(r"\bcodePostal\b")
+_RE_VILLE = re.compile(r"\bville\b")
+_RE_NOM_LIBELLE = re.compile(r"\bnom:")
+
+
 def _rewrite_filter_for_index(filter_by: str | None, type_name: str) -> str | None:
     """Réécrit les alias de champs utilisateur/doc vers les vrais attributs Meilisearch.
 
@@ -664,24 +673,12 @@ def _rewrite_filter_for_index(filter_by: str | None, type_name: str) -> str | No
         "tournois",
         "engagements",
     }:
-        s = re.sub(
-            r"(?<!commune\.)(?<!communeClubPro\.)\bcodePostal\b",
-            "commune.codePostal",
-            s,
-        )
-        s = re.sub(
-            r"(?<!commune\.)(?<!communeClubPro\.)\bdepartement\b",
-            "commune.departement",
-            s,
-        )
-        s = re.sub(
-            r"(?<!commune\.)(?<!communeClubPro\.)\bville\b",
-            "commune.libelle",
-            s,
-        )
+        s = _RE_CODE_POSTAL_COMMUNE.sub("commune.codePostal", s)
+        s = _RE_DEPARTEMENT_COMMUNE.sub("commune.departement", s)
+        s = _RE_VILLE_COMMUNE.sub("commune.libelle", s)
     elif type_name == "formations":
-        s = re.sub(r"\bcodePostal\b", "postal_code", s)
-        s = re.sub(r"\bville\b", "place", s)
+        s = _RE_CODE_POSTAL.sub("postal_code", s)
+        s = _RE_VILLE.sub("place", s)
     return s
 
 
@@ -698,18 +695,10 @@ def _rewrite_sort_for_index(sort: list[str] | None, type_name: str) -> list[str]
             "tournois",
             "engagements",
         }:
-            s = re.sub(
-                r"(?<!commune\.)(?<!communeClubPro\.)\bcodePostal\b",
-                "commune.codePostal",
-                s,
-            )
-            s = re.sub(
-                r"(?<!commune\.)(?<!communeClubPro\.)\bville\b",
-                "commune.libelle",
-                s,
-            )
+            s = _RE_CODE_POSTAL_COMMUNE.sub("commune.codePostal", s)
+            s = _RE_VILLE_COMMUNE.sub("commune.libelle", s)
         if type_name == "salles":
-            s = re.sub(r"\bnom:", "libelle:", s)
+            s = _RE_NOM_LIBELLE.sub("libelle:", s)
         rewritten.append(s)
     return rewritten
 
