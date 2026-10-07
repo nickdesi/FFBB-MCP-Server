@@ -47,6 +47,17 @@ logger = logging.getLogger("ffbb-mcp")
 
 _NUMERIC_EXTRACT_PATTERN = re.compile(r"(\d+)")
 
+_RE_CODEPOSTAL_COMMUNE = re.compile(
+    r"(?<!commune\.)(?<!communeClubPro\.)\bcodePostal\b"
+)
+_RE_DEPARTEMENT_COMMUNE = re.compile(
+    r"(?<!commune\.)(?<!communeClubPro\.)\bdepartement\b"
+)
+_RE_VILLE_COMMUNE = re.compile(r"(?<!commune\.)(?<!communeClubPro\.)\bville\b")
+_RE_CODEPOSTAL = re.compile(r"\bcodePostal\b")
+_RE_VILLE = re.compile(r"\bville\b")
+_RE_NOM_LIBELLE = re.compile(r"\bnom:")
+
 
 from .team_resolver import (
     _deduplicate_same_team_phases,
@@ -657,6 +668,15 @@ def _rewrite_filter_for_index(filter_by: str | None, type_name: str) -> str | No
     """
     if not filter_by:
         return None
+
+    # ⚡ Bolt: Fast path to avoid regex overhead if keywords aren't present
+    if (
+        "codePostal" not in filter_by
+        and "departement" not in filter_by
+        and "ville" not in filter_by
+    ):
+        return filter_by
+
     s = filter_by
     if type_name in {
         "organismes",
@@ -666,24 +686,17 @@ def _rewrite_filter_for_index(filter_by: str | None, type_name: str) -> str | No
         "tournois",
         "engagements",
     }:
-        s = re.sub(
-            r"(?<!commune\.)(?<!communeClubPro\.)\bcodePostal\b",
-            "commune.codePostal",
-            s,
-        )
-        s = re.sub(
-            r"(?<!commune\.)(?<!communeClubPro\.)\bdepartement\b",
-            "commune.departement",
-            s,
-        )
-        s = re.sub(
-            r"(?<!commune\.)(?<!communeClubPro\.)\bville\b",
-            "commune.libelle",
-            s,
-        )
+        if "codePostal" in s:
+            s = _RE_CODEPOSTAL_COMMUNE.sub("commune.codePostal", s)
+        if "departement" in s:
+            s = _RE_DEPARTEMENT_COMMUNE.sub("commune.departement", s)
+        if "ville" in s:
+            s = _RE_VILLE_COMMUNE.sub("commune.libelle", s)
     elif type_name == "formations":
-        s = re.sub(r"\bcodePostal\b", "postal_code", s)
-        s = re.sub(r"\bville\b", "place", s)
+        if "codePostal" in s:
+            s = _RE_CODEPOSTAL.sub("postal_code", s)
+        if "ville" in s:
+            s = _RE_VILLE.sub("place", s)
     return s
 
 
@@ -692,26 +705,25 @@ def _rewrite_sort_for_index(sort: list[str] | None, type_name: str) -> list[str]
     if not sort:
         return None
     rewritten: list[str] = []
+
+    # ⚡ Bolt: Pre-evaluate the set membership for the loop
+    is_commune_target = type_name in {
+        "organismes",
+        "salles",
+        "terrains",
+        "tournois",
+        "engagements",
+    }
+    is_salles = type_name == "salles"
+
     for s in sort:
-        if type_name in {
-            "organismes",
-            "salles",
-            "terrains",
-            "tournois",
-            "engagements",
-        }:
-            s = re.sub(
-                r"(?<!commune\.)(?<!communeClubPro\.)\bcodePostal\b",
-                "commune.codePostal",
-                s,
-            )
-            s = re.sub(
-                r"(?<!commune\.)(?<!communeClubPro\.)\bville\b",
-                "commune.libelle",
-                s,
-            )
-        if type_name == "salles":
-            s = re.sub(r"\bnom:", "libelle:", s)
+        if is_commune_target:
+            if "codePostal" in s:
+                s = _RE_CODEPOSTAL_COMMUNE.sub("commune.codePostal", s)
+            if "ville" in s:
+                s = _RE_VILLE_COMMUNE.sub("commune.libelle", s)
+        if is_salles and "nom:" in s:
+            s = _RE_NOM_LIBELLE.sub("libelle:", s)
         rewritten.append(s)
     return rewritten
 
