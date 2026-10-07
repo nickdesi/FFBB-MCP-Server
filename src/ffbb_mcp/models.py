@@ -1,24 +1,48 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Self
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class BilanTotal(BaseModel):
-    """Statistiques cumulées d'une équipe (victoires, défaites, paniers)."""
+    """Statistiques cumulées d'une équipe (victoires, défaites, paniers).
+
+    Note terminologie : dans les référentiels officiels FFBB, 'paniers marqués'
+    désigne le nombre total de points inscrits (et non le nombre de tirs réussis).
+    """
 
     match_joues: int = Field(default=0, description="Nombre de matchs joués.")
     gagnes: int = Field(default=0, description="Nombre de matchs gagnés.")
     perdus: int = Field(default=0, description="Nombre de matchs perdus.")
     nuls: int = Field(default=0, description="Nombre de matchs nuls.")
-    paniers_marques: int = Field(default=0, description="Total des paniers marqués.")
+    paniers_marques: int = Field(
+        default=0,
+        description="Total des paniers/points marqués (terminologie officielle FFBB).",
+    )
+    points_marques: int | None = Field(
+        default=None,
+        description="Alias usuel pour paniers_marques (total des points marqués).",
+    )
     paniers_encaisses: int = Field(
-        default=0, description="Total des paniers encaissés."
+        default=0,
+        description="Total des paniers/points encaissés.",
+    )
+    points_encaisses: int | None = Field(
+        default=None,
+        description="Alias usuel pour paniers_encaisses (total des points encaissés).",
     )
     difference: int = Field(
-        default=0, description="Différence de paniers (marqués - encaissés)."
+        default=0, description="Différence de paniers/points (marqués - encaissés)."
     )
+
+    @model_validator(mode="after")
+    def _sync_points_alias(self) -> Self:
+        if self.points_marques is None:
+            self.points_marques = self.paniers_marques
+        if self.points_encaisses is None:
+            self.points_encaisses = self.paniers_encaisses
+        return self
 
 
 class PhaseBilan(BaseModel):
@@ -45,9 +69,28 @@ class PhaseBilan(BaseModel):
     gagnes: int = Field(default=0, description="Matchs gagnés.")
     perdus: int = Field(default=0, description="Matchs perdus.")
     nuls: int = Field(default=0, description="Matchs nuls.")
-    paniers_marques: int = Field(default=0, description="Paniers marqués.")
-    paniers_encaisses: int = Field(default=0, description="Paniers encaissés.")
-    difference: int = Field(default=0, description="Différence de paniers.")
+    paniers_marques: int = Field(
+        default=0,
+        description="Paniers/points marqués (terminologie officielle FFBB).",
+    )
+    points_marques: int | None = Field(
+        default=None,
+        description="Alias usuel pour paniers_marques (points marqués).",
+    )
+    paniers_encaisses: int = Field(default=0, description="Paniers/points encaissés.")
+    points_encaisses: int | None = Field(
+        default=None,
+        description="Alias usuel pour paniers_encaisses (points encaissés).",
+    )
+    difference: int = Field(default=0, description="Différence de paniers/points.")
+
+    @model_validator(mode="after")
+    def _sync_points_alias(self) -> Self:
+        if self.points_marques is None:
+            self.points_marques = self.paniers_marques
+        if self.points_encaisses is None:
+            self.points_encaisses = self.paniers_encaisses
+        return self
 
 
 class MatchForme(BaseModel):

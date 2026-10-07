@@ -137,19 +137,14 @@ def _freshness_meta(
         meta["ttl_seconds"] = ttl_seconds
     if force_refresh_supported:
         meta["force_refresh_supported"] = True
-    # Champs mineurs pour audit : toujours présents pour cohérence
+    # Métadonnées fines : uniquement si explicitement renseignées
+    # (évite les contradictions avec provenance.technical.cache_status)
     if cache_hit is not None:
         meta["cache_hit"] = cache_hit
-    else:
-        meta["cache_hit"] = False
     if stale is not None:
         meta["stale"] = stale
-    else:
-        meta["stale"] = False
     if cache_age_seconds is not None:
         meta["cache_age_seconds"] = cache_age_seconds
-    else:
-        meta["cache_age_seconds"] = 0
     return meta
 
 

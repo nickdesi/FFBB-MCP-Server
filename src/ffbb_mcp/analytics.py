@@ -188,23 +188,15 @@ def compute_poule_advanced_stats(
     else:
         style = "Équipe équilibrée ⚖️"
         if rang_attaque and rang_defense and total_equipes:
-            if (
-                rang_attaque <= max(2, total_equipes // 3)
-                and rang_defense > total_equipes // 2
-            ):
+            top_tier = max(1, total_equipes // 3)
+            bottom_half = total_equipes // 2
+            if rang_attaque <= top_tier and rang_defense > bottom_half:
                 style = "Attaque explosive 💥 (Portée vers l'offensive)"
-            elif (
-                rang_defense <= max(2, total_equipes // 3)
-                and rang_attaque > total_equipes // 2
-            ):
+            elif rang_defense <= top_tier and rang_attaque > bottom_half:
                 style = "Forteresse défensive 🛡️ (Verrouille les matchs)"
-            elif rang_attaque <= max(3, total_equipes // 3) and rang_defense <= max(
-                3, total_equipes // 3
-            ):
+            elif rang_attaque <= top_tier and rang_defense <= top_tier:
                 style = "Complète & dominante 👑 (Top attaque et défense)"
-            elif (
-                rang_attaque > total_equipes // 2 and rang_defense > total_equipes // 2
-            ):
+            elif rang_attaque > bottom_half and rang_defense > bottom_half:
                 style = "En difficulté sur les deux côtés du terrain ⚠️"
 
     clutch_ratio = (
@@ -223,6 +215,10 @@ def compute_poule_advanced_stats(
         if target_entry
         else None,
         "style_de_jeu": style,
+        "disclaimer_terminologie": (
+            "En basket FFBB, 'paniers marqués' désigne le total des points marqués "
+            "(et non le nombre de paniers/tirs réussis)."
+        ),
         "domicile": dom_stats,
         "exterieur": ext_stats,
         "clutch_index": {

@@ -764,6 +764,19 @@ def _lighten_rencontre_hit(hit: dict[str, Any]) -> dict[str, Any]:
                 or raw_commune.get("code_postal"),
                 "departement": raw_commune.get("departement"),
             }
+        elif raw_salle.get("adresse"):
+            adr = str(raw_salle.get("adresse") or "")
+            parts = adr.split(",")
+            if len(parts) >= 2:
+                ville_cand = parts[-1].strip()
+                cp_match = re.search(r"\b(\d{5})\b", ville_cand)
+                cp = cp_match.group(1) if cp_match else None
+                ville_clean = re.sub(r"\b\d{5}\b", "", ville_cand).strip()
+                cleaned_commune = {
+                    "libelle": ville_clean or ville_cand,
+                    "codePostal": cp,
+                    "departement": cp[:2] if cp else None,
+                }
         item["salle"] = {
             "id": raw_salle.get("id"),
             "libelle": raw_salle.get("libelle") or raw_salle.get("nom"),
@@ -1708,7 +1721,17 @@ async def ffbb_search_service(
             sort=sort,
             force_refresh=force_refresh,
         )
-        return _add_truncation_meta(result, limit=limit, offset=offset, sort=sort)
+        res_dict = _add_truncation_meta(result, limit=limit, offset=offset, sort=sort)
+        warning_msg = (
+            "Données issues de l'index de recherche Meilisearch (cache 12h). "
+            "Pour les horaires confirmés, reports ou désignations en temps réel, "
+            "utiliser de préférence 'ffbb_next_match' ou 'ffbb_match_lookup'."
+        )
+        if isinstance(res_dict, dict):
+            res_dict["warning"] = warning_msg
+            if "_meta" in res_dict and isinstance(res_dict["_meta"], dict):
+                res_dict["_meta"]["warning"] = warning_msg
+        return res_dict
 
     if type == "salles":
         result = await search_salles_service(

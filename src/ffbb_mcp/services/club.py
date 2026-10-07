@@ -616,12 +616,21 @@ async def _resolve_team_equipes(
                     }
                 )
             )
+            msg = (
+                f"Aucune équipe matchant '{categorie}' n°{eff_num} (ou unique) trouvée."
+            )
             return (
                 {
                     "status": not_found_status,
-                    "message": f"Aucune équipe matchant '{categorie}' n°{eff_num} (ou unique) trouvée.",
+                    "message": msg,
                     "club_resolu": club_resolu,
                     "candidates": all_available,
+                    "presentation": {
+                        "short_answer": msg,
+                        "detail_line": "Vérifiez le numéro d'équipe ou consultez les candidats suggérés.",
+                        "source_label": format_source_label(),
+                        "warnings": [msg],
+                    },
                 },
                 [],
                 club_resolu,
@@ -629,12 +638,21 @@ async def _resolve_team_equipes(
         equipes = filtered
 
     if not equipes:
+        msg = (
+            f"Aucun engagement ne correspond aux critères spécifiés pour '{categorie}'."
+        )
         return (
             {
                 "status": not_found_status,
-                "message": f"Aucun engagement ne correspond aux critères spécifiés pour '{categorie}'.",
+                "message": msg,
                 "club_resolu": club_resolu,
                 "candidates": [],
+                "presentation": {
+                    "short_answer": msg,
+                    "detail_line": "Vérifiez la catégorie demandée.",
+                    "source_label": format_source_label(),
+                    "warnings": [msg],
+                },
             },
             [],
             club_resolu,
@@ -683,12 +701,19 @@ async def _resolve_team_equipes(
         club_nom_str = (
             club_resolu.get("nom", "") if isinstance(club_resolu, dict) else ""
         )
+        msg = f"Plusieurs engagements ({len(equipes)}) existent pour '{categorie or club_nom_str}'. Précisez `engagement_id`, `competition_id` ou `competition_type`."
         return (
             {
                 "status": "ambiguous",
-                "message": f"Plusieurs engagements ({len(equipes)}) existent pour '{categorie or club_nom_str}'. Précisez `engagement_id`, `competition_id` ou `competition_type`.",
+                "message": msg,
                 "candidates": equipes,
                 "club_resolu": club_resolu,
+                "presentation": {
+                    "short_answer": msg,
+                    "detail_line": f"{len(equipes)} candidats disponibles. Utilisez un critère distinctif.",
+                    "source_label": format_source_label(),
+                    "warnings": [msg],
+                },
             },
             [],
             club_resolu,
@@ -843,11 +868,18 @@ async def ffbb_next_match_service(
                 }
             )
         )
+        msg = "Aucune poule active trouvée pour cette équipe."
         return {
             "status": "not_found",
-            "message": "Aucune poule active trouvée pour cette équipe.",
+            "message": msg,
             "club_resolu": club_resolu,
             "candidates": all_available_equipes,
+            "presentation": {
+                "short_answer": msg,
+                "detail_line": "Toutes les phases sont terminées ou le calendrier officiel n'est pas encore programmé.",
+                "source_label": format_source_label(),
+                "warnings": [msg],
+            },
         }
 
     organisme_nom = str(club_resolu.get("nom", "")) if club_resolu is not None else ""

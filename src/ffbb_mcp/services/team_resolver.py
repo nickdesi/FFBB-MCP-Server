@@ -654,6 +654,17 @@ async def ffbb_find_team_candidates_service(
                     )
 
                     if target_m:
+                        try:
+                            from .salle import (
+                                _enrich_with_salle_details,
+                                get_client_async,
+                            )
+
+                            _cl = await get_client_async()
+                            await _enrich_with_salle_details(target_m, _cl)
+                        except Exception:
+                            pass
+
                         m1 = str(target_m.get("nomEquipe1") or "").strip()
                         m2 = str(target_m.get("nomEquipe2") or "").strip()
 
@@ -712,6 +723,24 @@ async def ffbb_find_team_candidates_service(
                         if heure_str in ("00h00", "00:00"):
                             heure_str = "Horaire à fixer"
 
+                        salle_info = (
+                            target_m.get("salle_details")
+                            if isinstance(target_m.get("salle_details"), dict)
+                            else {}
+                        )
+                        lieu_nom = (
+                            salle_info.get("libelle")
+                            or salle_info.get("nom")
+                            or target_m.get("nomSalle")
+                            or target_m.get("nom_salle")
+                            or (
+                                target_m.get("commune", {}).get("nom")
+                                if isinstance(target_m.get("commune"), dict)
+                                else target_m.get("commune")
+                            )
+                            or None
+                        )
+
                         next_match_info = {
                             "date": date_m[:10] if date_m else "Date non fixée",
                             "heure": heure_str,
@@ -719,13 +748,16 @@ async def ffbb_find_team_candidates_service(
                             "domicile_exterieur": (
                                 "domicile" if is_dom else "extérieur"
                             ),
-                            "lieu": (
-                                target_m.get("nomSalle")
-                                or (
-                                    target_m.get("commune", {}).get("nom")
-                                    if isinstance(target_m.get("commune"), dict)
-                                    else target_m.get("commune")
-                                )
+                            "lieu": lieu_nom,
+                            "salle": (
+                                salle_info.get("libelle")
+                                or target_m.get("nomSalle")
+                                or target_m.get("nom_salle")
+                                or None
+                            ),
+                            "adresse_salle": (
+                                target_m.get("adresse_salle")
+                                or salle_info.get("adresse")
                                 or None
                             ),
                         }

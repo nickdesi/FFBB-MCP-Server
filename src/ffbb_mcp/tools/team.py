@@ -918,7 +918,7 @@ async def ffbb_team_summary(
         is_cache_hit = (
             not force_refresh
             and isinstance(meta_obj, dict)
-            and bool(meta_obj.get("cache_hit"))
+            and (bool(meta_obj.get("cache_hit")) or meta_obj.get("source") == "cache")
         )
         resource_ids = {
             "organisme_id": str(effective_org_id) if effective_org_id else None,

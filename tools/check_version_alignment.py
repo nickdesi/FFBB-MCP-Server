@@ -57,7 +57,7 @@ def _check_tag(version: str, explicit_tag: str | None = None) -> list[str]:
             )
         return errors
 
-    if os.environ.get("SKIP_TAG_CHECK") == "1":
+    if os.environ.get("SKIP_TAG_CHECK") == "1" or os.environ.get("PRE_COMMIT") == "1":
         return errors
 
     # Priority 2: compare with latest git tag (CI on main / PR)

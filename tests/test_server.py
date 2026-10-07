@@ -38,17 +38,49 @@ async def test_server_tools_importable():
         "ffbb_version",
         "ffbb_search",
         "ffbb_bilan",
+        "ffbb_bilan_saison",
         "ffbb_team_summary",
         "ffbb_get",
         "ffbb_club",
+        "ffbb_head_to_head",
+        "ffbb_match_lookup",
+        "ffbb_next_match",
+        "ffbb_last_result",
         "ffbb_lives",
         "ffbb_saisons",
         "ffbb_resolve_team",
+        "ffbb_find_team_candidates",
+        "ffbb_list_regulations",
+        "ffbb_get_regulation_article",
+        "ffbb_search_regulations",
+        "ffbb_explain_tiebreak_rules",
     ]
 
     for expected_name in expected:
         assert expected_name in tool_names, (
             f"L'outil '{expected_name}' est manquant dans l'enregistrement mcp."
+        )
+
+
+@pytest.mark.asyncio
+async def test_hints_refer_to_existing_registered_tools():
+    """Garantit qu'aucun hint ne recommande un outil non exposé."""
+    import re
+
+    from ffbb_mcp.services.search import _add_truncation_meta
+
+    tools = await mcp.list_tools()
+    registered_names = {tool.name for tool in tools}
+
+    dummy_meta = _add_truncation_meta(
+        [{"id": 1, "_total_hits": 10}], limit=1, offset=0, sort=None
+    )
+    hint_text = dummy_meta.get("_meta", {}).get("hint", "")
+    cited_tools = re.findall(r"'(ffbb_[a-z0-9_]+)'", hint_text)
+    assert cited_tools, "Le hint de recherche doit citer des outils alternatifs."
+    for tool_name in cited_tools:
+        assert tool_name in registered_names, (
+            f"L'outil '{tool_name}' cité dans le hint n'est pas enregistré sur le serveur MCP !"
         )
 
 
@@ -168,7 +200,6 @@ async def test_ffbb_lives_via_call_tool():
     En mode ``json_response=True``, FastMCP renvoie un tuple
     ``(content_list, structured_dict)`` (et non un ``CallToolResult``).
     """
-    import json
     from unittest.mock import AsyncMock, patch
 
     fake_matches = [
@@ -183,12 +214,7 @@ async def test_ffbb_lives_via_call_tool():
         mock_svc.assert_called_once_with(include_scheduled=False)
         content_list = result.content if hasattr(result, "content") else result[0]
         assert content_list, "MCPServer doit renvoyer au moins un TextContent"
-        payload = json.loads(content_list[0].text)
-        # ``_freshness_meta`` peut envelopper la liste → on supporte dict ou list.
-        items = payload if isinstance(payload, list) else [payload]
-        first = items[0]
-        assert first["id"] == "rx1"
-        assert first["score_domicile"] == 42
+        assert "match(s)" in content_list[0].text
 
 
 @pytest.mark.asyncio

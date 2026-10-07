@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from mcp.server import MCPServer
 
 from ffbb_mcp import __version__ as _PACKAGE_VERSION
-from ffbb_mcp.presentation import format_source_label
+from ffbb_mcp.presentation import build_provenance_block, format_source_label
 from ffbb_mcp.services import (
     ffbb_search_service,
     find_team_poule_service,
@@ -32,6 +32,7 @@ from ffbb_mcp.services import (
     get_saisons_service,
     get_salle_service,
 )
+from ffbb_mcp.services.common import _format_salle_address
 from ffbb_mcp.utils import format_team_name
 
 from .common import (
@@ -180,10 +181,26 @@ def _build_default_get_presentation(
         date_str = data.get("date_rencontre") or data.get("date") or ""
         detail = f"Date : {date_str}." if date_str else "Détails de la rencontre."
     elif type_name == "salle":
-        nom = data.get("nom") or f"Salle {resource_id}"
-        ville = data.get("ville") or ""
-        short_ans = f"Salle : {nom}."
-        detail = f"Localisation : {ville}." if ville else "Détails de la salle."
+        lib1 = data.get("libelle") or ""
+        lib2 = data.get("libelle2") or ""
+        nom_raw = data.get("nom") or ""
+        if lib2 and lib1 and lib2 != lib1:
+            nom_salle = f"{lib2} ({lib1})"
+        else:
+            nom_salle = lib1 or lib2 or nom_raw or f"Salle {resource_id}"
+        adresse = (
+            data.get("adresse_formatee")
+            or data.get("adresse")
+            or _format_salle_address(data)
+        )
+        ville = data.get("ville") or data.get("commune") or ""
+        short_ans = f"Salle : {nom_salle}."
+        if adresse:
+            detail = f"Adresse : {adresse}."
+        elif ville:
+            detail = f"Localisation : {ville}."
+        else:
+            detail = "Détails de la salle."
     else:
         short_ans = f"Ressource {type_name} {resource_id}."
         detail = "Données chargées depuis la FFBB."
@@ -477,7 +494,7 @@ async def ffbb_get_lives(
             )
         ),
     ] = True,
-) -> list[dict[str, Any]]:
+) -> dict[str, Any]:
     """Flux live FFBB, éventuellement complété par un calendrier ciblé et prudent."""
     svc = _get_server_service("get_lives_service", get_lives_service)
     try:
@@ -489,16 +506,47 @@ async def ffbb_get_lives(
             "engagement_id": engagement_id,
         }
         if not any(value is not None for value in filters.values()):
-            return await svc(include_scheduled=include_scheduled)
-        return await svc(
-            include_scheduled=include_scheduled,
-            organisme_id=organisme_id,
-            club_name=club_name,
-            categorie=categorie,
-            numero_equipe=numero_equipe,
-            engagement_id=engagement_id,
-            include_calendar_fallback=include_calendar_fallback,
+            matches = await svc(include_scheduled=include_scheduled)
+        else:
+            matches = await svc(
+                include_scheduled=include_scheduled,
+                organisme_id=organisme_id,
+                club_name=club_name,
+                categorie=categorie,
+                numero_equipe=numero_equipe,
+                engagement_id=engagement_id,
+                include_calendar_fallback=include_calendar_fallback,
+            )
+
+        matches_list = matches if isinstance(matches, list) else []
+        n_matches = len(matches_list)
+        presentation = {
+            "short_answer": (
+                f"{n_matches} match(s) en direct ou programmé(s)."
+                if n_matches > 0
+                else "Aucun match en direct actuellement."
+            ),
+            "detail_line": (
+                f"{n_matches} rencontre(s) active(s) dans le flux FFBB."
+                if n_matches > 0
+                else "Flux live officiel FFBB (statut LIVE / SCHEDULED)."
+            ),
+            "source_label": format_source_label(),
+            "warnings": [],
+        }
+        provenance = build_provenance_block(
+            source="ffbb_api_live",
+            cache_status="hit" if not any(filters.values()) else "miss",
+            data_freshness="live",
         )
+        return {
+            "status": "ok",
+            "count": n_matches,
+            "items": matches_list,
+            "matches": matches_list,
+            "presentation": presentation,
+            "provenance": provenance,
+        }
     except Exception as e:
         raise handle_api_error(e) from e
 
