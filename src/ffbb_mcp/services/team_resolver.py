@@ -654,6 +654,17 @@ async def ffbb_find_team_candidates_service(
                     )
 
                     if target_m:
+                        mid = target_m.get("id")
+                        if mid:
+                            try:
+                                from .search import get_rencontre_service
+
+                                rd = await get_rencontre_service(mid)
+                                if rd and isinstance(rd, dict):
+                                    target_m.update(rd)
+                            except Exception:
+                                pass
+
                         try:
                             from .salle import (
                                 _enrich_with_salle_details,

@@ -174,3 +174,73 @@ async def test_ffbb_lives_standard_envelope():
         assert "presentation" in res
         assert "provenance" in res
         assert "1 match(s)" in res["presentation"]["short_answer"]
+
+
+@pytest.mark.asyncio
+async def test_find_team_candidates_enriches_next_match_salle():
+    """find_team_candidates doit enrichir next_match avec le lieu et la salle."""
+    from ffbb_mcp.services.team_resolver import ffbb_find_team_candidates_service
+
+    fake_teams = [
+        {
+            "team_id": "t1",
+            "engagement_id": "e1",
+            "team_label": "U18M1",
+            "categorie": "U18",
+            "sexe": "M",
+            "competition": "Départementale",
+            "poule_id": "p1",
+            "nom_equipe": "THIERS - 1",
+            "numero_equipe": "1",
+        }
+    ]
+    fake_match = {
+        "id": "m1",
+        "date_rencontre": "2026-10-11",
+        "heure": "10h00",
+        "nomEquipe1": "THIERS - 1",
+        "nomEquipe2": "GERZAT",
+        "idEngagementEquipe1": "e1",
+        "idEngagementEquipe2": "e2",
+    }
+    fake_rencontre_detail = {
+        "id": "m1",
+        "idSalle": "s1",
+        "nomSalle": "Maison des Sports",
+    }
+    with (
+        patch(
+            "ffbb_mcp.services.club.ffbb_equipes_club_service",
+            new_callable=AsyncMock,
+            return_value=fake_teams,
+        ),
+        patch(
+            "ffbb_mcp.services.search.resolve_club_and_org",
+            new_callable=AsyncMock,
+            return_value=(
+                [{"id": "9328", "nom": "THIERS", "organisme_id": "9328"}],
+                {},
+            ),
+        ),
+        patch(
+            "ffbb_mcp.services.club._fetch_poule_matches",
+            new_callable=AsyncMock,
+            return_value=[(fake_match, fake_teams[0])],
+        ),
+        patch(
+            "ffbb_mcp.services._fetch_poule_matches",
+            new_callable=AsyncMock,
+            return_value=[(fake_match, fake_teams[0])],
+        ),
+        patch(
+            "ffbb_mcp.services.search.get_rencontre_service",
+            new_callable=AsyncMock,
+            return_value=fake_rencontre_detail,
+        ),
+    ):
+        res = await ffbb_find_team_candidates_service(
+            club_name="Thiers", categorie="U18M"
+        )
+        c = res["candidates"][0]
+        assert c["next_match"]["lieu"] == "Maison des Sports"
+        assert c["next_match"]["salle"] == "Maison des Sports"
