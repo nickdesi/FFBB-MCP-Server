@@ -153,7 +153,7 @@ async def ffbb_saison_bilan_service(
     club_name: str | None = None,
     organisme_id: int | str | None = None,
     categorie: str | None = None,
-    numero_equipe: int = 1,
+    numero_equipe: int | None = None,
     engagement_id: int | str | None = None,
     competition_id: int | str | None = None,
     competition_type: str | None = None,
@@ -309,6 +309,9 @@ async def ffbb_saison_bilan_service(
         club_nom=club_nom,
         ratio_global_victoires=ratio_saison,
     )
+    from .common import _enrich_dynamique_matchs_salle
+
+    await _enrich_dynamique_matchs_salle(dynamique)
 
     # Catégorie normalisée depuis l'équipe résolue (team_label ex: "U13M"),
     # pas le paramètre brut qui peut être absent (engagement seul → "").
@@ -362,6 +365,7 @@ async def _build_bilan_payload(
     club_name: str | None,
     organisme_id: int | str | None,
     categorie: str | None,
+    numero_equipe: int | None = None,
     engagement_id: int | str | None = None,
     competition_id: int | str | None = None,
     competition_type: str | None = None,
@@ -467,6 +471,24 @@ async def _build_bilan_payload(
         equipes = [
             e for e in equipes if str(e.get("poule_id") or "").strip() == target_poule
         ]
+
+    eff_num = numero_equipe
+    if eff_num is None and categorie:
+        parsed_cat = parse_categorie(categorie)
+        if parsed_cat and parsed_cat.numero_equipe is not None:
+            eff_num = parsed_cat.numero_equipe
+
+    if eff_num is not None:
+        want_num = str(eff_num)
+        filtered_eq = [
+            e
+            for e in equipes
+            if (e.get("numero_equipe") or "").strip() == want_num
+            or str(e.get("nom_equipe") or e.get("nom") or "").endswith(f"- {want_num}")
+            or str(e.get("nom_equipe") or e.get("nom") or "").endswith(f"-{want_num}")
+        ]
+        if filtered_eq:
+            equipes = filtered_eq
 
     if not equipes:
         return {
@@ -709,6 +731,17 @@ async def _build_bilan_payload(
             ratio_global_victoires=tot_ratio,
         )
 
+    from .common import _enrich_dynamique_matchs_salle
+
+    enrich_tasks = [
+        _enrich_dynamique_matchs_salle(eq_data["dynamique"])
+        for eq_data in equipes_bilan.values()
+        if "dynamique" in eq_data
+    ]
+    if main_dynamique:
+        enrich_tasks.append(_enrich_dynamique_matchs_salle(main_dynamique))
+    await asyncio.gather(*enrich_tasks, return_exceptions=True)
+
     from ffbb_mcp.presentation import format_source_label
 
     gagnes_count = int(totaux.get("gagnes", 0))
@@ -725,10 +758,22 @@ async def _build_bilan_payload(
                 resolved_team_label = eq.get("team_label") or eq.get("nom_equipe")
                 break
 
+    warnings_list = []
+    if len(equipes_bilan) > 1:
+        warnings_list.append(
+            f"Ce bilan cumule {len(equipes_bilan)} équipes distinctes ({', '.join(f'équipe {k}' for k in sorted(equipes_bilan.keys()))}). "
+            "Précisez `numero_equipe` (ex: numero_equipe=1 ou numero_equipe=2) pour isoler une équipe."
+        )
+
     cat_str = categorie or resolved_team_label or "Toutes catégories"
     vic_str = f"{gagnes_count} victoire{'s' if gagnes_count > 1 else ''}"
     def_str = f"{perdus_count} défaite{'s' if perdus_count > 1 else ''}"
-    short_ans = f"Bilan pour {club_nom} ({cat_str}) : {vic_str}, {def_str} ({joues_count} match(s) joué(s))."
+    prefix = (
+        f"Bilan cumulé ({len(equipes_bilan)} équipes)"
+        if len(equipes_bilan) > 1
+        else "Bilan"
+    )
+    short_ans = f"{prefix} pour {club_nom} ({cat_str}) : {vic_str}, {def_str} ({joues_count} match(s) joué(s))."
     detail = (
         f"{len(phases)} phase(s) analysée(s) : {', '.join(competitions_incluses[:3])}."
         if phases
@@ -738,7 +783,7 @@ async def _build_bilan_payload(
         "short_answer": short_ans,
         "detail_line": detail,
         "source_label": format_source_label(),
-        "warnings": [],
+        "warnings": warnings_list,
     }
 
     res_dict = {
@@ -761,6 +806,7 @@ async def ffbb_bilan_service(
     club_name: str | None = None,
     organisme_id: int | str | None = None,
     categorie: str | None = None,
+    numero_equipe: int | None = None,
     engagement_id: int | str | None = None,
     competition_id: int | str | None = None,
     competition_type: str | None = None,
@@ -769,9 +815,11 @@ async def ffbb_bilan_service(
     force_refresh: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
+    if numero_equipe is None:
+        numero_equipe = kwargs.get("numero_equipe")
     if engagement_id is None:
         engagement_id = kwargs.get("engagement_id")
-    cache_key = f"bilan:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}:{engagement_id or ''}:{competition_id or ''}:{competition_type or ''}:{poule_id or ''}"
+    cache_key = f"bilan:{organisme_id or ''}:{_normalize_name(club_name or '')}:{_normalize_name(categorie or '')}:{numero_equipe or ''}:{engagement_id or ''}:{competition_id or ''}:{competition_type or ''}:{poule_id or ''}"
 
     if force_refresh and state.cache_bilan is not None:
         logger.debug("force_refresh=True, bypass cache pour bilan")
@@ -787,6 +835,7 @@ async def ffbb_bilan_service(
             club_name,
             organisme_id,
             categorie,
+            numero_equipe=numero_equipe,
             engagement_id=engagement_id,
             competition_id=competition_id,
             competition_type=competition_type,

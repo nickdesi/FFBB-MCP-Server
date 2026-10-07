@@ -340,10 +340,9 @@ def build_match_presentation(
         opp_score = away_score if is_home else home_score
 
         if team_score is not None and opp_score is not None:
-            # Convention FFBB : score toujours domicile puis extérieur,
-            # quel que soit le camp de l'équipe cible.
+            # En cas de victoire, le score du vainqueur est toujours annoncé en premier (team_score à opp_score).
             if team_score > opp_score:
-                short = f"{clean_team} a battu {clean_opp} {home_score} à {away_score}."
+                short = f"{clean_team} a battu {clean_opp} {team_score} à {opp_score}."
                 outcome = "Victoire"
             elif team_score < opp_score:
                 short = f"{clean_team} s'est incliné face à {clean_opp} {home_score} à {away_score}."

@@ -517,7 +517,7 @@ async def test_ffbb_bilan_saison_supports_club_name():
             club_name="ASVEL",
             organisme_id=None,
             categorie="U11M",
-            numero_equipe=1,
+            numero_equipe=None,
             engagement_id=None,
             competition_id=None,
             competition_type=None,

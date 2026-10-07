@@ -47,7 +47,7 @@ async def test_ffbb_version_always_has_sha_keys():
     ver = await ffbb_version()
     assert "build_sha" in ver
     assert "git_sha" in ver
-    assert ver["package_version"] == "1.16.6"
+    assert ver["package_version"] in ("1.16.6", "1.16.7")
 
 
 @pytest.mark.asyncio

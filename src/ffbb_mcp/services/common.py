@@ -1327,3 +1327,38 @@ async def _dedupe_inflight_detail(
         make_coro=make_coro,
         cache_name=cache_name,
     )
+
+
+async def _enrich_dynamique_matchs_salle(dyn: dict[str, Any]) -> None:
+    """Enrichit les matchs d'une structure dynamique avec le nom de salle via get_rencontre_service."""
+    matchs_list = dyn.get("matchs")
+    if not matchs_list or not isinstance(matchs_list, list):
+        return
+    from .salle import _enrich_with_salle_details, get_client_async
+    from .search import get_rencontre_service
+
+    async def _enrich_single_match(m: dict[str, Any]) -> None:
+        if not isinstance(m, dict) or m.get("salle"):
+            return
+        mid = m.get("id")
+        if not mid:
+            return
+        try:
+            rd = await get_rencontre_service(mid)
+            if rd and isinstance(rd, dict):
+                s_name = rd.get("nomSalle") or rd.get("nom_salle")
+                if not s_name:
+                    client = await get_client_async()
+                    await _enrich_with_salle_details(rd, client)
+                    sd = rd.get("salle_details") or {}
+                    s_name = (
+                        sd.get("libelle") or rd.get("nomSalle") or rd.get("nom_salle")
+                    )
+                if s_name:
+                    m["salle"] = s_name
+        except Exception:
+            pass
+
+    await asyncio.gather(
+        *[_enrich_single_match(m) for m in matchs_list], return_exceptions=True
+    )

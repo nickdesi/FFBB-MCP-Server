@@ -271,6 +271,8 @@ async def ffbb_club(
                 kwargs["strict_filters"] = strict_filters
             if group_by is not None:
                 kwargs["group_by"] = group_by
+            if phase is not None:
+                kwargs["phase"] = phase
             return await cal_svc(**kwargs)
 
         # Actions equipes / classement : pré-résolution nécessaire

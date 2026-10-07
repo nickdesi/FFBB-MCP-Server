@@ -129,9 +129,10 @@ async def ffbb_bilan(
     ] = False,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
-    """Bilan complet d'une équipe toutes phases confondues en UN seul appel (V/D/N, paniers, phases).
+    """Bilan statistique brut (V/D, paniers, répartition par équipe).
 
-    Outil prioritaire pour 'quel est le bilan de X ?' ou 'résultats de U11M1'.
+    Pour une vue d'ensemble avec calendrier/classement, préférer `ffbb_team_summary`.
+    Pour le parcours multi-phases/coupes, préférer `ffbb_bilan_saison`.
     """
     _require_club_identifier(
         organisme_id=organisme_id,
@@ -160,6 +161,7 @@ async def ffbb_bilan(
             club_name=club_name,
             organisme_id=organisme_id,
             categorie=effective_cat,
+            numero_equipe=numero_equipe,
             engagement_id=engagement_id,
             competition_id=competition_id,
             competition_type=competition_type,
@@ -385,9 +387,10 @@ async def ffbb_team_summary(
     ] = False,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
-    """1 appel pour bilan + classement complet + dernier/prochain match d'une équipe. Préférer cet outil pour toute question combinant résultats et classement.
+    """Synthèse recommandée d'une équipe (résultats, prochain match, classement, dynamique en 1 appel).
 
-    Résout NM3, PNM, NF1, etc. vers la bonne équipe. En cas d'ambiguïté, suggère les candidats.
+    Préférer cet outil pour toute question d'équipe ('Comment vont les U13M2 ?', 'NM3', etc.).
+    Pour une analyse multi-phases ou coupes, utiliser `ffbb_bilan_saison`.
     """
     _require_club_identifier(
         organisme_id=organisme_id,
@@ -1202,22 +1205,9 @@ async def ffbb_bilan_saison(
     ] = False,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
-    """Bilan détaillé de la saison pour une équipe précise (toutes phases).
+    """Bilan multi-phases approfondi d'une équipe sur la saison (phases 1/2, coupes, play-offs).
 
-    Cet outil est optimisé pour les questions du type
-    "Quel est le bilan de la saison des U11M1 ?".
-
-    Il agrège toutes les phases (toutes poules) de la saison FFBB pour
-    l'équipe identifiée par (organisme_id/club_name, categorie, numero_equipe).
-
-    Pour chaque phase, il retourne :
-      - competition
-      - poule_id
-      - position
-      - match_joues, gagnes, perdus, nuls
-      - paniers_marques, paniers_encaissés, difference
-
-    Et fournit également un champ `bilan_total` qui cumule toutes les phases.
+    Agrège le parcours successif avec cumul saisonnier. Pour une synthèse rapide, préférer `ffbb_team_summary`.
     """
     saison_bilan_svc = _get_server_service(
         "ffbb_saison_bilan_service", ffbb_saison_bilan_service
@@ -1225,7 +1215,7 @@ async def ffbb_bilan_saison(
     try:
         await _safe_report_progress(ctx, 0, total=1, message="Calcul du bilan saison…")
         effective_refresh = force_refresh
-        effective_num = numero_equipe if numero_equipe is not None else 1
+        effective_num = numero_equipe
         effective_cat = categorie
         if categorie:
             parsed = parse_categorie(categorie)

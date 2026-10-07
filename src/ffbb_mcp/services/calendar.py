@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from datetime import datetime
 from typing import Any
 
@@ -826,6 +827,56 @@ async def _build_calendar_matches(
             )
         ]
 
+    phase_query = kwargs.get("phase")
+    phase_warning: str | None = None
+    if phase_query:
+        from .common import _extract_phase_num
+
+        pq = str(phase_query).strip()
+        digits = re.findall(r"\d+", pq)
+        target_num = (
+            int(digits[0])
+            if (digits and ("phase" in pq.lower() or pq.isdigit()))
+            else None
+        )
+
+        def _matches_phase(m: dict[str, Any]) -> bool:
+            comp = str(
+                m.get("competition_nom")
+                or m.get("competition_name")
+                or m.get("competition")
+                or ""
+            )
+            poule = str(m.get("poule_nom") or m.get("poule_name") or "")
+            p_label = str(m.get("phase_label") or m.get("phase") or "")
+            if target_num is not None:
+                m_num = _extract_phase_num(f"{p_label} {comp} {poule}")
+                return m_num == target_num
+            pq_norm = _normalize_name(pq)
+            combined = _normalize_name(
+                f"{p_label} {comp} {poule} {m.get('competition_display', '')}"
+            )
+            return pq_norm in combined
+
+        filtered_by_phase = [m for m in all_matches if _matches_phase(m)]
+        if filtered_by_phase:
+            all_matches = filtered_by_phase
+        else:
+            avail = sorted(
+                list(
+                    {
+                        str(m.get("poule_nom") or m.get("competition_name") or "")
+                        for m in all_matches
+                        if (m.get("poule_nom") or m.get("competition_name"))
+                    }
+                )
+            )
+            phase_warning = (
+                f"Aucun match trouvé pour la phase '{phase_query}'. "
+                f"Poules/phases actives détectées : {avail or 'aucune'}."
+            )
+            all_matches = []
+
     all_matches.sort(key=lambda x: (x["_dt"] is None, x["_dt"] or now))
 
     played_indices: list[int] = []
@@ -927,11 +978,23 @@ async def _build_calendar_matches(
     if has_more:
         meta["truncated"] = True
 
+    round_warnings_list = list(round_warnings)
+    if phase_warning and phase_warning not in round_warnings_list:
+        round_warnings_list.append(phase_warning)
+
+    short_answer = f"{total_before_limit} rencontre(s) au calendrier."
+    detail_line = (
+        f"{len(validated_matches)} rencontre(s) affichée(s) (tri chronologique)."
+    )
+    if total_before_limit == 0 and phase_warning:
+        short_answer = "0 rencontre au calendrier pour la phase demandée."
+        detail_line = phase_warning
+
     presentation = {
-        "short_answer": f"{total_before_limit} rencontre(s) au calendrier.",
-        "detail_line": f"{len(validated_matches)} rencontre(s) affichée(s) (tri chronologique).",
+        "short_answer": short_answer,
+        "detail_line": detail_line,
         "source_label": format_source_label(),
-        "warnings": round_warnings,
+        "warnings": round_warnings_list,
     }
     poule_id_val = kwargs.get("poule_id") or (
         unique_poule_ids[0] if len(unique_poule_ids) == 1 else None
@@ -980,9 +1043,12 @@ async def get_calendrier_club_service(
     status_filter: list[str] | None = None,
     strict_filters: bool = True,
     group_by: str | None = None,
+    phase: str | None = None,
     force_refresh: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
+    if phase is None:
+        phase = kwargs.get("phase")
     if engagement_id is None:
         engagement_id = kwargs.get("engagement_id")
     if poule_id is None:
@@ -1013,7 +1079,7 @@ async def get_calendrier_club_service(
         f"{_normalize_name(categorie or '')}:{numero_equipe or ''}:"
         f"{_normalize_name(adversaire or '')}:{date_debut or ''}:{date_fin or ''}:"
         f"{engagement_id or ''}:{competition_id or ''}:{competition_type or ''}:"
-        f"{poule_id or ''}:"
+        f"{poule_id or ''}:{_normalize_name(phase or '')}:"
         f"{scope or ''}:{inc_types}:{exc_types}:{include_friendlies}:{include_youth}:"
         f"{include_reserves}:{st_filter}:{strict_filters}:{group_by or ''}:{season_id or ''}"
     )
@@ -1051,6 +1117,7 @@ async def get_calendrier_club_service(
             status_filter=status_filter,
             strict_filters=strict_filters,
             group_by=group_by,
+            phase=phase,
         ),
         cache_name="calendrier",
     )

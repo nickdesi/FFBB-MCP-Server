@@ -1663,6 +1663,11 @@ async def ffbb_last_result_service(
                 "away_team": format_team_name(dernier.get("nomEquipe2", ""), num2),
                 "home_score": _safe_int(dernier.get("resultatEquipe1")),
                 "away_score": _safe_int(dernier.get("resultatEquipe2")),
+                "score_pour": score_nous,
+                "score_contre": score_eux,
+                "diff_points": (score_nous - score_eux)
+                if (score_nous is not None and score_eux is not None)
+                else None,
                 "result_for_team": result_team_val,
                 "venue": {
                     "name": lieu or None,
@@ -1710,6 +1715,11 @@ async def ffbb_last_result_service(
         "score_domicile": dernier.get("resultatEquipe1"),
         "exterieur": format_team_name(dernier.get("nomEquipe2", ""), num2),
         "score_exterieur": dernier.get("resultatEquipe2"),
+        "score_pour": score_nous,
+        "score_contre": score_eux,
+        "diff_points": (score_nous - score_eux)
+        if (score_nous is not None and score_eux is not None)
+        else None,
         "salle": lieu,
         "ville": ville,
         "adresse": adresse_salle,
@@ -1975,36 +1985,7 @@ async def ffbb_head_to_head_service(
         all_rencontres, eng_ids=eng_ids_b, club_nom=nom_b
     )
 
-    async def _enrich_dynamique_matchs_salle(dyn: dict[str, Any]) -> None:
-        matchs_list = dyn.get("matchs")
-        if not matchs_list or not isinstance(matchs_list, list):
-            return
-        from .salle import _enrich_with_salle_details, get_client_async
-        from .search import get_rencontre_service
-
-        client = None
-        for m in matchs_list:
-            if isinstance(m, dict) and not m.get("salle"):
-                mid = m.get("id")
-                if mid:
-                    try:
-                        rd = await get_rencontre_service(mid)
-                        if rd and isinstance(rd, dict):
-                            s_name = rd.get("nomSalle") or rd.get("nom_salle")
-                            if not s_name:
-                                if client is None:
-                                    client = await get_client_async()
-                                await _enrich_with_salle_details(rd, client)
-                                sd = rd.get("salle_details") or {}
-                                s_name = (
-                                    sd.get("libelle")
-                                    or rd.get("nomSalle")
-                                    or rd.get("nom_salle")
-                                )
-                            if s_name:
-                                m["salle"] = s_name
-                    except Exception:
-                        pass
+    from .common import _enrich_dynamique_matchs_salle
 
     await asyncio.gather(
         _enrich_dynamique_matchs_salle(dynamique_a),
