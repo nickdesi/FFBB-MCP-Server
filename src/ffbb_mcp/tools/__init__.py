@@ -3,7 +3,12 @@
 Divise le fichier monolithique server.py en sous-modules thématiques.
 """
 
-from .club import ffbb_club, ffbb_head_to_head, register_club_tools
+from .club import (
+    ffbb_club,
+    ffbb_head_to_head,
+    ffbb_match_lookup,
+    register_club_tools,
+)
 from .common import (
     _READONLY_ANNOTATIONS,
     _get_server_service,
@@ -58,6 +63,7 @@ __all__ = [
     "ffbb_last_result",
     "ffbb_list_regulations",
     "ffbb_lives",
+    "ffbb_match_lookup",
     "ffbb_next_match",
     "ffbb_resolve_team",
     "ffbb_saisons",

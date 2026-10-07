@@ -16,6 +16,7 @@ from ffbb_mcp.services import (
     ffbb_equipes_club_service,
     ffbb_get_classement_service,
     ffbb_head_to_head_service,
+    ffbb_match_lookup_service,
     get_calendrier_club_service,
     resolve_club_and_org,
     resolve_poule_id_service,
@@ -574,6 +575,73 @@ async def ffbb_head_to_head(
         raise handle_api_error(e) from e
 
 
+@track_tool_usage("ffbb_match_lookup")
+async def ffbb_match_lookup(
+    club_a: Annotated[
+        str,
+        Field(
+            description=(
+                "Nom ou identifiant du premier club (ex: 'Thiers', 'SA Thiers Vaillante')."
+            )
+        ),
+    ],
+    club_b: Annotated[
+        str,
+        Field(
+            description=(
+                "Nom ou identifiant du second club / adversaire (ex: 'Gerzat', 'Gerzat Basket')."
+            )
+        ),
+    ],
+    categorie: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Catégorie ou division de l'équipe (ex: 'U18M2', 'U18M', 'DMU18', 'Senior', 'NM3'). "
+                "Permet de cibler la confrontation exacte."
+            )
+        ),
+    ] = None,
+    date_min: Annotated[
+        str | None,
+        Field(description="Date de début facultative au format 'YYYY-MM-DD'."),
+    ] = None,
+    date_max: Annotated[
+        str | None,
+        Field(description="Date de fin facultative au format 'YYYY-MM-DD'."),
+    ] = None,
+    force_refresh: Annotated[
+        bool,
+        Field(description="Si True, force le rafraîchissement des données."),
+    ] = False,
+    ctx: Context | None = None,
+) -> dict[str, Any]:
+    """Recherche directe d'un match entre 2 clubs : date, heure, salle, adresse et poule.
+
+    Outil haut niveau idéal pour répondre aux questions du type :
+    'Où se joue U18M2 Thiers vs Gerzat ce week-end ?' ou 'Quand a lieu le match X contre Y ?'.
+    """
+    lookup_svc = _get_server_service(
+        "ffbb_match_lookup_service", ffbb_match_lookup_service
+    )
+    try:
+        await _safe_report_progress(
+            ctx, 0, total=1, message="Recherche de la confrontation..."
+        )
+        result = await lookup_svc(
+            club_a=club_a,
+            club_b=club_b,
+            categorie=categorie,
+            date_min=date_min,
+            date_max=date_max,
+            force_refresh=force_refresh,
+        )
+        await _safe_report_progress(ctx, 1, total=1, message="Confrontation prête.")
+        return result
+    except Exception as e:
+        raise handle_api_error(e) from e
+
+
 def register_club_tools(mcp: MCPServer) -> None:
     """Enregistre les outils club auprès du serveur FastMCP."""
     mcp.add_tool(
@@ -586,5 +654,11 @@ def register_club_tools(mcp: MCPServer) -> None:
         ffbb_head_to_head,
         name="ffbb_head_to_head",
         title="Face-à-Face & Comparaison d'équipes (H2H)",
+        annotations=_READONLY_ANNOTATIONS,
+    )
+    mcp.add_tool(
+        ffbb_match_lookup,
+        name="ffbb_match_lookup",
+        title="Recherche directe de match entre 2 clubs",
         annotations=_READONLY_ANNOTATIONS,
     )

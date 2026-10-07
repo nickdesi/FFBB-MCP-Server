@@ -12,6 +12,7 @@ from .club import (
     ffbb_equipes_club_service,
     ffbb_head_to_head_service,
     ffbb_last_result_service,
+    ffbb_match_lookup_service,
     ffbb_next_match_service,
     ffbb_saison_bilan_service,
     get_calendrier_club_service,
@@ -59,6 +60,8 @@ from .search import (
     resolve_club_and_org,
     resolve_poule_id_service,
     search_organismes_service,
+    search_rencontres_service,
+    search_salles_service,
 )
 from .team_resolver import (
     ffbb_find_team_candidates_service,
@@ -87,6 +90,7 @@ __all__ = [
     "ffbb_get_classement_service",
     "ffbb_head_to_head_service",
     "ffbb_last_result_service",
+    "ffbb_match_lookup_service",
     "ffbb_next_match_service",
     "ffbb_resolve_team_service",
     "ffbb_saison_bilan_service",
@@ -118,5 +122,7 @@ __all__ = [
     "resolve_poule_id_service",
     "search_organismes_service",
     "search_regulations_service",
+    "search_rencontres_service",
+    "search_salles_service",
     "warmup_cache_service",
 ]

@@ -18,7 +18,7 @@ import asyncio
 import copy
 import logging
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from ffbb_mcp._state import state
 
@@ -1979,3 +1979,212 @@ async def ffbb_head_to_head_service(
     if fallback_warning:
         result["warning"] = fallback_warning
     return result
+
+
+async def ffbb_match_lookup_service(
+    club_a: str,
+    club_b: str,
+    categorie: str | None = None,
+    date_min: str | None = None,
+    date_max: str | None = None,
+    force_refresh: bool = False,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Recherche directe d'un match entre deux clubs (lieu, salle, date, heure).
+
+    Spécialement conçu pour les requêtes du type 'Où se joue U18M2 Thiers vs Gerzat ce week-end ?'.
+    """
+    from ffbb_mcp.presentation import build_provenance_block, format_source_label
+    from ffbb_mcp.services.search import (
+        _GENERIC_CLUB_WORDS,
+        search_rencontres_service,
+    )
+    from ffbb_mcp.utils import parse_categorie
+
+    # 1. Normalisation de la requête de recherche
+    search_q = f"{club_a.strip()} {club_b.strip()}"
+    if categorie:
+        search_q = f"{search_q} {categorie.strip()}"
+
+    # Récupérer les candidats via search_rencontres_service
+    candidates = await search_rencontres_service(
+        query=search_q,
+        limit=30,
+        force_refresh=force_refresh,
+    )
+
+    parsed_cat = parse_categorie(categorie) if categorie else None
+
+    norm_a = _normalize_name(club_a)
+    norm_b = _normalize_name(club_b)
+    kw_a = [
+        w for w in norm_a.split() if len(w) >= 3 and w not in _GENERIC_CLUB_WORDS
+    ] or [norm_a]
+    kw_b = [
+        w for w in norm_b.split() if len(w) >= 3 and w not in _GENERIC_CLUB_WORDS
+    ] or [norm_b]
+
+    matched_matches: list[dict[str, Any]] = []
+
+    for c in candidates:
+        eq1 = _normalize_name(c.get("nom_equipe1", "") or c.get("nomEquipe1", ""))
+        eq2 = _normalize_name(c.get("nom_equipe2", "") or c.get("nomEquipe2", ""))
+
+        # Vérifier que les deux clubs sont présents dans la rencontre (un dans eq1, l'autre dans eq2)
+        has_a_in_1 = any(k in eq1 for k in kw_a)
+        has_b_in_2 = any(k in eq2 for k in kw_b)
+        has_b_in_1 = any(k in eq1 for k in kw_b)
+        has_a_in_2 = any(k in eq2 for k in kw_a)
+
+        is_both = (has_a_in_1 and has_b_in_2) or (has_b_in_1 and has_a_in_2)
+        if not is_both:
+            continue
+
+        # Filtrage par catégorie
+        comp_info = c.get("competition") or c.get("competition_id")
+        comp_nom = (
+            comp_info.get("nom", "")
+            if isinstance(comp_info, dict)
+            else str(comp_info or "")
+        ).upper()
+
+        if parsed_cat and parsed_cat.categorie:
+            cat_code = parsed_cat.categorie.upper()
+            if (
+                cat_code not in comp_nom
+                and cat_code not in eq1.upper()
+                and cat_code not in eq2.upper()
+            ):
+                continue
+
+            # Numéro d'équipe éventuel (ex: équipe 2)
+            if parsed_cat.numero_equipe and parsed_cat.numero_equipe > 1:
+                target_suffix = f"- {parsed_cat.numero_equipe}"
+                team_a_str = eq1 if (has_a_in_1 and has_b_in_2) else eq2
+                if (
+                    target_suffix not in team_a_str
+                    and f" {parsed_cat.numero_equipe}" not in team_a_str
+                ):
+                    continue
+
+        # Filtrage par dates éventuelles
+        match_dt_str = str(c.get("date") or c.get("date_rencontre") or "")
+        if match_dt_str:
+            if date_min and match_dt_str[:10] < date_min:
+                continue
+            if date_max and match_dt_str[:10] > date_max:
+                continue
+
+        matched_matches.append(c)
+
+    if not matched_matches:
+        return {
+            "status": "not_found",
+            "message": f"Aucun match trouvé opposant '{club_a}' et '{club_b}'"
+            + (f" en catégorie '{categorie}'" if categorie else ""),
+            "presentation": {
+                "short_answer": f"Aucune rencontre trouvée entre {club_a} et {club_b}.",
+                "detail_line": "Vérifiez l'orthographe des clubs ou essayez d'élargir la catégorie.",
+                "warnings": [],
+            },
+        }
+
+    # Formater les matchs pour la présentation
+    formatted_items = []
+    for m in matched_matches:
+        salle_obj = m.get("salle") or {}
+        commune_obj = salle_obj.get("commune") if isinstance(salle_obj, dict) else {}
+        if not isinstance(commune_obj, dict):
+            commune_obj = {}
+
+        nom_salle = (
+            salle_obj.get("libelle") or salle_obj.get("nom")
+            if isinstance(salle_obj, dict)
+            else None
+        ) or "Salle non précisée"
+        adresse_salle = (
+            salle_obj.get("adresse") if isinstance(salle_obj, dict) else ""
+        ) or ""
+        ville_salle = commune_obj.get("libelle") or ""
+        cp_salle = commune_obj.get("codePostal") or commune_obj.get("code_postal") or ""
+
+        dt_str = str(m.get("date") or m.get("date_rencontre") or "")
+        heure_str = str(m.get("horaire") or "")
+
+        comp_dict = m.get("competition") or m.get("competition_id")
+        comp_display = (
+            comp_dict.get("nom")
+            if isinstance(comp_dict, dict)
+            else str(comp_dict or "")
+        )
+
+        formatted_items.append(
+            {
+                "id": m.get("id"),
+                "date": dt_str[:10] if len(dt_str) >= 10 else dt_str,
+                "heure": heure_str[:5] if len(heure_str) >= 5 else heure_str,
+                "equipe_domicile": m.get("nom_equipe1"),
+                "equipe_exterieur": m.get("nom_equipe2"),
+                "competition": comp_display,
+                "numero_journee": m.get("numero_journee"),
+                "salle": {
+                    "nom": nom_salle,
+                    "adresse": adresse_salle,
+                    "ville": ville_salle,
+                    "code_postal": cp_salle,
+                },
+                "derniere_mise_a_jour": m.get("derniere_mise_a_jour"),
+            }
+        )
+
+    # Construire presentation
+    top_m = formatted_items[0]
+    salle_val = top_m.get("salle")
+    top_salle: dict[str, Any] = (
+        cast("dict[str, Any]", salle_val) if isinstance(salle_val, dict) else {}
+    )
+    salle_nom: str = str(top_salle.get("nom") or "Salle non précisée")
+    salle_ville: str = str(top_salle.get("ville") or "")
+    salle_adresse: str = str(top_salle.get("adresse") or "")
+    salle_cp: str = str(top_salle.get("code_postal") or "")
+
+    date_val: str = str(top_m.get("date") or "")
+    date_part: str = f" le {date_val}" if date_val else ""
+    heure_val: str = str(top_m.get("heure") or "")
+    heure_part: str = f" à {heure_val}" if heure_val else ""
+    salle_part: str = (
+        f" ({salle_nom}, {salle_ville})" if salle_ville else f" ({salle_nom})"
+    )
+
+    short_ans: str = (
+        f"{top_m.get('equipe_domicile')} vs {top_m.get('equipe_exterieur')}"
+        f"{date_part}{heure_part}{salle_part}."
+    )
+    detail_parts: list[str] = []
+    comp_val = top_m.get("competition")
+    if comp_val:
+        j_num = top_m.get("numero_journee")
+        j_str = f" (J{j_num})" if j_num else ""
+        detail_parts.append(f"Compétition : {comp_val}{j_str}")
+    if salle_adresse or salle_ville:
+        adr_str = " ".join(p for p in (salle_adresse, salle_cp, salle_ville) if p)
+        detail_parts.append(f"Adresse salle : {adr_str}")
+
+    detail_line: str = " · ".join(detail_parts) if detail_parts else "Match programmé."
+
+    return {
+        "status": "ok",
+        "matchs": formatted_items,
+        "presentation": {
+            "short_answer": short_ans,
+            "detail_line": detail_line,
+            "source_label": format_source_label(),
+            "warnings": [
+                "Les horaires et désignations de salles peuvent être modifiés par les comités jusqu'au jeudi précédant le match."
+            ],
+        },
+        "provenance": build_provenance_block(
+            source="ffbb_api_live",
+            cache_status="miss" if force_refresh else "hit",
+        ),
+    }

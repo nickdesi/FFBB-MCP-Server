@@ -66,16 +66,17 @@ _KNOWN_CLUBS_HINTS = _format_known_club_ids()
 ROUTING_PROMPT = f"""\
 ## ROUTAGE DES OUTILS FFBB
 1. MATCHS :
+- CONFRONTATION (X vs Y) → `ffbb_match_lookup(club_a="X", club_b="Y", categorie=...)`. Jamais ffbb_search.
 - SINGULIER (prochain/dernier) → `ffbb_next_match` ou `ffbb_last_result`.
-- PLURIEL (calendrier, matchs à venir) → `ffbb_club(action="calendrier")`. Pour les matchs restants, conserver `played == false` et toute rencontre dont `joue` vaut `0`, `"0"` ou `null` afin de ne pas masquer un report. Ne JAMAIS utiliser `ffbb_next_match` au pluriel.
+- PLURIEL (calendrier, restants) → `ffbb_club(action="calendrier")` (played=false ou joue=0/null).
+- SALLES VILLE → `ffbb_search(type="salles", code_postal=..., commune=...)` (sans homonymie de rue).
 2. IDs : Mémoriser tout `organisme_id` résolu.
 Hints :
 {_KNOWN_CLUBS_HINTS}
 3. DÉSAMBIGUÏSATION : Catégorie sans n° (ex: 'U13M') → `ffbb_resolve_team` avant match.
 4. CALENDRIER : matchs restants selon `played` + `joue`, tri par date, club == equipe1 → domicile.
 5. CLASSEMENT & LUCIDITÉ SPORTIVE :
-- Début de saison (matchs joués ≤ 5 ou < 25% phase) : INTERDICTION FORMELLE d'extrapoler sur le maintien, les playoffs, la montée ou la relégation (anecdotique). S'en tenir aux faits comptables bruts (V, D, diff).
-- Projections réservées aux phases avancées (> 70% joués) ou si mathématiquement acté.
+- Début de saison (matchs joués ≤ 5 ou < 25% phase) : INTERDICTION FORMELLE d'extrapoler sur le maintien, les playoffs, la montée ou la relégation. S'en tenir aux faits comptables bruts (V, D, diff).
 6. STYLE DIRECT (ZERO-SLOP) :
 - Zéro politesse ou intro creuse ("Bonjour", "Avec plaisir"). Attaquer directement par le tableau ou la stat demandée, puis 1 ou 2 faits factuels max.
 """

@@ -590,6 +590,8 @@ async def resolve_club_and_org(
     return result
 
 
+from datetime import UTC
+
 from ffbb_data_client.config import (
     MEILISEARCH_INDEX_COMPETITIONS,
     MEILISEARCH_INDEX_ENGAGEMENTS,
@@ -740,6 +742,81 @@ def _lighten_competition_hit(hit: dict[str, Any]) -> dict[str, Any]:
     return item
 
 
+def _lighten_rencontre_hit(hit: dict[str, Any]) -> dict[str, Any]:
+    """Allège un résultat de recherche de rencontre pour limiter l'empreinte réseau/tokens.
+
+    Supprime les listes d'organisateurs null, logos, officiels et métadonnées
+    techniques tout en préservant équipes, dates, horaires, salles et compétition.
+    """
+    if not isinstance(hit, dict):
+        return hit
+    item = dict(hit)
+
+    # 1. Salle simplifiée
+    raw_salle = item.get("salle")
+    if isinstance(raw_salle, dict):
+        raw_commune = raw_salle.get("commune")
+        cleaned_commune = None
+        if isinstance(raw_commune, dict):
+            cleaned_commune = {
+                "libelle": raw_commune.get("libelle"),
+                "codePostal": raw_commune.get("codePostal")
+                or raw_commune.get("code_postal"),
+                "departement": raw_commune.get("departement"),
+            }
+        item["salle"] = {
+            "id": raw_salle.get("id"),
+            "libelle": raw_salle.get("libelle") or raw_salle.get("nom"),
+            "adresse": raw_salle.get("adresse"),
+            "commune": cleaned_commune,
+        }
+
+    # 2. Compétition simplifiée
+    raw_comp = item.get("competition_id") or item.get("competition")
+    if isinstance(raw_comp, dict):
+        cleaned_comp = {
+            "id": raw_comp.get("id"),
+            "nom": raw_comp.get("nom"),
+            "type_competition": raw_comp.get("type_competition"),
+        }
+        item["competition"] = cleaned_comp
+        item["competition_id"] = cleaned_comp
+
+    # 3. Formatage de date de dernière mise à jour depuis modification_timestamp
+    mod_ts = item.get("modification_timestamp")
+    if mod_ts:
+        try:
+            from datetime import datetime
+
+            ts_sec = float(mod_ts) / 1000.0 if float(mod_ts) > 1e11 else float(mod_ts)
+            dt = datetime.fromtimestamp(ts_sec, tz=UTC)
+            item["derniere_mise_a_jour"] = dt.strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            pass
+
+    # 4. Élagage des champs lourds/nuls/redondants
+    for k in (
+        "organisateur",
+        "officiels",
+        "thumbnail",
+        "geo",
+        "pratique",
+        "creation_timestamp",
+        "date_timestamp",
+        "date_rencontre_timestamp",
+        "date_saisie_resultat_timestamp",
+        "modification_timestamp",
+        "lower_id",
+        "lower_nom_equipe1",
+        "lower_nom_equipe2",
+        "lower_gs_id",
+        "lower_officiels",
+    ):
+        item.pop(k, None)
+
+    return item
+
+
 def _build_search_results(
     results: Any, limit: int, offset: int = 0, type_name: str | None = None
 ) -> list[dict]:
@@ -754,6 +831,8 @@ def _build_search_results(
     result_list = [serialize_model(hit) for hit in raw_hits]
     if type_name == "competitions":
         result_list = [_lighten_competition_hit(hit) for hit in result_list]
+    elif type_name == "rencontres":
+        result_list = [_lighten_rencontre_hit(hit) for hit in result_list]
     total = getattr(results, "estimated_total_hits", None)
     if total is not None:
         for item in result_list:
@@ -936,6 +1015,8 @@ async def _search_generic(
         hits = [serialize_model(h) for h in res0.hits]
         if type_name == "competitions":
             hits = [_lighten_competition_hit(h) for h in hits]
+        elif type_name == "rencontres":
+            hits = [_lighten_rencontre_hit(h) for h in hits]
         total_val = getattr(res0, "estimated_total_hits", None)
         if total_val is not None:
             try:
@@ -1056,6 +1137,189 @@ async def search_organismes_service(
             reverse=True,
         )
 
+    return results
+
+
+def _score_salle_relevance(r: dict[str, Any], query: str) -> float:
+    """Calcule un score de pertinence pour classer une salle par rapport à la requête.
+
+    Priorise les correspondances sur la commune (ville) par rapport aux homonymies de rue.
+    """
+    q_norm = _normalize_name(query)
+    if not q_norm:
+        return 0.0
+
+    commune_obj = r.get("commune")
+    commune_val = _normalize_name(
+        commune_obj.get("libelle", "")
+        if isinstance(commune_obj, dict)
+        else (str(commune_obj) if commune_obj else "")
+    )
+    libelle_val = _normalize_name(r.get("libelle", "") or r.get("nom", ""))
+    adresse_val = _normalize_name(r.get("adresse", ""))
+
+    score = 0.0
+
+    # 1. Correspondance sur la ville (commune) : priorité absolue
+    if q_norm == commune_val:
+        score += 150.0
+    elif q_norm in commune_val:
+        score += 80.0
+    elif commune_val and commune_val in q_norm:
+        score += 40.0
+
+    # 2. Correspondance sur le nom de la salle
+    if q_norm in libelle_val:
+        score += 70.0
+    elif libelle_val and libelle_val in q_norm and len(libelle_val) >= 4:
+        score += 30.0
+
+    # 3. Correspondance UNIQUEMENT sur l'adresse (ex: "rue Thiers" hors de la ville de Thiers)
+    if q_norm in adresse_val and q_norm != commune_val and q_norm not in libelle_val:
+        score += 5.0
+
+    # Similarités fines
+    if commune_val:
+        score += jaro_winkler_similarity(q_norm, commune_val) * 15.0
+    if libelle_val:
+        score += jaro_winkler_similarity(q_norm, libelle_val) * 10.0
+
+    return score
+
+
+def _score_rencontre_relevance(r: dict[str, Any], query: str) -> float:
+    """Calcule un score de pertinence pour classer une rencontre par rapport à la requête.
+
+    Priorise les rencontres où :
+    1. Les deux équipes correspondent aux termes recherchés (ex: "Thiers" et "Gerzat")
+    2. La catégorie (U18, Senior, etc.) et le numéro d'équipe correspondent
+    3. Pénalise les matchs de catégories différentes (ex: U11 pour requête U18)
+    """
+    q_norm = _normalize_name(query)
+    if not q_norm:
+        return 0.0
+
+    eq1_val = _normalize_name(r.get("nom_equipe1", "") or r.get("nomEquipe1", ""))
+    eq2_val = _normalize_name(r.get("nom_equipe2", "") or r.get("nomEquipe2", ""))
+
+    comp_obj = r.get("competition") or r.get("competition_id")
+    comp_val = _normalize_name(
+        comp_obj.get("nom", "")
+        if isinstance(comp_obj, dict)
+        else (str(comp_obj) if comp_obj else "")
+    )
+
+    parsed_cat = parse_categorie(query)
+    score = 0.0
+
+    # Analyse des mots de la requête hors catégorie et mots génériques
+    raw_words = query.strip().split()
+    query_keywords: list[str] = []
+    for w in raw_words:
+        w_norm = _normalize_name(w)
+        if len(w_norm) < 3 or w_norm in _GENERIC_CLUB_WORDS:
+            continue
+        # Vérifier si c'est la catégorie elle-même (ex: "U18", "U18M", "U18M2")
+        if parsed_cat.categorie and parsed_cat.categorie in w_norm:
+            continue
+        query_keywords.append(w_norm)
+
+    # 1. Correspondance croisée sur les deux équipes
+    matches_eq1 = [kw for kw in query_keywords if kw in eq1_val]
+    matches_eq2 = [kw for kw in query_keywords if kw in eq2_val]
+
+    if matches_eq1 and matches_eq2:
+        score += 150.0
+    elif matches_eq1 or matches_eq2:
+        score += 40.0
+    else:
+        if query_keywords:
+            score -= 60.0
+
+    # 2. Catégorie et numéro d'équipe
+    if parsed_cat.categorie:
+        cat_key = parsed_cat.categorie  # ex: "U18"
+        in_comp = cat_key in comp_val
+        in_teams = cat_key in eq1_val or cat_key in eq2_val
+
+        if in_comp or in_teams:
+            score += 60.0
+        else:
+            other_u = re.findall(r"\bU\d{1,2}\b", comp_val)
+            if other_u and cat_key not in other_u:
+                score -= 80.0
+            elif "SENIOR" in comp_val or "NM" in comp_val or "LF" in comp_val:
+                score -= 60.0
+
+        if parsed_cat.numero_equipe and parsed_cat.numero_equipe > 1:
+            num_str = f"- {parsed_cat.numero_equipe}"
+            num_direct = f" {parsed_cat.numero_equipe}"
+            if (
+                num_str in eq1_val
+                or num_str in eq2_val
+                or num_direct in eq1_val
+                or num_direct in eq2_val
+            ):
+                score += 30.0
+
+    return score
+
+
+async def search_rencontres_service(
+    query: str,
+    limit: int = 20,
+    offset: int = 0,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
+    force_refresh: bool = False,
+) -> list[dict[str, Any]]:
+    """Recherche de rencontres avec re-ranking contextuel sur les deux clubs et la catégorie."""
+    fetch_limit = max(limit, 40) if (offset == 0 and not sort) else limit
+    results = await _search_generic(
+        "rencontres",
+        query,
+        limit=fetch_limit,
+        offset=offset,
+        filter_by=filter_by,
+        sort=sort,
+        force_refresh=force_refresh,
+    )
+    if results and not sort:
+        results.sort(
+            key=lambda r: _score_rencontre_relevance(r, query),
+            reverse=True,
+        )
+        if len(results) > limit:
+            results = results[:limit]
+    return results
+
+
+async def search_salles_service(
+    query: str,
+    limit: int = 20,
+    offset: int = 0,
+    filter_by: str | None = None,
+    sort: list[str] | None = None,
+    force_refresh: bool = False,
+) -> list[dict[str, Any]]:
+    """Recherche de salles avec re-ranking privilégiant la commune hôte par rapport aux rues."""
+    fetch_limit = max(limit, 40) if (offset == 0 and not sort) else limit
+    results = await _search_generic(
+        "salles",
+        query,
+        limit=fetch_limit,
+        offset=offset,
+        filter_by=filter_by,
+        sort=sort,
+        force_refresh=force_refresh,
+    )
+    if results and not sort:
+        results.sort(
+            key=lambda r: _score_salle_relevance(r, query),
+            reverse=True,
+        )
+        if len(results) > limit:
+            results = results[:limit]
     return results
 
 
@@ -1366,6 +1630,12 @@ def _add_truncation_meta(
         meta["next_offset"] = next_offset
     if has_more:
         meta["truncated"] = True
+        remaining = max(0, effective_total - (result_offset + len(result)))
+        meta["hint"] = (
+            f"{remaining} résultat(s) supplémentaire(s) non affiché(s). "
+            "Affinez votre recherche avec 'code_postal', 'commune' ou utilisez "
+            "'ffbb_next_match' / 'ffbb_match_lookup' pour un ciblage direct."
+        )
 
     return {
         "items": result,
@@ -1381,6 +1651,8 @@ async def ffbb_search_service(
     offset: int = 0,
     filter_by: str | None = None,
     sort: list[str] | None = None,
+    commune: str | None = None,
+    code_postal: str | None = None,
     force_refresh: bool = False,
 ) -> dict[str, Any] | list[dict[str, Any]]:
     """Service de recherche FFBB unifié avec support complet de limit et offset.
@@ -1390,12 +1662,24 @@ async def ffbb_search_service(
     limit = max(1, min(100, limit))
     offset = max(0, offset)
 
+    # Combinaison des filtres natifs
+    effective_filter_by = filter_by
+    if code_postal or commune:
+        filter_clauses: list[str] = []
+        if filter_by:
+            filter_clauses.append(f"({filter_by.strip()})")
+        if code_postal:
+            filter_clauses.append(f'codePostal = "{code_postal.strip()}"')
+        if commune:
+            filter_clauses.append(f'ville = "{commune.strip()}"')
+        effective_filter_by = " AND ".join(filter_clauses) if filter_clauses else None
+
     if type == "all":
         result = await multi_search_service(
             nom=query,
             limit=limit,
             offset=offset,
-            filter_by=filter_by,
+            filter_by=effective_filter_by,
             sort=sort,
             force_refresh=force_refresh,
         )
@@ -1409,7 +1693,29 @@ async def ffbb_search_service(
             query,
             limit=limit,
             offset=offset,
-            filter_by=filter_by,
+            filter_by=effective_filter_by,
+            sort=sort,
+            force_refresh=force_refresh,
+        )
+        return _add_truncation_meta(result, limit=limit, offset=offset, sort=sort)
+
+    if type == "rencontres":
+        result = await search_rencontres_service(
+            query=query,
+            limit=limit,
+            offset=offset,
+            filter_by=effective_filter_by,
+            sort=sort,
+            force_refresh=force_refresh,
+        )
+        return _add_truncation_meta(result, limit=limit, offset=offset, sort=sort)
+
+    if type == "salles":
+        result = await search_salles_service(
+            query=query,
+            limit=limit,
+            offset=offset,
+            filter_by=effective_filter_by,
             sort=sort,
             force_refresh=force_refresh,
         )
@@ -1421,7 +1727,7 @@ async def ffbb_search_service(
             query=query,
             limit=limit,
             offset=offset,
-            filter_by=filter_by,
+            filter_by=effective_filter_by,
             sort=sort,
             force_refresh=force_refresh,
         )

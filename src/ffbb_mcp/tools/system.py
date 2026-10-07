@@ -289,12 +289,38 @@ async def ffbb_search(
         list[str] | None,
         Field(description="Tri Meilisearch (ex: ['nom:asc'])."),
     ] = None,
+    commune: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Filtrer par nom de commune/ville (ex: 'Thiers', 'Clermont-Ferrand'). "
+                "Particulièrement recommandé pour type='salles' ou type='organismes'."
+            )
+        ),
+    ] = None,
+    code_postal: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Filtrer par code postal à 5 chiffres (ex: '63300', '63000'). "
+                "Élimine les homonymies ville/rue pour type='salles'."
+            )
+        ),
+    ] = None,
     force_refresh: Annotated[
         bool,
         Field(description="Si True, force le rafraîchissement des données."),
     ] = False,
 ) -> dict[str, Any] | list[dict[str, Any]]:
-    """Recherche FFBB — clubs, compétitions, matchs, salles, tournois, news, actualités, etc."""
+    """Recherche FFBB unifiée — clubs, compétitions, matchs, salles, tournois.
+
+    Recommandations pour LLM :
+    - Pour trouver le prochain match d'une équipe précise : utiliser `ffbb_next_match` ou `ffbb_team_summary`.
+    - Pour trouver une confrontation directe entre 2 clubs : utiliser `ffbb_match_lookup` ou `ffbb_head_to_head`.
+    - Pour le calendrier complet d'un club : utiliser `ffbb_club(action="calendrier")`.
+    - Pour chercher les salles d'une ville sans confusion avec les noms de rues :
+      renseigner `code_postal` (ex: '63300') ou `commune` (ex: 'Thiers').
+    """
     svc = _get_server_service("ffbb_search_service", ffbb_search_service)
     try:
         safe_filter = _validate_filter_by(filter_by)
@@ -305,6 +331,8 @@ async def ffbb_search(
             offset=offset,
             filter_by=safe_filter,
             sort=sort,
+            commune=commune,
+            code_postal=code_postal,
             force_refresh=force_refresh,
         )
     except ValueError as e:

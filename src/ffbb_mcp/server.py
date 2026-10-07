@@ -31,6 +31,7 @@ from .services import (
     ffbb_get_classement_service,
     ffbb_head_to_head_service,
     ffbb_last_result_service,
+    ffbb_match_lookup_service,
     ffbb_next_match_service,
     ffbb_resolve_team_service,
     ffbb_saison_bilan_service,
@@ -61,6 +62,7 @@ from .sse_patch import apply_fastmcp_json_formatting_patch
 from .tools.club import (
     ffbb_club,
     ffbb_head_to_head,
+    ffbb_match_lookup,
     register_club_tools,
 )
 from .tools.common import (
@@ -383,6 +385,8 @@ __all__ = [
     "ffbb_last_result_service",
     "ffbb_list_regulations",
     "ffbb_lives",
+    "ffbb_match_lookup",
+    "ffbb_match_lookup_service",
     "ffbb_next_match",
     "ffbb_next_match_service",
     "ffbb_resolve_team",
