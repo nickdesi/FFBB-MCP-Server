@@ -194,13 +194,23 @@ def _build_default_get_presentation(
             or _format_salle_address(data)
         )
         ville = data.get("ville") or data.get("commune") or ""
+        tel = data.get("telephone") or data.get("tel") or ""
+        geo = data.get("geo") or {}
+        gps_str = ""
+        if isinstance(geo, dict) and geo.get("lat") and geo.get("lng"):
+            gps_str = f"GPS: {geo['lat']}, {geo['lng']}"
+
         short_ans = f"Salle : {nom_salle}."
+        details_parts = []
         if adresse:
-            detail = f"Adresse : {adresse}."
+            details_parts.append(f"Adresse : {adresse}")
         elif ville:
-            detail = f"Localisation : {ville}."
-        else:
-            detail = "Détails de la salle."
+            details_parts.append(f"Localisation : {ville}")
+        if tel:
+            details_parts.append(f"Tél : {tel}")
+        if gps_str:
+            details_parts.append(gps_str)
+        detail = " ; ".join(details_parts) if details_parts else "Détails de la salle."
     else:
         short_ans = f"Ressource {type_name} {resource_id}."
         detail = "Données chargées depuis la FFBB."
@@ -241,7 +251,8 @@ async def ffbb_version() -> dict[str, Any]:
     appel réseau externe ni effet de bord, <10ms.
     """
     mode = os.environ.get("MCP_MODE", "stdio").lower()
-    res: dict[str, Any] = {
+    sha = get_build_sha()
+    return {
         "package_version": _PACKAGE_VERSION,
         "mcp_sdk_version": _sdk_version("mcp"),
         "python_version": platform.python_version(),
@@ -249,12 +260,9 @@ async def ffbb_version() -> dict[str, Any]:
         if mode in ("sse", "http", "streamable-http")
         else "stdio",
         "cache_ttls": get_cache_ttls(),
+        "build_sha": sha,
+        "git_sha": sha,
     }
-    sha = get_build_sha()
-    if sha:
-        res["build_sha"] = sha
-        res["git_sha"] = sha
-    return res
 
 
 @track_tool_usage("ffbb_search")
@@ -331,12 +339,11 @@ async def ffbb_search(
 ) -> dict[str, Any] | list[dict[str, Any]]:
     """Recherche FFBB unifiée — clubs, compétitions, matchs, salles, tournois.
 
-    Recommandations pour LLM :
-    - Pour trouver le prochain match d'une équipe précise : utiliser `ffbb_next_match` ou `ffbb_team_summary`.
-    - Pour trouver une confrontation directe entre 2 clubs : utiliser `ffbb_match_lookup` ou `ffbb_head_to_head`.
-    - Pour le calendrier complet d'un club : utiliser `ffbb_club(action="calendrier")`.
-    - Pour chercher les salles d'une ville sans confusion avec les noms de rues :
-      renseigner `code_postal` (ex: '63300') ou `commune` (ex: 'Thiers').
+    Recommandations LLM :
+    - Prochain match équipe : `ffbb_next_match` ou `ffbb_team_summary`.
+    - Confrontation directe : `ffbb_match_lookup` ou `ffbb_head_to_head`.
+    - Calendrier club : `ffbb_club(action="calendrier")`.
+    - Salles par ville/CP (évite homonymies rues) : `code_postal` ou `commune`.
     """
     svc = _get_server_service("ffbb_search_service", ffbb_search_service)
     try:
@@ -519,6 +526,11 @@ async def ffbb_get_lives(
             )
 
         matches_list = matches if isinstance(matches, list) else []
+        for m in matches_list:
+            if isinstance(m, dict):
+                sd = m.get("salle_details")
+                if isinstance(sd, dict) and "presentation" in sd:
+                    sd.pop("presentation", None)
         n_matches = len(matches_list)
         presentation = {
             "short_answer": (
@@ -543,7 +555,6 @@ async def ffbb_get_lives(
             "status": "ok",
             "count": n_matches,
             "items": matches_list,
-            "matches": matches_list,
             "presentation": presentation,
             "provenance": provenance,
         }

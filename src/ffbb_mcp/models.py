@@ -108,6 +108,9 @@ class MatchForme(BaseModel):
     )
     salle: str | None = Field(default=None, description="Nom de la salle.")
     journee: str | None = Field(default=None, description="Nom ou numéro de journée.")
+    id: str | None = Field(
+        default=None, description="Identifiant unique de la rencontre."
+    )
 
 
 class SerieEnCours(BaseModel):

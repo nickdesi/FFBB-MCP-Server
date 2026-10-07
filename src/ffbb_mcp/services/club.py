@@ -391,11 +391,25 @@ async def _resolve_team_equipes(
                 if poule_id is None and refs["poule_id"]:
                     poule_id = refs["poule_id"]
             else:
+                msg = f"Engagement '{engagement_id}' introuvable sur les serveurs FFBB."
                 return (
                     {
                         "status": not_found_status,
-                        "message": f"Engagement '{engagement_id}' introuvable sur les serveurs FFBB.",
+                        "message": msg,
                         "club_resolu": None,
+                        "presentation": {
+                            "short_answer": msg,
+                            "detail_line": "Vérifiez l'identifiant d'engagement fourni.",
+                            "source_label": format_source_label(),
+                            "warnings": [msg],
+                        },
+                        "provenance": build_provenance_block(
+                            source="cache" if not force_refresh else "ffbb_api_live",
+                            cache_status="hit" if not force_refresh else "miss",
+                            data_freshness="recent_cache"
+                            if not force_refresh
+                            else "live",
+                        ),
                     },
                     [],
                     None,
@@ -406,8 +420,23 @@ async def _resolve_team_equipes(
                 if "a" in not_found_status.lower()
                 else "club_b (ou adversaire) / organisme_id_b / engagement_id_b"
             )
+            msg = f"Fournir {side_hint}"
             return (
-                {"status": "error", "message": f"Fournir {side_hint}"},
+                {
+                    "status": "error",
+                    "message": msg,
+                    "presentation": {
+                        "short_answer": msg,
+                        "detail_line": "Paramètres d'identification insuffisants.",
+                        "source_label": format_source_label(),
+                        "warnings": [msg],
+                    },
+                    "provenance": build_provenance_block(
+                        source="cache" if not force_refresh else "ffbb_api_live",
+                        cache_status="hit" if not force_refresh else "miss",
+                        data_freshness="recent_cache" if not force_refresh else "live",
+                    ),
+                },
                 [],
                 None,
             )
@@ -435,11 +464,23 @@ async def _resolve_team_equipes(
     )
 
     if not resolved_clubs:
+        msg = f"Club '{club_name or organisme_id}' introuvable."
         return (
             {
                 "status": not_found_status,
-                "message": f"Club '{club_name or organisme_id}' introuvable.",
+                "message": msg,
                 "club_resolu": None,
+                "presentation": {
+                    "short_answer": msg,
+                    "detail_line": "Vérifiez l'orthographe du nom ou l'organisme_id.",
+                    "source_label": format_source_label(),
+                    "warnings": [msg],
+                },
+                "provenance": build_provenance_block(
+                    source="cache" if not force_refresh else "ffbb_api_live",
+                    cache_status="hit" if not force_refresh else "miss",
+                    data_freshness="recent_cache" if not force_refresh else "live",
+                ),
             },
             [],
             None,
@@ -462,12 +503,24 @@ async def _resolve_team_equipes(
         )
 
     if is_real_ambiguity(resolved_clubs, club_name) and not organisme_id:
+        msg = f"Plusieurs clubs correspondent à '{club_name}'. Précisez l'organisme_id."
         return (
             {
                 "status": "ambiguous",
-                "message": f"Plusieurs clubs correspondent à '{club_name}'. Précisez l'organisme_id.",
+                "message": msg,
                 "candidates": resolved_clubs,
                 "club_resolu": None,
+                "presentation": {
+                    "short_answer": msg,
+                    "detail_line": "Sélectionnez un des clubs candidats ci-dessous.",
+                    "source_label": format_source_label(),
+                    "warnings": [msg],
+                },
+                "provenance": build_provenance_block(
+                    source="cache" if not force_refresh else "ffbb_api_live",
+                    cache_status="hit" if not force_refresh else "miss",
+                    data_freshness="recent_cache" if not force_refresh else "live",
+                ),
             },
             [],
             None,
@@ -880,6 +933,11 @@ async def ffbb_next_match_service(
                 "source_label": format_source_label(),
                 "warnings": [msg],
             },
+            "provenance": build_provenance_block(
+                source="cache" if not force_refresh else "ffbb_api_live",
+                cache_status="hit" if not force_refresh else "miss",
+                data_freshness="recent_cache" if not force_refresh else "live",
+            ),
         }
 
     organisme_nom = str(club_resolu.get("nom", "")) if club_resolu is not None else ""
@@ -964,7 +1022,9 @@ async def ffbb_next_match_service(
             "candidates": all_available_equipes,
             "presentation": empty_presentation,
             "provenance": provenance,
-            "_meta": _freshness_meta(cache="poule", force_refresh_supported=True),
+            "_meta": _freshness_meta(
+                cache="poule", force_refresh_supported=True, force_refresh=force_refresh
+            ),
         }
 
     phase_to_matches: dict[int, list[tuple[datetime, dict, dict]]] = {}
@@ -1231,7 +1291,9 @@ async def ffbb_next_match_service(
         "adversaire_resolution": opponent_resolution,
         "team": source_team,
         "match": legacy_match,
-        "_meta": _freshness_meta(cache="poule", force_refresh_supported=True),
+        "_meta": _freshness_meta(
+            cache="poule", force_refresh_supported=True, force_refresh=force_refresh
+        ),
     }
 
 
@@ -1361,7 +1423,9 @@ async def ffbb_last_result_service(
             "candidates": all_available_equipes,
             "presentation": empty_presentation,
             "provenance": provenance,
-            "_meta": _freshness_meta(cache="bilan", force_refresh_supported=True),
+            "_meta": _freshness_meta(
+                cache="bilan", force_refresh_supported=True, force_refresh=force_refresh
+            ),
         }
 
     # Fetch full rencontre details (includes salle info not available in poule data)
@@ -1650,7 +1714,9 @@ async def ffbb_last_result_service(
         "ville": ville,
         "adresse": adresse_salle,
         "victoire": victoire,
-        "_meta": _freshness_meta(cache="poule", force_refresh_supported=True),
+        "_meta": _freshness_meta(
+            cache="poule", force_refresh_supported=True, force_refresh=force_refresh
+        ),
     }
 
 
@@ -1909,6 +1975,43 @@ async def ffbb_head_to_head_service(
         all_rencontres, eng_ids=eng_ids_b, club_nom=nom_b
     )
 
+    async def _enrich_dynamique_matchs_salle(dyn: dict[str, Any]) -> None:
+        matchs_list = dyn.get("matchs")
+        if not matchs_list or not isinstance(matchs_list, list):
+            return
+        from .salle import _enrich_with_salle_details, get_client_async
+        from .search import get_rencontre_service
+
+        client = None
+        for m in matchs_list:
+            if isinstance(m, dict) and not m.get("salle"):
+                mid = m.get("id")
+                if mid:
+                    try:
+                        rd = await get_rencontre_service(mid)
+                        if rd and isinstance(rd, dict):
+                            s_name = rd.get("nomSalle") or rd.get("nom_salle")
+                            if not s_name:
+                                if client is None:
+                                    client = await get_client_async()
+                                await _enrich_with_salle_details(rd, client)
+                                sd = rd.get("salle_details") or {}
+                                s_name = (
+                                    sd.get("libelle")
+                                    or rd.get("nomSalle")
+                                    or rd.get("nom_salle")
+                                )
+                            if s_name:
+                                m["salle"] = s_name
+                    except Exception:
+                        pass
+
+    await asyncio.gather(
+        _enrich_dynamique_matchs_salle(dynamique_a),
+        _enrich_dynamique_matchs_salle(dynamique_b),
+        return_exceptions=True,
+    )
+
     # Stats de poule (si poule commune)
     profil_a = None
     profil_b = None
@@ -2006,7 +2109,9 @@ async def ffbb_head_to_head_service(
         },
         "points_cles_llm": narrative_points,
         "presentation": presentation,
-        "_meta": _freshness_meta(cache="poule", force_refresh_supported=True),
+        "_meta": _freshness_meta(
+            cache="poule", force_refresh_supported=True, force_refresh=force_refresh
+        ),
     }
     if fallback_warning:
         result["warning"] = fallback_warning

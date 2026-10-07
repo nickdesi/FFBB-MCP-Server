@@ -30,27 +30,54 @@ async def _enrich_salle_data_with_meilisearch(
 ) -> None:
     if not isinstance(salle_data, dict) or not salle_data:
         return
-    if not salle_data.get("ville") and not salle_data.get("commune"):
-        libelle = salle_data.get("libelle")
-        if libelle:
-            try:
-                search_res = await client.search_salles_async(libelle)
-                if getattr(search_res, "hits", None):
-                    for hit in search_res.hits:
-                        if getattr(hit, "id", None) == salle_data.get("id"):
-                            if getattr(hit, "commune", None):
-                                salle_data["ville"] = hit.commune.libelle
-                                salle_data["code_postal"] = hit.commune.code_postal
-                            break
-                    else:
-                        hit = search_res.hits[0]
-                        if getattr(hit, "commune", None):
-                            salle_data["ville"] = hit.commune.libelle
-                            salle_data["code_postal"] = hit.commune.code_postal
-            except (httpx.HTTPError, ValueError, TypeError):
-                # Soft-fail: l'enrichissement Meilisearch ne doit jamais casser
-                # le flux principal (get salle + formatage).
-                pass
+    libelle = salle_data.get("libelle") or salle_data.get("nom")
+    salle_id = str(salle_data.get("id") or "")
+    if libelle:
+        try:
+            search_res = await client.search_salles_async(libelle)
+            hits = getattr(search_res, "hits", None) or []
+            matched_hit = None
+            for hit in hits:
+                if str(getattr(hit, "id", None) or "") == salle_id:
+                    matched_hit = hit
+                    break
+            if matched_hit is None and hits:
+                matched_hit = hits[0]
+
+            if matched_hit:
+                # 1. Commune / Ville / Code postal
+                commune_obj = getattr(matched_hit, "commune", None)
+                if commune_obj:
+                    if not salle_data.get("ville"):
+                        salle_data["ville"] = getattr(commune_obj, "libelle", None)
+                    if not salle_data.get("code_postal"):
+                        salle_data["code_postal"] = getattr(
+                            commune_obj, "code_postal", None
+                        )
+                    if not salle_data.get("departement"):
+                        salle_data["departement"] = getattr(
+                            commune_obj, "departement", None
+                        )
+                # 2. Nom secondaire (libelle2)
+                lib2 = getattr(matched_hit, "libelle2", None)
+                if lib2 and not salle_data.get("libelle2"):
+                    salle_data["libelle2"] = lib2
+                # 3. Téléphone
+                tel = getattr(matched_hit, "telephone", None)
+                if tel and not salle_data.get("telephone"):
+                    salle_data["telephone"] = tel
+                # 4. Coordonnées GPS / geo
+                geo = getattr(matched_hit, "geo", None)
+                if geo and not salle_data.get("geo"):
+                    salle_data["geo"] = serialize_model(geo)
+                # 5. Cartographie
+                carto = getattr(matched_hit, "cartographie", None)
+                if carto and not salle_data.get("cartographie"):
+                    salle_data["cartographie"] = serialize_model(carto)
+        except (httpx.HTTPError, ValueError, TypeError):
+            # Soft-fail: l'enrichissement Meilisearch ne doit jamais casser
+            # le flux principal (get salle + formatage).
+            pass
 
 
 async def _enrich_with_salle_details(

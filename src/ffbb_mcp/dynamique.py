@@ -132,10 +132,21 @@ def compute_team_dynamique(
         salle_name = str(
             r.get("nomSalle") or r.get("nom_salle") or salle_details_lib or ""
         )
-        journee = str(r.get("nomJournee") or r.get("numJournee") or "")
+        raw_j = (
+            r.get("numeroJournee")
+            or r.get("numJournee")
+            or r.get("numero_journee")
+            or r.get("nomJournee")
+        )
+        if raw_j is not None and str(raw_j).strip():
+            j_str = str(raw_j).strip()
+            journee_str = f"J{j_str}" if j_str.isdigit() else j_str
+        else:
+            journee_str = None
 
         played_matches.append(
             {
+                "id": str(r.get("id")) if r.get("id") else None,
                 "dt": dt_val,
                 "date": date_str,
                 "adversaire": adversaire,
@@ -146,7 +157,7 @@ def compute_team_dynamique(
                 "ecart": ecart,
                 "domicile": domicile,
                 "salle": salle_name or None,
-                "journee": journee or None,
+                "journee": journee_str,
             }
         )
 
@@ -287,6 +298,7 @@ def compute_team_dynamique(
             domicile=m["domicile"],
             salle=m["salle"],
             journee=m["journee"],
+            id=m.get("id"),
         )
         for m in recent
     ]

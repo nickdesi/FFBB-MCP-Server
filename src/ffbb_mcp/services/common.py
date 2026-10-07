@@ -125,6 +125,7 @@ def _freshness_meta(
     cache_hit: bool | None = None,
     stale: bool | None = None,
     cache_age_seconds: int | None = None,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
     meta: dict[str, Any] = {
         "source": source,

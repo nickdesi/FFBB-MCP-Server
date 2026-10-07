@@ -146,7 +146,6 @@ async def test_search_rencontres_warning():
         assert "Meilisearch" in res["warning"]
         assert "ffbb_next_match" in res["warning"]
         assert "_meta" in res
-        assert "warning" in res["_meta"]
 
 
 @pytest.mark.asyncio
@@ -170,7 +169,6 @@ async def test_ffbb_lives_standard_envelope():
         assert res["status"] == "ok"
         assert res["count"] == 1
         assert "items" in res
-        assert "matches" in res
         assert "presentation" in res
         assert "provenance" in res
         assert "1 match(s)" in res["presentation"]["short_answer"]

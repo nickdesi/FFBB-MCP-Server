@@ -229,6 +229,10 @@ async def ffbb_resolve_team(
     ne connait pas le numero d'equipe exact ou si la categorie est ambiguë (ex: 'U11M').
     Pour une équipe senior au niveau national ou régional, la catégorie FFBB interne est souvent `SEM1` ou `SEF1` ;
     le serveur résout désormais `NM3`, `NM2`, `NF1`, `PNM`, `R2`, etc. vers la bonne équipe et sa poule.
+
+    Politique : si une catégorie sans numéro (ex: 'U18M') correspond à plusieurs équipes (ex: U18M1, U18M2),
+    retourne 'ambiguous' (confiance 0.5) sans trancher arbitrairement.
+    Pour des suggestions heuristiques ordonnées (U18M1 à 0.85), utiliser `ffbb_find_team_candidates`.
     """
     resolve_svc = _get_server_service(
         "ffbb_resolve_team_service", ffbb_resolve_team_service
@@ -298,6 +302,8 @@ async def ffbb_find_team_candidates(
 
     Évite la confusion entre équipe fanion sans numéro (ex: U13F en régional) et équipe réserve (ex: U13F2 en départemental).
     Retourne la liste des candidats triés avec confiance, motif, détails de compétition et prochain match.
+
+    Politique : contrairement à `ffbb_resolve_team` (garde-fou strict), recommande l'équipe fanion (confiance 0.85) en l'absence de numéro.
     """
     candidates_svc = _get_server_service(
         "ffbb_find_team_candidates_service", ffbb_find_team_candidates_service

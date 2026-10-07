@@ -764,19 +764,58 @@ def _lighten_rencontre_hit(hit: dict[str, Any]) -> dict[str, Any]:
                 or raw_commune.get("code_postal"),
                 "departement": raw_commune.get("departement"),
             }
-        elif raw_salle.get("adresse"):
+        sid = str(raw_salle.get("id") or "")
+        if cleaned_commune is None and sid:
+            from ffbb_mcp._state import state
+
+            cached_s = state.cache_salle.get(sid)
+            if isinstance(cached_s, dict):
+                c_nom = cached_s.get("ville") or cached_s.get("commune")
+                c_cp = cached_s.get("code_postal") or cached_s.get("codePostal")
+                c_dep = cached_s.get("departement") or (
+                    c_cp[:2] if c_cp and len(c_cp) == 5 else None
+                )
+                if c_nom or c_cp:
+                    cleaned_commune = {
+                        "libelle": c_nom,
+                        "codePostal": c_cp,
+                        "departement": c_dep,
+                    }
+
+        if cleaned_commune is None and raw_salle.get("adresse"):
             adr = str(raw_salle.get("adresse") or "")
-            parts = adr.split(",")
-            if len(parts) >= 2:
-                ville_cand = parts[-1].strip()
-                cp_match = re.search(r"\b(\d{5})\b", ville_cand)
-                cp = cp_match.group(1) if cp_match else None
-                ville_clean = re.sub(r"\b\d{5}\b", "", ville_cand).strip()
+            cp_match = re.search(r"\b(\d{5})\b(?:\s+([A-Za-zÀ-ÿ\- ]+))?", adr)
+            if cp_match:
+                cp = cp_match.group(1)
+                ville = cp_match.group(2).strip() if cp_match.group(2) else None
                 cleaned_commune = {
-                    "libelle": ville_clean or ville_cand,
+                    "libelle": ville,
                     "codePostal": cp,
                     "departement": cp[:2] if cp else None,
                 }
+            elif "," in adr:
+                parts = adr.split(",")
+                ville_cand = parts[-1].strip()
+                cleaned_commune = {
+                    "libelle": ville_cand,
+                    "codePostal": None,
+                    "departement": None,
+                }
+
+        # Fallback sur la commune du club hôte (équipe 1 recevant à domicile)
+        if cleaned_commune is None:
+            org1 = item.get("id_organisme_equipe1")
+            if isinstance(org1, dict) and (
+                org1.get("ville") or org1.get("code_postal")
+            ):
+                c_cp = org1.get("code_postal") or org1.get("codePostal")
+                cleaned_commune = {
+                    "libelle": org1.get("ville"),
+                    "codePostal": c_cp,
+                    "departement": org1.get("departement")
+                    or (c_cp[:2] if c_cp and len(c_cp) == 5 else None),
+                }
+
         item["salle"] = {
             "id": raw_salle.get("id"),
             "libelle": raw_salle.get("libelle") or raw_salle.get("nom"),
@@ -1729,8 +1768,6 @@ async def ffbb_search_service(
         )
         if isinstance(res_dict, dict):
             res_dict["warning"] = warning_msg
-            if "_meta" in res_dict and isinstance(res_dict["_meta"], dict):
-                res_dict["_meta"]["warning"] = warning_msg
         return res_dict
 
     if type == "salles":
