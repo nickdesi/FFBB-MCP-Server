@@ -343,10 +343,10 @@ async def test_tiebreak_rsg_art28_confrontation_vs_quotient():
     assert res_h2h["rows"][1][1] == "EQUIPE B"
 
     # Cas 2 : Aucune confrontation directe jouée
-    # Départage provisoire au quotient / différence générale : B (+30) devant A (+10)
+    # Départage provisoire à la différence générale : B (+30) devant A (+10)
     poule_no_h2h = {"rencontres": []}
     res_quotient = format_compact_classement(teams_tied, poule_data=poule_no_h2h)
-    assert res_quotient["departage"] == "quotient"
+    assert res_quotient["departage"] == "difference_generale"
     assert res_quotient["rows"][0][1] == "EQUIPE B"
     assert res_quotient["rows"][1][1] == "EQUIPE A"
 
@@ -679,7 +679,7 @@ def test_incomplete_mini_championship_fallback_general_difference():
 
     res = format_compact_classement(teams_tied, poule_data=poule_data)
     # Le départage doit se faire au point-average général car le mini-championnat est incomplet
-    assert res["departage"] == "quotient"
+    assert res["departage"] == "difference_generale"
     rows = res["rows"]
     # Vichy (+81) doit rester devant Meyzieu (+72) et Caluire (+52)
     assert rows[0][1] == "JEANNE D'ARC DE VICHY"
@@ -748,6 +748,34 @@ def test_complete_mini_championship_applies_h2h():
     assert res["rows"][2][1] == "EQUIPE C"
 
 
+def test_tiebreak_with_identical_diff_applies_quotient():
+    """Quand deux équipes ont la même différence de points et pas de confrontation directe,
+
+    le départage relève du quotient général (Art. 28).
+    """
+    teams_tied = [
+        {
+            "position": 4,
+            "equipe": "CTC CSR01 - SAINT-REMY",
+            "points": 6,
+            "difference": 71,
+            "paniers_marques": 392,
+            "paniers_encaisses": 321,
+        },
+        {
+            "position": 5,
+            "equipe": "VILLEFRANCHE BEAUJOLAIS",
+            "points": 6,
+            "difference": 71,
+            "paniers_marques": 244,
+            "paniers_encaisses": 173,
+        },
+    ]
+    poule_data = {"rencontres": []}
+    res = format_compact_classement(teams_tied, poule_data=poule_data)
+    assert res["departage"] == "quotient"
+
+
 @pytest.mark.asyncio
 async def test_format_poule_response_numerical_sorting():
     """Vérifie que format_poule_response trie numériquement les classements
@@ -772,3 +800,67 @@ async def test_format_poule_response_numerical_sorting():
     formatted = await format_poule_response(poule_data)
     positions = [int(c["position"]) for c in formatted["classements"]]
     assert positions == [1, 2, 9, 10, 11]
+
+
+@pytest.mark.asyncio
+async def test_incompatible_engagement_and_poule_returns_error():
+    """P1 : En cas d'incompatibilité entre engagement_id et poule_id,
+
+    ffbb_team_summary doit rejeter avec une erreur structurée sans réponse composite.
+    """
+    mock_resolve = AsyncMock(
+        return_value={
+            "status": "resolved",
+            "team": {
+                "team_id": 999,
+                "team_label": "U15M",
+                "nom_equipe": "JEANNE D'ARC DE VICHY",
+                "competition": "RMU15 Brassage",
+                "engagement_id": "200000005347050",
+                "poule_id": "200000003056282",  # Poule régionale
+            },
+            "club_resolu": {"organisme_id": 9220},
+        }
+    )
+
+    with patch("ffbb_mcp.server.ffbb_resolve_team_service", mock_resolve):
+        res = await ffbb_team_summary(
+            engagement_id="200000005347050",
+            poule_id="200000003057847",  # Poule départementale contradictoire !
+            include=["bilan", "next", "classement"],
+        )
+
+        assert res["status"] == "error"
+        assert res["code"] == "incompatible_identifiers"
+        assert "Incompatibilité d'identifiants" in res["error"]
+        assert "incompatible_identifiers" in res["warnings"]
+
+
+@pytest.mark.asyncio
+async def test_missing_bilan_does_not_display_zero_wins_zero_losses():
+    """P1 : Si le bilan est absent ou vide, ne jamais afficher '0 victoires, 0 défaites'."""
+    mock_resolve = AsyncMock(return_value=RESOLVED_SEM1)
+    mock_bilan = AsyncMock(
+        return_value={"status": "error", "error": "Bilan non calculable"}
+    )
+    mock_last = AsyncMock(return_value=None)
+    mock_next = AsyncMock(return_value=None)
+    mock_classement = AsyncMock(return_value=CLASSEMENT_6_EQUIPES)
+    mock_poule = AsyncMock(return_value={"id": 200000003055513, "rencontres": []})
+
+    with (
+        patch("ffbb_mcp.server.ffbb_resolve_team_service", mock_resolve),
+        patch("ffbb_mcp.server.ffbb_bilan_service", mock_bilan),
+        patch("ffbb_mcp.server.ffbb_last_result_service", mock_last),
+        patch("ffbb_mcp.server.ffbb_next_match_service", mock_next),
+        patch("ffbb_mcp.server.ffbb_get_classement_service", mock_classement),
+        patch("ffbb_mcp.server.get_poule_service", mock_poule),
+    ):
+        res = await ffbb_team_summary(
+            engagement_id="200000005355513",
+            poule_id="200000003055513",
+        )
+
+        short_ans = res["presentation"]["short_answer"]
+        assert "0 victoires, 0 défaites" not in short_ans
+        assert "non disponible" in short_ans

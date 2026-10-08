@@ -490,6 +490,49 @@ async def ffbb_team_summary(
             else None
         )
 
+        # Validation de cohérence : si un engagement_id et un poule_id sont tous les deux fournis,
+        # ils doivent correspondre à la même équipe / poule.
+        if (
+            engagement_id is not None
+            and poule_id is not None
+            and isinstance(resolved_team, dict)
+        ):
+            team_poule = str(resolved_team.get("poule_id") or "").strip()
+            given_poule = str(poule_id).strip()
+            if team_poule and given_poule and team_poule != given_poule:
+                comp_name = resolved_team.get("competition") or "cette compétition"
+                team_name = (
+                    resolved_team.get("nom_equipe")
+                    or resolved_team.get("team_label")
+                    or "l'équipe"
+                )
+
+                return {
+                    "status": "error",
+                    "error": (
+                        f"Incompatibilité d'identifiants : l'engagement '{engagement_id}' ({team_name}, {comp_name}) "
+                        f"appartient à la poule '{team_poule}', et non à la poule '{given_poule}' fournie."
+                    ),
+                    "code": "incompatible_identifiers",
+                    "engagement_id": str(engagement_id),
+                    "engagement_poule_id": team_poule,
+                    "provided_poule_id": given_poule,
+                    "suggestion": (
+                        f"Omettez 'poule_id' pour utiliser automatiquement la poule '{team_poule}' de cet engagement, "
+                        f"ou vérifiez les identifiants fournis."
+                    ),
+                    "presentation": {
+                        "short_answer": (
+                            f"Erreur d'identifiants : l'engagement {engagement_id} appartient à la poule {team_poule} "
+                            f"et ne peut pas être combiné avec la poule {given_poule}."
+                        ),
+                        "detail_line": "Requête contradictoire rejetée pour préserver l'intégrité des données.",
+                        "source_label": format_source_label(),
+                        "warnings": ["incompatible_identifiers"],
+                    },
+                    "warnings": ["incompatible_identifiers"],
+                }
+
         if effective_org_id and has_team_context:
             await _safe_report_progress(
                 ctx, 1, total=3, message="Récupération bilan et matchs en parallèle…"
@@ -788,13 +831,30 @@ async def ffbb_team_summary(
         summary_dict: dict[str, Any] = (
             raw_summary if isinstance(raw_summary, dict) else {}
         )
-        v_count = summary_dict.get("victoires")
-        if v_count is None:
-            v_count = summary_dict.get("gagnes", 0)
-        d_count = summary_dict.get("defaites")
-        if d_count is None:
-            d_count = summary_dict.get("perdus", 0)
-        n_count = summary_dict.get("nuls", 0)
+        has_real_bilan = (
+            isinstance(raw_summary, dict)
+            and bool(raw_summary)
+            and any(
+                k in raw_summary
+                for k in ("victoires", "defaites", "gagnes", "perdus", "match_joues")
+            )
+        )
+        if not has_real_bilan:
+            bilan_phrase = "bilan non disponible"
+        else:
+            v_count = summary_dict.get("victoires")
+            if v_count is None:
+                v_count = summary_dict.get("gagnes", 0)
+            d_count = summary_dict.get("defaites")
+            if d_count is None:
+                d_count = summary_dict.get("perdus", 0)
+            n_count = summary_dict.get("nuls", 0)
+            v_label = "victoire" if v_count == 1 else "victoires"
+            d_label = "défaite" if d_count == 1 else "défaites"
+            bilan_phrase = f"{v_count} {v_label}, {d_count} {d_label}"
+            if n_count:
+                n_label = "nul" if n_count == 1 else "nuls"
+                bilan_phrase += f", {n_count} {n_label}"
 
         # Formater la dynamique en texte lisible (seulement si demandée)
         dyn_str = ""
@@ -810,13 +870,6 @@ async def ffbb_team_summary(
                 parts.append(serie_label)
             if parts:
                 dyn_str = f" ({', '.join(parts)})"
-
-        v_label = "victoire" if v_count == 1 else "victoires"
-        d_label = "défaite" if d_count == 1 else "défaites"
-        bilan_phrase = f"{v_count} {v_label}, {d_count} {d_label}"
-        if n_count:
-            n_label = "nul" if n_count == 1 else "nuls"
-            bilan_phrase += f", {n_count} {n_label}"
 
         # 7. presentation.short_answer : position, points et prochain match complet
         target_pts = None
@@ -835,9 +888,16 @@ async def ffbb_team_summary(
             pos_pts_parts.append(pts_label)
 
         pos_pts_str = f" ({', '.join(pos_pts_parts)})" if pos_pts_parts else ""
-        short_ans = (
-            f"Bilan pour {team_name_str}{pos_pts_str} : {bilan_phrase}{dyn_str}."
-        )
+        if has_real_bilan:
+            short_ans = (
+                f"Bilan pour {team_name_str}{pos_pts_str} : {bilan_phrase}{dyn_str}."
+            )
+        elif pos_pts_str:
+            short_ans = f"Situation pour {team_name_str}{pos_pts_str} : bilan chiffré non disponible{dyn_str}."
+        else:
+            short_ans = (
+                f"Données pour {team_name_str} : bilan chiffré non disponible{dyn_str}."
+            )
 
         if (
             next_match
@@ -925,6 +985,33 @@ async def ffbb_team_summary(
             if detail_parts
             else "Aucun match récent ou programmé."
         )
+
+        # Agréger et dédupliquer les avertissements des sous-sections
+        def _collect_sub_warnings(source: dict[str, Any] | None) -> None:
+            if not isinstance(source, dict):
+                return
+            src_warns = source.get("warnings") or []
+            if isinstance(src_warns, list):
+                for w in src_warns:
+                    w_str = str(w).strip()
+                    if w_str and w_str not in warnings_list:
+                        warnings_list.append(w_str)
+            pres = source.get("presentation")
+            if isinstance(pres, dict):
+                p_warns = pres.get("warnings") or []
+                if isinstance(p_warns, list):
+                    for w in p_warns:
+                        w_str = str(w).strip()
+                        if w_str and w_str not in warnings_list:
+                            warnings_list.append(w_str)
+
+        _collect_sub_warnings(bilan)
+        _collect_sub_warnings(last_match)
+        _collect_sub_warnings(next_match)
+        if compact_classement.get("warning"):
+            cw = str(compact_classement["warning"]).strip()
+            if cw and cw not in warnings_list:
+                warnings_list.append(cw)
 
         presentation = {
             "short_answer": short_ans,

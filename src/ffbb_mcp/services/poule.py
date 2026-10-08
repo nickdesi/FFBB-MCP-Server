@@ -1086,7 +1086,18 @@ def format_compact_classement(
     # Déterminer la valeur de departage (RSG Art. 28)
     departage: str | None = None
     if has_any_tie:
-        departage = "confrontation" if used_h2h else "quotient"
+        if used_h2h:
+            departage = "confrontation"
+        else:
+            # Vérifier si au moins deux équipes du même groupe de points ont une différence générale identique
+            has_same_diff = False
+            for grp in points_groups.values():
+                if len(grp) > 1:
+                    diffs = [int(t.get("difference") or 0) for t in grp]
+                    if len(diffs) != len(set(diffs)):
+                        has_same_diff = True
+                        break
+            departage = "quotient" if has_same_diff else "difference_generale"
 
     # Vérification des colonnes détaillées si detail=True
     detail_col_defs = [

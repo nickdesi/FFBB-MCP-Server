@@ -138,11 +138,14 @@ def compute_team_dynamique(
             or r.get("numero_journee")
             or r.get("nomJournee")
         )
-        if raw_j is not None and str(raw_j).strip():
-            j_str = str(raw_j).strip()
-            journee_str = f"J{j_str}" if j_str.isdigit() else j_str
-        else:
-            journee_str = None
+        from ffbb_mcp.presentation import evaluate_round_reliability
+
+        round_info = evaluate_round_reliability(raw_j)
+        journee_str = (
+            f"J{round_info.display_value}"
+            if (round_info.is_reliable and round_info.display_value is not None)
+            else None
+        )
 
         played_matches.append(
             {

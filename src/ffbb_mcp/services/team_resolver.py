@@ -915,10 +915,27 @@ async def ffbb_find_team_candidates_service(
 
     clarification_prompt = None
     if status == "ambiguous" or len(candidates) > 1:
+        exact_matches = [
+            c
+            for c in candidates
+            if c.get("match_confidence") == 1.0
+            or (
+                categorie
+                and str(c.get("team_label", "")).strip().upper()
+                == str(categorie).strip().upper()
+            )
+        ]
+        if len(exact_matches) > 1:
+            intro_msg = f"Plusieurs engagements correspondent exactement au libellé `{categorie}` pour {club_nom} :"
+        else:
+            intro_msg = (
+                f"Je ne trouve pas de libellé FFBB unique correspondant à `{categorie or 'votre recherche'}`.\n"
+                f"Voici les équipes candidates pour {club_nom} :"
+            )
         lines = [
             "## Équipes candidates\n",
-            f"Je ne trouve pas de libellé FFBB exact correspondant à `{categorie or 'votre recherche'}`.",
-            f"Voici les équipes les plus proches pour {club_nom} :\n",
+            intro_msg,
+            "",
         ]
         for idx, c in enumerate(candidates, 1):
             num_str = (

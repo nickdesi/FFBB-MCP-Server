@@ -211,16 +211,28 @@ def _analyze_poule_tiebreaks(
                 )
             elif h2h_matches:
                 explication = (
-                    f"Égalité multiple ({len(teams)} équipes à {pts} {unit_pts}) : mini-championnat en cours "
+                    f"Égalité multiple ({len(teams)} équipes à {pts} {unit_pts}) : mini-championnat incomplet "
                     f"({len(h2h_matches)}/{expected_pairs} confrontations directes jouées). "
-                    f"Départage provisoire s'appuyant sur les rencontres directes disponibles et la différence générale."
+                    f"Départage provisoire s'appuyant sur le classement officiel FFBB (différence générale "
+                    f"en attendant la fin de toutes les rencontres directes du groupe)."
                 )
             else:
-                explication = (
-                    f"Égalité multiple ({len(teams)} équipes à {pts} {unit_pts}) : aucune confrontation directe "
-                    f"jouée à ce jour entre ces équipes. Départage provisoire à la différence de points générale "
-                    f"puis au quotient général."
-                )
+                diffs = [int(t.get("difference") or 0) for t in teams]
+                is_diff_strictly_descending = diffs == sorted(
+                    diffs, reverse=True
+                ) and len(set(diffs)) == len(diffs)
+                if is_diff_strictly_descending:
+                    explication = (
+                        f"Égalité multiple ({len(teams)} équipes à {pts} {unit_pts}) : aucune confrontation directe "
+                        f"jouée à ce jour entre ces équipes. Départage provisoire établi à la différence de points générale."
+                    )
+                else:
+                    explication = (
+                        f"Égalité multiple ({len(teams)} équipes à {pts} {unit_pts}) : aucune confrontation directe "
+                        f"jouée à ce jour entre ces équipes. Positions reprises du classement officiel FFBB "
+                        f"(ordre source homologué) ; le critère exact pour les équipes à différence identique "
+                        f"n'est pas intégralement déduit des seules statistiques publiques."
+                    )
 
         tiebreak_groups.append(
             {
