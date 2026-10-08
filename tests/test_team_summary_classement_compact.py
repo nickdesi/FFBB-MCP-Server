@@ -378,6 +378,8 @@ async def test_multiple_phases_exposes_autres_phases():
         assert len(res["autres_phases"]) == 1
         assert res["autres_phases"][0]["poule_id"] == "200000003055510"
         assert "Phase 1 - Brassage" in res["autres_phases"][0]["label"]
+        assert mock_bilan.call_args.kwargs.get("engagement_id") == "200000005355513"
+        assert mock_bilan.call_args.kwargs.get("poule_id") == "200000003055513"
 
 
 @pytest.mark.asyncio
@@ -617,3 +619,156 @@ async def test_detail_parameter_in_compact_classement():
     assert "logo_url" in detailed["cols"]
     # 'penalites_arbitrage' étant None partout, elle ne pollue pas cols
     assert "penalites_arbitrage" not in detailed["cols"]
+
+
+def test_incomplete_mini_championship_fallback_general_difference():
+    """Vérifie que pour 3+ équipes à égalité avec mini-championnat incomplet,
+
+    le départage s'effectue au point-average général (différence générale)
+    conformément à l'Art. 28 du RSG sans biais de mini-championnat partiel.
+    Cas réel JA Vichy (+81) vs AL Meyzieu (+72).
+    """
+    teams_tied = [
+        {
+            "position": 9,
+            "equipe": "JEANNE D'ARC DE VICHY",
+            "points": 5,
+            "match_joues": 3,
+            "gagnes": 2,
+            "perdus": 1,
+            "paniers_marques": 254,
+            "paniers_encaisses": 173,
+            "difference": 81,
+        },
+        {
+            "position": 10,
+            "equipe": "AL MEYZIEU",
+            "points": 5,
+            "match_joues": 3,
+            "gagnes": 2,
+            "perdus": 1,
+            "paniers_marques": 280,
+            "paniers_encaisses": 208,
+            "difference": 72,
+        },
+        {
+            "position": 11,
+            "equipe": "AL CALUIRE ET CUIRE",
+            "points": 5,
+            "match_joues": 3,
+            "gagnes": 2,
+            "perdus": 1,
+            "paniers_marques": 220,
+            "paniers_encaisses": 168,
+            "difference": 52,
+        },
+    ]
+
+    # Seulement 1 match joué sur 3 possibles (mini-championnat incomplet) :
+    # Meyzieu a battu Caluire, mais Vichy n'a affronté ni l'un ni l'autre
+    poule_data = {
+        "rencontres": [
+            {
+                "nomEquipe1": "AL MEYZIEU",
+                "resultatEquipe1": 85,
+                "nomEquipe2": "AL CALUIRE ET CUIRE",
+                "resultatEquipe2": 70,
+            }
+        ]
+    }
+
+    res = format_compact_classement(teams_tied, poule_data=poule_data)
+    # Le départage doit se faire au point-average général car le mini-championnat est incomplet
+    assert res["departage"] == "quotient"
+    rows = res["rows"]
+    # Vichy (+81) doit rester devant Meyzieu (+72) et Caluire (+52)
+    assert rows[0][1] == "JEANNE D'ARC DE VICHY"
+    assert rows[1][1] == "AL MEYZIEU"
+    assert rows[2][1] == "AL CALUIRE ET CUIRE"
+
+
+def test_complete_mini_championship_applies_h2h():
+    """Pour 3 équipes à égalité avec mini-championnat complet (toutes les paires jouées),
+
+    le mini-championnat Art. 28.3 s'applique aux points particuliers.
+    """
+    teams_tied = [
+        {
+            "position": 1,
+            "equipe": "EQUIPE A",
+            "points": 4,
+            "difference": 10,
+            "paniers_marques": 100,
+        },
+        {
+            "position": 2,
+            "equipe": "EQUIPE B",
+            "points": 4,
+            "difference": 30,
+            "paniers_marques": 120,
+        },
+        {
+            "position": 3,
+            "equipe": "EQUIPE C",
+            "points": 4,
+            "difference": 20,
+            "paniers_marques": 110,
+        },
+    ]
+
+    # Toutes les 3 paires ont joué : A bat B, A bat C, B bat C
+    poule_data = {
+        "rencontres": [
+            {
+                "nomEquipe1": "EQUIPE A",
+                "resultatEquipe1": 70,
+                "nomEquipe2": "EQUIPE B",
+                "resultatEquipe2": 60,
+            },
+            {
+                "nomEquipe1": "EQUIPE A",
+                "resultatEquipe1": 80,
+                "nomEquipe2": "EQUIPE C",
+                "resultatEquipe2": 50,
+            },
+            {
+                "nomEquipe1": "EQUIPE B",
+                "resultatEquipe1": 65,
+                "nomEquipe2": "EQUIPE C",
+                "resultatEquipe2": 60,
+            },
+        ]
+    }
+
+    res = format_compact_classement(teams_tied, poule_data=poule_data)
+    assert res["departage"] == "confrontation"
+    # A (2 victoires dans le mini-chpt) devant B (1 victoire) devant C (0 victoire)
+    assert res["rows"][0][1] == "EQUIPE A"
+    assert res["rows"][1][1] == "EQUIPE B"
+    assert res["rows"][2][1] == "EQUIPE C"
+
+
+@pytest.mark.asyncio
+async def test_format_poule_response_numerical_sorting():
+    """Vérifie que format_poule_response trie numériquement les classements
+
+    (1, 2, ..., 9, 10, 11...) au lieu du tri lexical de l'API Directus (1, 10, 11, 2...).
+    """
+    from ffbb_mcp.services.poule import format_poule_response
+
+    poule_data = {
+        "id": 12345,
+        "libelle": "Poule A",
+        "classements": [
+            {"position": "1", "id_engagement": {"nom": "EQ 1"}},
+            {"position": "10", "id_engagement": {"nom": "EQ 10"}},
+            {"position": "11", "id_engagement": {"nom": "EQ 11"}},
+            {"position": "2", "id_engagement": {"nom": "EQ 2"}},
+            {"position": "9", "id_engagement": {"nom": "EQ 9"}},
+        ],
+        "rencontres": [],
+    }
+
+    formatted = await format_poule_response(poule_data)
+    positions = [int(c["position"]) for c in formatted["classements"]]
+    assert positions == [1, 2, 9, 10, 11]

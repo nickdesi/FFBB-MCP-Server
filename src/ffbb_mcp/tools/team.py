@@ -479,6 +479,16 @@ async def ffbb_team_summary(
         effective_poule_id = poule_id or (
             resolved_team.get("poule_id") if isinstance(resolved_team, dict) else None
         )
+        effective_engagement_id = engagement_id or (
+            resolved_team.get("engagement_id")
+            if isinstance(resolved_team, dict)
+            else None
+        )
+        effective_competition_id = competition_id or (
+            resolved_team.get("competition_id")
+            if isinstance(resolved_team, dict)
+            else None
+        )
 
         if effective_org_id and has_team_context:
             await _safe_report_progress(
@@ -490,10 +500,10 @@ async def ffbb_team_summary(
             club_name=None,
             organisme_id=effective_org_id,
             categorie=effective_cat or categorie,
-            engagement_id=engagement_id,
-            competition_id=competition_id,
+            engagement_id=effective_engagement_id,
+            competition_id=effective_competition_id,
             competition_type=competition_type,
-            poule_id=poule_id,
+            poule_id=effective_poule_id,
             season_id=season_id,
             force_refresh=force_refresh,
         )
@@ -511,10 +521,10 @@ async def ffbb_team_summary(
                 organisme_id=effective_org_id,
                 categorie=categorie,
                 numero_equipe=resolved_num,
-                engagement_id=engagement_id,
-                competition_id=competition_id,
+                engagement_id=effective_engagement_id,
+                competition_id=effective_competition_id,
                 competition_type=competition_type,
-                poule_id=poule_id,
+                poule_id=effective_poule_id,
                 season_id=season_id,
                 force_refresh=force_refresh,
             )
@@ -527,10 +537,10 @@ async def ffbb_team_summary(
                 organisme_id=effective_org_id,
                 categorie=categorie,
                 numero_equipe=resolved_num,
-                engagement_id=engagement_id,
-                competition_id=competition_id,
+                engagement_id=effective_engagement_id,
+                competition_id=effective_competition_id,
                 competition_type=competition_type,
-                poule_id=poule_id,
+                poule_id=effective_poule_id,
                 season_id=season_id,
                 force_refresh=force_refresh,
             )
@@ -659,10 +669,10 @@ async def ffbb_team_summary(
                         club_name=None,
                         organisme_id=effective_org_id,
                         categorie=effective_cat or categorie,
-                        engagement_id=engagement_id,
-                        competition_id=competition_id,
+                        engagement_id=effective_engagement_id,
+                        competition_id=effective_competition_id,
                         competition_type=competition_type,
-                        poule_id=poule_id,
+                        poule_id=effective_poule_id,
                         season_id=season_id,
                         force_refresh=True,
                     )

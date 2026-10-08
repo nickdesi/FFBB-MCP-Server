@@ -251,6 +251,17 @@ async def format_poule_response(poule_data: dict) -> dict[str, Any]:
         )
         formatted_classements.append(c)
 
+    def _classement_pos_sort_key(item: dict[str, Any]) -> int:
+        pos_val = item.get("position")
+        if pos_val is not None:
+            try:
+                return int(pos_val)
+            except (ValueError, TypeError):
+                pass
+        return 999
+
+    formatted_classements.sort(key=_classement_pos_sort_key)
+
     rencontres = poule_data.get("rencontres") or []
     formatted_rencontres = []
     for m in rencontres or []:
@@ -1007,10 +1018,21 @@ def format_compact_classement(
             for m in played_matches:
                 m1 = _norm_t(m["eq1"])
                 m2 = _norm_t(m["eq2"])
-                if m1 in names and m2 in names:
+                if m1 in names and m2 in names and m1 != m2:
                     mini_h2h.append(m)
 
-            if mini_h2h:
+            # Conformément au RSG Art. 28.3 et aux règlements régionaux :
+            # Le mini-championnat ne peut être appliqué que s'il est complet (toutes les paires
+            # d'équipes à égalité se sont affrontées au moins une fois).
+            # En cours de phase, si le mini-championnat est incomplet, le départage officiel
+            # s'effectue au point-average général (différence générale puis paniers marqués).
+            expected_pairs = len(names) * (len(names) - 1) // 2
+            played_pairs = {
+                tuple(sorted([_norm_t(m["eq1"]), _norm_t(m["eq2"])])) for m in mini_h2h
+            }
+            is_complete_mini = len(names) >= 3 and len(played_pairs) >= expected_pairs
+
+            if is_complete_mini:
                 used_h2h = True
                 mini_stats: dict[str, dict[str, int]] = {
                     nm: {"pts": 0, "diff": 0, "for": 0} for nm in names
@@ -1046,7 +1068,16 @@ def format_compact_classement(
 
                 def _gen_sort_key(t: dict[str, Any]) -> tuple[int, int]:
                     gen_diff = int(t.get("difference") or 0)
-                    gen_marques = int(t.get("paniers_marques") or 0)
+                    raw_pm = (
+                        t.get("paniers_marques")
+                        if t.get("paniers_marques") is not None
+                        else (
+                            t.get("marques")
+                            if t.get("marques") is not None
+                            else t.get("pm")
+                        )
+                    )
+                    gen_marques = int(raw_pm) if raw_pm is not None else 0
                     return (gen_diff, gen_marques)
 
                 sorted_group = sorted(group, key=_gen_sort_key, reverse=True)
