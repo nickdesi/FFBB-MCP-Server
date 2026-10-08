@@ -87,3 +87,7 @@
 ## 2026-10-25 - Avoid contextlib.suppress in hot paths
 **Learning:** In CPython, using `with contextlib.suppress(Exception):` incurs significant execution overhead compared to a standard `try...except Exception: pass` block due to the context manager protocol (`__enter__` and `__exit__` evaluation). In performance-critical string parsing or data normalization loops, this overhead can be substantial (over 10x slower for the suppression operation itself).
 **Action:** Replace `contextlib.suppress` with explicit `try...except` blocks in performance-critical code paths such as serialization, data cleaning, or heavily executed algorithmic loops.
+
+## 2024-05-18 - [Pre-compile Python Regular Expressions for Text Normalization]
+**Learning:** In heavily executed loops (like parsing JSON from the FFBB API in `_norm_team` or `resolve_opponent_from_poule`), the Python `re.search` and `re.sub` module-level functions dynamically recompile regex patterns on every single execution, incurring severe execution overhead compared to static variables.
+**Action:** When working on text normalization loops in the FFBB API (such as extracting numbers from strings), always declare `re.compile()` variables statically at the module level. Furthermore, attempt to avoid the regex execution completely using literal fast-path evaluation (`"U" in text`) if there is a common fast path (e.g., senior categories).

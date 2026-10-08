@@ -19,6 +19,9 @@ from .common import (
     _normalize_name,
 )
 
+# ⚡ Bolt: Pre-compiled regex for extracting team numbers avoids re-compilation overhead in loops.
+_NUM_SUFFIX_PATTERN = re.compile(r"[-_\s]+([1-9])$")
+
 
 def resolve_opponent_from_poule(
     poule_data: dict[str, Any],
@@ -88,11 +91,13 @@ def resolve_opponent_from_poule(
     clean_opp = _clean_team_for_match(raw_opp)
 
     # Détection d'un numéro d'équipe à la fin (1 à 9 uniquement pour ne pas confondre avec un département ex: 42, 38)
-    num_match = re.search(r"[-_\s]+([1-9])$", raw_opp)
-    target_num = num_match.group(1) if num_match else None
-    base_raw_opp = (
-        re.sub(r"[-_\s]+([1-9])$", "", raw_opp).strip() if target_num else raw_opp
-    )
+    if m := _NUM_SUFFIX_PATTERN.search(raw_opp):
+        target_num = m.group(1)
+        base_raw_opp = _NUM_SUFFIX_PATTERN.sub("", raw_opp).strip()
+    else:
+        target_num = None
+        base_raw_opp = raw_opp
+
     base_clean_opp = _clean_team_for_match(base_raw_opp)
 
     candidates: list[dict[str, Any]] = []
