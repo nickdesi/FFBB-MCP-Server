@@ -980,11 +980,12 @@ async def ffbb_team_summary(
         elif cleaned_next_match:
             detail_parts.append("Prochain match programmé.")
 
-        detail_line = (
-            " ".join(detail_parts)
-            if detail_parts
-            else "Aucun match récent ou programmé."
-        )
+        if detail_parts:
+            detail_line = " ".join(detail_parts)
+        elif want_last or want_next:
+            detail_line = "Aucun match récent ou programmé."
+        else:
+            detail_line = "Calendrier non demandé (seuls le bilan et/ou le classement ont été consultés)."
 
         # Agréger et dédupliquer les avertissements des sous-sections
         def _collect_sub_warnings(source: dict[str, Any] | None) -> None:

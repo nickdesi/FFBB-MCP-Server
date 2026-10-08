@@ -1086,18 +1086,60 @@ def format_compact_classement(
     # Déterminer la valeur de departage (RSG Art. 28)
     departage: str | None = None
     if has_any_tie:
-        if used_h2h:
-            departage = "confrontation"
-        else:
-            # Vérifier si au moins deux équipes du même groupe de points ont une différence générale identique
-            has_same_diff = False
+        target_group: list[dict[str, Any]] | None = None
+        if target_organisme_id or target_num:
+            target_org_s = (
+                str(target_organisme_id) if target_organisme_id is not None else None
+            )
+            target_num_s = str(target_num) if target_num is not None else None
             for grp in points_groups.values():
-                if len(grp) > 1:
-                    diffs = [int(t.get("difference") or 0) for t in grp]
-                    if len(diffs) != len(set(diffs)):
-                        has_same_diff = True
+                for t in grp:
+                    is_t = bool(t.get("is_target"))
+                    if not is_t and target_org_s:
+                        t_org = str(
+                            t.get("idOrganisme")
+                            if t.get("idOrganisme") is not None
+                            else (t.get("organisme_id") or "")
+                        )
+                        if t_org == target_org_s:
+                            if target_num_s:
+                                t_num = str(
+                                    t.get("numeroEquipe")
+                                    if t.get("numeroEquipe") is not None
+                                    else (t.get("numero_equipe") or "")
+                                )
+                                if t_num == target_num_s or not t_num:
+                                    is_t = True
+                            else:
+                                is_t = True
+                    if is_t:
+                        target_group = grp
                         break
-            departage = "quotient" if has_same_diff else "difference_generale"
+                if target_group is not None:
+                    break
+
+        if target_group is not None:
+            if len(target_group) == 1:
+                departage = None
+            else:
+                diffs = [int(t.get("difference") or 0) for t in target_group]
+                if len(diffs) == len(set(diffs)):
+                    departage = "difference_generale"
+                else:
+                    departage = "quotient"
+        else:
+            if used_h2h:
+                departage = "confrontation"
+            else:
+                # Vérifier si au moins deux équipes du même groupe de points ont une différence générale identique
+                has_same_diff = False
+                for grp in points_groups.values():
+                    if len(grp) > 1:
+                        diffs = [int(t.get("difference") or 0) for t in grp]
+                        if len(diffs) != len(set(diffs)):
+                            has_same_diff = True
+                            break
+                departage = "quotient" if has_same_diff else "difference_generale"
 
     # Vérification des colonnes détaillées si detail=True
     detail_col_defs = [

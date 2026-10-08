@@ -589,3 +589,126 @@ def test_lighten_competition_hit_prunes_bloat():
     # organisateur doit être allégé aux champs clés
     assert "nested_stuff" not in light["organisateur"]
     assert light["organisateur"]["nom"] == "Ligue Régionale"
+
+
+@pytest.mark.asyncio
+async def test_team_summary_detail_line_when_calendar_not_requested():
+    """Vérifie que la synthèse ne prétend pas 'Aucun match' si le calendrier n'était pas demandé."""
+    mock_resolve = AsyncMock(
+        return_value={
+            "status": "resolved",
+            "team": {"team_label": "SEM1", "engagement_id": "200000005343882"},
+            "club_resolu": {"organisme_id": 10017, "nom": "LA MONTJOIE"},
+        }
+    )
+    mock_bilan = AsyncMock(
+        return_value={
+            "status": "ok",
+            "phase_courante": {"competition": "Régionale 3 Masculine"},
+            "bilan_total": {"gagnes": 2, "perdus": 1, "nuls": 0},
+        }
+    )
+    mock_classement = AsyncMock(
+        return_value=[
+            {"position": 1, "equipe": "LA MONTJOIE", "points": 5, "difference": 10}
+        ]
+    )
+
+    mock_org = AsyncMock(
+        return_value={
+            "nom": "LA MONTJOIE",
+            "engagements": [
+                {
+                    "id": "200000005343882",
+                    "idPoule": "200000003056282",
+                }
+            ],
+        }
+    )
+
+    with (
+        patch("ffbb_mcp.server.ffbb_resolve_team_service", mock_resolve),
+        patch("ffbb_mcp.tools.team.ffbb_resolve_team_service", mock_resolve),
+        patch("ffbb_mcp.server.ffbb_bilan_service", mock_bilan),
+        patch("ffbb_mcp.tools.team.ffbb_bilan_service", mock_bilan),
+        patch("ffbb_mcp.server.ffbb_get_classement_service", mock_classement),
+        patch("ffbb_mcp.tools.team.ffbb_get_classement_service", mock_classement),
+        patch("ffbb_mcp.services.poule.get_organisme_service", mock_org),
+    ):
+        res = await ffbb_team_summary(
+            organisme_id=10017,
+            engagement_id="200000005343882",
+            include=["bilan", "classement"],
+            force_refresh=True,
+        )
+        assert res["status"] == "ok"
+        pres = res.get("presentation", {})
+        detail_line = pres.get("detail_line", "")
+        assert "Calendrier non demandé" in detail_line
+        assert "Aucun match récent ou programmé" not in detail_line
+
+
+def test_evaluate_round_reliability_detects_brassage_farfelu():
+    """Vérifie que les numéros techniques de brassage FFBB (ex: J34, J47) sont signalés comme non fiables."""
+    from ffbb_mcp.presentation import evaluate_round_reliability
+
+    info_brassage_34 = evaluate_round_reliability(34, competition_name="RMU15 Brassage")
+    assert not info_brassage_34.is_reliable
+    assert info_brassage_34.display_value is None
+    assert "brassage" in info_brassage_34.warning.lower()
+
+    info_brassage_3 = evaluate_round_reliability(3, competition_name="RMU15 Brassage")
+    assert info_brassage_3.is_reliable
+    assert info_brassage_3.display_value == 3
+
+    info_jump = evaluate_round_reliability(34, context_rounds=[13, 27, 34, 47])
+    assert not info_jump.is_reliable
+    assert info_jump.display_value is None
+
+
+def test_format_compact_classement_targets_specific_group_departage():
+    """Vérifie que le départage cible reflète le groupe de l'équipe concernée et non une autre égalité."""
+    from ffbb_mcp.services.poule import format_compact_classement
+
+    classement_data = [
+        # Groupe 6 pts avec même différence (+71)
+        {
+            "position": 1,
+            "equipe": "St-Rémy",
+            "points": 6,
+            "difference": 71,
+            "idOrganisme": 1,
+        },
+        {
+            "position": 2,
+            "equipe": "Villefranche",
+            "points": 6,
+            "difference": 71,
+            "idOrganisme": 2,
+        },
+        # Groupe 5 pts avec différences distinctes (Vichy vs Meyzieu)
+        {
+            "position": 3,
+            "equipe": "JA Vichy",
+            "points": 5,
+            "difference": 81,
+            "idOrganisme": 3,
+            "numeroEquipe": 1,
+        },
+        {
+            "position": 4,
+            "equipe": "AL Meyzieu",
+            "points": 5,
+            "difference": 72,
+            "idOrganisme": 4,
+            "numeroEquipe": 1,
+        },
+    ]
+
+    # Sans cible : has_same_diff est vrai (St-Rémy / Villefranche) -> quotient
+    res_global = format_compact_classement(classement_data)
+    assert res_global["departage"] == "quotient"
+
+    # Avec cible Vichy (organisme 3) : leur groupe a des diffs différentes -> difference_generale
+    res_vichy = format_compact_classement(classement_data, target_organisme_id=3)
+    assert res_vichy["departage"] == "difference_generale"

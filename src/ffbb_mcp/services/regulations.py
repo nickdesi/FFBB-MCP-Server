@@ -324,8 +324,8 @@ async def explain_tiebreak_rules_service(
                 )
                 res["presentation"] = {
                     "short_answer": (
-                        f"{poule_label} : {count_ties} égalité(s) de points analysée(s). "
-                        f"Départage provisoire appliqué selon les confrontations directes et la différence générale."
+                        f"{poule_label} : {count_ties} situation(s) d'égalité analysée(s) selon l'Article 28 "
+                        f"(confrontations directes, différence générale ou ordre officiel)."
                     ),
                     "detail_line": f"{count_ties} groupe(s) d'équipes à égalité",
                 }

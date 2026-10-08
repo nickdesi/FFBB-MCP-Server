@@ -943,13 +943,28 @@ async def _build_calendar_matches(
 
     validated_matches = []
     round_warnings = []
+    cal_rounds = [
+        m.get("journee") or m.get("num_journee") or m.get("numeroJournee")
+        for m in effective
+        if isinstance(m, dict)
+    ]
+    cal_comp = next(
+        (
+            str(m.get("competition"))
+            for m in effective
+            if isinstance(m, dict) and m.get("competition")
+        ),
+        None,
+    )
     for m in effective:
         if "warning" in m:
             validated_matches.append(m)
         else:
             vm = CalendrierMatch(**m).model_dump(by_alias=True)
             raw_j = vm.get("journee") or vm.get("num_journee")
-            r_info = evaluate_round_reliability(raw_j)
+            r_info = evaluate_round_reliability(
+                raw_j, context_rounds=cal_rounds, competition_name=cal_comp
+            )
             vm["round"] = {
                 "display_value": r_info.display_value,
                 "is_reliable": r_info.is_reliable,

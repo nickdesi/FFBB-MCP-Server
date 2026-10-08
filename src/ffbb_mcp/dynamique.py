@@ -140,7 +140,27 @@ def compute_team_dynamique(
         )
         from ffbb_mcp.presentation import evaluate_round_reliability
 
-        round_info = evaluate_round_reliability(raw_j)
+        all_raw_rounds = [
+            m.get("numeroJournee")
+            or m.get("numJournee")
+            or m.get("numero_journee")
+            or m.get("nomJournee")
+            for m in rencontres
+            if isinstance(m, dict)
+        ]
+        comp_name = next(
+            (
+                str(m.get("competition") or m.get("nom_competition") or "")
+                for m in rencontres
+                if isinstance(m, dict)
+                and (m.get("competition") or m.get("nom_competition"))
+            ),
+            None,
+        )
+
+        round_info = evaluate_round_reliability(
+            raw_j, context_rounds=all_raw_rounds, competition_name=comp_name
+        )
         journee_str = (
             f"J{round_info.display_value}"
             if (round_info.is_reliable and round_info.display_value is not None)

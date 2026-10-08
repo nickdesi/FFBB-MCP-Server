@@ -148,6 +148,7 @@ class ProvenanceInfo(BaseModel):
 def evaluate_round_reliability(
     raw_round: Any,
     context_rounds: list[Any] | None = None,
+    competition_name: str | None = None,
 ) -> MatchRoundInfo:
     """Évalue la fiabilité sportive d'un numéro de journée.
 
@@ -155,7 +156,8 @@ def evaluate_round_reliability(
     - Valeur nulle, vide ou 0 -> non renseignée (display_value=None, is_reliable=False)
     - Valeur non entière ou négative -> non exploitable (display_value=None, is_reliable=False)
     - Valeur > 38 (hors championnat régulier standard) -> non fiable (display_value=None, is_reliable=False)
-    - Séquence non séquentielle dans un échantillon de poule (ex: 9, 17, 35, 48) -> non séquentielle.
+    - Compétitions de brassage/tournoi avec numéro > 10 (grilles fédérales techniques FFBB) -> non assimilable à une journée.
+    - Séquence non séquentielle dans un échantillon de poule (ex: 9, 13, 27, 34, 48) -> non séquentielle.
     """
     if raw_round is None:
         return MatchRoundInfo(display_value=None, is_reliable=False, raw_value=None)
@@ -187,7 +189,20 @@ def evaluate_round_reliability(
             warning=f"Numérotation de journée aberrante ou inhabituelle ({val}).",
         )
 
-    # Vérification d'une séquence de journées erratique dans la poule (ex: 9, 17, 35, 48)
+    # Détection des compétitions de brassage / tournois / qualifications FFBB
+    comp_norm = (competition_name or "").lower()
+    is_brassage = any(
+        w in comp_norm for w in ("brassage", "plateau", "tournoi", "qualif")
+    )
+    if is_brassage and val > 10:
+        return MatchRoundInfo(
+            display_value=None,
+            is_reliable=False,
+            raw_value=raw_round,
+            warning=f"Numérotation technique de brassage FFBB ({val}) non assimilable à une journée sportive.",
+        )
+
+    # Vérification d'une séquence de journées erratique dans la poule (ex: 9, 13, 27, 34, 48)
     if context_rounds and len(context_rounds) >= 3:
         parsed_ctx: list[int] = []
         for r in context_rounds:
@@ -200,10 +215,10 @@ def evaluate_round_reliability(
             differences = [
                 parsed_ctx[i + 1] - parsed_ctx[i] for i in range(len(parsed_ctx) - 1)
             ]
-            has_large_jumps = any(d > 7 or d < -7 for d in differences)
+            has_large_jumps = any(d > 5 or d < -5 for d in differences)
             if (
                 has_large_jumps
-                and val > 15
+                and val > 10
                 and 1 not in parsed_ctx
                 and 2 not in parsed_ctx
             ):

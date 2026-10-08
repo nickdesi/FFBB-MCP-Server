@@ -1114,9 +1114,14 @@ async def ffbb_next_match_service(
     scheduled_date = next_dt.strftime("%Y-%m-%d") if next_dt else None
     scheduled_at = next_dt.isoformat() if (time_confirmed and next_dt) else None
 
+    category_label = source_team.get("team_label") or categorie or ""
+    competition_name = source_team.get("competition") or ""
+
     # Fiabilité de la journée
     raw_round = next_match.get("numeroJournee")
-    round_info = evaluate_round_reliability(raw_round)
+    round_info = evaluate_round_reliability(
+        raw_round, competition_name=competition_name
+    )
 
     my_team_name = (
         eq1_name
@@ -1128,8 +1133,6 @@ async def ffbb_next_match_service(
         )
     )
     opp_team_name = adversaire or (eq2_name if domicile is True else eq1_name)
-    category_label = source_team.get("team_label") or categorie or ""
-    competition_name = source_team.get("competition") or ""
 
     # Résolution robuste ID-first de l'adversaire depuis la poule
     poule_id_match = source_team.get("poule_id")
@@ -1528,9 +1531,14 @@ async def ffbb_last_result_service(
         else scheduled_date_last
     )
 
+    category_label = source_eq.get("team_label") or categorie or ""
+    competition_name_last = source_eq.get("competition") or ""
+
     # Fiabilité de la journée
     raw_round = dernier.get("numeroJournee")
-    round_info = evaluate_round_reliability(raw_round)
+    round_info = evaluate_round_reliability(
+        raw_round, competition_name=competition_name_last
+    )
 
     my_team_name = (
         format_team_name(dernier.get("nomEquipe1", ""), num1)
@@ -1542,7 +1550,6 @@ async def ffbb_last_result_service(
         if est_domicile
         else format_team_name(dernier.get("nomEquipe1", ""), num1)
     )
-    category_label = source_eq.get("team_label") or categorie or ""
 
     # Résolution robuste ID-first de l'adversaire depuis la poule
     poule_id_last = source_eq.get("poule_id")
