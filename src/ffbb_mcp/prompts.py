@@ -162,10 +162,11 @@ Convention FFBB : `equipe1` = 🏠 DOMICILE (gauche) · `equipe2` = ✈️ EXTÉ
 | Équipe1 | R1 – R2 | Équipe2 |
 
 **Règles strictes :**
+- **Matchs joués ET matchs à venir (OBLIGATOIRE)** : Quand l'utilisateur demande les matchs ou le calendrier d'une équipe/phase, le tableau DOIT obligatoirement inclure TOUTES les rencontres programmées : les matchs joués avec leur score (`R1 – R2`), ET les matchs encore à venir/programmés (`joue: 0` ou sans score) avec leur date, horaire et la mention `À venir`. Il est STRICTEMENT INTERDIT d'omettre les matchs restants à jouer.
 - Ne jamais inverser l'ordre domicile/extérieur, même si l'équipe recherchée est l'équipe 2.
 - Mettre en **gras** et 🟢 uniquement l'équipe gagnante, sans modifier sa colonne.
 - Score toujours dans l'ordre R1 – R2 (domicile – extérieur), jamais inversé.
-- `joue: 0` = à venir (pas de score) · `joue: 1` = terminé.\
+- `joue: 0` = à venir (mentionner date/heure et `À venir`) · `joue: 1` = terminé (afficher le score).\
 """
 
 _RULES_DISPLAY_BILAN = """\
@@ -282,6 +283,7 @@ résoudre une phase spécifique — non fiable. L'appel automagique sans paramè
 - **Diff** : Différence de paniers (PM - PE)
 
 **Règles de mise en forme obligatoires :**
+- **Classement complet obligatoire (TOUTES les équipes)** : Le tableau de classement doit TOUJOURS inclure TOUTES les équipes de la poule (1re, 2e, ..., dernière), jamais uniquement l'équipe demandée ! L'équipe demandée est mise en valeur en **gras** avec 🎯, mais l'ensemble de ses concurrents doit figurer dans le tableau pour refléter fidèlement la situation sportive de la poule.
 - **Équipe cible en GRAS (OBLIGATOIRE)** : Identifier l'équipe de la requête via `is_target: true` dans le payload (ou par correspondance avec le club demandé). Afficher OBLIGATOIREMENT son nom en **gras** avec l'indicateur 🎯 dans la colonne Équipe (ex : `| 9 | **ETOILE DE CHAMALIERES SAYAT - 1** 🎯 | 1 | ... |`).
 - **Incohérence** : Si G + P ≠ J, ajouter : "⚠️ *Données en cours de synchronisation par la FFBB*".
 - **Tri** : Respecter l'ordre `Rang` retourné par les outils MCP (tri numérique natif croissant), jamais recalculé.
