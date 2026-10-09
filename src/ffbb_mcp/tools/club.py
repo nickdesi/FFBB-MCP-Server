@@ -52,6 +52,7 @@ async def ffbb_club(
         Field(
             description=(
                 "Action : 'calendrier' (matchs pluriels/restants), 'equipes' ou 'classement'. "
+                "Pour 'calendrier' : Renvoie les rencontres programmées. Restituer factuellement les matchs sans spéculer sur de futures journées non publiées, des repos ou des forfaits. "
                 "Pour 'classement' : Classement seul d'une poule ou d'un club. "
                 "Utiliser uniquement si poule_id est connu et que team_summary n'a pas été appelé."
             )

@@ -391,6 +391,7 @@ async def ffbb_team_summary(
 
     Préférer cet outil pour toute question d'équipe ('Comment vont les U13M2 ?', 'NM3', etc.).
     Pour une analyse multi-phases ou coupes, utiliser `ffbb_bilan_saison`.
+    Restituer strictement les chiffres officiels sans présumer de forfaits ou d'anomalies sur la seule base de scores faibles (fréquents en catégories jeunes).
     """
     _require_club_identifier(
         organisme_id=organisme_id,
