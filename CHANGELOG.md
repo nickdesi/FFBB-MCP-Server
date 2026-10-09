@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.16.8] - 2026-10-09
+
+### Fixed
+- **Garde-fous d'Intégrité des Identifiants (`ffbb_team_summary`)** :
+  - Détection et rejet structuré (`status: "error"`, `code: "incompatible_identifiers"`) lors de la fourniture d'un `engagement_id` et d'un `poule_id` contradictoires (ex: engagement régional et poule départementale).
+  - Traitement transparent des bilans chiffrés non encore renseignés : n'affiche plus "0 victoires, 0 défaites" quand la donnée publique est absente.
+  - Distinction nette entre section de calendrier non demandée et absence de match : `include: ["bilan", "classement"]` indique explicitement que le calendrier n'était pas demandé plutôt que d'affirmer faussement l'absence de rencontres.
+- **Départage Officiel & Règles RSG Art. 28 (`poule.py`, `regulations.py`)** :
+  - Alignement du critère `departage` dans `format_compact_classement` sur le groupe d'égalité de l'équipe concernée (`target_pos`) : évite qu'un quotient d'un autre groupe de la poule ne vienne requalifier une égalité résolue à la différence générale.
+  - Respect de l'incomplétude des mini-championnats en cours de phase et harmonisation des synthèses de règles.
+- **Validation Sémantique des Journées & Brassages FFBB (`presentation.py`, `calendar.py`, `club.py`, `dynamique.py`)** :
+  - Détection native des compétitions de brassage/plateaux/tournois : isolation des index de grilles fédérales techniques (J13, J27, J34, J47) marqués `is_reliable: false`.
+  - Élimination des formulations narratives sportives aberrantes ("34e journée de brassage") et masquage des numéros discontinus dans la dynamique.
+
+### Added
+- **Directives Anti-Extrapolation & Rendu Complet pour LLMs (`prompts.py`, `tools/`)** :
+  - Interdiction formelle pour les assistants d'extrapoler sur le calendrier (inventer des journées non publiées ou des repos).
+  - Interdiction de suspecter des forfaits ou des erreurs sur des scores faibles fréquents en catégories jeunes (U11, U13).
+  - Obligation stricte de restituer le classement complet de la poule (toutes les équipes avec équipe cible en gras 🎯) et d'inclure les matchs joués ET les matchs à venir dans les calendriers.
+
+
 ## [1.16.7] - 2026-10-07
 
 ### Fixed
