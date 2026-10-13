@@ -132,13 +132,43 @@ Configurez directement l'URL distante dans `mcp_config.json` via la directive na
 
 ---
 
-## 🧰 Outils principaux
+## 🧰 Outils principaux (19 outils exposés)
 
+Le serveur expose **19 outils MCP optimisés pour les LLMs** (réponses compactes, cache SWR, déduplication automatique) :
+
+### 🏀 Matchs, Résultats & Calendriers
 | Outil | Usage |
-| --- | --- |
+| :--- | :--- |
+| `ffbb_last_result` | Dernier résultat connu d'une équipe avec score précis et détails du match. |
+| `ffbb_next_match` | Prochaine rencontre programmée (date, heure, gymnase et adversaire). |
+| `ffbb_team_summary` | Synthèse complète d'une équipe (matchs passés, à venir, classement et dynamique). |
+| `ffbb_bilan` | Bilan synthétique victoires / défaites, points marqués / encaissés et différentiel. |
+| `ffbb_bilan_saison` | Synthèse exhaustive d'un club sur toute la saison toutes phases confondues. |
+| `ffbb_head_to_head` | Confrontation directe et historique récent entre deux clubs ou équipes. |
+| `ffbb_match_lookup` | Recherche ciblée d'une rencontre par identifiant ou critères. |
+| `ffbb_lives` | Scores en direct des rencontres en cours (rafraîchi toutes les 30s). |
+
+### 🏢 Clubs, Équipes & Découverte
+| Outil | Usage |
+| :--- | :--- |
+| `ffbb_search` | Recherche universelle plein texte (clubs, compétitions, salles, tournois). |
+| `ffbb_club` | Fiche complète d'un club, coordonnées et calendrier de toutes ses équipes. |
+| `ffbb_resolve_team` | Résolution canonique d'un libellé d'équipe (catégorie, genre, numéro d'équipe). |
+| `ffbb_find_team_candidates` | Liste des équipes candidates pour un nom de club ou d'organisme. |
+| `ffbb_get` | Extraction brute d'un objet Directus / Meilisearch par identifiant. |
+| `ffbb_saisons` | Liste des saisons sportives fédérales disponibles. |
+
+### 📜 Règlements Officiels FFBB (Index FTS5)
+| Outil | Usage |
+| :--- | :--- |
+| `ffbb_search_regulations` | Recherche sémantique dans les Règlements Sportifs Généraux (RSG 2026-2027) et comités. |
+| `ffbb_get_regulation_article` | Consultation intégrale et inaltérée d'un article réglementaire officiel (ex: Art. 28). |
+| `ffbb_explain_tiebreak_rules` | Explication certifiée des règles de départage d'égalité (point-average, quotient). |
+| `ffbb_list_regulations` | Catalogue hiérarchique des règlements fédéraux et départementaux indexés. |
+| `ffbb_version` | Diagnostic, transport actif, version FastMCP et SDK. |
 
 > [!NOTE]
-> Référence complète des paramètres : [`docs/TOOLS_REFERENCE.md`](docs/TOOLS_REFERENCE.md).
+> Référence complète des schémas et paramètres : [`docs/TOOLS_REFERENCE.md`](docs/TOOLS_REFERENCE.md).
 
 ---
 
@@ -158,25 +188,40 @@ https://ffbb.desimone.fr/mcp
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Architecture & Résilience Réseau
 
 ```mermaid
 flowchart LR
-    A[Client MCP<br/>Claude · Cursor · Antigravity] -->|Streamable HTTP / Stdio| B[FFBB MCP Server<br/>MCPServer]
+    A[Client MCP<br/>Claude · Cursor · Antigravity] -->|Streamable HTTP / Stdio| B[FFBB MCP Server<br/>FastMCP Streamable]
     B --> C[Services métier<br/>Cache SWR & Agrégation]
-    C --> D[ffbb-data-client<br/>SDK Python]
-    D --> E[(API FFBB · Meilisearch · Directus)]
+    C --> D[ffbb-data-client<br/>SDK Python v2.4.37]
+    D --> E[(Directus bo.ffbb.com<br/>Origine officielle non filtrée)]
+    D --> F[(Meilisearch Nginx<br/>meilisearch-prod.ffbb.app)]
 ```
 
 Points clés :
 
+- **Résilience WAF & Directus** : Les requêtes Directus sont routées nativement vers `https://bo.ffbb.com/` (et fallback miroir `https://bo.ffbb.app/`), éliminant définitivement les erreurs 403 HTML de l'ancienne pullzone BunnyCDN `api.ffbb.app` ;
+- **Auto-résolution des tokens** : Découverte dynamique et transparente des jetons de session sans clé API requise ;
 - **Double transport** : Streamable HTTP distant (spec `2026-07-28`, Stateless Core) ou Stdio local (`uvx`) ;
-- **SDK Python découplé** : Requêtes vers les sources fédérales et parsing Pydantic v2 délégués à `ffbb-data-client` ; le serveur MCP ne les interroge pas directement ;
-- **Agrégation composite** : 12 outils optimisés pour réduire les allers-retours et le contexte LLM ;
+- **SDK Python découplé** : Requêtes vers les sources fédérales et parsing Pydantic v2 délégués à `ffbb-data-client` ;
 - **Cache intelligent & SWR** : *Stale-While-Revalidate* avec TTL par type de donnée (30 s lives, 1 h bilans, 24 h clubs) ;
 - **Observabilité complète** : Dashboard HTML, métriques Prometheus, snapshot JSON et healthcheck intégrés.
 
 Détails : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) et [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
+
+---
+
+## ⚙️ Variables d'Environnement
+
+| Variable | Description | Valeur par défaut |
+| :--- | :--- | :--- |
+| `API_FFBB_BASE_URL` | Base URL du backend Directus FFBB | `https://bo.ffbb.com/` |
+| `FFBB_USER_AGENT` | User-Agent authentique transmis à Directus | iOS Safari Mobile |
+| `API_FFBB_APP_BEARER_TOKEN` | Jeton Directus explicite (override l'auto-résolution) | Auto-résolu dynamiquement |
+| `MEILISEARCH_BEARER_TOKEN` | Jeton Meilisearch explicite (override l'auto-résolution) | Auto-résolu dynamiquement |
+| `MCP_MODE` | Mode de transport du serveur | `streamable-http` (ou `stdio`) |
+| `PORT` | Port d'écoute HTTP | `9123` |
 
 ---
 
@@ -228,6 +273,7 @@ Le pipeline CI (`.github/workflows/ci.yml`) exécute ruff, mypy, pytest et le co
 
 | Symptôme | Cause probable | Solution |
 | --- | --- | --- |
+| `FFBB access blocked by CDN (403 BunnyCDN)` | Ancien domaine `api.ffbb.app` (pullzone 5204911) verrouillé par le CDN | Vérifier que le serveur est à jour (≥ v1.16.9) ou définir `API_FFBB_BASE_URL=https://bo.ffbb.com/` |
 | `Missing session ID` / `deadline exceeded` | Wrapper `mcp-remote` ou mauvais transport | Utiliser `serverUrl` natif dans `mcp_config.json` (voir [Google Antigravity](#google-antigravity)) |
 | Claude Desktop refuse l'URL `http` | Claude Desktop impose `stdio` | Utiliser le bridge `@modelcontextprotocol/client-sse` via `npx` (voir [Claude Desktop](#claude-desktop)) |
 | Données live obsolètes | Cache TTL | Attendre le rafraîchissement (≤ 30 s) ou interroger l'endpoint `/health` |

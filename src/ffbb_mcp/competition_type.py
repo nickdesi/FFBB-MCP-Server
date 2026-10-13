@@ -18,7 +18,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 # Table de correspondance officielle issue de l'endpoint :
-# GET https://api.ffbb.app/fields/ffbbserver_competitions/typeCompetition
+# GET https://bo.ffbb.com/fields/ffbbserver_competitions/typeCompetition
 # Interface : select-dropdown, translations: 'Type de compétition'
 OFFICIAL_COMPETITION_TYPE_CHOICES: dict[str, str] = {
     "DIV": "Championnat",
@@ -29,7 +29,7 @@ OFFICIAL_COMPETITION_TYPE_CHOICES: dict[str, str] = {
 }
 
 # Table de correspondance officielle issue de l'endpoint :
-# GET https://api.ffbb.app/fields/ffbbserver_rencontres/pratique
+# GET https://bo.ffbb.com/fields/ffbbserver_rencontres/pratique
 # Interface : select-dropdown
 OFFICIAL_PRACTICE_CHOICES: dict[str, str] = {
     "5x5": "Basket 5×5",

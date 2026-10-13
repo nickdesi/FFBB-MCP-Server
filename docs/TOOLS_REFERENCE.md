@@ -2,7 +2,7 @@
 
 > Version courante : **1.16.9**
 
-Ce document fournit une documentation technique exhaustive pour les 17 outils exposés par le serveur FFBB MCP. Il est destiné aux développeurs et aux agents IA pour comprendre les capacités et les schémas de données du serveur.
+Ce document fournit une documentation technique exhaustive pour les 19 outils exposés par le serveur FFBB MCP. Il est destiné aux développeurs et aux agents IA pour comprendre les capacités et les schémas de données du serveur.
 
 ## ✨ Nouveautés v1.13.0
 
@@ -269,6 +269,24 @@ la logique de désambiguïsation (U11M1, U13F-2, etc.).
 3. Utiliser ensuite l'outil adapté : `ffbb_club(action="calendrier")` pour les matchs
   de l'équipe, ou `ffbb_get(type="poule", id=team.poule_id)` pour le classement,
   l'historique ou le calendrier complet de la poule.
+
+---
+
+### 5. `ffbb_find_team_candidates`
+
+**Description** : Recherche et ordonne les équipes candidates d'un club ou CTC pour désambiguïser avant tout calendrier ou résultat. Évite la confusion entre équipe fanion sans numéro (ex: U13F en régional) et équipe réserve (ex: U13F2 en départemental). Recommande l'équipe fanion (confiance 0.85) en l'absence de numéro d'équipe.
+
+- **Arguments** :
+  - `club_name` (string, optionnel) : Nom du club ou CTC (ex: `"Cournon"`, `"Stade Clermontois"`). Requis si `organisme_id` absent.
+  - `organisme_id` (integer|string, optionnel) : Identifiant FFBB du club.
+  - `categorie` (string, optionnel) : Catégorie ou étiquette recherchée (ex: `"U13F1"`, `"U13F"`, `"NM3"`, `"Senior"`).
+  - `sexe` (`"M"` | `"F"` | `"MIXTE"`, optionnel) : Genre de l'équipe.
+  - `numero_equipe` (integer, optionnel) : Numéro d'équipe (1, 2, ...).
+  - `season_id` (integer|string, optionnel) : Saison FFBB ciblée.
+  - `include_next_match` (boolean, défaut: `true`) : Récupère le prochain match programmé pour chaque candidat.
+  - `force_refresh` (boolean, défaut: `false`) : Force le rafraîchissement des données.
+
+- **Retour** : Liste ordonnée des candidats avec score de confiance, raisonnement de correspondance, compétition/poule et prochain match programmé.
 
 ---
 
@@ -731,6 +749,22 @@ Fournit une analyse tactique complète et narrative pour préparer un avant-matc
 - Forme récente respective de chaque équipe (`V-D-V-V...`) et séries en cours
 - Duel statistique des styles : Attaque vs Défense, ratio de victoires domicile/extérieur
 - Points clés narratifs synthétiques prêts pour les LLMs
+
+---
+
+### `ffbb_match_lookup`
+
+**Description** : Recherche directe d'un match précis entre deux clubs : date, heure, salle, adresse, poule et statut. Outil haut niveau idéal pour répondre en un seul appel aux requêtes du type *"Où se joue U18M2 Thiers vs Gerzat ce week-end ?"* ou *"Quand a lieu le match ASM contre Chamalières ?"*.
+
+- **Arguments** :
+  - `club_a` (string, requis) : Nom ou identifiant du premier club (ex: `"Thiers"`, `"SA Thiers Vaillante"`).
+  - `club_b` (string, requis) : Nom ou identifiant du second club / adversaire (ex: `"Gerzat"`, `"Gerzat Basket"`).
+  - `categorie` (string, optionnel) : Catégorie ou division de l'équipe (ex: `"U18M2"`, `"U18M"`, `"DMU18"`, `"Senior"`, `"NM3"`).
+  - `date_min` (string, optionnel) : Date de début facultative au format `"YYYY-MM-DD"`.
+  - `date_max` (string, optionnel) : Date de fin facultative au format `"YYYY-MM-DD"`.
+  - `force_refresh` (boolean, défaut: `false`) : Force le rafraîchissement des données.
+
+- **Retour** : Fiche détaillée de la rencontre comprenant l'horaire précis, l'adresse du gymnase, les équipes en lice et le statut de programmation.
 
 ---
 

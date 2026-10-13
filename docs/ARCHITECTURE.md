@@ -20,9 +20,10 @@ Le serveur supporte deux modes d'exposition :
 Cette couche modulaire fait le pont entre les outils MCP et le client API FFBB (`ffbb-data-client`). Elle implémente les patterns suivants :
 
 - **Accès FFBB & Factory Singleton** : Délègue les appels réseau au package `ffbb-data-client` (`>=2.0.0,<3.0.0`) via un singleton `FFBBClientFactory` avec rafraîchissement proactif du jeton d'accès en tâche de fond.
-- **Agrégation des sources** : Le serveur MCP n'interroge pas directement les backends fédéraux. `ffbb-data-client` unifie les données disponibles depuis l'API FFBB, Meilisearch et Directus, puis la couche service les normalise pour les outils MCP.
+- **Agrégation des sources** : Le serveur MCP n'interroge pas directement les backends fédéraux. `ffbb-data-client` unifie les données disponibles depuis l'API FFBB Directus (`https://bo.ffbb.com/` avec fallback multi-miroirs) et Meilisearch (`https://meilisearch-prod.ffbb.app`), éliminant tout blocage 403 BunnyCDN. La couche service les normalise ensuite pour les outils MCP.
 - **Découpage modulaire par domaine métier** :
-  - `services/club.py` : Navigation club, équipes, composition et outil composite `ffbb_team_summary`.
+  - `services/club.py` : Navigation club, équipes, composition, face-à-face, recherche de match (`ffbb_match_lookup`) et outil composite `ffbb_team_summary`.
+  - `services/team_resolver.py` : Résolution canonique d'équipes (`ffbb_resolve_team`) et découverte de candidats (`ffbb_find_team_candidates`).
   - `services/poule.py` : Classements, bilans `ffbb_bilan`, calculs de goal-average et rencontres.
   - `services/salle.py` : Recherche et géolocalisation des salles et terrains.
   - `services/search.py` : Recherche multi-index Directus / Meilisearch déléguée à `ffbb-data-client`.
@@ -38,14 +39,14 @@ Cette couche modulaire fait le pont entre les outils MCP et le client API FFBB (
 
 ## 🏗️ Surface MCP actuelle
 
-Le serveur expose **17 outils MCP** en lecture seule. Les quatre outils généralistes (`ffbb_search`, `ffbb_get`, `ffbb_club`, `ffbb_bilan`) et les quatre outils de règlements (`ffbb_search_regulations`, `ffbb_get_regulation_article`, `ffbb_explain_tiebreak_rules`, `ffbb_list_regulations`) couvrent les workflows les plus fréquents.
+Le serveur expose **19 outils MCP** en lecture seule. Les quatre outils généralistes (`ffbb_search`, `ffbb_get`, `ffbb_club`, `ffbb_bilan`) et les quatre outils de règlements (`ffbb_search_regulations`, `ffbb_get_regulation_article`, `ffbb_explain_tiebreak_rules`, `ffbb_list_regulations`) couvrent les workflows les plus fréquents.
 
 | Famille | Outils | Usage |
 | --- | --- | --- |
 | Diagnostic | `ffbb_version` | Version, transport et TTL de cache runtime. |
 | Recherche & lecture | `ffbb_search`, `ffbb_get` | Recherche multi-index puis chargement par identifiant. |
-| Club & équipe | `ffbb_club`, `ffbb_resolve_team`, `ffbb_team_summary` | Navigation club → équipes → poules, résumé agent-friendly. |
-| Résultats & H2H | `ffbb_bilan`, `ffbb_last_result`, `ffbb_next_match`, `ffbb_bilan_saison`, `ffbb_head_to_head` | Bilan saison, face-à-face, dernier résultat et prochain match. |
+| Club & équipe | `ffbb_club`, `ffbb_resolve_team`, `ffbb_find_team_candidates`, `ffbb_team_summary` | Navigation club → équipes → poules, candidats et résumé agent-friendly. |
+| Résultats & H2H | `ffbb_bilan`, `ffbb_last_result`, `ffbb_next_match`, `ffbb_bilan_saison`, `ffbb_head_to_head`, `ffbb_match_lookup` | Bilan saison, face-à-face, dernier résultat, prochain match et recherche ciblée. |
 | Temps réel | `ffbb_lives`, `ffbb_saisons` | Scores live et saisons disponibles. |
 | Règlements officiels | `ffbb_search_regulations`, `ffbb_get_regulation_article`, `ffbb_explain_tiebreak_rules`, `ffbb_list_regulations` | Recherche plein texte FTS5, articles exacts, départage d'égalité (Art. 28) et catalogue. |
 
