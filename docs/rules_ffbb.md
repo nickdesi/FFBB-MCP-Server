@@ -14,7 +14,7 @@
 
 ---
 
-### Outils MCP disponibles et leur rôle réel (17 outils)
+### Outils MCP disponibles et leur rôle réel (19 outils)
 
 | Outil                        | Rôle                                       | Fiabilité multi-équipes        |
 |------------------------------|--------------------------------------------|--------------------------------|
@@ -22,10 +22,12 @@
 | `ffbb_get`                   | Détail complet par entité (`poule`, `organisme`, `competition`, `salle`) | ✅ Source de vérité |
 | `ffbb_club`                  | Actions club (`equipes`, `calendrier`, `salles`, `details`) | ✅ Source de vérité |
 | `ffbb_resolve_team`          | Résolution club + catégorie + numéro d'équipe | ⚠️ Résout 1 engagement |
+| `ffbb_find_team_candidates`  | Recherche et tri des équipes candidates d'un club/CTC avec confiance | ✅ Pré-désambiguïsation |
 | `ffbb_team_summary`          | Résumé complet équipe (bilan, classement, dernier & prochain match) | ⚠️ Résout 1 engagement |
 | `ffbb_bilan`                 | Bilan agrégé toutes phases confondues en 1 appel | ✅ Fiable (toutes phases) |
 | `ffbb_last_result`           | Dernier résultat d'une équipe précise      | ⚠️ 1 seul match retourné |
 | `ffbb_next_match`            | Prochain match programmé d'une équipe      | ⚠️ 1 seul match retourné |
+| `ffbb_match_lookup`          | Recherche ciblée d'un match direct entre 2 clubs (date, heure, gymnase) | ✅ Fiable (1 match précis) |
 | `ffbb_bilan_saison`          | Bilan complet saison par phase et goal-average | ✅ Fiable |
 | `ffbb_head_to_head`          | Face-à-face et analyse historique confrontations directes | ✅ Fiable |
 | `ffbb_lives`                 | Scores live et statut par quart-temps       | ✅ Temps réel (cache 15s) |

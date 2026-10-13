@@ -137,9 +137,45 @@ Ce document fournit des exemples de bout en bout pour aider les agents IA à sui
 
 ---
 
-## 6. Notes générales pour les agents
+## 6. Recherche d'un match direct entre deux clubs (`ffbb_match_lookup`)
+
+**Question utilisateur**
+> "Où et quand se joue le match de U18M2 entre Thiers et Gerzat ce week-end ?"
+
+**Workflow attendu**
+
+1. Appeler l'outil composite dédié :
+   - `ffbb_match_lookup(club_a="Thiers", club_b="Gerzat", categorie="U18M2")`
+2. L'outil identifie directement la confrontation dans la bonne poule et extrait :
+   - la date et l'horaire précis du coup d'envoi ;
+   - le nom du gymnase et son adresse physique résolue ;
+   - l'équipe qui reçoit et celle qui se déplace.
+3. Répondre de manière concise à l'utilisateur avec la localisation exacte et le statut de programmation.
+
+---
+
+## 7. Pré-désambiguïsation d'équipes d'un club (`ffbb_find_team_candidates`)
+
+**Question utilisateur**
+> "Quelles sont les équipes U13 engagées pour Cournon ?"
+
+**Workflow attendu**
+
+1. Appeler le découvrant de candidats :
+   - `ffbb_find_team_candidates(club_name="Cournon", categorie="U13")`
+2. L'outil extrait et ordonne tous les engagements candidats avec :
+   - le niveau de confiance et le motif (ex: équipe fanion régionale vs réserve départementale) ;
+   - la division et la poule rattachée ;
+   - le prochain match programmé pour chaque candidat.
+3. Présenter les choix à l'utilisateur ou enchaîner directement avec l'équipe fanion recommandée (`confidence: 0.85`).
+
+---
+
+## 8. Notes générales pour les agents
 
 - Utiliser `ffbb_search(type="organismes")` pour lever une ambiguïté de club, puis réutiliser l'`organisme_id`.
+- Utiliser `ffbb_find_team_candidates` pour explorer ou lever une hésitation sur les engagements d'un club.
+- Utiliser `ffbb_match_lookup` pour répondre immédiatement aux questions de confrontation directe sans dérouler tout le calendrier.
 - Utiliser `ffbb_club(action="equipes")` pour lister les engagements, phases et `poule_id` disponibles d'un club.
 - Utiliser `ffbb_resolve_team` quand la catégorie ou le numéro d'équipe est ambigu (`U11M`, `U13F2`, etc.).
 - Utiliser `ffbb_team_summary` pour obtenir en un appel un résumé équipe + dernier/prochain match + bilan.
@@ -151,7 +187,7 @@ Ce document fournit des exemples de bout en bout pour aider les agents IA à sui
 
 ---
 
-## 7. Règlements officiels et règles de départage
+## 9. Règlements officiels et règles de départage
 
 ### Exemple A : Résolution d'égalité et goal-average
 **Question utilisateur**  

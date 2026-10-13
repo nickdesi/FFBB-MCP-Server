@@ -8,7 +8,7 @@ Bienvenue dans le centre de documentation officiel du serveur **FFBB MCP**.
 
 | Document | Description | Public |
 | :--- | :--- | :--- |
-| **[🛠️ Référence des 17 Outils MCP](TOOLS_REFERENCE.md)** | Schémas complets des 17 outils MCPServer (dont les 4 outils de règlements FTS5), paramètres d'entrée, retours JSON et exemples d'appels. | Développeurs & Agents IA |
+| **[🛠️ Référence des 19 Outils MCP](TOOLS_REFERENCE.md)** | Schémas complets des 19 outils FastMCP (dont les 4 outils de règlements FTS5), paramètres d'entrée, retours JSON et exemples d'appels. | Développeurs & Agents IA |
 | **[🏗️ Architecture Technique](ARCHITECTURE.md)** | Fonctionnement interne du serveur, MCPServer (Stateless Core), transport Streamable HTTP, services, moteur de règlements FTS5 et cycle de vie. | Développeurs & Architectes |
 | **[💬 Exemples & Cas d'usage](EXAMPLES.md)** | Prompts types, exemples d'appels pour Claude Desktop, Cursor et assistants IA (données et règlements officiels). | Utilisateurs & Intégrateurs |
 | **[⚡ Performance & Optimisations](PERFORMANCE.md)** | Gestion du cache SQLite / SWR, benchmarks de latence, métriques Prometheus et dashboards. | Développeurs & DevOps |
