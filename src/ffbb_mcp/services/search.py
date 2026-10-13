@@ -365,7 +365,7 @@ async def _search_organismes_directus(
     api = getattr(client, "_api", None)
     if not api:
         return []
-    base = getattr(api, "url", "https://api.ffbb.app").rstrip("/")
+    base = getattr(api, "url", "https://bo.ffbb.com").rstrip("/")
     headers = getattr(api, "headers", {})
 
     q_clean = query.strip()

@@ -122,7 +122,10 @@ class FFBBClientFactory:
                 req = urllib.request.Request(
                     ep,
                     headers={
-                        "User-Agent": os.environ.get("FFBB_USER_AGENT", "okhttp/4.12.0")
+                        "User-Agent": os.environ.get(
+                            "FFBB_USER_AGENT",
+                            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+                        )
                     },
                 )
                 with urllib.request.urlopen(req, timeout=5) as resp:
