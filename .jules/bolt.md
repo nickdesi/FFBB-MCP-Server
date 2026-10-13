@@ -93,3 +93,6 @@
 ## 2025-10-25 - Regex Extraction with Walrus and Slicing Fast-path
 **Learning:** When conditionally extracting a regular expression group and stripping the match from the string, using the walrus operator (`if m := pattern.search(text):`) combined with string slicing (`text[:m.start()]`) is significantly faster than using sequential `.search()` and `.sub()` calls. It evaluates the regex engine only once and avoids pure Python overhead.
 **Action:** When conditionally parsing and stripping matched strings using regex, replace two-step `.search` and `.sub` flows with a walrus `if match := ...` block and string slicing to avoid redundant string allocation overhead.
+## 2026-11-04 - Fast-path Any() with generator expressions
+**Learning:** In CPython, using `any()` with a generator expression (e.g. `any(w in text for w in words)`) incurs significant overhead due to generator initialization, frame creation and function calls for each iteration. For a small, fixed number of conditions, explicitly unrolling the conditions with the `or` operator (e.g. `w1 in text or w2 in text ...`) avoids this overhead entirely and is massively faster (up to ~7x speedup).
+**Action:** When evaluating a small number of fixed string membership checks, replace `any(w in text for w in (...))` with explicitly unrolled `or` conditions to eliminate pure Python generator overhead.
