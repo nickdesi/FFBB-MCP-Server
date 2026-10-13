@@ -80,6 +80,12 @@ async def get_regulation_article_service(
             "message": f"Aucun article trouvé pour document='{document_id}', article='{article_number}', organisateur='{organizer}'",
         }
 
+    from ffbb_mcp.regulations.models import compute_content_hash
+
+    c_hash = getattr(art, "content_hash", None)
+    if not c_hash and art.content:
+        c_hash = compute_content_hash(art.content)
+
     return {
         "found": True,
         "article": {
@@ -94,8 +100,16 @@ async def get_regulation_article_service(
             "content": art.content,
             "topics": art.topics,
             "source_url": art.source_url,
-            "content_nature": getattr(art, "content_nature", "official_transcription"),
-            "disclaimer": getattr(art, "disclaimer", None),
+            "official_source_url": getattr(art, "official_source_url", None)
+            or art.source_url,
+            "content_nature": getattr(art, "content_nature", "verbatim"),
+            "content_hash": c_hash,
+            "corpus_coverage": "selective_key_articles",
+            "disclaimer": getattr(art, "disclaimer", None)
+            or (
+                "Information réglementaire indicative issue des règlements FFBB indexés. "
+                "Seuls les textes officiels publiés au bulletin officiel FFBB font seuls foi."
+            ),
         },
     }
 
@@ -372,8 +386,14 @@ async def list_regulations_service(season: str = "2026-2027") -> dict[str, Any]:
         "total_documents": len(docs),
         "documents": docs,
         "jurisdictions": docs,
+        "coverage": "selective_index",
+        "coverage_note": (
+            "Le nombre d'articles indiqué pour chaque document (indexed_articles) correspond aux articles clés indexés "
+            "dans ce serveur MCP, et non à l'exhaustivité des articles du document officiel."
+        ),
         "note": (
             "Le Règlement Sportif Général (RSG FFBB) s'applique par défaut sur tout le territoire national français. "
-            "Les ligues régionales et comités départementaux le complètent avec leurs règlements particuliers respectifs."
+            "Les ligues régionales et comités départementaux le complètent avec leurs règlements particuliers respectifs. "
+            "Seuls les textes officiels publiés au bulletin officiel FFBB font foi."
         ),
     }

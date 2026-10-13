@@ -228,6 +228,8 @@ ENV_DESCRIPTIONS = {
     "GIT_SHA": "Commit SHA Git déployé exposé dans ffbb_version et /health",
     "BUILD_SHA": "Build SHA de l'image conteneurisée",
     "COMMIT_SHA": "Alias de commit SHA pour les déploiements CI/CD",
+    "BUILD_DATE": "Date de compilation/build de l'image ou du package exposé dans ffbb_version",
+    "DEPLOY_DATE": "Date de déploiement en production (alternative à BUILD_DATE)",
 }
 
 

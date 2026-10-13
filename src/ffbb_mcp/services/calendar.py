@@ -103,6 +103,7 @@ async def _build_calendar_matches(
     status_filter: list[str] | None = None,
     strict_filters: bool = True,
     group_by: str | None = None,
+    unpaginated: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Construit la liste des matchs (calendrier complet) pour un club / catégorie."""
@@ -907,31 +908,82 @@ async def _build_calendar_matches(
         m["is_next_match"] = next_future_idx is not None and idx == next_future_idx
         m.pop("_dt", None)
 
-    effective = all_matches
+    poule_id_val = kwargs.get("poule_id") or (
+        unique_poule_ids[0] if len(unique_poule_ids) == 1 else None
+    )
+    raw_unpaginated: dict[str, Any] = {
+        "all_matches": all_matches,
+        "phase_warning": phase_warning,
+        "unique_poule_ids": unique_poule_ids,
+        "organisme_id": str(organisme_id) if organisme_id else None,
+        "competition_id": str(competition_id) if competition_id else None,
+        "poule_id": str(poule_id_val) if poule_id_val else None,
+        "engagement_id": str(engagement_id) if engagement_id else None,
+        "generated_at": datetime.now(_TZ).isoformat(),
+    }
+    if unpaginated:
+        return raw_unpaginated
+
+    return _paginate_calendar_result(raw_unpaginated, limit=limit, offset=offset)
+
+
+def _paginate_calendar_result(
+    raw_result: dict[str, Any],
+    limit: int | None = None,
+    offset: int | None = None,
+    from_cache: bool = False,
+) -> dict[str, Any]:
+    tz = _TZ
+    gen_at = (
+        raw_result.get("generated_at")
+        or (raw_result.get("_meta") or {}).get("generated_at")
+        or datetime.now(tz).isoformat()
+    )
+    if "error" in raw_result or raw_result.get("status") in ("not_found", "error"):
+        res = dict(raw_result)
+        res["_meta"] = {
+            "total": 0,
+            "returned": 0,
+            "limit": limit if limit is not None else 0,
+            "offset": offset if offset is not None else 0,
+            "has_more": False,
+            "sort": "scheduled_at:asc",
+            "generated_at": gen_at,
+        }
+        return res
+
+    all_matches = raw_result.get("all_matches") or []
+    phase_warning = raw_result.get("phase_warning")
+    organisme_id = raw_result.get("organisme_id")
+    competition_id = raw_result.get("competition_id")
+    poule_id_val = raw_result.get("poule_id")
+    engagement_id = raw_result.get("engagement_id")
 
     max_matches = _get_max_calendar_matches()
-    total_before_limit = len(effective)
+    total_before_limit = len(all_matches)
 
     effective_offset = max(0, offset) if offset is not None else 0
     if limit is not None:
         limit = max(1, min(100, limit))
         applied_limit: int | None = limit
-        paginated = effective[effective_offset : effective_offset + limit]
-    elif len(effective) > max_matches:
+        paginated = all_matches[effective_offset : effective_offset + limit]
+    elif len(all_matches) > max_matches:
         applied_limit = max_matches
         if offset is not None:
-            paginated = effective[effective_offset : effective_offset + max_matches]
+            paginated = all_matches[effective_offset : effective_offset + max_matches]
         else:
-            paginated = effective[:max_matches]
+            paginated = all_matches[:max_matches]
             effective_offset = 0
     else:
         applied_limit = limit
         if offset is not None:
-            paginated = effective[effective_offset : effective_offset + (limit or 100)]
+            paginated = all_matches[
+                effective_offset : effective_offset + (limit or 100)
+            ]
             if limit is None:
                 applied_limit = 100
         else:
-            paginated = effective
+            paginated = all_matches
             effective_offset = 0
             if limit is None:
                 applied_limit = None
@@ -939,26 +991,24 @@ async def _build_calendar_matches(
     if offset is not None and effective_offset >= total_before_limit:
         paginated = []
 
-    effective = paginated
-
     validated_matches = []
     round_warnings = []
     cal_rounds = [
         m.get("journee") or m.get("num_journee") or m.get("numeroJournee")
-        for m in effective
+        for m in paginated
         if isinstance(m, dict)
     ]
     cal_comp = next(
         (
             str(m.get("competition"))
-            for m in effective
+            for m in paginated
             if isinstance(m, dict) and m.get("competition")
         ),
         None,
     )
-    for m in effective:
+    for m in paginated:
         if "warning" in m:
-            validated_matches.append(m)
+            validated_matches.append(dict(m))
         else:
             vm = CalendrierMatch(**m).model_dump(by_alias=True)
             raw_j = vm.get("journee") or vm.get("num_journee")
@@ -986,7 +1036,7 @@ async def _build_calendar_matches(
         "offset": effective_offset,
         "has_more": has_more,
         "sort": "scheduled_at:asc",
-        "generated_at": datetime.now(tz).isoformat(),
+        "generated_at": gen_at,
     }
     if next_offset is not None:
         meta["next_offset"] = next_offset
@@ -1011,12 +1061,9 @@ async def _build_calendar_matches(
         "source_label": format_source_label(),
         "warnings": round_warnings_list,
     }
-    poule_id_val = kwargs.get("poule_id") or (
-        unique_poule_ids[0] if len(unique_poule_ids) == 1 else None
-    )
     provenance = build_provenance_block(
         source="ffbb_api_live",
-        cache_status="miss",
+        cache_status="hit" if from_cache else "miss",
         resource_ids={
             "organisme_id": str(organisme_id) if organisme_id else None,
             "competition_id": str(competition_id) if competition_id else None,
@@ -1099,12 +1146,18 @@ async def get_calendrier_club_service(
         f"{include_reserves}:{st_filter}:{strict_filters}:{group_by or ''}:{season_id or ''}"
     )
 
+    was_in_cache = (
+        not force_refresh
+        and state.cache_calendrier is not None
+        and cache_key in state.cache_calendrier
+    )
+
     if force_refresh and state.cache_calendrier is not None:
         state.cache_calendrier.pop(cache_key, None)
 
     from .common import _dedupe_inflight as _dedupe
 
-    return await _dedupe(
+    raw_result = await _dedupe(
         cache=state.cache_calendrier,
         cache_key=cache_key,
         inflight_map=state.inflight_calendrier,
@@ -1116,13 +1169,13 @@ async def get_calendrier_club_service(
             adversaire,
             date_debut,
             date_fin,
-            limit,
+            limit=None,
             engagement_id=engagement_id,
             competition_id=competition_id,
             competition_type=competition_type,
             poule_id=poule_id,
             season_id=season_id,
-            offset=offset,
+            offset=None,
             scope=scope,
             include_competition_types=include_competition_types,
             exclude_competition_types=exclude_competition_types,
@@ -1133,6 +1186,13 @@ async def get_calendrier_club_service(
             strict_filters=strict_filters,
             group_by=group_by,
             phase=phase,
+            unpaginated=True,
+            force_refresh=force_refresh,
+            **kwargs,
         ),
         cache_name="calendrier",
+    )
+
+    return _paginate_calendar_result(
+        raw_result, limit=limit, offset=offset, from_cache=was_in_cache
     )

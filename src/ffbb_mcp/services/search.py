@@ -862,6 +862,73 @@ def _lighten_rencontre_hit(hit: dict[str, Any]) -> dict[str, Any]:
     return item
 
 
+def _lighten_organisme_hit(
+    hit: dict[str, Any], compact: bool = False
+) -> dict[str, Any]:
+    """Allège un résultat de recherche d'organisme pour limiter l'empreinte tokens.
+
+    Supprime les arborescences géantes d'organismes parents imbriqués, la cartographie
+    détaillée, les coordonnées brutes et les champs nuls.
+    En mode compact (compact=True), ne conserve que id, nom, code, type, commune,
+    code_postal, departement et organisme_parent (libellé court).
+    """
+    if not isinstance(hit, dict):
+        return hit
+    item = dict(hit)
+
+    commune_val = item.get("commune")
+    commune_dict = commune_val if isinstance(commune_val, dict) else {}
+    libelle_commune = (
+        commune_dict.get("libelle")
+        or item.get("ville")
+        or (
+            str(commune_val)
+            if commune_val and not isinstance(commune_val, dict)
+            else ""
+        )
+    )
+    cp = commune_dict.get("codePostal") or item.get("code_postal") or ""
+    dep = (
+        commune_dict.get("departement")
+        or item.get("departement")
+        or (cp[:2] if cp and len(cp) == 5 else "")
+    )
+
+    parent = item.get("organismeParent") or item.get("parent")
+    parent_nom = (
+        parent.get("nom")
+        if isinstance(parent, dict)
+        else (parent if isinstance(parent, str) else None)
+    )
+
+    if compact:
+        res: dict[str, Any] = {
+            "id": item.get("id") or item.get("organisme_id"),
+            "nom": item.get("nom"),
+            "code": item.get("code"),
+            "type": item.get("type"),
+            "commune": libelle_commune or None,
+            "code_postal": cp or None,
+            "departement": dep or None,
+        }
+        if parent_nom:
+            res["organisme_parent"] = parent_nom
+        return {k: v for k, v in res.items() if v is not None and v != ""}
+
+    # Mode standard : élaguer cartographie, geo et arborescences parents
+    item.pop("cartographie", None)
+    item.pop("geo", None)
+    if "organismeParent" in item and isinstance(item["organismeParent"], dict):
+        p = item["organismeParent"]
+        item["organismeParent"] = {
+            "id": p.get("id"),
+            "nom": p.get("nom"),
+            "code": p.get("code"),
+            "type": p.get("type"),
+        }
+    return {k: v for k, v in item.items() if v is not None}
+
+
 def _build_search_results(
     results: Any, limit: int, offset: int = 0, type_name: str | None = None
 ) -> list[dict]:
@@ -878,6 +945,8 @@ def _build_search_results(
         result_list = [_lighten_competition_hit(hit) for hit in result_list]
     elif type_name == "rencontres":
         result_list = [_lighten_rencontre_hit(hit) for hit in result_list]
+    elif type_name == "organismes":
+        result_list = [_lighten_organisme_hit(hit) for hit in result_list]
     total = getattr(results, "estimated_total_hits", None)
     if total is not None:
         for item in result_list:
@@ -1141,6 +1210,7 @@ async def search_organismes_service(
     filter_by: str | None = None,
     sort: list[str] | None = None,
     force_refresh: bool = False,
+    compact: bool = False,
 ) -> list[dict[str, Any]]:
     results = await _search_generic(
         "organismes",
@@ -1181,6 +1251,9 @@ async def search_organismes_service(
             key=lambda r: _score_organisme_relevance(r, nom),
             reverse=True,
         )
+
+    if results and compact:
+        results = [_lighten_organisme_hit(r, compact=True) for r in results]
 
     return results
 
@@ -1671,6 +1744,8 @@ def _add_truncation_meta(
         "has_more": has_more,
         "sort": sort_str,
     }
+    if total is not None:
+        meta["total_is_estimated"] = True
     if next_offset is not None:
         meta["next_offset"] = next_offset
     if has_more:
@@ -1680,6 +1755,11 @@ def _add_truncation_meta(
             f"{remaining} résultat(s) supplémentaire(s) non affiché(s). "
             "Affinez votre recherche avec 'code_postal', 'commune' ou utilisez "
             "'ffbb_next_match' / 'ffbb_match_lookup' pour un ciblage direct."
+        )
+    elif total is not None and len(result) < limit and effective_total > len(result):
+        meta["note"] = (
+            "Le total annoncé provient de l'estimation de l'index Meilisearch ; "
+            "la liste retournée correspond à l'intégralité des résultats qualifiés disponibles."
         )
 
     return {
@@ -1699,6 +1779,7 @@ async def ffbb_search_service(
     commune: str | None = None,
     code_postal: str | None = None,
     force_refresh: bool = False,
+    compact: bool = False,
 ) -> dict[str, Any] | list[dict[str, Any]]:
     """Service de recherche FFBB unifié avec support complet de limit et offset.
 
@@ -1730,7 +1811,14 @@ async def ffbb_search_service(
         )
         if not isinstance(result, list):
             return []
-        # multi_search_service déjà slice, mais on garde offset meta cohérente
+        if compact:
+            result = [
+                _lighten_organisme_hit(item, compact=True)
+                if item.get("type") in ("CLUB", "COMITE", "LIGUE")
+                or "organisme_id" in item
+                else item
+                for item in result
+            ]
         return _add_truncation_meta(result, limit=limit, offset=offset, sort=sort)
 
     if type == "organismes":
@@ -1741,6 +1829,7 @@ async def ffbb_search_service(
             filter_by=effective_filter_by,
             sort=sort,
             force_refresh=force_refresh,
+            compact=compact,
         )
         return _add_truncation_meta(result, limit=limit, offset=offset, sort=sort)
 

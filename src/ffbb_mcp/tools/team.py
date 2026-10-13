@@ -1131,7 +1131,7 @@ async def ffbb_last_result(
     last_svc = _get_server_service("ffbb_last_result_service", ffbb_last_result_service)
     try:
         effective_refresh = force_refresh
-        effective_num = numero_equipe if numero_equipe is not None else 1
+        effective_num = numero_equipe
         effective_cat = categorie or ""
         if categorie:
             parsed = parse_categorie(categorie)
@@ -1225,7 +1225,7 @@ async def ffbb_next_match(
 
     next_svc = _get_server_service("ffbb_next_match_service", ffbb_next_match_service)
     try:
-        effective_num = numero_equipe if numero_equipe is not None else 1
+        effective_num = numero_equipe
         effective_cat = categorie or ""
         if categorie:
             parsed = parse_categorie(categorie)

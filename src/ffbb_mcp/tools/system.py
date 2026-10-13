@@ -232,6 +232,24 @@ def get_build_sha() -> str | None:
     )
     if sha and sha != "unknown":
         return sha[:7]
+
+    # Détection via fichier de build statique (déploiements Docker / conteneurs)
+    import contextlib
+    from pathlib import Path
+
+    for p in (
+        Path(__file__).resolve().parent / "build_info.json",
+        Path(__file__).resolve().parents[3] / "build_info.json",
+        Path("/app/build_info.json"),
+    ):
+        if p.exists():
+            with contextlib.suppress(Exception):
+                import json
+
+                data = json.loads(p.read_text(encoding="utf-8"))
+                if val := (data.get("git_sha") or data.get("build_sha")):
+                    return str(val)[:7]
+
     try:
         import subprocess
 
@@ -242,14 +260,31 @@ def get_build_sha() -> str | None:
         return None
 
 
+def get_build_date() -> str | None:
+    """Retourne la date du build ou déploiement."""
+    if env_date := (os.environ.get("BUILD_DATE") or os.environ.get("DEPLOY_DATE")):
+        return env_date
+    import contextlib
+    from pathlib import Path
+
+    for p in (
+        Path(__file__).resolve().parent / "build_info.json",
+        Path(__file__).resolve().parents[3] / "build_info.json",
+        Path("/app/build_info.json"),
+    ):
+        if p.exists():
+            with contextlib.suppress(Exception):
+                import json
+
+                data = json.loads(p.read_text(encoding="utf-8"))
+                if val := data.get("build_date"):
+                    return str(val)
+    return "2026-10-13"
+
+
 @track_tool_usage("ffbb_version")
 async def ffbb_version() -> dict[str, Any]:
-    """Informations de version et configuration runtime du serveur FFBB MCP.
-
-    Retourne `dict` compact et typé `{package_version, mcp_sdk_version,
-    python_version, transport, cache_ttls, build_sha, git_sha}` ; lecture seule, idempotent, sans
-    appel réseau externe ni effet de bord, <10ms.
-    """
+    """Version et configuration runtime du serveur FFBB MCP."""
     mode = os.environ.get("MCP_MODE", "stdio").lower()
     sha = get_build_sha()
     return {
@@ -262,6 +297,8 @@ async def ffbb_version() -> dict[str, Any]:
         "cache_ttls": get_cache_ttls(),
         "build_sha": sha,
         "git_sha": sha,
+        "build_date": get_build_date(),
+        "response_schema_version": "1.2.0",
     }
 
 
@@ -303,12 +340,7 @@ async def ffbb_search(
     ] = 0,
     filter_by: Annotated[
         str | None,
-        Field(
-            description=(
-                "Filtre Meilisearch natif (ex: 'codePostal = \"63000\"', "
-                '\'codePostal IN ["63000", "63100"]\', \'departement = "Puy-de-Dôme"\').'
-            )
-        ),
+        Field(description="Filtre Meilisearch natif (ex: 'codePostal = \"63000\"')."),
     ] = None,
     sort: Annotated[
         list[str] | None,
@@ -316,25 +348,19 @@ async def ffbb_search(
     ] = None,
     commune: Annotated[
         str | None,
-        Field(
-            description=(
-                "Filtrer par nom de commune/ville (ex: 'Thiers', 'Clermont-Ferrand'). "
-                "Particulièrement recommandé pour type='salles' ou type='organismes'."
-            )
-        ),
+        Field(description="Filtrer par commune/ville (ex: 'Thiers')."),
     ] = None,
     code_postal: Annotated[
         str | None,
-        Field(
-            description=(
-                "Filtrer par code postal à 5 chiffres (ex: '63300', '63000'). "
-                "Élimine les homonymies ville/rue pour type='salles'."
-            )
-        ),
+        Field(description="Filtrer par code postal à 5 chiffres (ex: '63300')."),
     ] = None,
     force_refresh: Annotated[
         bool,
         Field(description="Si True, force le rafraîchissement des données."),
+    ] = False,
+    compact: Annotated[
+        bool,
+        Field(description="Si True, réponse compacte allégée pour agents IA."),
     ] = False,
 ) -> dict[str, Any] | list[dict[str, Any]]:
     """Recherche FFBB unifiée — clubs, compétitions, matchs, salles, tournois.
@@ -358,6 +384,7 @@ async def ffbb_search(
             commune=commune,
             code_postal=code_postal,
             force_refresh=force_refresh,
+            compact=compact,
         )
     except ValueError as e:
         raise handle_api_error(e) from e

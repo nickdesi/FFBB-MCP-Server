@@ -143,16 +143,19 @@ def parse_markdown_document(
                 t for t in doc_topics if t in combined_text
             ] or doc_topics[:2]
 
-        # Qualification de la nature du contenu
-        # Article 51 (brûlage avec 'généralement 5 rencontres') est une synthèse indicative
+        # Qualification de la nature du contenu (verbatim, extrait, synthese)
+        body_lower = body.lower()
         if (
-            "généralement" in body.lower()
+            "généralement" in body_lower
             or "51" in art_num
-            or "synthèse" in body.lower()
+            or "synthèse" in body_lower
+            or "synthese" in body_lower
         ):
-            art_nature = "editorial_summary"
+            art_nature = "synthese"
+        elif len(body) < 200 or "extrait" in body_lower:
+            art_nature = "extrait"
         else:
-            art_nature = "official_transcription"
+            art_nature = "verbatim"
 
         # Création de l'ID unique
         safe_num = re.sub(r"[^\w]+", "_", art_num.lower()).strip("_")

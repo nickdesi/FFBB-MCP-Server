@@ -574,12 +574,77 @@ async def _resolve_team_equipes(
     # Application des filtres de désambiguïsation explicites par ordre de priorité strict
     if engagement_id is not None:
         target_eng = str(engagement_id).strip()
-        equipes = [
+        matched = [
             e
             for e in equipes
             if str(e.get("engagement_id") or e.get("team_id") or "").strip()
             == target_eng
         ]
+        if matched:
+            eq_target = matched[0]
+            if poule_id is not None:
+                team_poule = str(eq_target.get("poule_id") or "").strip()
+                given_poule = str(poule_id).strip()
+                if team_poule and given_poule and team_poule != given_poule:
+                    comp_name = eq_target.get("competition") or "cette compétition"
+                    team_name = (
+                        eq_target.get("nom_equipe")
+                        or eq_target.get("team_label")
+                        or "l'équipe"
+                    )
+                    msg = (
+                        f"Incompatibilité d'identifiants : l'engagement '{engagement_id}' ({team_name}, {comp_name}) "
+                        f"appartient à la poule '{team_poule}', et non à la poule '{given_poule}' fournie."
+                    )
+                    return (
+                        {
+                            "status": "error",
+                            "error": msg,
+                            "code": "incompatible_identifiers",
+                            "engagement_id": str(engagement_id),
+                            "engagement_poule_id": team_poule,
+                            "provided_poule_id": given_poule,
+                            "presentation": {
+                                "short_answer": msg,
+                                "detail_line": "Requête contradictoire rejetée pour préserver l'intégrité des données.",
+                                "source_label": format_source_label(),
+                                "warnings": ["incompatible_identifiers"],
+                            },
+                            "warnings": ["incompatible_identifiers"],
+                        },
+                        [],
+                        club_resolu,
+                    )
+            if numero_equipe is not None:
+                raw_eq_num = str(eq_target.get("numero_equipe") or "").strip()
+                if (
+                    raw_eq_num
+                    and raw_eq_num.isdigit()
+                    and int(raw_eq_num) != int(numero_equipe)
+                ):
+                    msg = (
+                        f"Incompatibilité d'identifiants : l'engagement '{engagement_id}' correspond au numéro d'équipe {raw_eq_num}, "
+                        f"alors que numero_equipe={numero_equipe} a été fourni."
+                    )
+                    return (
+                        {
+                            "status": "error",
+                            "error": msg,
+                            "code": "incompatible_identifiers",
+                            "presentation": {
+                                "short_answer": msg,
+                                "detail_line": "Requête contradictoire rejetée.",
+                                "source_label": format_source_label(),
+                                "warnings": ["incompatible_identifiers"],
+                            },
+                            "warnings": ["incompatible_identifiers"],
+                        },
+                        [],
+                        club_resolu,
+                    )
+            equipes = matched
+        else:
+            equipes = []
 
     if len(equipes) > 1 and poule_id is not None:
         target_poule = str(poule_id).strip()
@@ -782,9 +847,6 @@ async def _fetch_poule_matches(
     numero_equipe: int | None,
     force_refresh: bool = False,
 ) -> list[tuple[dict, dict]]:
-
-    numero_equipe_match = int(numero_equipe) if numero_equipe is not None else None
-
     async def _fetch_one(eq: dict) -> list[tuple[dict, dict]]:
         pid = eq.get("poule_id")
         my_eng = eq.get("engagement_id")
@@ -811,6 +873,14 @@ async def _fetch_poule_matches(
             id_eng2 = str(eng2.get("id") if isinstance(eng2, dict) else eng2)
             str_my_eng = str(my_eng) if my_eng else None
 
+            raw_eq_num = eq.get("numero_equipe")
+            if raw_eq_num is not None and str(raw_eq_num).strip().isdigit():
+                this_eq_match_num = int(raw_eq_num)
+            elif numero_equipe is not None:
+                this_eq_match_num = int(numero_equipe)
+            else:
+                this_eq_match_num = None
+
             is_my_team = False
             if str_my_eng and (str_my_eng in (id_eng1, id_eng2)):
                 is_my_team = True
@@ -819,12 +889,12 @@ async def _fetch_poule_matches(
                 is_my_team = _match_team_name(
                     str(m.get("nomEquipe1", "")),
                     organisme_nom_norm,
-                    numero_equipe_match,
+                    this_eq_match_num,
                     is_organisme_nom_normalized=True,
                 ) or _match_team_name(
                     str(m.get("nomEquipe2", "")),
                     organisme_nom_norm,
-                    numero_equipe_match,
+                    this_eq_match_num,
                     is_organisme_nom_normalized=True,
                 )
                 if not is_my_team and not _team_has_explicit_number(eq):
@@ -905,6 +975,7 @@ async def ffbb_next_match_service(
         competition_id=competition_id,
         competition_type=competition_type,
         poule_id=poule_id,
+        season_id=season_id,
         not_found_status="not_found",
         force_refresh=force_refresh,
     )
@@ -1010,16 +1081,25 @@ async def ffbb_next_match_service(
             },
         )
         empty_presentation = {
-            "short_answer": "Aucun match à venir trouvé pour cette équipe.",
-            "detail_line": "Toutes les rencontres de la phase actuelle ont été jouées ou le calendrier officiel n'est pas encore programmé.",
+            "short_answer": "Aucun match à venir publié trouvé pour cette équipe dans le périmètre consulté.",
+            "detail_line": f"Toutes les rencontres de la phase actuelle ont été jouées ou le calendrier officiel suivant n'est pas encore publié (saison {season_id or 'en cours'}).",
             "source_label": format_source_label(),
-            "warnings": ["Aucun match programmé."],
+            "warnings": ["Aucun match programmé dans le périmètre consulté."],
         }
         return {
             "status": "no_upcoming_match",
-            "message": "Aucun match à venir trouvé pour cette équipe.",
+            "message": "Aucun match à venir publié trouvé dans le périmètre consulté.",
             "club_resolu": club_resolu,
             "candidates": all_available_equipes,
+            "consulted_scope": {
+                "season_id": str(season_id) if season_id else None,
+                "poules_consulted": [str(p) for p in poules_actives],
+                "engagements_consulted": [
+                    str(e.get("engagement_id"))
+                    for e in equipes
+                    if e.get("engagement_id")
+                ],
+            },
             "presentation": empty_presentation,
             "provenance": provenance,
             "_meta": _freshness_meta(
@@ -1304,7 +1384,7 @@ async def ffbb_last_result_service(
     club_name: str | None = None,
     organisme_id: int | str | None = None,
     categorie: str | None = None,
-    numero_equipe: int = 1,
+    numero_equipe: int | None = None,
     engagement_id: int | str | None = None,
     competition_id: int | str | None = None,
     competition_type: str | None = None,
@@ -1324,6 +1404,7 @@ async def ffbb_last_result_service(
         competition_id=competition_id,
         competition_type=competition_type,
         poule_id=poule_id,
+        season_id=season_id,
         not_found_status="no_result",
         force_refresh=force_refresh,
     )
@@ -1331,6 +1412,7 @@ async def ffbb_last_result_service(
         return error
 
     organisme_nom = str(club_resolu.get("nom", "")) if club_resolu is not None else ""
+    poules_actives = [e["poule_id"] for e in equipes if e.get("poule_id")]
 
     async def _get_latest_match(
         refresh: bool,
@@ -1406,24 +1488,38 @@ async def ffbb_last_result_service(
                 }
             )
         )
+        resource_ids = {
+            "organisme_id": str(organisme_id) if organisme_id else None,
+            "engagement_id": str(engagement_id) if engagement_id else None,
+            "poule_id": str(poule_id) if poule_id else None,
+            "competition_id": str(competition_id) if competition_id else None,
+            "season_id": str(season_id) if season_id else None,
+        }
         provenance = build_provenance_block(
             source="ffbb_api_live",
             cache_status="hit" if not force_refresh else "miss",
-            resource_ids={
-                "organisme_id": str(organisme_id) if organisme_id else None,
-            },
+            resource_ids=resource_ids,
         )
         empty_presentation = {
-            "short_answer": "Aucun match joué trouvé.",
-            "detail_line": "Aucune rencontre terminée n'est enregistrée pour cette équipe sur la saison.",
+            "short_answer": "Aucune rencontre terminée n'est enregistrée pour cette équipe dans le périmètre consulté.",
+            "detail_line": f"Aucune rencontre terminée n'est enregistrée pour cette équipe dans le périmètre consulté (saison {season_id or 'en cours'}).",
             "source_label": format_source_label(),
-            "warnings": ["Aucun résultat disponible."],
+            "warnings": ["Aucun match joué trouvé dans le périmètre consulté."],
         }
         return {
             "status": "no_result",
-            "message": "Aucun match joué trouvé.",
+            "message": "Aucun match joué trouvé dans le périmètre consulté.",
             "club_resolu": club_resolu,
             "candidates": all_available_equipes,
+            "consulted_scope": {
+                "season_id": str(season_id) if season_id else None,
+                "poules_consulted": [str(p) for p in poules_actives],
+                "engagements_consulted": [
+                    str(e.get("engagement_id"))
+                    for e in equipes
+                    if e.get("engagement_id")
+                ],
+            },
             "presentation": empty_presentation,
             "provenance": provenance,
             "_meta": _freshness_meta(
@@ -1446,12 +1542,19 @@ async def ffbb_last_result_service(
     id_eng2 = eng2.get("id") if isinstance(eng2, dict) else eng2
     my_eng_id = str(source_eq.get("engagement_id") or source_eq.get("team_id") or "")
 
+    raw_eq_num = source_eq.get("numero_equipe")
+    if raw_eq_num is not None and str(raw_eq_num).strip().isdigit():
+        _numero_equipe_match = int(raw_eq_num)
+    elif numero_equipe is not None:
+        _numero_equipe_match = int(numero_equipe)
+    else:
+        _numero_equipe_match = None
+
     if my_eng_id and id_eng1 and my_eng_id == str(id_eng1):
         est_domicile = True
     elif my_eng_id and id_eng2 and my_eng_id == str(id_eng2):
         est_domicile = False
     else:
-        _numero_equipe_match = int(numero_equipe) if numero_equipe is not None else None
         est_domicile = _match_team_name(
             str(dernier.get("nomEquipe1", "")), str(organisme_nom), _numero_equipe_match
         )
@@ -1652,15 +1755,21 @@ async def ffbb_last_result_service(
         )
     )
 
+    dernier_id_str = str(dernier.get("id")) if dernier.get("id") is not None else None
     return {
         "status": "ok",
+        "match_id": dernier_id_str,
         "data": {
+            "match_id": dernier_id_str,
             "team": {
                 "name": my_team_name,
                 "category": category_label,
                 "competition": competition_name,
+                "numero_equipe": _numero_equipe_match,
             },
             "match": {
+                "id": dernier_id_str,
+                "match_id": dernier_id_str,
                 "context_label": "Dernier match joué",
                 "status": "final",
                 "date": scheduled_date_last,

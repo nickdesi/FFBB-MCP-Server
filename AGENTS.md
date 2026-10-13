@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB MCP server | server.py: 434 lignes | services.py: 11885 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 434 lignes | services.py: 12163 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -130,7 +130,7 @@ src/ffbb_mcp/
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
 ├── server.py              # Tools MCP + main() (≈434 lignes)
-├── services/              # Logique métier modularisée (≈11885 lignes)
+├── services/              # Logique métier modularisée (≈12163 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── bilan.py           # Module de service
 │   ├── calendar.py        # Module de service
@@ -155,7 +155,7 @@ src/ffbb_mcp/
 - Pas de suffixe `_compact_` ou `_impl_` exposé
 - Modifier une fonction à la fois, seulement si test/usage échoue
 - Nouvelle fonction → test manuel validé avant exposition MCP
-- **Modularisation** : Le package `services/` (total ≈11885 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
+- **Modularisation** : Le package `services/` (total ≈12163 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
 
 ## Commandes
 - Démarrer le serveur MCP (stdio) : `rtk uv run python -m ffbb_mcp` (recommandé pour Claude Desktop)
@@ -218,6 +218,8 @@ Avant push/tag/release :
 | `GIT_SHA` | `` | Commit SHA Git déployé exposé dans ffbb_version et /health |
 | `BUILD_SHA` | `` | Build SHA de l'image conteneurisée |
 | `COMMIT_SHA` | `` | Alias de commit SHA pour les déploiements CI/CD |
+| `BUILD_DATE` | `` | Date de compilation/build de l'image ou du package exposé dans ffbb_version |
+| `DEPLOY_DATE` | `` | Date de déploiement en production (alternative à BUILD_DATE) |
 | `FFBB_ENABLE_BENCHMARK` | — | Activer endpoint `/benchmark/run` (sécurité) |
 | `FFBB_POULE_FETCH_CONCURRENCY` | — | Concurrence max fetch poules |
 | `FFBB_CACHE_TTL_*` | — | TTL par type de cache (voir cache_strategy.py) |

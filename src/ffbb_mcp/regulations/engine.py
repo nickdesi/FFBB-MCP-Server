@@ -27,6 +27,19 @@ def _strip_accents(text: str) -> str:
     return unicodedata.normalize("NFD", text).translate(_DIACRITICS).lower()
 
 
+def _normalize_content_nature(val: str | None) -> str:
+    """Normalise la nature du texte vers le standard verbatim / extrait / synthese."""
+    if not val:
+        return "verbatim"
+    if val in ("official_transcription", "verbatim"):
+        return "verbatim"
+    if val in ("editorial_summary", "synthese", "synthèse"):
+        return "synthese"
+    if val in ("extrait", "extract"):
+        return "extrait"
+    return str(val)
+
+
 def find_default_manifest_path() -> Path | None:
     """Recherche le fichier manifest.yaml des règlements selon plusieurs emplacements ordonnés."""
     # 1. Variable d'environnement explicite
@@ -238,10 +251,8 @@ class RegulationsEngine:
         results = []
         for row in rows:
             keys = row.keys() if hasattr(row, "keys") else []
-            c_nature = (
-                row["content_nature"]
-                if "content_nature" in keys and row["content_nature"]
-                else "official_transcription"
+            c_nature = _normalize_content_nature(
+                row["content_nature"] if "content_nature" in keys else None
             )
             disc = (
                 row["disclaimer"]
@@ -358,6 +369,9 @@ class RegulationsEngine:
                 "level": r["level"],
                 "organizer": r["organizer"],
                 "total_articles": r["total_articles"],
+                "indexed_articles": r["total_articles"],
+                "coverage": "selective_key_articles",
+                "coverage_note": "Articles clés indexés pour consultation rapide ; ne reflète pas l'exhaustivité du recueil officiel.",
                 "source_url": r["source_url"],
             }
             for r in rows
@@ -408,10 +422,8 @@ class RegulationsEngine:
             return None
 
         keys = row.keys() if hasattr(row, "keys") else []
-        c_nature = (
-            row["content_nature"]
-            if "content_nature" in keys and row["content_nature"]
-            else "official_transcription"
+        c_nature = _normalize_content_nature(
+            row["content_nature"] if "content_nature" in keys else None
         )
         disc = row["disclaimer"] if "disclaimer" in keys and row["disclaimer"] else None
 

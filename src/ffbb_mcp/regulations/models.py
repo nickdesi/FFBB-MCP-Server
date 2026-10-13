@@ -60,8 +60,8 @@ class RegulationArticle(BaseModel):
         default="", description="Hash SHA-256 du contenu de l'article pour traçabilité"
     )
     content_nature: str = Field(
-        default="official_transcription",
-        description="Nature du texte : 'official_transcription' (verbatim officiel), 'editorial_summary' (synthèse indicative), 'unverified_synthesis' (non vérifié)",
+        default="verbatim",
+        description="Nature du texte : 'verbatim' (retranscription officielle intégrale), 'extrait' (passage extrait du texte officiel), 'synthese' (synthèse indicative)",
     )
     disclaimer: str | None = Field(
         default="Information réglementaire indicative issue des règlements FFBB indexés. Les textes officiels publiés au bulletin officiel FFBB font seuls foi.",

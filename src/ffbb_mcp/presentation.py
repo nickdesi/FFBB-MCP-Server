@@ -437,7 +437,9 @@ def build_provenance_block(
     return {
         "provider": "FFBB",
         "retrieved_at": now_paris,
+        "served_at": now_paris,
         "data_freshness": freshness,
+        "cache_hit": cache_status == "hit",
         "display_to_user": False,
         "technical": tech_payload,
     }
