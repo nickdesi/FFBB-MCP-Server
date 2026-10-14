@@ -179,12 +179,18 @@ def _is_entente_name(nom: str | None) -> bool:
     )
 
 
-_PREFIX_CLEAN_RE = re.compile(r"^(IE\s*-\s*|CTC\s+|ENT\.\s*|ENTENTE\s+)", re.IGNORECASE)
+_PREFIX_CLEAN_RE = re.compile(r"^(IE\s*-\s*|CTC\s+|ENT\.\s*|ENTENTE\s+)")
 
 
 def _clean_team_for_match(name: str) -> str:
     """Nettoie les préfixes inter-clubs (CTC, IE, ENT) pour matching normalisé."""
     norm = _normalize_name(name)
+    # ⚡ Bolt: Fast-path literal check avoids executing the regex engine
+    # when the required prefixes ("IE", "CTC", "ENT") are not present.
+    # The regex re.IGNORECASE flag was also removed since _normalize_name
+    # guarantees uppercase strings, eliminating pure Python compilation overhead.
+    if not norm or norm[0] not in "ICE":
+        return norm.strip()
     return _PREFIX_CLEAN_RE.sub("", norm).strip()
 
 
