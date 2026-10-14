@@ -68,17 +68,25 @@
                 "image": "https://ffbb.desimone.fr/logo.webp",
                 "softwareVersion": "1.16.9",
                 "datePublished": "2025-01-01T00:00:00Z",
-                "dateModified": "2026-10-10T19:19:45Z",
+                "dateModified": "2026-10-14T08:00:00Z",
                 "featureList": [
                     "ffbb_team_summary : Synthèse complète d'une équipe (bilan, classement, dernier & prochain match)",
+                    "ffbb_next_match : Prochaine rencontre officielle programmée (date, heure, adversaire, gymnase)",
+                    "ffbb_last_result : Dernier résultat officiel validé et feuille de match",
                     "ffbb_lives : Scores en direct et temps forts de tous les championnats de basketball",
                     "ffbb_bilan : Bilan victoires/défaites et goal-average officiel",
+                    "ffbb_bilan_saison : Bilan approfondi d'une équipe sur l'ensemble des phases d'une saison",
+                    "ffbb_head_to_head : Face-à-face et analyse historique des confrontations directes",
+                    "ffbb_match_lookup : Recherche ciblée d'une rencontre par identifiant ou critères",
                     "ffbb_club : Fiches complètes des clubs, gymnases et coordonnées",
                     "ffbb_search : Recherche universelle multi-index Meilisearch",
-                    "ffbb_next_match : Prochaine rencontre officielle programmée",
-                    "ffbb_last_result : Dernier résultat officiel validé",
-                    "ffbb_search_regulations : Recherche FTS5 dans les règlements officiels FFBB, régionaux et départementaux",
-                    "ffbb_get_regulation_article : Consultation intégrale d'un article de règlement officiel",
+                    "ffbb_resolve_team : Désambiguïsation intelligente pour identifier une équipe unique",
+                    "ffbb_find_team_candidates : Détection et scoring des équipes candidates pour un nom de club",
+                    "ffbb_get : Extraction brute d'une ressource Directus ou Meilisearch par identifiant",
+                    "ffbb_saisons : Catalogue des saisons sportives fédérales disponibles",
+                    "ffbb_version : Diagnostic, transport actif, version FastMCP et SDK",
+                    "ffbb_search_regulations : Recherche FTS5 dans les règlements officiels FFBB, régionaux et comités",
+                    "ffbb_get_regulation_article : Consultation intégrale d'un article de règlement officiel (ex: Art. 28)",
                     "ffbb_explain_tiebreak_rules : Règles officielles de départage en cas d'égalité (Article 28 RSG)",
                     "ffbb_list_regulations : Catalogue des textes réglementaires fédéraux, régionaux et départementaux"
                 ],
@@ -114,7 +122,7 @@
                         "name": "Quelle est la différence entre ffbb.desimone.fr (MCP) et ffbb-api.desimone.fr (API REST) ?",
                         "acceptedAnswer": {
                             "@type": "Answer",
-                            "text": "ffbb.desimone.fr est le serveur MCP dédié aux intelligences artificielles (Claude, Cursor, Copilot) avec 17 outils spécialisés et optimisés en tokens (dont le moteur de règlements FTS5). ffbb-api.desimone.fr est l'API REST FastAPI indépendante et le SDK Python (ffbb-data-client sur PyPI) destinés aux applications web (comme SCBA Bénévolat), sites de clubs et scripts personnalisés."
+                            "text": "ffbb.desimone.fr est le serveur MCP dédié aux intelligences artificielles (Claude, Cursor, Copilot) avec 19 outils spécialisés et optimisés en tokens (dont le moteur de règlements FTS5). ffbb-api.desimone.fr est l'API REST FastAPI indépendante et le SDK Python (ffbb-data-client sur PyPI) destinés aux applications web (comme SCBA Bénévolat), sites de clubs et scripts personnalisés."
                         }
                     },
                     {
@@ -163,7 +171,7 @@
             </a>
             <nav class="main-nav">
                 <a href="#demo">Démo</a>
-                <a href="#outils">17 Outils IA</a>
+                <a href="#outils">19 Outils IA</a>
                 <a href="#integration">Intégration MCP</a>
                 <a href="#architecture">Architecture & API</a>
                 <a href="#dashboard">Dashboard</a>
@@ -183,7 +191,7 @@
         <div class="mobile-nav-drawer" id="mobileDrawer">
             <ul class="mobile-nav-links">
                 <li><a href="#demo" onclick="closeMobileMenu()">🎯 Démo en direct</a></li>
-                <li><a href="#outils" onclick="closeMobileMenu()">⚡ 17 Outils IA Spécialisés</a></li>
+                <li><a href="#outils" onclick="closeMobileMenu()">⚡ 19 Outils IA Spécialisés</a></li>
                 <li><a href="#integration" onclick="closeMobileMenu()">🚀 Intégration 1 Clic (Cursor, Claude, Copilot)</a></li>
                 <li><a href="#architecture" onclick="closeMobileMenu()">🏗️ Architecture & API REST</a></li>
                 <li><a href="#dashboard" onclick="closeMobileMenu()">📊 Dashboard & Santé du Service</a></li>
@@ -214,7 +222,7 @@
                     </p>
                     <div class="hero-actions">
                         <a href="#integration" class="btn btn-primary btn-lg">🚀 Connecter l'IA en 1 Clic</a>
-                        <a href="#outils" class="btn btn-surface btn-lg">⚡ Découvrir les 17 Outils IA</a>
+                        <a href="#outils" class="btn btn-surface btn-lg">⚡ Découvrir les 19 Outils IA</a>
                     </div>
                     <div style="margin-top: 1.25rem;">
                         <a href="https://ffbb-api.desimone.fr" target="_blank" rel="noopener" class="chip chip-indigo" style="text-decoration: none; padding: 0.5rem 1rem; display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.82rem;">
@@ -311,7 +319,7 @@
             <div class="container">
                 <div class="section-head">
                     <span class="chip chip-orange">OUTILS IA</span>
-                    <h2>17 Outils pour explorer tout le basket français & ses règlements</h2>
+                    <h2>19 Outils pour explorer tout le basket français & ses règlements</h2>
                     <p>Votre assistant IA sélectionne automatiquement le meilleur outil pour vous répondre avec une précision totale.</p>
                 </div>
 
@@ -356,6 +364,18 @@
                         <div class="tool-icon">⚔️</div>
                         <h3><code>ffbb_head_to_head</code></h3>
                         <p>Face-à-face et historique des confrontations directes entre deux clubs ou équipes.</p>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-icon">🔍</div>
+                        <h3><code>ffbb_match_lookup</code></h3>
+                        <p>Recherche ciblée et détaillée d'une rencontre par identifiant unique ou critères précis (division, date, salle).</p>
+                    </div>
+
+                    <div class="tool-card">
+                        <div class="tool-icon">👥</div>
+                        <h3><code>ffbb_find_team_candidates</code></h3>
+                        <p>Identification instantanée des équipes candidates pour un nom de club ou d'organisme avec score de confiance.</p>
                     </div>
 
                     <div class="tool-card">
@@ -512,7 +532,7 @@
                         </div>
                         <h3 style="font-size: 1.3rem; margin-bottom: 0.5rem; color: #fff;">FFBB MCP Server</h3>
                         <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5; margin-bottom: 1rem;">
-                            Dédié exclusivement aux <strong>assistants IA & LLMs</strong> (Claude, Cursor, VS Code Copilot, Antigravity). Expose 17 outils standardisés avec agrégation intelligente et un moteur de recherche réglementaire SQLite FTS5.
+                            Dédié exclusivement aux <strong>assistants IA & LLMs</strong> (Claude, Cursor, VS Code Copilot, Antigravity). Expose 19 outils standardisés avec agrégation intelligente et un moteur de recherche réglementaire SQLite FTS5.
                         </p>
                         <ul style="color: var(--text-secondary); font-size: 0.85rem; space-y: 0.5rem; padding-left: 1.2rem; margin-bottom: 1.5rem;">
                             <li>Protocole Streamable HTTP / SSE standard</li>
@@ -619,7 +639,7 @@ lives = client.<span style="color: #d2a8ff;">get_lives</span>()
                             <span class="faq-plus">+</span>
                         </div>
                         <div class="faq-answer-row">
-                            <p>Il suffit d'ajouter l'URL <code>https://ffbb.desimone.fr/mcp</code> dans votre client MCP (Cursor, Claude Desktop, Copilot, Antigravity). Votre IA saura automatiquement utiliser les 17 outils spécialisés pour vous répondre.</p>
+                            <p>Il suffit d'ajouter l'URL <code>https://ffbb.desimone.fr/mcp</code> dans votre client MCP (Cursor, Claude Desktop, Copilot, Antigravity). Votre IA saura automatiquement utiliser les 19 outils spécialisés pour vous répondre.</p>
                         </div>
                     </div>
 

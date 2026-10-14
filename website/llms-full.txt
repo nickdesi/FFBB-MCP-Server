@@ -4,7 +4,7 @@
 Le serveur **FFBB MCP Server** est une passerelle officielle et haute performance connectant les modèles de langage (Claude, Cursor, GitHub Copilot, ChatGPT, Antigravity) et les applications aux bases de données officielles et aux règlements de la Fédération Française de BasketBall (FFBB).
 
 Il repose sur une architecture modulaire :
-1. **Couche Métier MCP (FastMCP / Starlette / Uvicorn)** : Expose 17 outils haut niveau optimisés pour les LLMs (agrégation "one-shot", cache TTL adaptatif, gestion proactive du token).
+1. **Couche Métier MCP (FastMCP / Starlette / Uvicorn)** : Expose 19 outils haut niveau optimisés pour les LLMs (agrégation "one-shot", cache TTL adaptatif, gestion proactive du token).
 2. **Moteur Réglementaire FTS5 (`src/ffbb_mcp/regulations/`)** : Index SQLite FTS5 plein texte intégrant les Règlements Sportifs Généraux (RSG 2026-2027), les règlements particuliers (NM1-NM3, LF2-NF3, U15/U18 Élite), les ligues régionales (IDF, HDF, AURA) et les comités départementaux (75, 59, 69, 63, 03) avec mécanisme de fallback fédéral universel.
 3. **Couche Moteur Données Python (`ffbb-data-client`)** : SDK Python asynchrone (Pydantic v2, HTTPX, Hishel SQLite cache, Directus REST API + Meilisearch).
 

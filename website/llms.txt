@@ -1,5 +1,5 @@
 # FFBB MCP Server — Serveur Model Context Protocol pour le Basket Français
-> Serveur FastMCP public et open-source exposant 17 outils d'agrégation et de recherche réglementaire pour interroger les données officielles et règlements de la Fédération Française de BasketBall (FFBB) depuis n'importe quel client MCP (Claude Desktop, Cursor, VS Code Copilot, ChatGPT, Antigravity, OpenCode).
+> Serveur FastMCP public et open-source exposant 19 outils d'agrégation et de recherche réglementaire pour interroger les données officielles et règlements de la Fédération Française de BasketBall (FFBB) depuis n'importe quel client MCP (Claude Desktop, Cursor, VS Code Copilot, ChatGPT, Antigravity, OpenCode).
 > Propulsé par le SDK Python officiel et l'API REST `ffbb-data-client` (https://ffbb-api.desimone.fr).
 
 ## Endpoints Publics & Ressources
@@ -9,10 +9,10 @@
 - Healthcheck : https://ffbb.desimone.fr/health
 - Dépôt GitHub MCP : https://github.com/nickdesi/FFBB-MCP-Server
 - API REST Dédiée (FastAPI / Swagger) : https://ffbb-api.desimone.fr
-- SDK Python (ffbb-data-client) : https://nickdesi.github.io/ffbb-data-client/
+- SDK Python & API REST : https://ffbb-api.desimone.fr
 - Package PyPI : https://pypi.org/project/ffbb-data-client/
 
-## 17 Outils MCP Disponibles
+## 19 Outils MCP Disponibles
 1. `ffbb_team_summary` : 1 appel pour bilan + classement complet + dernier/prochain match d'une équipe. Préférer cet outil pour toute question combinant résultats et classement.
 2. `ffbb_lives` : Scores en direct, statut et temps forts des rencontres du week-end sur toutes les divisions françaises.
 3. `ffbb_bilan` : Bilan victoires / défaites exhaustif, points marqués/encaissés et goal-average d'une équipe.
@@ -22,14 +22,16 @@
 7. `ffbb_last_result` : Dernier résultat et score officiel enregistré pour une équipe.
 8. `ffbb_bilan_saison` : Bilan approfondi d'une équipe sur l'ensemble des phases d'une saison sportive.
 9. `ffbb_head_to_head` : Face-à-face et analyse historique des confrontations directes entre deux clubs ou équipes.
-10. `ffbb_resolve_team` : Pivot central de désambiguïsation pour identifier une équipe unique à partir d'un nom ou d'un club.
-11. `ffbb_get` : Récupération brute d'une ressource FFBB par son identifiant unique.
-12. `ffbb_saisons` : Liste des saisons sportives disponibles (historique et saison en cours).
-13. `ffbb_version` : Informations de version, configuration runtime et santé du serveur.
-14. `ffbb_search_regulations` : Recherche plein texte déterministe (FTS5) dans les règlements officiels FFBB (RSG, règlements particuliers, ligues et comités avec fallback fédéral).
-15. `ffbb_get_regulation_article` : Récupération intégrale et exacte du texte d'un article réglementaire sans troncature.
-16. `ffbb_explain_tiebreak_rules` : Explication et calcul officiel des règles de départage en cas d'égalité (Article 28 du RSG FFBB).
-17. `ffbb_list_regulations` : Catalogue complet des textes réglementaires fédéraux, régionaux et comités disponibles.
+10. `ffbb_match_lookup` : Recherche ciblée et détaillée d'une rencontre par identifiant ou critères (division, date, salle).
+11. `ffbb_resolve_team` : Pivot central de désambiguïsation pour identifier une équipe unique à partir d'un nom ou d'un club.
+12. `ffbb_find_team_candidates` : Identification instantanée des équipes candidates pour un nom de club ou d'organisme.
+13. `ffbb_get` : Récupération brute d'une ressource FFBB par son identifiant unique.
+14. `ffbb_saisons` : Liste des saisons sportives disponibles (historique et saison en cours).
+15. `ffbb_version` : Informations de version, configuration runtime et santé du serveur.
+16. `ffbb_search_regulations` : Recherche plein texte déterministe (FTS5) dans les règlements officiels FFBB (RSG, règlements particuliers, ligues et comités avec fallback fédéral).
+17. `ffbb_get_regulation_article` : Récupération intégrale et exacte du texte d'un article réglementaire sans troncature.
+18. `ffbb_explain_tiebreak_rules` : Explication et calcul officiel des règles de départage en cas d'égalité (Article 28 du RSG FFBB).
+19. `ffbb_list_regulations` : Catalogue complet des textes réglementaires fédéraux, régionaux et comités disponibles.
 
 ## Configuration pour Clients IA
 
@@ -66,7 +68,6 @@
   }
 }
 ```
-
 ### Google Antigravity (mcp_config.json)
 ```json
 {
