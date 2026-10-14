@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.16.10] - 2026-10-14
+
+### Changed & Hardened
+- **Routage Directus & Résilience WAF** : Bascule native du client API vers l'origine `https://bo.ffbb.com/` (avec miroir `https://bo.ffbb.app/`), éliminant définitivement les erreurs 403 HTML de l'ancienne pullzone BunnyCDN `api.ffbb.app`.
+- **Durcissement User-Agent & Résolution Miroir** : Normalisation de l'User-Agent iOS Safari authentique et robustesse accrue lors de la résolution des jetons d'accès.
+- **Optimisation de Performance (Core)** : Déroulage des expressions génératrices `any()` dans les parcours critiques de calendrier et de résolution d'équipe.
+- **Audit de Pagination & Résolution** : Amélioration de la traçabilité et fiabilisation des parcours paginés d'organismes et de rencontres.
+
+### Added & Documented
+- **Catalogue Officiel 19 Outils Synchronisé** : Actualisation complète de la documentation (`TOOLS_REFERENCE.md`, `website-docs`), des balises Open Graph, du schema JSON-LD et de la vitrine web `https://ffbb.desimone.fr`.
+- **Dépendance ffbb-data-client v2.4.38** : Montée vers la dernière version du SDK officiel intégrant le probing dynamique des bundles Next.js et la remédiation CodeQL.
+
 ## [1.16.9] - 2026-10-10
 
 ### Fixed
