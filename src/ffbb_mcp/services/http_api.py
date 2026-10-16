@@ -17,6 +17,8 @@ import datetime
 import re
 from typing import Any
 
+from ffbb_data_client.config import API_FFBB_BASE_URL
+
 WEEKDAYS_FR = [
     "Lundi",
     "Mardi",
@@ -151,7 +153,7 @@ async def fetch_club_matches(
     if getattr(org, "logo", None):
         logo_id = getattr(org.logo, "id", None) or org.logo
         if logo_id:
-            club_logo_url = f"https://api.ffbb.com/assets/{logo_id}"
+            club_logo_url = f"{API_FFBB_BASE_URL}assets/{logo_id}"
 
     engagements = getattr(org, "engagements", []) or []
     matches_list: list[dict[str, Any]] = []
@@ -314,7 +316,7 @@ async def fetch_club_matches(
                 if org_data and getattr(org_data, "logo", None):
                     logo_id = getattr(org_data.logo, "id", None) or org_data.logo
                     if logo_id:
-                        return org_id, f"https://api.ffbb.com/assets/{logo_id}"
+                        return org_id, f"{API_FFBB_BASE_URL}assets/{logo_id}"
             except Exception:
                 pass
             return org_id, None

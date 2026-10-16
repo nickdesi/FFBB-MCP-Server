@@ -20,6 +20,8 @@ async def get_client_async(*args, **kwargs):
 
 import re
 
+from ffbb_data_client.config import API_FFBB_BASE_URL
+
 from ffbb_mcp.utils import (
     clean_serialized_data,
     format_team_name,
@@ -245,7 +247,7 @@ async def format_poule_response(poule_data: dict) -> dict[str, Any]:
         c["equipe"] = format_team_name(nom, num)
         _, logo_id = resolve_relation_field(eng, "logo")
         c["logo_url"] = (
-            f"https://api.ffbb.com/assets/{logo_id}?height=220&fit=contain&format=avif"
+            f"{API_FFBB_BASE_URL}assets/{logo_id}?height=220&fit=contain&format=avif"
             if logo_id
             else None
         )
@@ -442,7 +444,7 @@ async def ffbb_get_classement_service(
             _, eng_logo_id = resolve_relation_field(eng, "logo")
             logo_id = c.get("organisme_logo_id") or eng_logo_id
             logo_url = (
-                f"https://api.ffbb.com/assets/{logo_id}?height=220&fit=contain&format=avif"
+                f"{API_FFBB_BASE_URL}assets/{logo_id}?height=220&fit=contain&format=avif"
                 if logo_id
                 else None
             )

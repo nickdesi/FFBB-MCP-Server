@@ -428,7 +428,7 @@ class TestFormatPouleResponse:
         assert str(result["id"]) == "42"
         assert result["nom"] == "Poule A"
         assert result["classements"][0]["equipe"] == "CSB REVARD"
-        assert "api.ffbb.com/assets/abc123" in result["classements"][0]["logo_url"]
+        assert "assets/abc123" in result["classements"][0]["logo_url"]
         assert result["rencontres"][0]["nomEquipe1"] == "CLUB A"
 
     async def test_truncation(self, monkeypatch):

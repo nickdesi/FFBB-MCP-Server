@@ -99,6 +99,11 @@ _GENERIC_CLUB_WORDS: frozenset[str] = frozenset(
         "CA",
         "SA",
         "PL",
+        "SAINT",
+        "SAINTE",
+        "ASPTT",
+        "FOYER",
+        "FRATERNELLE",
     ]
 )
 
