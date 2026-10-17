@@ -63,7 +63,7 @@ def test_1_rfu13_brassage_undocumented_or_raw_fallback():
 def test_2_official_mapping_directus_reference():
     """Test 2 — Mapping officiel trouvé dans ffbb-api (Directus schema metadata).
 
-    Source officielle : GET https://api.ffbb.app/fields/ffbbserver_competitions/typeCompetition
+    Source officielle : GET https://bo.ffbb.com/fields/ffbbserver_competitions/typeCompetition
     L'API Directus expose la liste des choix officiels :
     - DIV -> Championnat
     - COUPE -> Coupe

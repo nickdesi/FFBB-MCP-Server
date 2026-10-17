@@ -127,7 +127,7 @@ async def test_team_summary_short_answer_formats_perdus_and_dynamique_cleanly():
 def test_handle_api_error_403_mentions_invalid_id_and_archived_season():
     from httpx import HTTPStatusError, Request, Response
 
-    req = Request("GET", "https://api.ffbb.app/items/rencontres/999999999")
+    req = Request("GET", "https://bo.ffbb.com/items/rencontres/999999999")
     resp = Response(
         403,
         request=req,

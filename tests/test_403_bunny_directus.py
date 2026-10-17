@@ -13,7 +13,7 @@ from ffbb_mcp.services.common import handle_api_error
 
 
 def _http_error(status: int, content_type: str, body: bytes) -> HTTPStatusError:
-    req = Request("GET", "https://api.ffbb.app/items/ffbbserver_competitions/1")
+    req = Request("GET", "https://bo.ffbb.com/items/ffbbserver_competitions/1")
     resp = Response(
         status, request=req, headers={"content-type": content_type}, content=body
     )
