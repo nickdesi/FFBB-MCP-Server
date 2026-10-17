@@ -107,3 +107,11 @@
 ## 2026-11-20 - Fast-path literal removal over `re.sub`
 **Learning:** Using chained `str.replace()` (e.g., `text.replace('h', '').replace('H', '').replace(':', '')`) is significantly faster (~5x in microbenchmarks) than using `re.sub(r'[hH:]', '', text)` for removing a small, fixed set of characters from a string. Additionally, pre-compiling multiple regex patterns for inline string extraction (like `re.search(r'U\s*(\d+)', ...)`) yields a ~2x speedup compared to calling `re.search` repeatedly inside a hot function, since it skips the internal cache lookup.
 **Action:** When stripping a few known literal characters, prefer chained `.replace()` calls over regular expressions. Always hoist `re.compile()` calls to the module level for regexes used within repeatedly called functions.
+
+## 2026-12-14 - Fast-path for type casting loosely typed data
+**Learning:** When a function accepts loosely typed data (e.g., `int | str`) and wraps type casting like `int(str(val))` in a `try...except` block, adding an explicit type-check fast path (`if type(val) is int:`) bypasses the exception handling and type casting overhead, significantly improving performance for native primitives in hot paths.
+**Action:** Add explicit exact type checks (`type(val) is int`) before performing expensive conversions (`int(str(val))`) in heavily iterated loops processing loosely typed payloads.
+
+## 2026-12-14 - Fast-path for type casting loosely typed data (Dynamique extension)
+**Learning:** The fast-path optimization (`s = score if type(score) is int else int(str(score))`) to bypass `int(str())` overhead must be applied consistently across *all* identical pattern sweeps within the same architectural layer, including `src/ffbb_mcp/dynamique.py`.
+**Action:** When identifying a performance bottleneck in data processing loops, sweep the entire codebase for identical logic blocks (like the FFBB matches loop parsing `resultatEquipe1` and `resultatEquipe2`) and apply the optimization globally.

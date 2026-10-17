@@ -101,7 +101,8 @@ def compute_poule_advanced_stats(
         if score1 in (None, "None", "") or score2 in (None, "None", ""):
             continue
         try:
-            s1, s2 = int(str(score1)), int(str(score2))
+            s1 = score1 if type(score1) is int else int(str(score1))
+            s2 = score2 if type(score2) is int else int(str(score2))
         except (ValueError, TypeError):
             continue
 
@@ -265,7 +266,8 @@ def compute_head_to_head(
         if score1 in (None, "None", "") or score2 in (None, "None", ""):
             continue
         try:
-            s1, s2 = int(str(score1)), int(str(score2))
+            s1 = score1 if type(score1) is int else int(str(score1))
+            s2 = score2 if type(score2) is int else int(str(score2))
         except (ValueError, TypeError):
             continue
 
