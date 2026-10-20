@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import re
 from typing import Any
 
 from ffbb_mcp.regulations.engine import get_regulations_engine
 
 logger = logging.getLogger(__name__)
+
+# ⚡ Bolt: Pre-compiled regex for removing trailing team numbers in H2H normalization
+_H2H_TEAM_CLEAN_RE = re.compile(r"\s+-\s+\d+$")
 
 
 async def search_regulations_service(
@@ -115,9 +119,7 @@ async def get_regulation_article_service(
 
 
 def _normalize_team_for_h2h(name: str) -> str:
-    import re
-
-    return re.sub(r"\s+-\s+\d+$", "", name.strip().upper())
+    return _H2H_TEAM_CLEAN_RE.sub("", name.strip().upper())
 
 
 def _analyze_poule_tiebreaks(

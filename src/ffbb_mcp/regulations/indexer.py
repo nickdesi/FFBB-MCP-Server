@@ -23,6 +23,9 @@ ARTICLE_HEADER_PATTERN = re.compile(
     re.IGNORECASE | re.MULTILINE,
 )
 
+# ⚡ Bolt: Pre-compiled regex for stripping non-word characters in article numbers
+_NON_WORD_RE = re.compile(r"[^\w]+")
+
 
 def parse_markdown_document(
     file_path: Path,
@@ -170,7 +173,7 @@ def parse_markdown_document(
             art_nature = "verbatim"
 
         # Création de l'ID unique
-        safe_num = re.sub(r"[^\w]+", "_", art_num.lower()).strip("_")
+        safe_num = _NON_WORD_RE.sub("_", art_num.lower()).strip("_")
         art_id = f"{doc_id}_{safe_num}"
 
         art = RegulationArticle(

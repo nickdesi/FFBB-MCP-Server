@@ -19,6 +19,10 @@ from .models import RegulationArticle, RegulationSearchResult
 
 logger = logging.getLogger(__name__)
 
+# ⚡ Bolt: Pre-compiled regexes for regulations text processing
+_FTS5_CLEAN_RE = re.compile(r"[^\w\s\-\.\']+", flags=re.UNICODE)
+_ART_NUM_CLEAN_RE = re.compile(r"[^\w\.]+")
+
 
 def _strip_accents(text: str) -> str:
     """Normalise une chaîne en minuscules sans accents pour le matching sémantique."""
@@ -83,7 +87,7 @@ def find_default_manifest_path() -> Path | None:
 def _sanitize_fts5_query(raw_query: str) -> str:
     """Nettoie et formate la requête utilisateur pour SQLite FTS5."""
     # Remplacer les caractères spéciaux FTS5
-    cleaned = re.sub(r"[^\w\s\-\.\']+", " ", raw_query, flags=re.UNICODE)
+    cleaned = _FTS5_CLEAN_RE.sub(" ", raw_query)
     terms = [t.strip() for t in cleaned.split() if len(t.strip()) > 1]
     if not terms:
         return ""
@@ -409,7 +413,7 @@ class RegulationsEngine:
             params.append(f"%{organizer}%")
         if article_number:
             # Accepter "28", "Article 28", "art. 28", etc.
-            num_clean = re.sub(r"[^\w\.]+", "", article_number).lower()
+            num_clean = _ART_NUM_CLEAN_RE.sub("", article_number).lower()
             sql += " AND (LOWER(REPLACE(article_number, ' ', '')) LIKE ? OR article_number LIKE ?)"
             params.append(f"%{num_clean}%")
             params.append(f"%{article_number}%")
