@@ -271,7 +271,8 @@ async def resolve_engagement_refs(
     raw_num = getattr(data, "numeroEquipe", None)
     if raw_num is not None:
         try:
-            parsed = int(str(raw_num))
+            # ⚡ Bolt: Fast-path for integers avoids type coercion overhead
+            parsed = raw_num if type(raw_num) is int else int(str(raw_num))
         except (TypeError, ValueError):
             parsed = None
         if parsed and parsed > 1:
