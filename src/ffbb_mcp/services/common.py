@@ -404,6 +404,36 @@ async def disambiguate_clubs_by_category(
     return resolved_clubs, None
 
 
+_GENERIC_WORDS = frozenset(
+    [
+        "BASKET",
+        "BASKETBALL",
+        "CLUB",
+        "BC",
+        "BBC",
+        "AS",
+        "CS",
+        "US",
+        "AL",
+        "IE",
+        "CTC",
+        "ENT",
+        "BALL",
+        "LOIRE",
+        "SUD",
+        "NORD",
+        "EST",
+        "OUEST",
+        "SAINT",
+        "SAINTE",
+        "ETOILE",
+        "STADE",
+        "AMICALE",
+        "OLYMPIQUE",
+    ]
+)
+
+
 def is_club_match_confident(
     candidate: dict[str, Any] | None, query: str | None
 ) -> bool:
@@ -450,33 +480,8 @@ def is_club_match_confident(
     # Les mots génériques ne suffisent pas (ex: "BASKET", "CLUB", "LOIRE")
     # Inclut les déterminants et prépositions français courants qui gonflent
     # artificiellement le score JW sans apporter de signal distinctif.
-    generic_words = {
-        "BASKET",
-        "BASKETBALL",
-        "CLUB",
-        "BC",
-        "BBC",
-        "AS",
-        "CS",
-        "US",
-        "AL",
-        "IE",
-        "CTC",
-        "ENT",
-        "BALL",
-        "LOIRE",
-        "SUD",
-        "NORD",
-        "EST",
-        "OUEST",
-        "SAINT",
-        "SAINTE",
-        "ETOILE",
-        "STADE",
-        "AMICALE",
-        "OLYMPIQUE",
-    }
-    q_words = [w for w in q_norm.split() if len(w) >= 4 and w not in generic_words]
+
+    q_words = [w for w in q_norm.split() if len(w) >= 4 and w not in _GENERIC_WORDS]
     cand_words = set(cand_nom_norm.split())
     has_distinctive_word = any(w in cand_words for w in q_words)
 
