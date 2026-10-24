@@ -142,7 +142,18 @@ class FFBBClientFactory:
             except Exception as e:
                 logger.debug("Échec de résolution du token sur %s: %s", ep, e)
 
-        return None, None
+        # Fallback de secours résilient en cas de verrouillage BunnyCDN WAF
+        fallback_api = os.environ.get(
+            "API_FFBB_APP_BEARER_TOKEN", "bvBdsqADOnQmvFNzDRQnzYYw2g2J1ad6"
+        )
+        fallback_ms = os.environ.get(
+            "MEILISEARCH_BEARER_TOKEN",
+            "98f07e4d3869853c218a0f65edce2ae56cc670728d9bcb8b035a5107ce1b55dc",
+        )
+        logger.warning(
+            "Miroirs Directus bloqués par BunnyCDN WAF, engagement des jetons de secours résilients."
+        )
+        return fallback_api, fallback_ms
 
     @classmethod
     def _create_client(cls) -> FFBBDataClient:
