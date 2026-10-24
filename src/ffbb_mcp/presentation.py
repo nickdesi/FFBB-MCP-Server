@@ -212,7 +212,8 @@ def evaluate_round_reliability(
         parsed_ctx: list[int] = []
         for r in context_rounds:
             try:
-                parsed_ctx.append(int(str(r).strip()))
+                # ⚡ Bolt: Fast-path for integers avoids type coercion overhead
+                parsed_ctx.append(r if type(r) is int else int(str(r).strip()))
             except (ValueError, TypeError):
                 continue
 
