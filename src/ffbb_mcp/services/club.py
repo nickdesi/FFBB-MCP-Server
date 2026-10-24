@@ -208,6 +208,7 @@ async def ffbb_equipes_club_service(
             "sexe": comp.get("sexe", ""),
             "categorie": categorie_code,
             "niveau": comp.get("competition_origine_niveau"),
+            "competitionsUrl": e.get("competitionsUrl"),
         }
         all_teams.append(team_info)
 
@@ -865,8 +866,17 @@ async def _fetch_poule_matches(
             poule_getter = poule_fn
 
         poule = await poule_getter(pid, force_refresh=force_refresh)
+        raw_rencontres = poule.get("rencontres") or []
+        comp_url = eq.get("competitionsUrl")
+        if not raw_rencontres and isinstance(comp_url, str) and comp_url:
+            from .poule import fetch_edge_equipe_page
+
+            edge_data = await fetch_edge_equipe_page(comp_url)
+            if edge_data and edge_data.get("matches"):
+                raw_rencontres = edge_data["matches"]
+
         matches: list[tuple[dict, dict]] = []
-        for m in poule.get("rencontres") or []:
+        for m in raw_rencontres:
             eng1 = m.get("idEngagementEquipe1")
             eng2 = m.get("idEngagementEquipe2")
             id_eng1 = str(eng1.get("id") if isinstance(eng1, dict) else eng1)
@@ -1124,9 +1134,12 @@ async def ffbb_next_match_service(
     if match_id:
         from .search import get_rencontre_service
 
-        rencontre_detail = await get_rencontre_service(match_id)
-        if rencontre_detail:
-            next_match.update(rencontre_detail)
+        try:
+            rencontre_detail = await get_rencontre_service(match_id)
+            if rencontre_detail:
+                next_match.update(rencontre_detail)
+        except Exception as exc:
+            logger.debug("Échec enrichissement détail match %s: %s", match_id, exc)
 
     eng1 = next_match.get("idEngagementEquipe1")
     eng2 = next_match.get("idEngagementEquipe2")
@@ -1532,9 +1545,14 @@ async def ffbb_last_result_service(
     if dernier_id:
         from .search import get_rencontre_service
 
-        rencontre_detail = await get_rencontre_service(dernier_id)
-        if rencontre_detail:
-            dernier.update(rencontre_detail)
+        try:
+            rencontre_detail = await get_rencontre_service(dernier_id)
+            if rencontre_detail:
+                dernier.update(rencontre_detail)
+        except Exception as exc:
+            logger.debug(
+                "Échec enrichissement détail dernier match %s: %s", dernier_id, exc
+            )
 
     eng1 = dernier.get("idEngagementEquipe1")
     eng2 = dernier.get("idEngagementEquipe2")

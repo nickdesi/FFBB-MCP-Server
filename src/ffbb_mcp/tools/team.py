@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
@@ -565,10 +566,10 @@ async def ffbb_team_summary(
                 organisme_id=effective_org_id,
                 categorie=categorie,
                 numero_equipe=resolved_num,
-                engagement_id=effective_engagement_id,
-                competition_id=effective_competition_id,
+                engagement_id=engagement_id,
+                competition_id=competition_id,
                 competition_type=competition_type,
-                poule_id=effective_poule_id,
+                poule_id=poule_id,
                 season_id=season_id,
                 force_refresh=force_refresh,
             )
@@ -581,10 +582,10 @@ async def ffbb_team_summary(
                 organisme_id=effective_org_id,
                 categorie=categorie,
                 numero_equipe=resolved_num,
-                engagement_id=effective_engagement_id,
-                competition_id=effective_competition_id,
+                engagement_id=engagement_id,
+                competition_id=competition_id,
                 competition_type=competition_type,
-                poule_id=effective_poule_id,
+                poule_id=poule_id,
                 season_id=season_id,
                 force_refresh=force_refresh,
             )
@@ -821,13 +822,6 @@ async def ffbb_team_summary(
         cleaned_last_match = _clean_match_item(last_match) if want_last else None
         cleaned_next_match = _clean_match_item(next_match) if want_next else None
 
-        team_name_str = (
-            (team_data.get("team_label") if isinstance(team_data, dict) else None)
-            or (team_data.get("nom_equipe") if isinstance(team_data, dict) else None)
-            or (team_data.get("nom") if isinstance(team_data, dict) else None)
-            or club_name
-            or "Équipe"
-        )
         raw_summary = bilan.get("bilan_total") if isinstance(bilan, dict) else None
         summary_dict: dict[str, Any] = (
             raw_summary if isinstance(raw_summary, dict) else {}
@@ -836,9 +830,168 @@ async def ffbb_team_summary(
             isinstance(raw_summary, dict)
             and bool(raw_summary)
             and any(
-                k in raw_summary
+                raw_summary.get(k) not in (0, "0", None)
                 for k in ("victoires", "defaites", "gagnes", "perdus", "match_joues")
             )
+        )
+
+        candidate_urls: list[str] = []
+        for cand in [resolved_team, team_data] + (
+            resolve_result.get("candidates") or []
+        ):
+            if isinstance(cand, dict) and cand.get("competitionsUrl"):
+                u = str(cand["competitionsUrl"])
+                if u not in candidate_urls:
+                    candidate_urls.append(u)
+
+        for c_url in candidate_urls:
+            raw_last_status = (
+                raw_last.get("status") if isinstance(raw_last, dict) else None
+            )
+            can_enrich_last = (
+                want_last
+                and not cleaned_last_match
+                and raw_last_status not in ("ambiguous", "no_recent_match")
+            )
+            raw_next_status = (
+                raw_next.get("status") if isinstance(raw_next, dict) else None
+            )
+            can_enrich_next = (
+                want_next
+                and not cleaned_next_match
+                and raw_next_status not in ("ambiguous", "no_upcoming_match")
+            )
+            can_enrich_classement = want_classement and not compact_classement.get(
+                "rows"
+            )
+            can_enrich_bilan = not has_real_bilan
+
+            if not (
+                can_enrich_last
+                or can_enrich_next
+                or can_enrich_classement
+                or can_enrich_bilan
+            ):
+                break
+
+            from ffbb_mcp.services.poule import fetch_edge_equipe_page
+
+            edge_data = await fetch_edge_equipe_page(c_url)
+            if not edge_data:
+                continue
+
+            if can_enrich_last and edge_data.get("matches"):
+                played = [
+                    m
+                    for m in edge_data["matches"]
+                    if m.get("joue") or m.get("resultatEquipe1") is not None
+                ]
+                played.sort(
+                    key=lambda x: str(x.get("date_rencontre") or ""), reverse=True
+                )
+                if played:
+                    lm = played[0]
+                    sc1 = lm.get("resultatEquipe1")
+                    sc2 = lm.get("resultatEquipe2")
+                    cleaned_last_match = {
+                        "id": str(lm.get("id")),
+                        "date_rencontre": lm.get("date_rencontre"),
+                        "equipe_domicile": lm.get("nomEquipe1"),
+                        "equipe_exterieur": lm.get("nomEquipe2"),
+                        "score_domicile": int(sc1) if str(sc1).isdigit() else sc1,
+                        "score_exterieur": int(sc2) if str(sc2).isdigit() else sc2,
+                        "joue": True,
+                        "numero_journee": lm.get("numeroJournee"),
+                        "url_competition": lm.get("url_competition"),
+                    }
+
+            if can_enrich_next and edge_data.get("matches"):
+                unplayed = [
+                    m
+                    for m in edge_data["matches"]
+                    if not m.get("joue") and m.get("resultatEquipe1") is None
+                ]
+                unplayed.sort(key=lambda x: str(x.get("date_rencontre") or ""))
+                if unplayed:
+                    nm = unplayed[0]
+                    cleaned_next_match = {
+                        "id": str(nm.get("id")),
+                        "date_rencontre": nm.get("date_rencontre"),
+                        "equipe_domicile": nm.get("nomEquipe1"),
+                        "equipe_exterieur": nm.get("nomEquipe2"),
+                        "joue": False,
+                        "numero_journee": nm.get("numeroJournee"),
+                        "url_competition": nm.get("url_competition"),
+                    }
+
+            if can_enrich_classement and edge_data.get("rankings"):
+                rows: list[list[Any]] = []
+                target_pos_found = None
+                for r in edge_data.get("rankings", []):
+                    try:
+                        pos = int(r.get("position") or len(rows) + 1)
+                    except (ValueError, TypeError):
+                        pos = len(rows) + 1
+                    eq_nom = str(
+                        r.get("label")
+                        or r.get("organisme_nom")
+                        or (r.get("idEngagement") or {}).get("nom")
+                        or ""
+                    )
+                    pts = int(r.get("points") or 0)
+                    diff = 0
+                    for cl_item in edge_data.get("classement", []):
+                        if str(cl_item.get("position")) == str(pos):
+                            diff = int(cl_item.get("difference") or 0)
+                            break
+                    rows.append([pos, eq_nom, pts, diff])
+                    if str(r.get("position")) == "1" and target_pos_found is None:
+                        target_pos_found = pos
+                if rows:
+                    target_pos = target_pos_found or 1
+                    compact_classement = {
+                        "cols": ["pos", "equipe", "pts", "diff"],
+                        "rows": rows,
+                        "target_pos": target_pos,
+                    }
+                    if "classement_indisponible" in warnings_list:
+                        warnings_list.remove("classement_indisponible")
+
+            if not has_real_bilan and edge_data.get("classement"):
+                cl0 = edge_data["classement"][0]
+                v = int(cl0.get("gagnes") or 0)
+                d = int(cl0.get("perdus") or 0)
+                mj = int(cl0.get("matchJoues") or (v + d))
+                if mj > 0:
+                    raw_summary = {
+                        "victoires": v,
+                        "defaites": d,
+                        "gagnes": v,
+                        "perdus": d,
+                        "match_joues": mj,
+                        "points": int(cl0.get("points") or 0),
+                        "difference": int(cl0.get("difference") or 0),
+                        "paniers_marques": int(cl0.get("paniersMarques") or 0),
+                        "paniers_encaisses": int(cl0.get("paniersEncaisses") or 0),
+                    }
+                    summary_dict = raw_summary
+                    has_real_bilan = True
+                    bilan_pos = cl0.get("position")
+                    if bilan_pos:
+                        with contextlib.suppress(ValueError, TypeError):
+                            target_pos = int(bilan_pos)
+
+        if cleaned_last_match and not last_match:
+            last_match = {"status": "ok", "match": cleaned_last_match}
+        if cleaned_next_match and not next_match:
+            next_match = {"status": "ok", "match": cleaned_next_match}
+
+        team_name_str = (
+            (team_data.get("team_label") if isinstance(team_data, dict) else None)
+            or (team_data.get("nom_equipe") if isinstance(team_data, dict) else None)
+            or (team_data.get("nom") if isinstance(team_data, dict) else None)
+            or club_name
+            or "Équipe"
         )
         if not has_real_bilan:
             bilan_phrase = "bilan non disponible"

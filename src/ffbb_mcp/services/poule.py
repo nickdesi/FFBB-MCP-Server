@@ -58,6 +58,7 @@ _NORM_PATTERN = re.compile(r"[^a-z0-9]")
 __all__ = [
     "_fetch_lives",
     "_is_live_match",
+    "fetch_edge_equipe_page",
     "ffbb_get_classement_service",
     "find_team_poule_service",
     "format_compact_classement",
@@ -175,13 +176,28 @@ async def get_poule_service(
 
     async def _fetch() -> dict:
         client = await get_client_async()
-        poule = await _with_ffbb_semaphore(
-            _safe_call_with_inflight(
-                f"Poule {poule_id_int}",
-                lambda: client.get_poule_async(poule_id=poule_id_int),
-            ),
-        )
-        data = serialize_model(poule) or {}
+        data: dict = {}
+        try:
+            poule = await _with_ffbb_semaphore(
+                _safe_call_with_inflight(
+                    f"Poule {poule_id_int}",
+                    lambda: client.get_poule_async(poule_id=poule_id_int),
+                ),
+            )
+            data = serialize_model(poule) or {}
+        except Exception as e:
+            logger.warning(
+                "Directus 403/erreur sur Poule %s (%s). Fallback résilient...",
+                poule_id_int,
+                e,
+            )
+            data = {
+                "id": str(poule_id_int),
+                "nom": f"Poule {poule_id_int}",
+                "rencontres": [],
+                "classements": [],
+                "_cdn_fallback": True,
+            }
 
         rencontres = data.get("rencontres") or []
         restantes_par_equipe: dict[str, list[dict]] = {}
@@ -337,6 +353,154 @@ async def format_poule_response(poule_data: dict) -> dict[str, Any]:
     return res
 
 
+def _get_meilisearch_auth() -> tuple[str, str]:
+    import os
+
+    from ffbb_data_client.config import MEILISEARCH_BASE_URL
+
+    token = (
+        os.environ.get("MEILISEARCH_BEARER_TOKEN")
+        or "98f07e4d3869853c218a0f65edce2ae56cc670728d9bcb8b035a5107ce1b55dc"
+    )
+    url = (os.environ.get("MEILISEARCH_URL") or MEILISEARCH_BASE_URL).rstrip("/")
+    return url, token
+
+
+async def _get_organisme_from_meilisearch(organisme_id: int | str) -> dict[str, Any]:
+    """Reconstitue un organisme et l'intégralité de ses engagements depuis Meilisearch sans Directus."""
+    import httpx
+
+    org_id_str = str(organisme_id).strip()
+    meili_url, meili_token = _get_meilisearch_auth()
+    headers = {"Authorization": f"Bearer {meili_token}"}
+    try:
+        async with httpx.AsyncClient(headers=headers, timeout=10.0) as http_client:
+            res_org = await http_client.post(
+                f"{meili_url}/indexes/ffbbserver_organismes/search",
+                json={"q": org_id_str, "limit": 20},
+            )
+            hits = res_org.json().get("hits", []) if res_org.status_code == 200 else []
+            org_hit = None
+            for h in hits:
+                if (
+                    str(h.get("id")) == org_id_str
+                    or str(h.get("code", "")).upper() == org_id_str.upper()
+                ):
+                    org_hit = h
+                    break
+
+            if not org_hit:
+                return {}
+
+            club_code = org_hit.get("code")
+            club_nom = org_hit.get("nom", "")
+
+            engagements = []
+            if club_code:
+                res_eng = await http_client.post(
+                    f"{meili_url}/indexes/ffbbserver_engagements/search",
+                    json={"q": club_code, "limit": 100},
+                )
+                if res_eng.status_code == 200:
+                    eng_hits = res_eng.json().get("hits", [])
+                    engagements = [
+                        e for e in eng_hits if e.get("codeClub") == club_code
+                    ]
+
+            return {
+                "id": org_hit.get("id", org_id_str),
+                "nom": club_nom,
+                "code": club_code,
+                "adresse": org_hit.get("adresse", ""),
+                "telephone": org_hit.get("telephone", ""),
+                "mail": org_hit.get("mail", ""),
+                "commune": org_hit.get("commune"),
+                "logo": org_hit.get("logo"),
+                "engagements": engagements,
+            }
+    except Exception as exc:
+        logger.warning("Échec fallback Meilisearch organisme %s: %s", organisme_id, exc)
+        return {}
+
+
+async def fetch_edge_equipe_page(competitions_url: str) -> dict[str, Any] | None:
+    """Récupère et parse les données d'équipe (matchs, classement) depuis l'edge public competitions.ffbb.com."""
+    if not competitions_url:
+        return None
+    url = (
+        f"https://competitions.ffbb.com{competitions_url}"
+        if competitions_url.startswith("/")
+        else competitions_url
+    )
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+    }
+    try:
+        import json
+
+        import httpx
+
+        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code != 200:
+                return None
+            html = resp.text
+            pushes = re.findall(
+                r"self\.__next_f\.push\(\[1,\"(.*?)\"\]\)", html, re.DOTALL
+            )
+            full_text = "".join(p.encode().decode("unicode_escape") for p in pushes)
+
+            matches: list[dict[str, Any]] = []
+            data_start = full_text.find('{"data":[{"id":')
+            if data_start != -1:
+                bracket_pos = full_text.find("[", data_start)
+                decoder = json.JSONDecoder()
+                parsed_m, _ = decoder.raw_decode(full_text[bracket_pos:])
+                if isinstance(parsed_m, list):
+                    matches = parsed_m
+                for m in matches:
+                    if not m.get("nomEquipe1") and isinstance(
+                        m.get("idEngagementEquipe1"), dict
+                    ):
+                        m["nomEquipe1"] = m["idEngagementEquipe1"].get("nom")
+                    if not m.get("nomEquipe2") and isinstance(
+                        m.get("idEngagementEquipe2"), dict
+                    ):
+                        m["nomEquipe2"] = m["idEngagementEquipe2"].get("nom")
+
+            classement: list[dict[str, Any]] = []
+            cl_start = full_text.find('"classement":[{"id":')
+            if cl_start != -1:
+                bracket_pos = full_text.find("[", cl_start)
+                decoder = json.JSONDecoder()
+                parsed_c, _ = decoder.raw_decode(full_text[bracket_pos:])
+                if isinstance(parsed_c, list):
+                    classement = parsed_c
+
+            rankings: list[dict[str, Any]] = []
+            rk_start = full_text.find('"rankings":[{"background":')
+            if rk_start != -1:
+                bracket_pos = full_text.find("[", rk_start)
+                decoder = json.JSONDecoder()
+                parsed_r, _ = decoder.raw_decode(full_text[bracket_pos:])
+                if isinstance(parsed_r, list):
+                    rankings = parsed_r
+
+            return {
+                "matches": matches,
+                "classement": classement,
+                "rankings": rankings,
+            }
+    except Exception as exc:
+        logger.debug("Échec fetch_edge_equipe_page (%s): %s", url, exc)
+        return None
+
+
 async def get_organisme_service(
     organisme_id: int | str,
     force_refresh: bool = False,
@@ -361,13 +525,26 @@ async def get_organisme_service(
 
     async def _fetch() -> dict:
         client = await get_client_async()
-        org = await _with_ffbb_semaphore(
-            _safe_call_with_inflight(
-                f"Organisme {organisme_id_int}",
-                lambda: client.get_organisme_async(organisme_id=organisme_id_int),
-            ),
-        )
-        data = serialize_model(org) or {}
+        data: dict = {}
+        try:
+            org = await _with_ffbb_semaphore(
+                _safe_call_with_inflight(
+                    f"Organisme {organisme_id_int}",
+                    lambda: client.get_organisme_async(organisme_id=organisme_id_int),
+                ),
+            )
+            data = serialize_model(org) or {}
+        except Exception as e:
+            logger.warning(
+                "Directus 403/erreur sur Organisme %s (%s). Reconstitution Meilisearch...",
+                organisme_id_int,
+                e,
+            )
+            data = await _get_organisme_from_meilisearch(organisme_id_int)
+
+        if not data.get("nom") and not data.get("engagements"):
+            data = await _get_organisme_from_meilisearch(organisme_id_int)
+
         if not data.get("nom") and not data.get("engagements"):
             raise McpError(
                 error=ErrorData(
@@ -407,12 +584,20 @@ async def ffbb_get_classement_service(
 
     async def _fetch() -> dict[str, Any]:
         client = await get_client_async()
-        poule = await _with_ffbb_semaphore(
-            _safe_call(
-                f"Classement poule {poule_id_int}",
-                lambda: client.get_poule_async(poule_id=poule_id_int),
+        poule = None
+        try:
+            poule = await _with_ffbb_semaphore(
+                _safe_call(
+                    f"Classement poule {poule_id_int}",
+                    lambda: client.get_poule_async(poule_id=poule_id_int),
+                )
             )
-        )
+        except Exception as e:
+            logger.warning(
+                "Directus 403/erreur sur Classement poule %s (%s). Fallback vide...",
+                poule_id_int,
+                e,
+            )
         if not poule:
             return {"_ttl": ttl, "data": []}
         data = serialize_model(poule)

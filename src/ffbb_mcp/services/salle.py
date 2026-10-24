@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 
 import httpx
+
+logger = logging.getLogger("ffbb-mcp")
 
 
 async def get_client_async(*args, **kwargs):
@@ -89,12 +92,17 @@ async def _enrich_with_salle_details(
 
     salle_data = _cache_get(state.cache_salle, salle_id, "salle")
     if salle_data is None:
-        salle = await _with_ffbb_semaphore(
-            _safe_call_with_inflight(
-                f"Get salle {salle_id}",
-                lambda: client.get_salle_async(salle_id),
+        salle = None
+        try:
+            salle = await _with_ffbb_semaphore(
+                _safe_call_with_inflight(
+                    f"Get salle {salle_id}",
+                    lambda: client.get_salle_async(salle_id),
+                )
             )
-        )
+        except Exception as exc:
+            logger.debug("Échec récupération salle %s: %s", salle_id, exc)
+            salle = None
         salle_data = serialize_model(salle) if salle is not None else {}
         if isinstance(salle_data, dict) and salle_data:
             await _enrich_salle_data_with_meilisearch(salle_data, client)

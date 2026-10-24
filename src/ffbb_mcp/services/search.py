@@ -1236,11 +1236,7 @@ async def search_organismes_service(
     has_confident = (
         any(is_club_match_confident(r, nom) for r in results) if results else False
     )
-    if (
-        not filter_by
-        and not sort
-        and (not results or is_code or not has_confident or len(results) < limit)
-    ):
+    if not filter_by and not sort and (not results or (is_code and not has_confident)):
         directus_results = await _search_organismes_directus(nom, limit=limit)
         if directus_results:
             existing_ids = {str(r.get("id") or r.get("organisme_id")) for r in results}
@@ -1917,12 +1913,21 @@ async def ffbb_search_service(
 
 async def get_rencontre_service(rencontre_id: int | str) -> dict[str, Any]:
     client = await get_client_async()
-    result = await _with_ffbb_semaphore(
-        _safe_call_with_inflight(
-            f"Get rencontre {rencontre_id}",
-            lambda: client.get_rencontre_async(str(rencontre_id)),
+    result = None
+    try:
+        result = await _with_ffbb_semaphore(
+            _safe_call_with_inflight(
+                f"Get rencontre {rencontre_id}",
+                lambda: client.get_rencontre_async(str(rencontre_id)),
+            )
         )
-    )
+    except Exception as exc:
+        logger.warning(
+            "Directus 403/erreur sur Rencontre %s (%s). Détail omis...",
+            rencontre_id,
+            exc,
+        )
+        return {}
     data = serialize_model(result) if result is not None else {}
     return (
         await _enrich_with_salle_details(data, client) if isinstance(data, dict) else {}
