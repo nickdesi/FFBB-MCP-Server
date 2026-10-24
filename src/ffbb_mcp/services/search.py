@@ -23,6 +23,9 @@ from .common import (
     _with_ffbb_semaphore,
 )
 
+# ⚡ Bolt: Pre-compiled regex for stripping punctuation in search words
+_PUNC_RE = re.compile(r"[^\w\s]")
+
 
 async def get_client_async(*args, **kwargs):
     import ffbb_mcp.client
@@ -390,7 +393,7 @@ async def _search_organismes_directus(
         queries_to_try.append(("search", resolved_acronym))
 
     # Mots clés distinctifs (sans stop-words et sans mots géographiques génériques)
-    cleaned = re.sub(r"[^\w\s]", " ", q_clean).strip()
+    cleaned = _PUNC_RE.sub(" ", q_clean).strip()
     words = cleaned.split()
     tokens = [
         w
