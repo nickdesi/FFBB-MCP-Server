@@ -353,74 +353,30 @@ async def format_poule_response(poule_data: dict) -> dict[str, Any]:
     return res
 
 
-def _get_meilisearch_auth() -> tuple[str, str]:
-    import os
-
-    from ffbb_data_client.config import MEILISEARCH_BASE_URL
-
-    token = (
-        os.environ.get("MEILISEARCH_BEARER_TOKEN")
-        or "98f07e4d3869853c218a0f65edce2ae56cc670728d9bcb8b035a5107ce1b55dc"
-    )
-    url = (os.environ.get("MEILISEARCH_URL") or MEILISEARCH_BASE_URL).rstrip("/")
-    return url, token
-
-
 async def _get_organisme_from_meilisearch(organisme_id: int | str) -> dict[str, Any]:
     """Reconstitue un organisme et l'intégralité de ses engagements depuis Meilisearch sans Directus."""
-    import httpx
+    from ffbb_data_client.helpers.meilisearch_fallback import (
+        organisme_from_meilisearch,
+    )
 
-    org_id_str = str(organisme_id).strip()
-    meili_url, meili_token = _get_meilisearch_auth()
-    headers = {"Authorization": f"Bearer {meili_token}"}
     try:
-        async with httpx.AsyncClient(headers=headers, timeout=10.0) as http_client:
-            res_org = await http_client.post(
-                f"{meili_url}/indexes/ffbbserver_organismes/search",
-                json={"q": org_id_str, "limit": 20},
-            )
-            hits = res_org.json().get("hits", []) if res_org.status_code == 200 else []
-            org_hit = None
-            for h in hits:
-                if (
-                    str(h.get("id")) == org_id_str
-                    or str(h.get("code", "")).upper() == org_id_str.upper()
-                ):
-                    org_hit = h
-                    break
-
-            if not org_hit:
-                return {}
-
-            club_code = org_hit.get("code")
-            club_nom = org_hit.get("nom", "")
-
-            engagements = []
-            if club_code:
-                res_eng = await http_client.post(
-                    f"{meili_url}/indexes/ffbbserver_engagements/search",
-                    json={"q": club_code, "limit": 100},
-                )
-                if res_eng.status_code == 200:
-                    eng_hits = res_eng.json().get("hits", [])
-                    engagements = [
-                        e for e in eng_hits if e.get("codeClub") == club_code
-                    ]
-
-            return {
-                "id": org_hit.get("id", org_id_str),
-                "nom": club_nom,
-                "code": club_code,
-                "adresse": org_hit.get("adresse", ""),
-                "telephone": org_hit.get("telephone", ""),
-                "mail": org_hit.get("mail", ""),
-                "commune": org_hit.get("commune"),
-                "logo": org_hit.get("logo"),
-                "engagements": engagements,
-            }
+        org_hit = await organisme_from_meilisearch(organisme_id)
     except Exception as exc:
         logger.warning("Échec fallback Meilisearch organisme %s: %s", organisme_id, exc)
         return {}
+    if not org_hit:
+        return {}
+    return {
+        "id": org_hit.get("id", str(organisme_id)),
+        "nom": org_hit.get("nom", ""),
+        "code": org_hit.get("code"),
+        "adresse": org_hit.get("adresse", ""),
+        "telephone": org_hit.get("telephone", ""),
+        "mail": org_hit.get("mail", ""),
+        "commune": org_hit.get("commune"),
+        "logo": org_hit.get("logo"),
+        "engagements": org_hit.get("engagements", []),
+    }
 
 
 async def fetch_edge_equipe_page(competitions_url: str) -> dict[str, Any] | None:
