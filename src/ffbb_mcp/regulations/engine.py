@@ -280,10 +280,13 @@ class RegulationsEngine:
             # Boost de pertinence sur le titre (+2.5 par terme) et les topics (+1.5 par terme)
             title_norm = _strip_accents(art.article_title or "")
             topics_norm = [_strip_accents(t) for t in art.topics if t]
+
+            # ⚡ Bolt: Fast-path. Joined string lookup avoids generator initialization
+            # and function call overhead from `any(...)`
+            joined_topics = " ".join(topics_norm)
+
             title_boost = sum(2.5 for w in query_words if w in title_norm)
-            topic_boost = sum(
-                1.5 for w in query_words if any(w in t for t in topics_norm)
-            )
+            topic_boost = sum(1.5 for w in query_words if w in joined_topics)
 
             final_score = round(base_score + title_boost + topic_boost, 2)
             results.append(RegulationSearchResult(article=art, score=final_score))
