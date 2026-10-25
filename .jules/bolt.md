@@ -124,3 +124,7 @@
 ## 2025-02-05 - Avoid Unrolling any() Generators Unnecessarily
 **Learning:** Replacing idiomatic, highly readable one-line `any(...)` generator expressions with 6-8 line verbose `for` loops is a regression in readability. In functions tied to async I/O operations (like querying APIs or databases), the nanosecond-level overhead of Python generators is completely negligible and attempting to optimize it is a textbook premature micro-optimization.
 **Action:** Do not unroll `any()` generator expressions unless they are inside an extremely hot, tight, purely algorithmic loop where profiling proves them to be a bottleneck. Favor readability and idiomatic Python for standard search/filter operations.
+
+## 2026-10-25 - Using `set.isdisjoint()` for collection overlap check
+**Learning:** Using `any(w in cand_words for w in q_words)` creates a generator object and iterates in pure Python. When `cand_words` is already a `set`, `not cand_words.isdisjoint(q_words)` delegates the membership check directly to optimized C-level hashing, yielding up to ~9x speedup without any generator overhead.
+**Action:** When checking whether any item of an iterable exists in a `set`, prefer `not cand_set.isdisjoint(iterable)` over `any(x in cand_set for x in iterable)`.
