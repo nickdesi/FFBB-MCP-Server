@@ -128,3 +128,11 @@
 ## 2026-10-25 - Using `set.isdisjoint()` for collection overlap check
 **Learning:** Using `any(w in cand_words for w in q_words)` creates a generator object and iterates in pure Python. When `cand_words` is already a `set`, `not cand_words.isdisjoint(q_words)` delegates the membership check directly to optimized C-level hashing, yielding up to ~9x speedup without any generator overhead.
 **Action:** When checking whether any item of an iterable exists in a `set`, prefer `not cand_set.isdisjoint(iterable)` over `any(x in cand_set for x in iterable)`.
+
+## 2026-11-20 - Fast-path for string dictionary parsing
+**Learning:** When parsing string representations of dictionaries inside heavily recursed functions, `ast.literal_eval` incurs a massive pure Python execution overhead (taking approx ~6.0s for 1M iterations vs ~0.3s for `json.loads` on valid JSON strings). Even though data payloads might occasionally contain Python literals (e.g. single quotes, `True`/`False`), a vast majority of payloads in modern APIs are strictly valid JSON.
+**Action:** When forced to evaluate string representations of dictionaries/lists, use an opportunistic `try...except` block with `json.loads(val)` as the fast path before falling back to `ast.literal_eval`. Do not attempt to string replace Python literals to force JSON compatibility as it's slower than just falling back for edge cases.
+
+## 2026-11-20 - Type check reordering for recursive collections
+**Learning:** In heavily recursed generic traversal functions (like nested serialization), explicitly checking for `dict` and `list` exact primitive types before `str`, `int`, etc., limits deep recursion overhead as these collections make up the bulk of node traversal operations.
+**Action:** Order exact `type(obj)` primitive checks according to probability in the application domain. Specifically, hoist `dict` and `list` to the top of serialization recursions to exit checks early.

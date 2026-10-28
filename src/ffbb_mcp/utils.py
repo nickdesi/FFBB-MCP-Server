@@ -1,4 +1,5 @@
 import ast
+import json
 import re
 import sys
 import unicodedata
@@ -31,7 +32,10 @@ def clean_serialized_data(data: Any) -> Any:
             return None
         if data.startswith("{") and data.endswith("}"):
             try:
-                parsed = ast.literal_eval(data)
+                try:
+                    parsed = json.loads(data)
+                except (json.JSONDecodeError, ValueError):
+                    parsed = ast.literal_eval(data)
                 if type(parsed) is dict or type(parsed) is list:
                     return clean_serialized_data(parsed)
             except Exception:
@@ -73,12 +77,20 @@ def serialize_model(obj: Any) -> JSONValue:
 
     # Fast path: exact primitive types
     obj_type = type(obj)
+    if obj_type is dict:
+        return {k: serialize_model(v) for k, v in obj.items()}
+    if obj_type is list:
+        return [serialize_model(item) for item in obj]
+
     if obj_type is str:
         if obj in ("None", "null"):
             return None
         if obj.startswith("{") and obj.endswith("}"):
             try:
-                parsed = ast.literal_eval(obj)
+                try:
+                    parsed = json.loads(obj)
+                except (json.JSONDecodeError, ValueError):
+                    parsed = ast.literal_eval(obj)
                 if type(parsed) is dict or type(parsed) is list:
                     return clean_serialized_data(parsed)
             except Exception:
@@ -88,11 +100,6 @@ def serialize_model(obj: Any) -> JSONValue:
     if obj_type is int or obj_type is float or obj_type is bool:
         return obj
 
-    if obj_type is dict:
-        return {k: serialize_model(v) for k, v in obj.items()}
-    if obj_type is list:
-        return [serialize_model(item) for item in obj]
-
     # Pydantic v2 fast path: model_dump(mode="json") is natively JSON-safe in Rust/C
     if (dump_fn := getattr(obj, "model_dump", None)) is not None:
         return clean_serialized_data(dump_fn(mode="json"))
@@ -100,7 +107,7 @@ def serialize_model(obj: Any) -> JSONValue:
     if (dict_fn := getattr(obj, "dict", None)) is not None:  # Pydantic v1
         return clean_serialized_data(dict_fn())
 
-    # Fallback: isinstance pour supporter les sous-classes (ex: IntEnum)
+    # Fallback: isinstance pour supporter les sous-classes (ex: IntEnum, StrEnum)
     if isinstance(obj, (str, int, float, bool)):
         return clean_serialized_data(obj)
 
