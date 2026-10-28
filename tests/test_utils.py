@@ -1,3 +1,5 @@
+from enum import IntEnum, StrEnum
+
 from ffbb_mcp.aliases import _normalize_apostrophes, normalize_query
 from ffbb_mcp.utils import (
     jaro_winkler_similarity,
@@ -37,6 +39,21 @@ def test_serialize_object():
     serialized = serialize_model(obj)
     assert serialized == {"a": 1}
     assert "_private" not in serialized
+
+
+class DemoStatus(IntEnum):
+    ACTIVE = 1
+    INACTIVE = 0
+
+
+class DemoRole(StrEnum):
+    ADMIN = "admin"
+
+
+def test_serialize_enums():
+    assert serialize_model(DemoStatus.ACTIVE) == 1
+    assert serialize_model(DemoStatus.INACTIVE) == 0
+    assert serialize_model(DemoRole.ADMIN) == "admin"
 
 
 # ---------------------------------------------------------------------------
