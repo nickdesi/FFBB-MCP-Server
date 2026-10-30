@@ -114,8 +114,9 @@ class FFBBClientFactory:
         import urllib.request
 
         endpoints = [
+            "https://api.ffbb.com/items/configuration",
+            "https://api.ffbb.app/items/configuration",
             "https://bo.ffbb.com/items/configuration",
-            "https://bo.ffbb.app/items/configuration",
         ]
         for ep in endpoints:
             try:
@@ -124,7 +125,7 @@ class FFBBClientFactory:
                     headers={
                         "User-Agent": os.environ.get(
                             "FFBB_USER_AGENT",
-                            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+                            "FFBB/1.6.7.42 Dalvik/2.1.0 (Linux; U; Android 5.1.1; Android SDK built for x86 Build/LMY48X)",
                         )
                     },
                 )
@@ -209,7 +210,7 @@ class FFBBClientFactory:
 
         # Invariant WAF / CDN : router le client API vers l'origine Directus non bloquée
         target_base_url = (
-            os.environ.get("API_FFBB_BASE_URL", "https://bo.ffbb.com/").rstrip("/")
+            os.environ.get("API_FFBB_BASE_URL", "https://api.ffbb.com/").rstrip("/")
             + "/"
         )
         if hasattr(client, "api_ffbb_client") and hasattr(

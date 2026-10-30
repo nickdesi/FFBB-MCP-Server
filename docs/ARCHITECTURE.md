@@ -20,7 +20,7 @@ Le serveur supporte deux modes d'exposition :
 Cette couche modulaire fait le pont entre les outils MCP et le client API FFBB (`ffbb-data-client`). Elle implémente les patterns suivants :
 
 - **Accès FFBB & Factory Singleton** : Délègue les appels réseau au package `ffbb-data-client` (`>=2.0.0,<3.0.0`) via un singleton `FFBBClientFactory` avec rafraîchissement proactif du jeton d'accès en tâche de fond.
-- **Agrégation des sources** : Le serveur MCP n'interroge pas directement les backends fédéraux. `ffbb-data-client` unifie les données disponibles depuis l'API FFBB Directus (`https://bo.ffbb.com/` avec fallback multi-miroirs) et Meilisearch (`https://meilisearch-prod.ffbb.app`), éliminant tout blocage 403 BunnyCDN. La couche service les normalise ensuite pour les outils MCP.
+- **Agrégation des sources** : Le serveur MCP n'interroge pas directement les backends fédéraux. `ffbb-data-client` unifie les données disponibles depuis l'API FFBB Directus mobile (`https://api.ffbb.com/` avec bootstrapping dynamique) et Meilisearch (`https://meilisearch-prod.ffbb.app`), éliminant tout blocage 403 BunnyCDN. La couche service les normalise ensuite pour les outils MCP.
 - **Découpage modulaire par domaine métier** :
   - `services/club.py` : Navigation club, équipes, composition, face-à-face, recherche de match (`ffbb_match_lookup`) et outil composite `ffbb_team_summary`.
   - `services/team_resolver.py` : Résolution canonique d'équipes (`ffbb_resolve_team`) et découverte de candidats (`ffbb_find_team_candidates`).

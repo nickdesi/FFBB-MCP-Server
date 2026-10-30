@@ -20,8 +20,8 @@ Le serveur FFBB MCP est exécuté en tant que conteneur Docker géré par **Dokp
 
 | Variable | Valeur recommandée | Rôle |
 | :--- | :--- | :--- |
-| `API_FFBB_BASE_URL` | `https://bo.ffbb.com/` | URL backend Directus FFBB officielle non filtrée (anti-403 BunnyCDN). |
-| `FFBB_USER_AGENT` | `Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15` | En-tête User-Agent authentique transmis à Directus. |
+| `API_FFBB_BASE_URL` | `https://api.ffbb.com/` | URL backend Directus FFBB officielle mobile pullzone 5204911 (anti-403 BunnyCDN). |
+| `FFBB_USER_AGENT` | `FFBB/1.6.7.42 Dalvik/2.1.0 (Linux; U; Android 5.1.1; Android SDK built for x86 Build/LMY48X)` | En-tête User-Agent officiel de l'application mobile. |
 | `MCP_MODE` | `http` | Active le transport MCP moderne **Streamable HTTP** sur `/mcp`. |
 | `MCP_STATELESS_HTTP` | `true` | Active le mode Stateless Core (MCP Spec 2026-07-28 sans session). |
 | `PORT` | `9123` | Port HTTP d'écoute du serveur FastAPI/Starlette. |

@@ -195,13 +195,13 @@ flowchart LR
     A[Client MCP<br/>Claude · Cursor · Antigravity] -->|Streamable HTTP / Stdio| B[FFBB MCP Server<br/>FastMCP Streamable]
     B --> C[Services métier<br/>Cache SWR & Agrégation]
     C --> D[ffbb-data-client<br/>SDK Python v2.4.37]
-    D --> E[(Directus bo.ffbb.com<br/>Origine officielle non filtrée)]
+    D --> E[(Directus api.ffbb.com<br/>Origine officielle mobile pullzone 5204911)]
     D --> F[(Meilisearch Nginx<br/>meilisearch-prod.ffbb.app)]
 ```
 
 Points clés :
 
-- **Résilience WAF & Directus** : Les requêtes Directus sont routées nativement vers `https://bo.ffbb.com/` (et fallback miroir `https://bo.ffbb.app/`), éliminant définitivement les erreurs 403 HTML de l'ancienne pullzone BunnyCDN `api.ffbb.app` ;
+- **Résilience WAF & Directus** : Les requêtes Directus sont routées nativement vers `https://api.ffbb.com/` (pullzone mobile officielle 5204911, amorcée via `/items/configuration`), éliminant définitivement les erreurs 403 HTML des anciens domaines bloqués ;
 - **Auto-résolution des tokens** : Découverte dynamique et transparente des jetons de session sans clé API requise ;
 - **Double transport** : Streamable HTTP distant (spec `2026-07-28`, Stateless Core) ou Stdio local (`uvx`) ;
 - **SDK Python découplé** : Requêtes vers les sources fédérales et parsing Pydantic v2 délégués à `ffbb-data-client` ;
@@ -216,8 +216,8 @@ Détails : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) et [`docs/PERFORMANCE.
 
 | Variable | Description | Valeur par défaut |
 | :--- | :--- | :--- |
-| `API_FFBB_BASE_URL` | Base URL du backend Directus FFBB | `https://bo.ffbb.com/` |
-| `FFBB_USER_AGENT` | User-Agent authentique transmis à Directus | iOS Safari Mobile |
+| `API_FFBB_BASE_URL` | Base URL du backend Directus FFBB | `https://api.ffbb.com/` |
+| `FFBB_USER_AGENT` | User-Agent authentique transmis à Directus | FFBB Android Mobile (1.6.7.42) |
 | `API_FFBB_APP_BEARER_TOKEN` | Jeton Directus explicite (override l'auto-résolution) | Auto-résolu dynamiquement |
 | `MEILISEARCH_BEARER_TOKEN` | Jeton Meilisearch explicite (override l'auto-résolution) | Auto-résolu dynamiquement |
 | `MCP_MODE` | Mode de transport du serveur | `streamable-http` (ou `stdio`) |
@@ -273,7 +273,7 @@ Le pipeline CI (`.github/workflows/ci.yml`) exécute ruff, mypy, pytest et le co
 
 | Symptôme | Cause probable | Solution |
 | --- | --- | --- |
-| `FFBB access blocked by CDN (403 BunnyCDN)` | Ancien domaine `api.ffbb.app` (pullzone 5204911) verrouillé par le CDN | Vérifier que le serveur est à jour (≥ v1.16.9) ou définir `API_FFBB_BASE_URL=https://bo.ffbb.com/` |
+| `FFBB access blocked by CDN (403 BunnyCDN)` | IP bloquée par le WAF ou User-Agent non officiel | Utiliser `ffbb-data-client` ≥ v2.4.42 (pullzone mobile `api.ffbb.com` + UA Dalvik) ou un proxy sortant VPN (Gluetun) |
 | `Missing session ID` / `deadline exceeded` | Wrapper `mcp-remote` ou mauvais transport | Utiliser `serverUrl` natif dans `mcp_config.json` (voir [Google Antigravity](#google-antigravity)) |
 | Claude Desktop refuse l'URL `http` | Claude Desktop impose `stdio` | Utiliser le bridge `@modelcontextprotocol/client-sse` via `npx` (voir [Claude Desktop](#claude-desktop)) |
 | Données live obsolètes | Cache TTL | Attendre le rafraîchissement (≤ 30 s) ou interroger l'endpoint `/health` |
