@@ -510,6 +510,20 @@ async def _build_calendar_matches(
         poule_id: poule_data
         for poule_id, poule_data in zip(unique_poule_ids, poules_data, strict=False)
     }
+    has_waf_fallback = any(
+        isinstance(p, Exception)
+        or (
+            isinstance(p, dict)
+            and (
+                p.get("_cdn_fallback")
+                or (
+                    isinstance(p.get("data"), dict)
+                    and p.get("data", {}).get("_cdn_fallback")
+                )
+            )
+        )
+        for p in poules_data
+    )
 
     for equipe in equipes:
         poule_id = equipe.get("poule_id")
@@ -915,6 +929,7 @@ async def _build_calendar_matches(
         "all_matches": all_matches,
         "phase_warning": phase_warning,
         "unique_poule_ids": unique_poule_ids,
+        "has_waf_fallback": has_waf_fallback,
         "organisme_id": str(organisme_id) if organisme_id else None,
         "competition_id": str(competition_id) if competition_id else None,
         "poule_id": str(poule_id_val) if poule_id_val else None,
@@ -939,6 +954,7 @@ def _paginate_calendar_result(
         or (raw_result.get("_meta") or {}).get("generated_at")
         or datetime.now(tz).isoformat()
     )
+    has_waf_fallback = bool(raw_result.get("has_waf_fallback", False))
     if "error" in raw_result or raw_result.get("status") in ("not_found", "error"):
         res = dict(raw_result)
         res["_meta"] = {
@@ -1054,6 +1070,18 @@ def _paginate_calendar_result(
     if total_before_limit == 0 and phase_warning:
         short_answer = "0 rencontre au calendrier pour la phase demandée."
         detail_line = phase_warning
+    elif total_before_limit == 0 and has_waf_fallback:
+        short_answer = "Impossible de récupérer les matchs : accès FFBB temporairement bloqué (WAF 403 / indisponibilité)."
+        detail_line = "Le calendrier officiel n'a pas pu être chargé depuis la fédération. Ne pas affirmer que l'équipe n'a aucun match."
+        waf_msg = "WAF BunnyCDN bloque temporairement api.ffbb.com. Ne pas affirmer que l'équipe n'a aucun match programmé."
+        if waf_msg not in round_warnings_list:
+            round_warnings_list.append(waf_msg)
+
+    ret_status = (
+        "ok"
+        if total_before_limit > 0
+        else ("waf_degraded" if has_waf_fallback else "ok")
+    )
 
     presentation = {
         "short_answer": short_answer,
@@ -1073,6 +1101,7 @@ def _paginate_calendar_result(
     )
 
     return {
+        "status": ret_status,
         "items": validated_matches,
         "presentation": presentation,
         "provenance": provenance,

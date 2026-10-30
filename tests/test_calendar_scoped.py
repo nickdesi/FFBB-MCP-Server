@@ -331,3 +331,37 @@ async def test_live_filter_includes_scheduled_match_after_tipoff(
     assert match["temporal_status"] == "presumed_in_progress"
     assert match["status_confidence"] == "medium"
     assert "33 minute" in match["status_explanation"]
+
+
+@pytest.mark.asyncio
+async def test_calendar_waf_fallback_returns_degraded_status(
+    complex_club_data, monkeypatch
+):
+    teams, poules = complex_club_data
+    # Remplacer toutes les poules par des réponses avec _cdn_fallback
+    waf_poule = {
+        "id": "poule_nm2",
+        "nom": "Poule NM2",
+        "rencontres": [],
+        "classements": [],
+        "_cdn_fallback": True,
+        "_waf_error": "403 Forbidden",
+    }
+    for k in list(poules.keys()):
+        poules[k] = dict(waf_poule, id=k)
+
+    res = await get_calendrier_club_service(
+        club_name="Stade Clermontois",
+        organisme_id="9326",
+        categorie="NM2",
+        numero_equipe=1,
+        force_refresh=True,
+    )
+
+    assert res["status"] == "waf_degraded"
+    assert len(res["items"]) == 0
+    assert "WAF" in res["presentation"]["short_answer"]
+    assert any("WAF BunnyCDN" in w for w in res["presentation"]["warnings"])
+    assert len(res["items"]) == 0
+    assert "WAF" in res["presentation"]["short_answer"]
+    assert any("WAF BunnyCDN" in w for w in res["presentation"]["warnings"])

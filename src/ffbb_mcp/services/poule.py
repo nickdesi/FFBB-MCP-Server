@@ -197,6 +197,7 @@ async def get_poule_service(
                 "rencontres": [],
                 "classements": [],
                 "_cdn_fallback": True,
+                "_waf_error": str(e),
             }
 
         rencontres = data.get("rencontres") or []
