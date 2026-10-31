@@ -151,6 +151,8 @@ class FFBBClientFactory:
             "MEILISEARCH_BEARER_TOKEN",
             "98f07e4d3869853c218a0f65edce2ae56cc670728d9bcb8b035a5107ce1b55dc",
         )
+        os.environ["API_FFBB_APP_BEARER_TOKEN"] = fallback_api
+        os.environ["MEILISEARCH_BEARER_TOKEN"] = fallback_ms
         logger.warning(
             "Miroirs Directus bloqués par BunnyCDN WAF, engagement des jetons de secours résilients."
         )
