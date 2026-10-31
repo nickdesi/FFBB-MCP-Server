@@ -136,3 +136,7 @@
 ## 2026-11-20 - Type check reordering for recursive collections
 **Learning:** In heavily recursed generic traversal functions (like nested serialization), explicitly checking for `dict` and `list` exact primitive types before `str`, `int`, etc., limits deep recursion overhead as these collections make up the bulk of node traversal operations.
 **Action:** Order exact `type(obj)` primitive checks according to probability in the application domain. Specifically, hoist `dict` and `list` to the top of serialization recursions to exit checks early.
+
+## 2026-11-20 - Fast-path for multiple string suffix checks
+**Learning:** When checking if a string ends with any of a dynamic or static set of suffixes, using `any(s.endswith(suf) for suf in suffixes)` is significantly slower (~25x in microbenchmarks) than creating a tuple of suffixes and calling `s.endswith(tuple)`. The `tuple` approach executes entirely in C, avoiding generator initialization and pure Python execution overhead for every item.
+**Action:** Replace `any(s.endswith(suf)...)` generator checks with a direct `str.endswith(tuple_of_suffixes)` call. Hoist the tuple creation to the module level if the suffixes are static.
