@@ -23,6 +23,13 @@ from typing import Any, cast
 from ffbb_mcp._state import state
 
 
+_TEAM_NUMBER_SUFFIXES = tuple(
+    suffix
+    for n in range(1, 10)
+    for suffix in (f"- {n}", f"-{n}")
+)
+
+
 async def get_client_async(*args, **kwargs):
     import ffbb_mcp.client
 
@@ -362,7 +369,7 @@ def _team_has_explicit_number(eq: dict) -> bool:
     if str(eq.get("numero_equipe") or "").strip():
         return True
     nom = str(eq.get("nom_equipe") or eq.get("nom") or "")
-    return any(nom.endswith(f"- {n}") or nom.endswith(f"-{n}") for n in range(1, 10))
+    return nom.endswith(_TEAM_NUMBER_SUFFIXES)
 
 
 async def _resolve_team_equipes(
@@ -697,15 +704,17 @@ async def _resolve_team_equipes(
         if not filtered and eff_num is not None and eff_num >= 1:
             # Équipe n°N demandée sans numéro explicite FFBB : filtrer les équipes
             # qui ne portent pas explicitement un autre numéro
+            other_suffixes = tuple(
+                suffix
+                for n in range(1, 10)
+                if n != eff_num
+                for suffix in (f"- {n}", f"-{n}")
+            )
             potential = [
                 e
                 for e in equipes
                 if not (e.get("numero_equipe") or "").strip()
-                and not any(
-                    _team_nom(e).endswith(f"- {n}") or _team_nom(e).endswith(f"-{n}")
-                    for n in range(1, 10)
-                    if n != eff_num
-                )
+                and not _team_nom(e).endswith(other_suffixes)
             ]
             from .division import resolve_team_by_division_rank
 
