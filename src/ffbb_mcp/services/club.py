@@ -23,9 +23,7 @@ from typing import Any, cast
 from ffbb_mcp._state import state
 
 _TEAM_NUMBER_SUFFIXES = tuple(
-    suffix
-    for n in range(1, 10)
-    for suffix in (f"- {n}", f"-{n}")
+    suffix for n in range(1, 10) for suffix in (f"- {n}", f"-{n}")
 )
 
 
