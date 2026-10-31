@@ -29,8 +29,8 @@ logger = logging.getLogger("ffbb-mcp")
 
 _REQUEST_ID_RE = re.compile(r"^[a-zA-Z0-9\-]{1,64}$")
 
-# Intervalle de rafraîchissement proactif du cache « lives » (secondes).
-_LIVES_REFRESH_INTERVAL = _read_positive_int_env("FFBB_LIVES_REFRESH_INTERVAL", 10)
+# Intervalle de rafraîchissement proactif du cache « lives » (secondes, min 60s pour éviter 429).
+_LIVES_REFRESH_INTERVAL = _read_positive_int_env("FFBB_LIVES_REFRESH_INTERVAL", 60)
 
 
 async def _background_lives_refresh_loop() -> None:
@@ -40,18 +40,26 @@ async def _background_lives_refresh_loop() -> None:
     ainsi toujours à jour en cache, l'utilisateur ne subit jamais la latence
     (~400ms) d'un miss sur le chemin le plus chaud.
     """
+    current_interval = max(60, _LIVES_REFRESH_INTERVAL)
     while True:
         try:
-            await asyncio.sleep(_LIVES_REFRESH_INTERVAL)
+            await asyncio.sleep(current_interval)
             if not is_in_match_window():
+                current_interval = max(60, _LIVES_REFRESH_INTERVAL)
                 continue
             from ffbb_mcp.services.poule import _fetch_lives
 
             await _fetch_lives()
+            current_interval = max(60, _LIVES_REFRESH_INTERVAL)
         except asyncio.CancelledError:
             break
-        except Exception:  # pragma: no cover - robustness
-            logger.debug("Refresh lives en arrière-plan échoué", exc_info=True)
+        except Exception as e:  # pragma: no cover - robustness
+            current_interval = min(300, current_interval * 2)
+            logger.warning(
+                "Refresh lives en arrière-plan échoué (%s), backoff à %ds",
+                e,
+                current_interval,
+            )
 
 
 async def _bootstrap_cache() -> None:

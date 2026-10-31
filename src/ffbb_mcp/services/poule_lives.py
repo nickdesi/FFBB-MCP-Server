@@ -39,9 +39,12 @@ async def _fetch_lives() -> list[dict]:
     )
     lives_list = lives if isinstance(lives, list) else []
     result = [serialize_model(live) for live in lives_list]
-    from .salle import _enrich_matches_with_salle_details
+    try:
+        from .salle import _enrich_matches_with_salle_details
 
-    await _enrich_matches_with_salle_details(result)
+        await _enrich_matches_with_salle_details(result)
+    except Exception as e:
+        logger.debug("Enrichissement des salles sur les lives ignoré (%s)", e)
     _cache_set(state.cache_lives, "lives", result, "lives")
     return result
 
