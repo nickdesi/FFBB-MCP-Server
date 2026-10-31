@@ -1,0 +1,74 @@
+name: Auto-update uv.lock & Security Dependencies
+
+on:
+  schedule:
+    # Run bi-weekly on Mondays and Thursdays at 06:00 UTC
+    - cron: '0 6 * * 1,4'
+  workflow_dispatch:
+
+concurrency:
+  group: auto-update-dependencies
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  update-dependencies:
+    name: Update uv.lock & Run Test Suite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          python-version: "3.12"
+
+      - name: Upgrade all dependencies in uv.lock
+        run: uv lock --upgrade
+
+      - name: Check git diff
+        id: git-diff
+        run: |
+          if git diff --quiet uv.lock; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "uv.lock is already up to date."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "uv.lock has been updated."
+          fi
+
+      - name: Install dependencies & Run tests
+        if: steps.git-diff.outputs.changed == 'true'
+        run: |
+          uv sync --all-extras
+          uv run pytest tests/ -q
+
+      - name: Create Pull Request
+        if: steps.git-diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ secrets.BUMP_BOT_TOKEN || github.token }}
+          commit-message: "chore(deps): auto-upgrade dependencies in uv.lock [security]"
+          branch: chore/auto-update-uv-lock
+          title: "chore(deps): auto-upgrade dependencies in uv.lock"
+          body: |
+            ## 🔄 Auto-upgrade uv.lock & Dependencies
+
+            Automated dependency upgrade to keep transitive dependencies secure and eliminate Trivy / GitHub Security CVE alerts.
+
+            - **Lockfile updated**: `uv lock --upgrade`
+            - **Test suite validation**: `uv run pytest tests/ -q` (Passed)
+
+            > Triggered automatically by schedule `${{ github.event_name }}`.
+          labels: dependencies, security, automation
+          delete-branch: true
