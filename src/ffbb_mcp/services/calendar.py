@@ -32,7 +32,7 @@ from ffbb_mcp.presentation import (
     evaluate_round_reliability,
     format_source_label,
 )
-from ffbb_mcp.utils import format_team_name
+from ffbb_mcp.utils import canonicalize_sexe, format_team_name
 
 from .common import _PARIS_TZ as _TZ
 from .common import (
@@ -316,7 +316,7 @@ async def _build_calendar_matches(
                     equipes = [
                         e
                         for e in equipes
-                        if (e.get("sexe") or "").upper().strip() == parsed_c.sexe
+                        if (canonicalize_sexe(e.get("sexe")) or "") == parsed_c.sexe
                     ]
 
         if numero_equipe is not None:

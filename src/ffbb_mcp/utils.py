@@ -48,6 +48,23 @@ def clean_serialized_data(data: Any) -> Any:
     return data
 
 
+def canonicalize_sexe(val: str | None) -> str | None:
+    """Normalise la valeur du sexe en code standardisé court ('M', 'F', 'X' ou None).
+
+    Gère 'Masculin', 'Féminin', 'Mixte', 'M', 'F', 'X', etc.
+    """
+    if not val:
+        return None
+    v = str(val).strip().upper()
+    if v in ("M", "MASCULIN", "MASCULINE", "HOMME", "HOMMES"):
+        return "M"
+    if v in ("F", "FEMININ", "FÉMININ", "FEMININE", "FÉMININE", "FEMME", "FEMMES"):
+        return "F"
+    if v in ("MIXTE", "X", "M/F", "MIX"):
+        return "X"
+    return v
+
+
 def resolve_relation_field(
     data: dict[str, Any] | None, field: str
 ) -> tuple[dict[str, Any], str | None]:

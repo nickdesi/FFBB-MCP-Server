@@ -37,6 +37,7 @@ from ffbb_mcp.presentation import (
 )
 from ffbb_mcp.utils import (
     ParsedCategorie,
+    canonicalize_sexe,
     format_team_name,
     parse_categorie,
     resolve_relation_field,
@@ -191,6 +192,7 @@ async def ffbb_equipes_club_service(
         poule_id_raw = poule.get("id")
 
         _, saison_raw = resolve_relation_field(comp, "saison")
+        canon_sexe = canonicalize_sexe(comp.get("sexe", "")) or ""
         team_info = {
             "team_id": team_id_str,
             "engagement_id": team_id_str,
@@ -205,7 +207,7 @@ async def ffbb_equipes_club_service(
             "competition_id": str(comp_id_raw) if comp_id_raw is not None else None,
             "poule_id": str(poule_id_raw) if poule_id_raw is not None else None,
             "season_id": str(saison_raw) if saison_raw is not None else None,
-            "sexe": comp.get("sexe", ""),
+            "sexe": canon_sexe,
             "categorie": categorie_code,
             "niveau": comp.get("competition_origine_niveau"),
             "competitionsUrl": e.get("competitionsUrl"),
@@ -250,9 +252,10 @@ async def ffbb_equipes_club_service(
             )
             if not is_match:
                 continue
-            if parsed_filter.sexe == "F" and (t.get("sexe") or "").upper() == "M":
+            t_sexe = canonicalize_sexe(t.get("sexe")) or ""
+            if parsed_filter.sexe == "F" and t_sexe == "M":
                 continue
-            if parsed_filter.sexe == "M" and (t.get("sexe") or "").upper() == "F":
+            if parsed_filter.sexe == "M" and t_sexe == "F":
                 continue
             filtered_teams.append(t)
 
@@ -294,17 +297,10 @@ async def ffbb_equipes_club_service(
                     )
                     if not is_match:
                         continue
-                if (
-                    parsed_filter
-                    and parsed_filter.sexe == "F"
-                    and (t.get("sexe") or "").upper() == "M"
-                ):
+                t_sexe = canonicalize_sexe(t.get("sexe")) or ""
+                if parsed_filter and parsed_filter.sexe == "F" and t_sexe == "M":
                     continue
-                if (
-                    parsed_filter
-                    and parsed_filter.sexe == "M"
-                    and (t.get("sexe") or "").upper() == "F"
-                ):
+                if parsed_filter and parsed_filter.sexe == "M" and t_sexe == "F":
                     continue
                 filtered_teams.append(t)
 
