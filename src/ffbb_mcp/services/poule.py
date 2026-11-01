@@ -191,14 +191,19 @@ async def get_poule_service(
                 poule_id_int,
                 e,
             )
-            data = {
-                "id": str(poule_id_int),
-                "nom": f"Poule {poule_id_int}",
-                "rencontres": [],
-                "classements": [],
-                "_cdn_fallback": True,
-                "_waf_error": str(e),
-            }
+            data = await _get_poule_from_meilisearch(poule_id_int)
+            if not data:
+                data = {
+                    "id": str(poule_id_int),
+                    "nom": f"Poule {poule_id_int}",
+                    "rencontres": [],
+                    "classements": [],
+                    "_cdn_fallback": True,
+                    "_waf_error": str(e),
+                }
+            else:
+                data["_cdn_fallback"] = True
+                data["_waf_error"] = str(e)
 
         rencontres = data.get("rencontres") or []
         restantes_par_equipe: dict[str, list[dict]] = {}
@@ -352,6 +357,23 @@ async def format_poule_response(poule_data: dict) -> dict[str, Any]:
             res["_omitted_count"] = total_matches - max_limit
             res["_total"] = total_matches
     return res
+
+
+async def _get_poule_from_meilisearch(poule_id: int | str) -> dict[str, Any]:
+    """Reconstitue une poule (équipes et rencontres) depuis Meilisearch sans Directus."""
+    try:
+        from typing import cast
+
+        from ffbb_data_client.helpers import meilisearch_fallback as mf
+
+        poule_fn = getattr(mf, "poule_from_meilisearch", None)
+        if callable(poule_fn):
+            res = await cast("Any", poule_fn)(poule_id)
+            if isinstance(res, dict):
+                return res
+    except Exception as exc:
+        logger.debug("Échec fallback Meilisearch poule %s: %s", poule_id, exc)
+    return {}
 
 
 async def _get_organisme_from_meilisearch(organisme_id: int | str) -> dict[str, Any]:
