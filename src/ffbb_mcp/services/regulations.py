@@ -132,9 +132,8 @@ def _analyze_poule_tiebreaks(
     for r in rencontres:
         sc1 = r.get("resultatEquipe1")
         sc2 = r.get("resultatEquipe2")
-        if (
-            (type(sc1) is int or (sc1 is not None and str(sc1).isdigit()))
-            and (type(sc2) is int or (sc2 is not None and str(sc2).isdigit()))
+        if (type(sc1) is int or (sc1 is not None and str(sc1).isdigit())) and (
+            type(sc2) is int or (sc2 is not None and str(sc2).isdigit())
         ):
             played_matches.append(
                 {

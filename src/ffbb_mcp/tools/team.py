@@ -898,8 +898,16 @@ async def ffbb_team_summary(
                         "date_rencontre": lm.get("date_rencontre"),
                         "equipe_domicile": lm.get("nomEquipe1"),
                         "equipe_exterieur": lm.get("nomEquipe2"),
-                        "score_domicile": sc1 if type(sc1) is int else int(sc1) if str(sc1).isdigit() else sc1,
-                        "score_exterieur": sc2 if type(sc2) is int else int(sc2) if str(sc2).isdigit() else sc2,
+                        "score_domicile": sc1
+                        if type(sc1) is int
+                        else int(sc1)
+                        if str(sc1).isdigit()
+                        else sc1,
+                        "score_exterieur": sc2
+                        if type(sc2) is int
+                        else int(sc2)
+                        if str(sc2).isdigit()
+                        else sc2,
                         "joue": True,
                         "numero_journee": lm.get("numeroJournee"),
                         "url_competition": lm.get("url_competition"),
