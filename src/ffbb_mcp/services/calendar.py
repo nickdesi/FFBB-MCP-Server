@@ -21,6 +21,10 @@ import httpx
 from pydantic import ValidationError
 
 from ffbb_mcp._state import state
+
+_OTHER_TEAM_SUFFIXES = tuple(
+    suffix for n in range(2, 10) for suffix in (f"- {n}", f"-{n}")
+)
 from ffbb_mcp.competition_type import (
     format_competition_display,
     resolve_competition_type,
@@ -332,11 +336,7 @@ async def _build_calendar_matches(
                     e
                     for e in equipes
                     if not str(e.get("numero_equipe") or "").strip()
-                    and not any(
-                        str(e.get("nom") or "").endswith(f"- {n}")
-                        or str(e.get("nom") or "").endswith(f"-{n}")
-                        for n in range(2, 10)
-                    )
+                    and not str(e.get("nom") or "").endswith(_OTHER_TEAM_SUFFIXES)
                 ]
                 if len(potential) == 1:
                     equipes_filtrees = potential

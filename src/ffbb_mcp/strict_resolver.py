@@ -459,15 +459,17 @@ async def resolve_team_strict(
         elif eff_num is not None and eff_num >= 1:
             # Équipe n°N demandée sans numéro explicite FFBB : filtrer les équipes
             # qui ne portent pas explicitement un autre numéro
+            other_suffixes = tuple(
+                suffix
+                for n in range(1, 10)
+                if n != eff_num
+                for suffix in (f"- {n}", f"-{n}")
+            )
             potential_teams = [
                 c
                 for c in candidates
                 if str(c.get("numero_equipe") or "").strip() in ("", str(eff_num))
-                and not any(
-                    _cand_nom(c).endswith(f"- {n}") or _cand_nom(c).endswith(f"-{n}")
-                    for n in range(1, 10)
-                    if n != eff_num
-                )
+                and not _cand_nom(c).endswith(other_suffixes)
             ]
             from ffbb_mcp.services.division import resolve_team_by_division_rank
 
