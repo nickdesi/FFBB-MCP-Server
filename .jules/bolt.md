@@ -140,6 +140,7 @@
 ## 2026-11-20 - Fast-path for multiple string suffix checks
 **Learning:** When checking if a string ends with any of a dynamic or static set of suffixes, using `any(s.endswith(suf) for suf in suffixes)` is significantly slower (~25x in microbenchmarks) than creating a tuple of suffixes and calling `s.endswith(tuple)`. The `tuple` approach executes entirely in C, avoiding generator initialization and pure Python execution overhead for every item.
 **Action:** Replace `any(s.endswith(suf)...)` generator checks with a direct `str.endswith(tuple_of_suffixes)` call. Hoist the tuple creation to the module level if the suffixes are static.
-## 2026-11-20 - Fast-path for multiple string suffix checks
-**Learning:** When checking if a string ends with any of a dynamic or static set of suffixes, using `any(s.endswith(suf) for suf in suffixes)` is significantly slower (~25x in microbenchmarks) than creating a tuple of suffixes and calling `s.endswith(tuple)`. The `tuple` approach executes entirely in C, avoiding generator initialization and pure Python execution overhead for every item.
-**Action:** Replace `any(s.endswith(suf)...)` generator checks with a direct `str.endswith(tuple_of_suffixes)` call. Hoist the tuple creation to the module level if the suffixes are static.
+
+## 2026-12-14 - Fast-path for isdigit checks on loosely typed data
+**Learning:** When validating if a loosely typed variable is numeric using string methods like `str(val).isdigit()`, always prepend a type-check fast path (e.g., `type(val) is int or (val is not None and str(val).isdigit())`) to bypass unnecessary string allocation and method execution overhead for native integers.
+**Action:** When identifying a performance bottleneck in data processing loops that relies on `str().isdigit()`, check if the underlying variable could already be an integer. If so, add an explicit type check before proceeding to the string method.
