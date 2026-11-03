@@ -1084,11 +1084,8 @@ def format_compact_classement(
                 continue
             sc1 = r.get("resultatEquipe1")
             sc2 = r.get("resultatEquipe2")
-            if (
-                sc1 is not None
-                and sc2 is not None
-                and str(sc1).isdigit()
-                and str(sc2).isdigit()
+            if (type(sc1) is int or (sc1 is not None and str(sc1).isdigit())) and (
+                type(sc2) is int or (sc2 is not None and str(sc2).isdigit())
             ):
                 played_matches.append(
                     {
