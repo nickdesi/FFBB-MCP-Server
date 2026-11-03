@@ -140,3 +140,6 @@
 ## 2026-11-20 - Fast-path for multiple string suffix checks
 **Learning:** When checking if a string ends with any of a dynamic or static set of suffixes, using `any(s.endswith(suf) for suf in suffixes)` is significantly slower (~25x in microbenchmarks) than creating a tuple of suffixes and calling `s.endswith(tuple)`. The `tuple` approach executes entirely in C, avoiding generator initialization and pure Python execution overhead for every item.
 **Action:** Replace `any(s.endswith(suf)...)` generator checks with a direct `str.endswith(tuple_of_suffixes)` call. Hoist the tuple creation to the module level if the suffixes are static.
+## 2026-11-20 - Fast-path for multiple string suffix checks
+**Learning:** When checking if a string ends with any of a dynamic or static set of suffixes, using `any(s.endswith(suf) for suf in suffixes)` is significantly slower (~25x in microbenchmarks) than creating a tuple of suffixes and calling `s.endswith(tuple)`. The `tuple` approach executes entirely in C, avoiding generator initialization and pure Python execution overhead for every item.
+**Action:** Replace `any(s.endswith(suf)...)` generator checks with a direct `str.endswith(tuple_of_suffixes)` call. Hoist the tuple creation to the module level if the suffixes are static.
