@@ -763,7 +763,7 @@ async def find_team_poule_service(
     club_nom = str(organisme_id_or_name)
     org_data: dict[str, Any] | None = None
 
-    if str(organisme_id_or_name).strip().isdigit():
+    if type(organisme_id_or_name) is int or str(organisme_id_or_name).strip().isdigit():
         org_id = str(organisme_id_or_name).strip()
         org_data = await get_organisme_service(org_id)
         if org_data and isinstance(org_data, dict):
