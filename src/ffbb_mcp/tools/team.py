@@ -901,12 +901,12 @@ async def ffbb_team_summary(
                         "score_domicile": sc1
                         if type(sc1) is int
                         else int(sc1)
-                        if str(sc1).isdigit()
+                        if sc1 is not None and str(sc1).isdigit()
                         else sc1,
                         "score_exterieur": sc2
                         if type(sc2) is int
                         else int(sc2)
-                        if str(sc2).isdigit()
+                        if sc2 is not None and str(sc2).isdigit()
                         else sc2,
                         "joue": True,
                         "numero_journee": lm.get("numeroJournee"),

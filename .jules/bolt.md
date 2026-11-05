@@ -144,3 +144,7 @@
 ## 2026-12-14 - Fast-path for isdigit checks on loosely typed data
 **Learning:** When validating if a loosely typed variable is numeric using string methods like `str(val).isdigit()`, always prepend a type-check fast path (e.g., `type(val) is int or (val is not None and str(val).isdigit())`) to bypass unnecessary string allocation and method execution overhead for native integers.
 **Action:** When identifying a performance bottleneck in data processing loops that relies on `str().isdigit()`, check if the underlying variable could already be an integer. If so, add an explicit type check before proceeding to the string method.
+
+## 2026-12-14 - Fast-path for isdigit checks on loosely typed data
+**Learning:** When validating if a loosely typed variable is numeric using string methods like `str(val).isdigit()`, always prepend a type-check fast path (e.g., `type(val) is int or (val is not None and str(val).isdigit())`) to bypass unnecessary string allocation and method execution overhead for native integers and `None`.
+**Action:** When identifying a performance bottleneck in data processing loops that relies on `str().isdigit()`, check if the underlying variable could already be an integer or `None`. If so, add an explicit exact type check before proceeding to the string method.

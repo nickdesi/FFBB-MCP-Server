@@ -618,7 +618,11 @@ async def ffbb_find_team_candidates_service(
         team_label = t.get("team_label") or ""
         numero_raw = t.get("numero_equipe")
         cand_num = (
-            int(numero_raw) if (numero_raw and str(numero_raw).isdigit()) else None
+            numero_raw
+            if type(numero_raw) is int
+            else int(numero_raw)
+            if numero_raw is not None and str(numero_raw).isdigit()
+            else None
         )
         comp_name = (t.get("competition") or "").strip()
         comp_type = (t.get("competition_type") or "").strip()
