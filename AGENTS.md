@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB MCP server | server.py: 434 lignes | services.py: 12454 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 434 lignes | services.py: 12448 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -130,7 +130,7 @@ src/ffbb_mcp/
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
 ├── server.py              # Tools MCP + main() (≈434 lignes)
-├── services/              # Logique métier modularisée (≈12454 lignes)
+├── services/              # Logique métier modularisée (≈12448 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── bilan.py           # Module de service
 │   ├── calendar.py        # Module de service
@@ -155,7 +155,7 @@ src/ffbb_mcp/
 - Pas de suffixe `_compact_` ou `_impl_` exposé
 - Modifier une fonction à la fois, seulement si test/usage échoue
 - Nouvelle fonction → test manuel validé avant exposition MCP
-- **Modularisation** : Le package `services/` (total ≈12454 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
+- **Modularisation** : Le package `services/` (total ≈12448 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
 
 ## Commandes
 - Démarrer le serveur MCP (stdio) : `rtk uv run python -m ffbb_mcp` (recommandé pour Claude Desktop)
@@ -210,7 +210,7 @@ Avant push/tag/release :
 | `FFBB_SWR_ENABLED` | `1` | Activer le Stale-While-Revalidate : servir le cache et rafraîchir en arrière-plan (défaut : 1) |
 | `FFBB_SWR_STALE_FRACTION` | `0.75` | Fraction du TTL au-delà de laquelle une entrée est rafraîchie en arrière-plan (défaut : 0.75) |
 | `FFBB_API_TIMEOUT_SECONDS` | `30` | Timeout en secondes pour les requêtes vers l'API FFBB / Meilisearch |
-| `MAX_CONCURRENT_FFBB` | `8` | Concurrence max appels API FFBB |
+| `MAX_CONCURRENT_FFBB` | `4` | Concurrence max appels API FFBB |
 | `FFBB_MAX_CALENDAR_MATCHES` | `300` | Max rencontres retournées |
 | `FFBB_SWR_MAX_TASKS` | `32` | Nombre max de tâches SWR concurrentes (défaut : 32) |
 | `FFBB_WARMUP_ORGANISMES` | `` | Liste d'organisme_id séparés par des virgules à préchauffer au démarrage |

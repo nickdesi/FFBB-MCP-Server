@@ -159,7 +159,7 @@ async def fetch_club_matches(
     matches_list: list[dict[str, Any]] = []
     seen_match_ids: set[str] = set()
 
-    sem = asyncio.Semaphore(10)
+    sem = asyncio.Semaphore(3)
 
     async def _fetch_poule_data(eng: Any) -> tuple[Any, str, str, list[Any]]:
         poule_obj = getattr(eng, "idPoule", None)

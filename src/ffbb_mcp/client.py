@@ -114,9 +114,10 @@ class FFBBClientFactory:
         import urllib.request
 
         endpoints = [
+            "https://bo.ffbb.com/items/configuration",
+            "https://bo.ffbb.app/items/configuration",
             "https://api.ffbb.com/items/configuration",
             "https://api.ffbb.app/items/configuration",
-            "https://bo.ffbb.com/items/configuration",
         ]
         for ep in endpoints:
             try:

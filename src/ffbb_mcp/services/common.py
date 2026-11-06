@@ -82,7 +82,7 @@ _ELIMINATION_KEYWORDS = re.compile(
 )
 
 # Limiter globalement le nombre d'appels concurrents vers l'API FFBB.
-_MAX_CONCURRENT_FFBB = _read_positive_int_env("MAX_CONCURRENT_FFBB", 8)
+_MAX_CONCURRENT_FFBB = _read_positive_int_env("MAX_CONCURRENT_FFBB", 4)
 _MAX_CALENDAR_MATCHES = _read_positive_int_env("FFBB_MAX_CALENDAR_MATCHES", 300)
 _ffbb_semaphore = asyncio.Semaphore(_MAX_CONCURRENT_FFBB)
 

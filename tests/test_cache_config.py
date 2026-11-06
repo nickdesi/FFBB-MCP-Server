@@ -101,7 +101,7 @@ def test_services_import_ignores_invalid_max_concurrent_ffbb(monkeypatch):
 
     reloaded = importlib.reload(services)
 
-    assert reloaded._MAX_CONCURRENT_FFBB == 8
+    assert reloaded._MAX_CONCURRENT_FFBB == 4
 
     monkeypatch.delenv("MAX_CONCURRENT_FFBB", raising=False)
     importlib.reload(services)
