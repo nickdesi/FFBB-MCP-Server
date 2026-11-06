@@ -886,7 +886,9 @@ async def _fetch_poule_matches(
             str_my_eng = str(my_eng) if my_eng else None
 
             raw_eq_num = eq.get("numero_equipe")
-            if raw_eq_num is not None and str(raw_eq_num).strip().isdigit():
+            if type(raw_eq_num) is int or (
+                raw_eq_num is not None and str(raw_eq_num).strip().isdigit()
+            ):
                 this_eq_match_num = int(raw_eq_num)
             elif numero_equipe is not None:
                 this_eq_match_num = int(numero_equipe)
@@ -1563,7 +1565,9 @@ async def ffbb_last_result_service(
     my_eng_id = str(source_eq.get("engagement_id") or source_eq.get("team_id") or "")
 
     raw_eq_num = source_eq.get("numero_equipe")
-    if raw_eq_num is not None and str(raw_eq_num).strip().isdigit():
+    if type(raw_eq_num) is int or (
+        raw_eq_num is not None and str(raw_eq_num).strip().isdigit()
+    ):
         _numero_equipe_match = int(raw_eq_num)
     elif numero_equipe is not None:
         _numero_equipe_match = int(numero_equipe)
