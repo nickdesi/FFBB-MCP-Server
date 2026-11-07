@@ -144,3 +144,7 @@
 ## 2026-12-14 - Fast-path for isdigit checks on loosely typed data
 **Learning:** When validating if a loosely typed variable is numeric using string methods like `str(val).isdigit()`, always prepend a type-check fast path (e.g., `type(val) is int or (val is not None and str(val).isdigit())`) to bypass unnecessary string allocation and method execution overhead for native integers.
 **Action:** When identifying a performance bottleneck in data processing loops that relies on `str().isdigit()`, check if the underlying variable could already be an integer. If so, add an explicit type check before proceeding to the string method.
+
+## 2023-11-07 - [Optimization of Date Parsing with fromisoformat fallback]
+**Learning:** `datetime.date.fromisoformat()` natively supports exact ISO 8601 formatting, which avoids string splitting and exception handling overhead present in manual date parsing on typical paths. But it does raise `ValueError` for loosely formatted ISO dates like `2023-1-1`, requiring a fallback mechanism.
+**Action:** Used `try...except ValueError` block containing the fallback to `iso_str.split('-')` logic when dealing with loosely structured date strings.
