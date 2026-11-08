@@ -270,7 +270,59 @@ async def ffbb_equipes_club_service(
                 for t in filtered_teams
                 if (t.get("numero_equipe") or "").strip() == want_num
             ]
-            if exact_matches:
+            if parsed_filter.numero_equipe == 1:
+                other_suffixes = tuple(
+                    suffix for n in range(2, 10) for suffix in (f"- {n}", f"-{n}")
+                )
+                empty_num_matches = [
+                    t
+                    for t in filtered_teams
+                    if not (t.get("numero_equipe") or "").strip()
+                    and not (t.get("nom_equipe") or "").endswith(other_suffixes)
+                ]
+                if empty_num_matches:
+                    from .division import (
+                        get_competition_level_rank,
+                        resolve_team_by_division_rank,
+                    )
+
+                    max_unnum = max(
+                        get_competition_level_rank(u) for u in empty_num_matches
+                    )
+                    max_exact = max(
+                        (get_competition_level_rank(e) for e in exact_matches),
+                        default=0,
+                    )
+                    if max_unnum > max_exact:
+                        note = (
+                            "équipe fanion (équipe 1) résolue par hiérarchie de niveau de compétition"
+                            if exact_matches
+                            else "équipe sans numéro explicite, correspond potentiellement à ce numéro"
+                        )
+                        if len(empty_num_matches) == 1:
+                            chosen_team = empty_num_matches[0]
+                            chosen_team.setdefault("note", note)
+                            filtered_teams = [chosen_team]
+                        else:
+                            ranked_team, tied = resolve_team_by_division_rank(
+                                empty_num_matches, 1
+                            )
+                            if ranked_team is not None:
+                                ranked_team.setdefault("note", note)
+                                filtered_teams = [ranked_team]
+                            elif tied:
+                                filtered_teams = tied
+                            else:
+                                filtered_teams = empty_num_matches
+                    elif exact_matches:
+                        filtered_teams = exact_matches
+                    else:
+                        filtered_teams = []
+                elif exact_matches:
+                    filtered_teams = exact_matches
+                else:
+                    filtered_teams = []
+            elif exact_matches:
                 filtered_teams = exact_matches
             else:
                 empty_num_matches = [
@@ -315,8 +367,59 @@ async def ffbb_equipes_club_service(
                 for t in filtered_teams
                 if (t.get("numero_equipe") or "").strip() == want_num
             ]
+            if parsed_filter.numero_equipe == 1:
+                other_suffixes = tuple(
+                    suffix for n in range(2, 10) for suffix in (f"- {n}", f"-{n}")
+                )
+                empty_num_matches = [
+                    t
+                    for t in filtered_teams
+                    if not (t.get("numero_equipe") or "").strip()
+                    and not (t.get("nom_equipe") or "").endswith(other_suffixes)
+                ]
+                if empty_num_matches:
+                    from .division import (
+                        get_competition_level_rank,
+                        resolve_team_by_division_rank,
+                    )
 
-            if exact_matches:
+                    max_unnum = max(
+                        get_competition_level_rank(u) for u in empty_num_matches
+                    )
+                    max_exact = max(
+                        (get_competition_level_rank(e) for e in exact_matches),
+                        default=0,
+                    )
+                    if max_unnum > max_exact:
+                        note = (
+                            "équipe fanion (équipe 1) résolue par hiérarchie de niveau de compétition"
+                            if exact_matches
+                            else "équipe sans numéro explicite, correspond potentiellement à ce numéro"
+                        )
+                        if len(empty_num_matches) == 1:
+                            chosen_team = empty_num_matches[0]
+                            chosen_team.setdefault("note", note)
+                            filtered_teams = [chosen_team]
+                        else:
+                            ranked_team, tied = resolve_team_by_division_rank(
+                                empty_num_matches, 1
+                            )
+                            if ranked_team is not None:
+                                ranked_team.setdefault("note", note)
+                                filtered_teams = [ranked_team]
+                            elif tied:
+                                filtered_teams = tied
+                            else:
+                                filtered_teams = empty_num_matches
+                    elif exact_matches:
+                        filtered_teams = exact_matches
+                    else:
+                        filtered_teams = []
+                elif exact_matches:
+                    filtered_teams = exact_matches
+                else:
+                    filtered_teams = []
+            elif exact_matches:
                 filtered_teams = exact_matches
             else:
                 empty_num_matches = [
@@ -694,6 +797,50 @@ async def _resolve_team_equipes(
             or _team_nom(e).endswith(f"- {want}")
             or _team_nom(e).endswith(f"-{want}")
         ]
+        # Cas spécifique équipe 1 / fanion :
+        # Si une équipe sans numéro (fanion) évolue à un niveau hiérarchiquement supérieur
+        # à l'équipe enregistrée avec le numéro '1' au niveau départemental, l'équipe fanion prime.
+        if eff_num == 1:
+            other_suffixes = tuple(
+                suffix for n in range(2, 10) for suffix in (f"- {n}", f"-{n}")
+            )
+            unnumbered = [
+                e
+                for e in equipes
+                if not (e.get("numero_equipe") or "").strip()
+                and not _team_nom(e).endswith(other_suffixes)
+            ]
+            if unnumbered:
+                from .division import (
+                    get_competition_level_rank,
+                    resolve_team_by_division_rank,
+                )
+
+                max_unnum = max(get_competition_level_rank(u) for u in unnumbered)
+                max_filt = max(
+                    (get_competition_level_rank(f) for f in filtered), default=0
+                )
+                if max_unnum > max_filt:
+                    if len(unnumbered) == 1:
+                        chosen_team = unnumbered[0]
+                        chosen_team.setdefault(
+                            "note",
+                            "équipe fanion (équipe 1) résolue par hiérarchie de niveau de compétition",
+                        )
+                        filtered = [chosen_team]
+                    else:
+                        ranked_team, tied = resolve_team_by_division_rank(unnumbered, 1)
+                        if ranked_team is not None:
+                            ranked_team.setdefault(
+                                "note",
+                                "équipe fanion (équipe 1) résolue par hiérarchie de niveau de compétition",
+                            )
+                            filtered = [ranked_team]
+                        elif tied:
+                            filtered = tied
+                        else:
+                            filtered = unnumbered
+
         if not filtered and eff_num is not None and eff_num >= 1:
             # Équipe n°N demandée sans numéro explicite FFBB : filtrer les équipes
             # qui ne portent pas explicitement un autre numéro
@@ -715,15 +862,15 @@ async def _resolve_team_equipes(
                 # Une seule équipe sans numéro explicite : comportement historique.
                 filtered = potential
             else:
-                chosen, tied = resolve_team_by_division_rank(potential, eff_num)
-                if chosen is not None:
+                ranked_team, tied = resolve_team_by_division_rank(potential, eff_num)
+                if ranked_team is not None:
                     note = (
                         "équipe fanion (équipe 1) résolue par hiérarchie de niveau de compétition"
                         if eff_num == 1
                         else f"équipe réserve (équipe {eff_num}) résolue par hiérarchie de niveau de compétition"
                     )
-                    chosen.setdefault("note", note)
-                    filtered = [chosen]
+                    ranked_team.setdefault("note", note)
+                    filtered = [ranked_team]
                 elif tied:
                     filtered = tied
                 else:

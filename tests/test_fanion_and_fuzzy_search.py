@@ -532,3 +532,90 @@ def test_persistent_cache_mapping_methods_and_delete_prefix():
     assert "equipes:200:1" in p_cache
     assert "equipes:100:1" not in p_cache
     assert "equipes:100:2" not in p_cache
+
+
+@pytest.fixture
+def scba_u13_mixed_teams():
+    """Stade Clermontois avec équipe 1 Régionale sans numéro et équipe Départementale avec numéro 1."""
+    return [
+        {
+            "engagement_id": "200000005363765",
+            "team_id": "200000005363765",
+            "poule_id": "200000003058528",
+            "competition_id": "200000002899050",
+            "competition": "Départementale masculine U13 - Division 10",
+            "competition_code": "DMU13-10",
+            "competition_type": "DIV",
+            "team_label": "U131",
+            "nom_equipe": "STADE CLERMONTOIS BASKET AUVERGNE",
+            "numero_equipe": "1",
+            "categorie": "U13",
+            "sexe": "M",
+            "season_id": "1037",
+            "club": "STADE CLERMONTOIS BASKET AUVERGNE",
+            "organisme_id": "9326",
+        },
+        {
+            "engagement_id": "200000005370000",
+            "team_id": "200000005370000",
+            "poule_id": "200000003063634",
+            "competition_id": "200000002901836",
+            "competition": "Régionale masculine U13 - Division 2",
+            "competition_code": "RMU13-2",
+            "competition_type": "PLAT",
+            "team_label": "U13",
+            "nom_equipe": "STADE CLERMONTOIS BASKET AUVERGNE",
+            "numero_equipe": "",
+            "categorie": "U13",
+            "sexe": "M",
+            "season_id": "1037",
+            "club": "STADE CLERMONTOIS BASKET AUVERGNE",
+            "organisme_id": "9326",
+        },
+        {
+            "engagement_id": "200000005370002",
+            "team_id": "200000005370002",
+            "poule_id": "200000003058529",
+            "competition_id": "200000002899051",
+            "competition": "Départementale masculine U13",
+            "competition_code": "DMU13",
+            "competition_type": "DIV",
+            "team_label": "U132",
+            "nom_equipe": "STADE CLERMONTOIS BASKET AUVERGNE - 2",
+            "numero_equipe": "2",
+            "categorie": "U13",
+            "sexe": "M",
+            "season_id": "1037",
+            "club": "STADE CLERMONTOIS BASKET AUVERGNE",
+            "organisme_id": "9326",
+        },
+    ]
+
+
+@pytest.mark.asyncio
+async def test_resolve_team_strict_fanion_outranks_numbered_dept(scba_u13_mixed_teams):
+    """Vérifie que pour U13M1, l'équipe Régionale sans numéro prime sur l'équipe Départementale numérotée 1."""
+    res = await resolve_team_strict(
+        all_teams=scba_u13_mixed_teams,
+        categorie="U13M1",
+        club_name="STADE CLERMONTOIS BASKET AUVERGNE",
+    )
+    assert res.status == ResponseStatus.OK
+    assert res.selected is not None
+    assert str(res.selected.get("engagement_id")) == "200000005370000"
+    assert res.selected.get("competition_code") == "RMU13-2"
+    assert "fanion_higher_division_than_numbered_1" in res.match_strategy
+
+
+@pytest.mark.asyncio
+async def test_resolve_team_strict_team_2_resolves_numbered_2(scba_u13_mixed_teams):
+    """Vérifie que pour U13M2, l'équipe Départementale portant le numéro 2 est résolue."""
+    res = await resolve_team_strict(
+        all_teams=scba_u13_mixed_teams,
+        categorie="U13M2",
+        club_name="STADE CLERMONTOIS BASKET AUVERGNE",
+    )
+    assert res.status == ResponseStatus.OK
+    assert res.selected is not None
+    assert str(res.selected.get("engagement_id")) == "200000005370002"
+    assert res.selected.get("competition_code") == "DMU13"

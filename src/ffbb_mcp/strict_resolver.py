@@ -492,7 +492,61 @@ async def resolve_team_strict(
             or _cand_nom(c).endswith(f"- {num_str}")
             or _cand_nom(c).endswith(f"-{num_str}")
         ]
-        if exact_num:
+        # Cas spécifique équipe 1 / fanion :
+        # En FFBB, l'équipe fanion d'un club (qui évolue souvent en Régionale ou Nationale)
+        # est fréquemment enregistrée sans suffixe de numéro (numero_equipe=None/vide).
+        # Une équipe secondaire en championnat départemental peut porter l'étiquette '1'
+        # au niveau de son comité local. Si une équipe sans numéro évolue à un niveau
+        # hiérarchiquement supérieur à l'équipe portant le numéro '1', l'équipe fanion prime.
+        if eff_num == 1:
+            other_suffixes = tuple(
+                suffix for n in range(2, 10) for suffix in (f"- {n}", f"-{n}")
+            )
+            unnumbered = [
+                c
+                for c in candidates
+                if not str(c.get("numero_equipe") or "").strip()
+                and not _cand_nom(c).endswith(other_suffixes)
+            ]
+            if unnumbered:
+                from ffbb_mcp.services.division import (
+                    get_competition_level_rank,
+                    resolve_team_by_division_rank,
+                )
+
+                max_unnum = max(get_competition_level_rank(u) for u in unnumbered)
+                max_exact = max(
+                    (get_competition_level_rank(e) for e in exact_num), default=0
+                )
+                if max_unnum > max_exact:
+                    strategies.append("fallback_highest_division_as_team_1")
+                    if exact_num:
+                        strategies.append("fanion_higher_division_than_numbered_1")
+                    note = (
+                        "équipe fanion (équipe 1) résolue par hiérarchie de niveau de compétition"
+                        if exact_num
+                        else "équipe sans numéro explicite, correspond potentiellement à ce numéro"
+                    )
+                    if len(unnumbered) == 1:
+                        chosen_team = unnumbered[0]
+                        chosen_team.setdefault("note", note)
+                        candidates = [chosen_team]
+                    else:
+                        ranked_team, tied = resolve_team_by_division_rank(unnumbered, 1)
+                        if ranked_team is not None:
+                            ranked_team.setdefault("note", note)
+                            candidates = [ranked_team]
+                        elif tied:
+                            candidates = tied
+                        else:
+                            candidates = unnumbered
+                else:
+                    candidates = exact_num
+            elif exact_num:
+                candidates = exact_num
+            else:
+                candidates = []
+        elif exact_num:
             candidates = exact_num
         elif eff_num is not None and eff_num >= 1:
             # Équipe n°N demandée sans numéro explicite FFBB : filtrer les équipes
@@ -519,8 +573,10 @@ async def resolve_team_strict(
                 )
                 candidates = potential_teams
             else:
-                chosen, tied = resolve_team_by_division_rank(potential_teams, eff_num)
-                if chosen is not None:
+                ranked_team, tied = resolve_team_by_division_rank(
+                    potential_teams, eff_num
+                )
+                if ranked_team is not None:
                     if eff_num == 1:
                         strategies.append("fallback_highest_division_as_team_1")
                         note = "équipe fanion (équipe 1) résolue par hiérarchie de niveau de compétition"
@@ -529,8 +585,8 @@ async def resolve_team_strict(
                             f"fallback_division_hierarchy_as_team_{eff_num}"
                         )
                         note = f"équipe réserve (équipe {eff_num}) résolue par hiérarchie de niveau de compétition"
-                    chosen.setdefault("note", note)
-                    candidates = [chosen]
+                    ranked_team.setdefault("note", note)
+                    candidates = [ranked_team]
                 elif tied:
                     candidates = tied
                 else:
