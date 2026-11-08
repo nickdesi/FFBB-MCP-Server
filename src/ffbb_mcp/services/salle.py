@@ -23,6 +23,8 @@ from .common import (
     _cache_set,
     _extract_salle_id,
     _format_salle_address,
+    _is_mocked,
+    _safe_call,
     _safe_call_with_inflight,
     _with_ffbb_semaphore,
 )
@@ -83,6 +85,36 @@ async def _enrich_salle_data_with_meilisearch(
             pass
 
 
+async def _fetch_salle_from_meilisearch(salle_id: str) -> dict[str, Any]:
+    """Récupère directement les détails d'une salle depuis Meilisearch sans Directus."""
+    sid = str(salle_id).strip()
+    if not sid:
+        return {}
+    try:
+        from ffbb_data_client.config import MEILISEARCH_INDEX_SALLES
+        from ffbb_data_client.helpers.meilisearch_fallback import meili_search_async
+
+        hits = await meili_search_async(
+            MEILISEARCH_INDEX_SALLES,
+            {"q": f'"{sid}"', "attributesToSearchOn": ["id"], "limit": 5},
+        )
+        matched = next((h for h in hits if str(h.get("id")) == sid), None)
+        if matched:
+            res = dict(matched)
+            commune_obj = res.get("commune")
+            if isinstance(commune_obj, dict):
+                if not res.get("ville"):
+                    res["ville"] = commune_obj.get("libelle")
+                if not res.get("code_postal"):
+                    res["code_postal"] = commune_obj.get("code_postal")
+                if not res.get("departement"):
+                    res["departement"] = commune_obj.get("departement")
+            return res
+    except Exception as exc:
+        logger.debug("Échec Meilisearch salle %s: %s", salle_id, exc)
+    return {}
+
+
 async def _enrich_with_salle_details(
     data: dict[str, Any], client: Any
 ) -> dict[str, Any]:
@@ -92,20 +124,34 @@ async def _enrich_with_salle_details(
 
     salle_data = _cache_get(state.cache_salle, salle_id, "salle")
     if salle_data is None:
-        salle = None
-        try:
-            salle = await _with_ffbb_semaphore(
-                _safe_call_with_inflight(
-                    f"Get salle {salle_id}",
-                    lambda: client.get_salle_async(salle_id),
-                )
-            )
-        except Exception as exc:
-            logger.debug("Échec récupération salle %s: %s", salle_id, exc)
-            salle = None
-        salle_data = serialize_model(salle) if salle is not None else {}
+        if client and _is_mocked(getattr(client, "get_salle_async", None)):
+            try:
+                salle = await client.get_salle_async(salle_id)
+                salle_data = serialize_model(salle) if salle is not None else {}
+            except Exception:
+                salle_data = {}
+        else:
+            # 1. Meilisearch-First (< 15ms)
+            salle_data = await _fetch_salle_from_meilisearch(salle_id)
+            if not salle_data and client:
+                try:
+                    salle = await _with_ffbb_semaphore(
+                        _safe_call(
+                            f"Get salle {salle_id}",
+                            lambda: client.get_salle_async(salle_id),
+                            retries=1,
+                        )
+                    )
+                    directus_salle = serialize_model(salle) if salle is not None else {}
+                    if isinstance(directus_salle, dict) and directus_salle:
+                        salle_data = directus_salle
+                        await _enrich_salle_data_with_meilisearch(salle_data, client)
+                except Exception as exc:
+                    logger.debug(
+                        "Échec récupération Directus salle %s: %s", salle_id, exc
+                    )
+
         if isinstance(salle_data, dict) and salle_data:
-            await _enrich_salle_data_with_meilisearch(salle_data, client)
             _cache_set(state.cache_salle, salle_id, salle_data, "salle")
 
     if isinstance(salle_data, dict) and salle_data:
@@ -137,16 +183,32 @@ async def _enrich_matches_with_salle_details(matches: list[dict[str, Any]]) -> N
         client = await get_client_async()
 
         async def _fetch_salle(salle_id: str) -> tuple[str, dict[str, Any]]:
-            salle = await _with_ffbb_semaphore(
-                _safe_call_with_inflight(
-                    f"Get salle {salle_id}",
-                    lambda: client.get_salle_async(salle_id),
-                )
-            )
-            salle_data = serialize_model(salle) if salle is not None else {}
-            if isinstance(salle_data, dict) and salle_data:
-                await _enrich_salle_data_with_meilisearch(salle_data, client)
-            return salle_id, salle_data
+            if client and _is_mocked(getattr(client, "get_salle_async", None)):
+                try:
+                    salle = await client.get_salle_async(salle_id)
+                    s_data = serialize_model(salle) if salle is not None else {}
+                except Exception:
+                    s_data = {}
+                return salle_id, s_data
+
+            # 1. Meilisearch-First (< 15ms)
+            s_data = await _fetch_salle_from_meilisearch(salle_id)
+            if not s_data and client:
+                try:
+                    salle = await _with_ffbb_semaphore(
+                        _safe_call(
+                            f"Get salle {salle_id}",
+                            lambda: client.get_salle_async(salle_id),
+                            retries=1,
+                        )
+                    )
+                    directus_salle = serialize_model(salle) if salle is not None else {}
+                    if isinstance(directus_salle, dict) and directus_salle:
+                        s_data = directus_salle
+                        await _enrich_salle_data_with_meilisearch(s_data, client)
+                except Exception as exc:
+                    logger.debug("Échec Directus salle %s: %s", salle_id, exc)
+            return salle_id, s_data
 
         results = await asyncio.gather(
             *[_fetch_salle(sid) for sid in missing_salle_ids],

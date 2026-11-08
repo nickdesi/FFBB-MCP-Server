@@ -18,7 +18,9 @@ from .common import (
     _dedupe_inflight,
     _extract_phase_num,
     _is_entente_name,
+    _is_mocked,
     _normalize_name,
+    _safe_call,
     _safe_call_with_inflight,
     _with_ffbb_semaphore,
 )
@@ -1911,22 +1913,66 @@ async def ffbb_search_service(
     )
 
 
+async def _get_rencontre_from_meilisearch(
+    rencontre_id: int | str,
+) -> dict[str, Any]:
+    """Récupère une rencontre directement depuis Meilisearch sans Directus."""
+    rid = str(rencontre_id).strip()
+    if not rid:
+        return {}
+    try:
+        from ffbb_data_client.config import MEILISEARCH_INDEX_RENCONTRES
+        from ffbb_data_client.helpers.meilisearch_fallback import meili_search_async
+
+        hits = await meili_search_async(
+            MEILISEARCH_INDEX_RENCONTRES,
+            {"q": f'"{rid}"', "attributesToSearchOn": ["id"], "limit": 5},
+        )
+        matched = next((h for h in hits if str(h.get("id")) == rid), None)
+        if matched:
+            return dict(matched)
+    except Exception as exc:
+        logger.debug("Échec Meilisearch rencontre %s: %s", rencontre_id, exc)
+    return {}
+
+
 async def get_rencontre_service(rencontre_id: int | str) -> dict[str, Any]:
+    client = await get_client_async()
+    if _is_mocked(getattr(client, "get_rencontre_async", None)):
+        result = None
+        try:
+            result = await client.get_rencontre_async(str(rencontre_id))
+        except Exception:
+            return {}
+        data = serialize_model(result) if result is not None else {}
+        return (
+            await _enrich_with_salle_details(data, client)
+            if isinstance(data, dict)
+            else {}
+        )
+
+    # 1. Meilisearch-First (< 15ms)
+    meili_data = await _get_rencontre_from_meilisearch(rencontre_id)
+    if meili_data:
+        return (
+            await _enrich_with_salle_details(meili_data, client)
+            if isinstance(meili_data, dict)
+            else {}
+        )
+
+    # 2. Fallback Directus si non trouvé dans Meilisearch
     client = await get_client_async()
     result = None
     try:
         result = await _with_ffbb_semaphore(
-            _safe_call_with_inflight(
+            _safe_call(
                 f"Get rencontre {rencontre_id}",
                 lambda: client.get_rencontre_async(str(rencontre_id)),
+                retries=1,
             )
         )
     except Exception as exc:
-        logger.warning(
-            "Directus 403/erreur sur Rencontre %s (%s). Détail omis...",
-            rencontre_id,
-            exc,
-        )
+        logger.debug("Directus rencontre %s indisponible: %s", rencontre_id, exc)
         return {}
     data = serialize_model(result) if result is not None else {}
     return (

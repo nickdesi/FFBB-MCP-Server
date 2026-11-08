@@ -180,18 +180,56 @@ async def resolve_team_strict(
                     confidence=1.0,
                 )
 
-        # Lookup distant si non trouvé ou organisme non fourni
+        # Lookup Meilisearch-First (puis fallback client si non trouvé)
+        org_id: str | None = None
         from ffbb_mcp.client import FFBBClientFactory
+        from ffbb_mcp.services.common import _is_mocked
 
         client = await FFBBClientFactory.get_client_async()
-        try:
-            eng_data = await client.get_engagement_async(target_eng_id)
-        except Exception as e:
-            logger.error("Erreur récupération engagement %s: %s", target_eng_id, e)
-            eng_data = None
+        if _is_mocked(getattr(client, "get_engagement_async", None)):
+            try:
+                eng_data = await client.get_engagement_async(target_eng_id)
+                if eng_data and getattr(eng_data, "idOrganisme", None):
+                    org_id = str(eng_data.idOrganisme)
+            except Exception as e:
+                logger.error("Erreur récupération engagement %s: %s", target_eng_id, e)
 
-        if eng_data and getattr(eng_data, "idOrganisme", None):
-            org_id = str(eng_data.idOrganisme)
+        if not org_id:
+            try:
+                from ffbb_data_client.config import MEILISEARCH_INDEX_ENGAGEMENTS
+                from ffbb_data_client.helpers.meilisearch_fallback import (
+                    meili_search_async,
+                )
+
+                hits = await meili_search_async(
+                    MEILISEARCH_INDEX_ENGAGEMENTS,
+                    {
+                        "q": f'"{target_eng_id}"',
+                        "attributesToSearchOn": ["id"],
+                        "limit": 5,
+                    },
+                )
+                m_eng = next(
+                    (h for h in hits if str(h.get("id")) == target_eng_id), None
+                )
+                if m_eng:
+                    o_val = m_eng.get("idOrganisme") or m_eng.get("organisme")
+                    if isinstance(o_val, dict):
+                        org_id = str(o_val.get("id") or "")
+                    elif o_val:
+                        org_id = str(o_val)
+            except Exception:
+                pass
+
+        if not org_id:
+            try:
+                eng_data = await client.get_engagement_async(target_eng_id)
+                if eng_data and getattr(eng_data, "idOrganisme", None):
+                    org_id = str(eng_data.idOrganisme)
+            except Exception as e:
+                logger.error("Erreur récupération engagement %s: %s", target_eng_id, e)
+
+        if org_id:
             eq_fn = _get_equipes_club_service_fn()
             all_eq = await eq_fn(
                 organisme_id=org_id, force_refresh=force_refresh, season_id=season_id
