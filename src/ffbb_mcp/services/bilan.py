@@ -484,8 +484,9 @@ async def _build_bilan_payload(
             e
             for e in equipes
             if (e.get("numero_equipe") or "").strip() == want_num
-            or str(e.get("nom_equipe") or e.get("nom") or "").endswith(f"- {want_num}")
-            or str(e.get("nom_equipe") or e.get("nom") or "").endswith(f"-{want_num}")
+            or str(e.get("nom_equipe") or e.get("nom") or "").endswith(
+                (f"- {want_num}", f"-{want_num}")
+            )
         ]
         if filtered_eq:
             equipes = filtered_eq

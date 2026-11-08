@@ -188,13 +188,7 @@ def _is_entente_name(nom: str | None) -> bool:
     if not norm or norm[0] not in "EC":
         return False
 
-    return (
-        norm.startswith("ENT.")
-        or norm.startswith("ENT ")
-        or norm.startswith("ENTENTE ")
-        or norm.startswith("CTC ")
-        or norm.startswith("CTC.")
-    )
+    return norm.startswith(("ENT.", "ENT ", "ENTENTE ", "CTC ", "CTC."))
 
 
 _PREFIX_CLEAN_RE = re.compile(r"^(IE\s*-\s*|CTC\s+|ENT\.\s*|ENTENTE\s+)")
@@ -231,11 +225,8 @@ def _match_team_name(
     search_num = numero_equipe if numero_equipe is not None else 1
     str_num = str(search_num)
 
-    has_trailing_num = (
-        nom_norm.endswith(f"- {str_num}")
-        or nom_norm.endswith(f" {str_num}")
-        or nom_norm.endswith(f"-{str_num}")
-        or nom_norm.endswith(f"_{str_num}")
+    has_trailing_num = nom_norm.endswith(
+        (f"- {str_num}", f" {str_num}", f"-{str_num}", f"_{str_num}")
     )
 
     if search_num == 1:
