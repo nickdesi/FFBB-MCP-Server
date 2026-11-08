@@ -427,7 +427,7 @@ async def _search_organismes_directus(
             if session:
                 resp = await session.get(url, headers=headers)
             else:
-                async with httpx.AsyncClient(timeout=8.0) as http:
+                async with httpx.AsyncClient(timeout=3.0) as http:
                     resp = await http.get(url, headers=headers)
             if resp.status_code == 200:
                 data = resp.json().get("data", [])
@@ -437,6 +437,9 @@ async def _search_organismes_directus(
                         if oid and oid not in seen_ids:
                             seen_ids.add(oid)
                             results.append(item)
+            elif resp.status_code in (401, 403, 500, 502, 503):
+                # Arrêt immédiat si Directus bloque ou est indisponible (anti-stalling)
+                break
         except Exception as e:
             logger.debug(
                 "Erreur requête directus organismes (%s, %s): %s",

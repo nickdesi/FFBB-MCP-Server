@@ -101,7 +101,7 @@ _SWR_ENABLED = os.environ.get("FFBB_SWR_ENABLED", "1").lower() in (
 _SWR_STALE_FRACTION = float(os.environ.get("FFBB_SWR_STALE_FRACTION", "0.75"))
 # Timeout applicatif par tentative d'appel FFBB (sec). Indépendant des
 # timeouts httpx : un appel qui pend ne bloque jamais la réponse MCP.
-_API_TIMEOUT_SECONDS = float(os.environ.get("FFBB_API_TIMEOUT_SECONDS", "30"))
+_API_TIMEOUT_SECONDS = float(os.environ.get("FFBB_API_TIMEOUT_SECONDS", "3.0"))
 # Nombre max de tâches SWR concurrentes (CWE-770 / 400). Au-delà, le refresh
 # est abandonné et compté via ffbb_swr_dropped_total.
 _SWR_MAX_TASKS = _read_positive_int_env("FFBB_SWR_MAX_TASKS", 32)
@@ -1144,7 +1144,7 @@ async def _safe_call(
     operation_name: str,
     coro: Callable[[], Coroutine[Any, Any, Any]],
     *,
-    retries: int = 3,
+    retries: int = 1,
     base_delay: float = 0.5,
     max_delay: float = 10.0,
 ) -> Any:
@@ -1234,7 +1234,7 @@ async def _safe_call_with_inflight(
     operation_name: str,
     coro_factory,
     *,
-    retries: int = 3,
+    retries: int = 1,
     base_delay: float = 0.5,
     max_delay: float = 10.0,
 ) -> Any:

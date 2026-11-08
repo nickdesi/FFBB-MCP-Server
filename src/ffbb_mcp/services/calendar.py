@@ -745,10 +745,11 @@ async def _build_calendar_matches(
                 async def _fetch_by_poule(pid: str) -> list:
                     fc = json.dumps({"idPoule": {"_eq": int(pid)}})
                     try:
-                        return await _client.list_rencontres_async(
-                            limit=500, filter_criteria=fc
-                        )
-                    except (httpx.HTTPError, ValidationError):
+                        async with asyncio.timeout(3.0):
+                            return await _client.list_rencontres_async(
+                                limit=500, filter_criteria=fc
+                            )
+                    except (httpx.HTTPError, ValidationError, TimeoutError, Exception):
                         return []
 
                 _rencontres_lists = await asyncio.gather(
