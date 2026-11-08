@@ -124,25 +124,28 @@ async def _fetch_saisons(active_only: bool) -> list[dict]:
             pass
 
     if saisons_list is None:
-        # 1. Tentative client/Directus avec retries=1 pour ne pas bloquer si indisponible
-        try:
-            filter_criteria = '{"actif": {"_eq": true}}' if active_only else None
-            saisons = await _with_ffbb_semaphore(
-                _safe_call(
-                    "Saisons",
-                    lambda: client.get_saisons_async(
-                        fields=_SAISONS_FIELDS, filter_criteria=filter_criteria
-                    ),
-                    retries=1,
+        from ffbb_mcp.client import is_directus_disabled
+
+        if not is_directus_disabled():
+            # 1. Tentative client/Directus avec retries=1 pour ne pas bloquer si indisponible
+            try:
+                filter_criteria = '{"actif": {"_eq": true}}' if active_only else None
+                saisons = await _with_ffbb_semaphore(
+                    _safe_call(
+                        "Saisons",
+                        lambda: client.get_saisons_async(
+                            fields=_SAISONS_FIELDS, filter_criteria=filter_criteria
+                        ),
+                        retries=1,
+                    )
                 )
-            )
-            if isinstance(saisons, list) and saisons:
-                saisons_list = saisons
-        except Exception as exc:
-            logger.debug(
-                "Directus saisons indisponible (%s), repli sur le référentiel déterministe.",
-                exc,
-            )
+                if isinstance(saisons, list) and saisons:
+                    saisons_list = saisons
+            except Exception as exc:
+                logger.debug(
+                    "Directus saisons indisponible (%s), repli sur le référentiel déterministe.",
+                    exc,
+                )
 
     # 2. Référentiel déterministe immédiat
     if saisons_list is None:
@@ -223,7 +226,12 @@ async def get_competition_service(competition_id: int | str) -> dict:
         if meili_data:
             return meili_data
 
-        # 2. Fallback Directus si absent de Meilisearch
+        # 2. Fallback Directus si absent de Meilisearch et Directus non désactivé
+        from ffbb_mcp.client import is_directus_disabled
+
+        if is_directus_disabled():
+            return {}
+
         try:
             comp = await _with_ffbb_semaphore(
                 _safe_call(
@@ -277,27 +285,30 @@ async def get_poule_service(
             # 1. Meilisearch-First (< 40ms)
             data = await _get_poule_from_meilisearch(poule_id_int)
             if not (data and (data.get("rencontres") or data.get("classements"))):
-                # 2. Fallback Directus si non trouvé dans Meilisearch
-                try:
-                    poule = await _with_ffbb_semaphore(
-                        _safe_call(
-                            f"Poule {poule_id_int}",
-                            lambda: client.get_poule_async(poule_id=poule_id_int),
-                            retries=1,
-                        ),
-                    )
-                    directus_data = serialize_model(poule) or {}
-                    if directus_data and (
-                        directus_data.get("rencontres")
-                        or directus_data.get("classements")
-                    ):
-                        data = directus_data
-                except Exception as e:
-                    logger.debug(
-                        "Directus poule %s indisponible (%s).",
-                        poule_id_int,
-                        e,
-                    )
+                # 2. Fallback Directus si non trouvé dans Meilisearch et Directus non désactivé
+                from ffbb_mcp.client import is_directus_disabled
+
+                if not is_directus_disabled():
+                    try:
+                        poule = await _with_ffbb_semaphore(
+                            _safe_call(
+                                f"Poule {poule_id_int}",
+                                lambda: client.get_poule_async(poule_id=poule_id_int),
+                                retries=1,
+                            ),
+                        )
+                        directus_data = serialize_model(poule) or {}
+                        if directus_data and (
+                            directus_data.get("rencontres")
+                            or directus_data.get("classements")
+                        ):
+                            data = directus_data
+                    except Exception as e:
+                        logger.debug(
+                            "Directus poule %s indisponible (%s).",
+                            poule_id_int,
+                            e,
+                        )
 
         if not data:
             data = {
@@ -613,28 +624,31 @@ async def get_organisme_service(
             # 1. Meilisearch-First (< 35ms)
             data = await _get_organisme_from_meilisearch(organisme_id_int)
             if not (data and (data.get("nom") or data.get("engagements"))):
-                # 2. Fallback Directus si non trouvé dans Meilisearch
-                try:
-                    org = await _with_ffbb_semaphore(
-                        _safe_call(
-                            f"Organisme {organisme_id_int}",
-                            lambda: client.get_organisme_async(
-                                organisme_id=organisme_id_int
+                # 2. Fallback Directus si non trouvé dans Meilisearch et Directus non désactivé
+                from ffbb_mcp.client import is_directus_disabled
+
+                if not is_directus_disabled():
+                    try:
+                        org = await _with_ffbb_semaphore(
+                            _safe_call(
+                                f"Organisme {organisme_id_int}",
+                                lambda: client.get_organisme_async(
+                                    organisme_id=organisme_id_int
+                                ),
+                                retries=1,
                             ),
-                            retries=1,
-                        ),
-                    )
-                    directus_data = serialize_model(org) or {}
-                    if directus_data and (
-                        directus_data.get("nom") or directus_data.get("engagements")
-                    ):
-                        data = directus_data
-                except Exception as e:
-                    logger.debug(
-                        "Directus organisme %s indisponible (%s).",
-                        organisme_id_int,
-                        e,
-                    )
+                        )
+                        directus_data = serialize_model(org) or {}
+                        if directus_data and (
+                            directus_data.get("nom") or directus_data.get("engagements")
+                        ):
+                            data = directus_data
+                    except Exception as e:
+                        logger.debug(
+                            "Directus organisme %s indisponible (%s).",
+                            organisme_id_int,
+                            e,
+                        )
 
         if not data.get("nom") and not data.get("engagements"):
             raise McpError(
@@ -675,23 +689,35 @@ async def ffbb_get_classement_service(
 
     async def _fetch() -> dict[str, Any]:
         client = await get_client_async()
-        poule = None
-        try:
-            poule = await _with_ffbb_semaphore(
-                _safe_call(
-                    f"Classement poule {poule_id_int}",
-                    lambda: client.get_poule_async(poule_id=poule_id_int),
-                )
-            )
-        except Exception as e:
-            logger.warning(
-                "Directus 403/erreur sur Classement poule %s (%s). Fallback vide...",
-                poule_id_int,
-                e,
-            )
-        if not poule:
+        data: dict[str, Any] = {}
+        if _is_mocked(getattr(client, "get_poule_async", None)):
+            try:
+                poule = await client.get_poule_async(poule_id=poule_id_int)
+                data = serialize_model(poule) or {}
+            except Exception:
+                data = {}
+        else:
+            data = await _get_poule_from_meilisearch(poule_id_int)
+            if not (data and (data.get("classements") or data.get("rencontres"))):
+                from ffbb_mcp.client import is_directus_disabled
+
+                if not is_directus_disabled():
+                    try:
+                        poule = await _with_ffbb_semaphore(
+                            _safe_call(
+                                f"Classement poule {poule_id_int}",
+                                lambda: client.get_poule_async(poule_id=poule_id_int),
+                            )
+                        )
+                        data = serialize_model(poule) or {}
+                    except Exception as e:
+                        logger.warning(
+                            "Directus 403/erreur sur Classement poule %s (%s). Fallback vide...",
+                            poule_id_int,
+                            e,
+                        )
+        if not data:
             return {"_ttl": ttl, "data": []}
-        data = serialize_model(poule)
         raw = data.get("classements", data.get("classement") or []) or []
         if not isinstance(raw, list):
             raw = []
@@ -1001,16 +1027,42 @@ async def get_engagement_service(
 
     async def _fetch() -> dict[str, Any]:
         client = await get_client_async()
-        eng = await _with_ffbb_semaphore(
-            _safe_call_with_inflight(
-                f"Engagement {eng_id_str}",
-                lambda: client.get_engagement_async(eng_id_str),
-            ),
-        )
-        if not eng:
-            return {"error": f"Engagement '{eng_id_str}' introuvable."}
+        eng_dict: dict[str, Any] = {}
+        if _is_mocked(getattr(client, "get_engagement_async", None)):
+            eng = await client.get_engagement_async(eng_id_str)
+            eng_dict = serialize_model(eng) or {}
+        else:
+            # 1. Meilisearch-First
+            try:
+                from ffbb_data_client.config import MEILISEARCH_INDEX_ENGAGEMENTS
+                from ffbb_data_client.helpers.meilisearch_fallback import (
+                    meili_search_async,
+                )
 
-        eng_dict = serialize_model(eng) or {}
+                hits = await meili_search_async(
+                    MEILISEARCH_INDEX_ENGAGEMENTS,
+                    {"q": f'"{eng_id_str}"', "limit": 5},
+                )
+                m_eng = next((h for h in hits if str(h.get("id")) == eng_id_str), None)
+                if m_eng:
+                    eng_dict = dict(m_eng)
+            except Exception:
+                pass
+
+            if not eng_dict:
+                from ffbb_mcp.client import is_directus_disabled
+
+                if not is_directus_disabled():
+                    eng = await _with_ffbb_semaphore(
+                        _safe_call_with_inflight(
+                            f"Engagement {eng_id_str}",
+                            lambda: client.get_engagement_async(eng_id_str),
+                        ),
+                    )
+                    eng_dict = serialize_model(eng) or {}
+
+        if not eng_dict:
+            return {"error": f"Engagement '{eng_id_str}' introuvable."}
 
         def _extract_id(val: Any) -> str:
             if isinstance(val, dict):

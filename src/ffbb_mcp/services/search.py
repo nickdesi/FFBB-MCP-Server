@@ -371,6 +371,11 @@ async def _search_organismes_directus(
     Permet de contourner les lacunes de l'index Meilisearch (ex: organisme 10948 Andrézieux)
     et supporte la recherche par code FFBB (ex: ARA0042016), acronymes et sous-chaînes.
     """
+    from ffbb_mcp.client import is_directus_disabled
+
+    if is_directus_disabled():
+        return []
+
     client = await get_client_async()
     api = getattr(client, "_api", None)
     if not api:
@@ -1929,7 +1934,7 @@ async def _get_rencontre_from_meilisearch(
 
         hits = await meili_search_async(
             MEILISEARCH_INDEX_RENCONTRES,
-            {"q": f'"{rid}"', "attributesToSearchOn": ["id"], "limit": 5},
+            {"q": rid, "limit": 10},
         )
         matched = next((h for h in hits if str(h.get("id")) == rid), None)
         if matched:
@@ -1963,7 +1968,12 @@ async def get_rencontre_service(rencontre_id: int | str) -> dict[str, Any]:
             else {}
         )
 
-    # 2. Fallback Directus si non trouvé dans Meilisearch
+    # 2. Fallback Directus si non trouvé dans Meilisearch et Directus non désactivé
+    from ffbb_mcp.client import is_directus_disabled
+
+    if is_directus_disabled():
+        return {}
+
     client = await get_client_async()
     result = None
     try:
@@ -1984,6 +1994,10 @@ async def get_rencontre_service(rencontre_id: int | str) -> dict[str, Any]:
 
 
 async def get_officiel_service(officiel_id: int | str) -> dict[str, Any]:
+    from ffbb_mcp.client import is_directus_disabled
+
+    if is_directus_disabled():
+        return {}
     client = await get_client_async()
     result = await _with_ffbb_semaphore(
         _safe_call_with_inflight(
@@ -1995,6 +2009,10 @@ async def get_officiel_service(officiel_id: int | str) -> dict[str, Any]:
 
 
 async def get_entraineur_service(entraineur_id: int | str) -> dict[str, Any]:
+    from ffbb_mcp.client import is_directus_disabled
+
+    if is_directus_disabled():
+        return {}
     client = await get_client_async()
     result = await _with_ffbb_semaphore(
         _safe_call_with_inflight(

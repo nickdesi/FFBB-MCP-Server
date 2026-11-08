@@ -1,7 +1,7 @@
 # FFBB MCP Server
 
 > ⚠️ **Fichier auto-généré** par `tools/update_agents_md.py` — ne pas modifier manuellement.
-> Dernière mise à jour : FFBB MCP server | server.py: 434 lignes | services.py: 12906 lignes
+> Dernière mise à jour : FFBB MCP server | server.py: 434 lignes | services.py: 13020 lignes
 
 ## Langue
 Tous les documents de travail (walkthrough.md, implementation_plan.md) DOIVENT être en français.
@@ -130,7 +130,7 @@ src/ffbb_mcp/
 ├── resources.py           # Resources MCP (ffbb://saisons, etc.)
 ├── routes.py              # Routes HTTP (health, metrics, dashboard, docs, etc.)
 ├── server.py              # Tools MCP + main() (≈434 lignes)
-├── services/              # Logique métier modularisée (≈12906 lignes)
+├── services/              # Logique métier modularisée (≈13020 lignes)
 │   ├── __init__.py        # Point d'entrée et factory de services
 │   ├── bilan.py           # Module de service
 │   ├── calendar.py        # Module de service
@@ -155,7 +155,7 @@ src/ffbb_mcp/
 - Pas de suffixe `_compact_` ou `_impl_` exposé
 - Modifier une fonction à la fois, seulement si test/usage échoue
 - Nouvelle fonction → test manuel validé avant exposition MCP
-- **Modularisation** : Le package `services/` (total ≈12906 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
+- **Modularisation** : Le package `services/` (total ≈13020 lignes) remplace l'ancien fichier unique de 2915 lignes pour une meilleure cohésion.
 
 ## Commandes
 - Démarrer le serveur MCP (stdio) : `rtk uv run python -m ffbb_mcp` (recommandé pour Claude Desktop)
@@ -195,7 +195,12 @@ Avant push/tag/release :
 | `ENABLE_DNS_PROTECTION` | `` | Activer/désactiver explicitement la protection contre le DNS rebinding |
 | `TRUSTED_PROXY_HOSTS` | `127.0.0.1` | Proxies de confiance |
 | `FFBB_LIVES_REFRESH_INTERVAL` | `60` | Intervalle de rafraîchissement proactif des lives en secondes, mode HTTP (défaut : 10) |
+| `FFBB_ENABLE_DIRECTUS` | `0` | Forcer l'activation des appels Directus (défaut : 0, Directus désactivé en faveur de Meilisearch) |
+| `FFBB_DISABLE_DIRECTUS` | `1` | Désactiver les appels réseau Directus vers bo/api.ffbb.com bloqués par BunnyCDN (défaut : 1) |
+| `API_FFBB_APP_BEARER_TOKEN` | `` | Jeton d'authentification Bearer pour l'API Directus FFBB |
+| `MEILISEARCH_BEARER_TOKEN` | `` | Jeton d'authentification Bearer pour le cluster Meilisearch FFBB |
 | `FFBB_CACHE_BACKEND` | `sqlite` | Choix du backend de cache HTTP (`sqlite` ou `redis`) |
+| `API_FFBB_BASE_URL` | `https://api.ffbb.com/` | URL de base de l'API FFBB (défaut : https://api.ffbb.com/) |
 | `FFBB_SERVICE_CACHE_PERSIST` | `1` | Activer la persistance des caches service sur disque (SQLite) entre redémarrages |
 | `FFBB_KNOWN_CLUB_IDS` | `` | Override JSON de la liste d'organisme_id connus pour les prompts MCP (fallback : _DEFAULT_KNOWN_CLUB_IDS) |
 | `FFBB_REGULATIONS_MANIFEST` | `` | Chemin explicite vers le fichier manifest.yaml des règlements sportifs |

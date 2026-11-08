@@ -230,6 +230,11 @@ ENV_DESCRIPTIONS = {
     "COMMIT_SHA": "Alias de commit SHA pour les déploiements CI/CD",
     "BUILD_DATE": "Date de compilation/build de l'image ou du package exposé dans ffbb_version",
     "DEPLOY_DATE": "Date de déploiement en production (alternative à BUILD_DATE)",
+    "FFBB_ENABLE_DIRECTUS": "Forcer l'activation des appels Directus (défaut : 0, Directus désactivé en faveur de Meilisearch)",
+    "FFBB_DISABLE_DIRECTUS": "Désactiver les appels réseau Directus vers bo/api.ffbb.com bloqués par BunnyCDN (défaut : 1)",
+    "API_FFBB_APP_BEARER_TOKEN": "Jeton d'authentification Bearer pour l'API Directus FFBB",
+    "MEILISEARCH_BEARER_TOKEN": "Jeton d'authentification Bearer pour le cluster Meilisearch FFBB",
+    "API_FFBB_BASE_URL": "URL de base de l'API FFBB (défaut : https://api.ffbb.com/)",
 }
 
 

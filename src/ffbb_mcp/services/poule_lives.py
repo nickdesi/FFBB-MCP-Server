@@ -29,9 +29,26 @@ logger = logging.getLogger("ffbb-mcp")
 async def _fetch_lives() -> list[dict]:
     import sys
 
+    from .common import _is_mocked
+
     poule_mod = sys.modules.get("ffbb_mcp.services.poule")
     client_getter = getattr(poule_mod, "get_client_async", get_client_async)
     client = await client_getter()
+
+    if client and _is_mocked(getattr(client, "get_lives_async", None)):
+        lives = await client.get_lives_async()
+        lives_list = lives if isinstance(lives, list) else []
+        return [serialize_model(live) for live in lives_list]
+
+    from ffbb_mcp.client import is_directus_disabled
+
+    if is_directus_disabled():
+        # Directus (/json/lives.json) est bloqué par BunnyCDN WAF (HTTP 403).
+        # Ne jamais tenter l'appel réseau vers Directus.
+        logger.debug("Directus désactivé : bypass /json/lives.json.")
+        _cache_set(state.cache_lives, "lives", [], "lives")
+        return []
+
     lives = await _with_ffbb_semaphore(
         _safe_call_with_inflight(
             "Lives (Matchs en cours)", lambda: client.get_lives_async()

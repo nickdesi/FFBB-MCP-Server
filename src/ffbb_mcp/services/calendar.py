@@ -738,40 +738,48 @@ async def _build_calendar_matches(
         )
         if _poule_ids:
             try:
+                from ffbb_mcp.client import is_directus_disabled
+
                 from .common import get_client_async as _get_client
 
-                _client = await _get_client()
+                if not is_directus_disabled():
+                    _client = await _get_client()
 
-                async def _fetch_by_poule(pid: str) -> list:
-                    fc = json.dumps({"idPoule": {"_eq": int(pid)}})
-                    try:
-                        async with asyncio.timeout(3.0):
-                            return await _client.list_rencontres_async(
-                                limit=500, filter_criteria=fc
-                            )
-                    except (httpx.HTTPError, ValidationError, TimeoutError, Exception):
-                        return []
-
-                _rencontres_lists = await asyncio.gather(
-                    *[_fetch_by_poule(pid) for pid in _poule_ids],
-                    return_exceptions=True,
-                )
-                _salle_map: dict[str, str] = {}
-                for _res in _rencontres_lists:
-                    if isinstance(_res, list):
-                        for _r in _res:
-                            if _r.id and _r.salle:
-                                raw = _r.salle
-                                sid = (
-                                    str(raw.get("id", raw))
-                                    if isinstance(raw, dict)
-                                    else str(raw)
+                    async def _fetch_by_poule(pid: str) -> list:
+                        fc = json.dumps({"idPoule": {"_eq": int(pid)}})
+                        try:
+                            async with asyncio.timeout(3.0):
+                                return await _client.list_rencontres_async(
+                                    limit=500, filter_criteria=fc
                                 )
-                                _salle_map[str(_r.id)] = sid
-                for m in _matches_need_salle:
-                    _sid = _salle_map.get(str(m["id"]))
-                    if _sid:
-                        m["salle"] = _sid
+                        except (
+                            httpx.HTTPError,
+                            ValidationError,
+                            TimeoutError,
+                            Exception,
+                        ):
+                            return []
+
+                    _rencontres_lists = await asyncio.gather(
+                        *[_fetch_by_poule(pid) for pid in _poule_ids],
+                        return_exceptions=True,
+                    )
+                    _salle_map: dict[str, str] = {}
+                    for _res in _rencontres_lists:
+                        if isinstance(_res, list):
+                            for _r in _res:
+                                if _r.id and _r.salle:
+                                    raw = _r.salle
+                                    sid = (
+                                        str(raw.get("id", raw))
+                                        if isinstance(raw, dict)
+                                        else str(raw)
+                                    )
+                                    _salle_map[str(_r.id)] = sid
+                    for m in _matches_need_salle:
+                        _sid = _salle_map.get(str(m["id"]))
+                        if _sid:
+                            m["salle"] = _sid
             except (AttributeError, TypeError):
                 pass
 

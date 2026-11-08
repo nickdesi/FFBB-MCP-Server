@@ -305,7 +305,7 @@ async def resolve_engagement_refs(
         if eid:
             hits = await meili_search_async(
                 MEILISEARCH_INDEX_ENGAGEMENTS,
-                {"q": f'"{eid}"', "attributesToSearchOn": ["id"], "limit": 5},
+                {"q": f'"{eid}"', "limit": 5},
             )
             meili_eng = next((h for h in hits if str(h.get("id")) == eid), None)
             if meili_eng:
@@ -337,6 +337,11 @@ async def resolve_engagement_refs(
         pass
 
     # 2. Fallback client
+    from ffbb_mcp.client import is_directus_disabled
+
+    if is_directus_disabled():
+        return empty
+
     try:
         from ffbb_mcp.client import FFBBClientFactory
 

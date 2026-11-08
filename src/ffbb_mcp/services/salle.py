@@ -96,7 +96,7 @@ async def _fetch_salle_from_meilisearch(salle_id: str) -> dict[str, Any]:
 
         hits = await meili_search_async(
             MEILISEARCH_INDEX_SALLES,
-            {"q": f'"{sid}"', "attributesToSearchOn": ["id"], "limit": 5},
+            {"q": f'"{sid}"', "limit": 5},
         )
         matched = next((h for h in hits if str(h.get("id")) == sid), None)
         if matched:
@@ -131,9 +131,11 @@ async def _enrich_with_salle_details(
             except Exception:
                 salle_data = {}
         else:
+            from ffbb_mcp.client import is_directus_disabled
+
             # 1. Meilisearch-First (< 15ms)
             salle_data = await _fetch_salle_from_meilisearch(salle_id)
-            if not salle_data and client:
+            if not salle_data and client and not is_directus_disabled():
                 try:
                     salle = await _with_ffbb_semaphore(
                         _safe_call(
@@ -191,9 +193,11 @@ async def _enrich_matches_with_salle_details(matches: list[dict[str, Any]]) -> N
                     s_data = {}
                 return salle_id, s_data
 
+            from ffbb_mcp.client import is_directus_disabled
+
             # 1. Meilisearch-First (< 15ms)
             s_data = await _fetch_salle_from_meilisearch(salle_id)
-            if not s_data and client:
+            if not s_data and client and not is_directus_disabled():
                 try:
                     salle = await _with_ffbb_semaphore(
                         _safe_call(
@@ -238,16 +242,26 @@ async def get_salle_service(salle_id: int | str) -> dict[str, Any]:
     if cached is not None:
         return cached
 
-    client = await get_client_async()
-    salle = await _with_ffbb_semaphore(
-        _safe_call_with_inflight(
-            f"Get salle {sid}",
-            lambda: client.get_salle_async(sid),
-        )
-    )
-    salle_data = serialize_model(salle) if salle is not None else {}
+    # 1. Meilisearch-First
+    salle_data = await _fetch_salle_from_meilisearch(sid)
+
+    # 2. Fallback Directus si non trouvé et si Directus n'est pas désactivé
+    if not salle_data:
+        from ffbb_mcp.client import is_directus_disabled
+
+        if not is_directus_disabled():
+            client = await get_client_async()
+            salle = await _with_ffbb_semaphore(
+                _safe_call_with_inflight(
+                    f"Get salle {sid}",
+                    lambda: client.get_salle_async(sid),
+                )
+            )
+            salle_data = serialize_model(salle) if salle is not None else {}
+            if isinstance(salle_data, dict) and salle_data:
+                await _enrich_salle_data_with_meilisearch(salle_data, client)
+
     if isinstance(salle_data, dict) and salle_data:
-        await _enrich_salle_data_with_meilisearch(salle_data, client)
         adresse = _format_salle_address(salle_data)
         if adresse:
             salle_data["adresse_formatee"] = adresse

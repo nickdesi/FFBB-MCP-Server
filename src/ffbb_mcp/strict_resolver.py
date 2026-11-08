@@ -205,7 +205,6 @@ async def resolve_team_strict(
                     MEILISEARCH_INDEX_ENGAGEMENTS,
                     {
                         "q": f'"{target_eng_id}"',
-                        "attributesToSearchOn": ["id"],
                         "limit": 5,
                     },
                 )
@@ -222,12 +221,17 @@ async def resolve_team_strict(
                 pass
 
         if not org_id:
-            try:
-                eng_data = await client.get_engagement_async(target_eng_id)
-                if eng_data and getattr(eng_data, "idOrganisme", None):
-                    org_id = str(eng_data.idOrganisme)
-            except Exception as e:
-                logger.error("Erreur récupération engagement %s: %s", target_eng_id, e)
+            from ffbb_mcp.client import is_directus_disabled
+
+            if not is_directus_disabled():
+                try:
+                    eng_data = await client.get_engagement_async(target_eng_id)
+                    if eng_data and getattr(eng_data, "idOrganisme", None):
+                        org_id = str(eng_data.idOrganisme)
+                except Exception as e:
+                    logger.error(
+                        "Erreur récupération engagement %s: %s", target_eng_id, e
+                    )
 
         if org_id:
             eq_fn = _get_equipes_club_service_fn()
