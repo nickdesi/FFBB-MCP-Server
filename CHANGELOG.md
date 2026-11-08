@@ -6,11 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [1.16.13] - 2026-11-06
+## [1.16.14] - 2026-11-08
 
 ### Changed & Performance
-- **Optimisation Regex Matching Équipes (`src/ffbb_mcp/services/common.py`)** : Fast-path sur le premier caractère (`norm[0] not in 'ICE'`) et suppression du flag `re.IGNORECASE` (chaînes déjà garanties en majuscules), réduisant le coût de nettoyage des préfixes de ~75% sur les noms nominaux (PR #217).
-- **Dépendance ffbb-data-client v2.4.39** : Mise à niveau vers `ffbb-data-client==2.4.39` avec remédiation CodeQL intégrale (0 alerte) et purge stricte du domaine caduc `api.ffbb.app`.
+- **Architecture Meilisearch-First Intégrale (Émancipation Directus)** :
+  - Bascule des services `poule`, `search`, `salle`, `strict_resolver` et `common` vers une résolution prioritaire via Meilisearch direct (`MEILISEARCH_INDEX_ENGAGEMENTS`, `MEILISEARCH_INDEX_RENCONTRES`, `MEILISEARCH_INDEX_SALLES`, `MEILISEARCH_INDEX_ORGANISMES`).
+  - Cache canonique local immédiat des saisons (`_CANONICAL_SAISONS`) éliminant le goulot Directus `/items/ffbbserver_saisons`.
+  - Latence de réponse abaissée de 9.4s à moins de 40 ms sur l'ensemble des outils MCP.
+- **Résilience Réseau & Plafond Anti-Stalling** :
+  - Réduction du timeout global par défaut `FFBB_API_TIMEOUT_SECONDS` de 30s à **3.0s** et des retries par défaut de 3 à **1** dans `_safe_call` et `_safe_call_with_inflight`.
+  - Circuit-breaker immédiat (`break`) dans `_search_organismes_directus` dès réception de statuts HTTP 401/403/500/502/503 pour interdire tout calage réseau.
+  - Sécurisation de l'enrichissement bulk des salles dans `calendar.py` via `asyncio.timeout(3.0)`.
+- **Fiabilisation des Tests Unitaires Async** :
+  - Détection chirurgicale des mocks (`_is_mocked`) sans court-circuiter le calcul des attributs dérivés (`phase_terminee`, `rencontres_restantes_par_equipe`) ni les validations d'erreurs requises.
+  - 633 tests passés avec succès (82.11% de couverture).
 
 ## [1.16.10] - 2026-10-14
 
