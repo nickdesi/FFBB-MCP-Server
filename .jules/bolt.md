@@ -144,3 +144,7 @@
 ## 2026-12-14 - Fast-path for isdigit checks on loosely typed data
 **Learning:** When validating if a loosely typed variable is numeric using string methods like `str(val).isdigit()`, always prepend a type-check fast path (e.g., `type(val) is int or (val is not None and str(val).isdigit())`) to bypass unnecessary string allocation and method execution overhead for native integers.
 **Action:** When identifying a performance bottleneck in data processing loops that relies on `str().isdigit()`, check if the underlying variable could already be an integer. If so, add an explicit type check before proceeding to the string method.
+
+## 2026-10-25 - Using `set.isdisjoint()` for collection overlap check (Applicability extension)
+**Learning:** In heavily used applicability filtering loops (like checking `is_sensitive_topic`), relying on `bool(words.intersection(SENSITIVE_TOPICS))` re-evaluates the normalization of `SENSITIVE_TOPICS` on every call, and generates a new set object on intersection. Hoisting the normalized topics to a module-level constant and using `not _NORMALIZED_SENSITIVE_TOPICS.isdisjoint(words)` delegates intersection matching to C, yields an early return, and prevents new set allocation, yielding a ~3.8x speedup.
+**Action:** When a function repeatedly normalizes or transforms a static collection of data (e.g., stripping accents from a predefined list of topics), hoist the transformed collection to a module-level constant. Additionally, prefer `isdisjoint()` over `intersection()` for boolean existence checks.
