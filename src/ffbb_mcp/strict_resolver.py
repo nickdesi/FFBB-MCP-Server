@@ -493,8 +493,7 @@ async def resolve_team_strict(
             c
             for c in candidates
             if str(c.get("numero_equipe") or "").strip() == num_str
-            or _cand_nom(c).endswith(f"- {num_str}")
-            or _cand_nom(c).endswith(f"-{num_str}")
+            or _cand_nom(c).endswith((f"- {num_str}", f"-{num_str}"))
         ]
         # Cas spécifique équipe 1 / fanion :
         # En FFBB, l'équipe fanion d'un club (qui évolue souvent en Régionale ou Nationale)

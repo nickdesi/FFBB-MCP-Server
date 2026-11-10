@@ -794,8 +794,7 @@ async def _resolve_team_equipes(
             e
             for e in equipes
             if (e.get("numero_equipe") or "").strip() == want
-            or _team_nom(e).endswith(f"- {want}")
-            or _team_nom(e).endswith(f"-{want}")
+            or _team_nom(e).endswith((f"- {want}", f"-{want}"))
         ]
         # Cas spécifique équipe 1 / fanion :
         # Si une équipe sans numéro (fanion) évolue à un niveau hiérarchiquement supérieur
