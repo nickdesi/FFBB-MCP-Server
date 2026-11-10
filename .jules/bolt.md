@@ -144,3 +144,7 @@
 ## 2026-12-14 - Fast-path for isdigit checks on loosely typed data
 **Learning:** When validating if a loosely typed variable is numeric using string methods like `str(val).isdigit()`, always prepend a type-check fast path (e.g., `type(val) is int or (val is not None and str(val).isdigit())`) to bypass unnecessary string allocation and method execution overhead for native integers.
 **Action:** When identifying a performance bottleneck in data processing loops that relies on `str().isdigit()`, check if the underlying variable could already be an integer. If so, add an explicit type check before proceeding to the string method.
+
+## 2024-05-18 - Hoist normalized constants and use `isdisjoint` over intersection
+**Learning:** In string matching algorithms, repeatedly normalizing a static collection (e.g. `SENSITIVE_TOPICS`) on every function call incurs significant overhead. Furthermore, when checking for any overlap between two sets, using `not set1.isdisjoint(set2)` is heavily optimized in C and significantly faster than checking boolean truthiness of `set1.intersection(set2)`.
+**Action:** Always hoist normalized constants to module level and use `isdisjoint` over `intersection` when only checking for existence of any overlap.
