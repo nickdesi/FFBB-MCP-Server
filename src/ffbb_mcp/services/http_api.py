@@ -52,15 +52,20 @@ def _fmt_date(iso_str: str) -> str:
     if not iso_str:
         return ""
     try:
-        parts = iso_str.split("-")
-        if len(parts) != 3:
-            return iso_str
-        dt = datetime.date(int(parts[0]), int(parts[1]), int(parts[2]))
+        # ⚡ Bolt: Fast-path. datetime.fromisoformat() natively supports parsing YYYY-MM-DD
+        dt = datetime.date.fromisoformat(iso_str)
         return (
             f"{WEEKDAYS_FR[dt.weekday()]} {dt.day} {MONTHS_FR[dt.month - 1]} {dt.year}"
         )
-    except Exception:
-        return iso_str
+    except ValueError:
+        try:
+            parts = iso_str.split("-")
+            if len(parts) != 3:
+                return iso_str
+            dt = datetime.date(int(parts[0]), int(parts[1]), int(parts[2]))
+            return f"{WEEKDAYS_FR[dt.weekday()]} {dt.day} {MONTHS_FR[dt.month - 1]} {dt.year}"
+        except Exception:
+            return iso_str
 
 
 _CLEAN_OPP_PATTERN = re.compile(r"^(?:IE|CTC)\s*[-]?\s*", re.IGNORECASE)
