@@ -65,11 +65,14 @@ def _strip_accents(text: str) -> str:
     return unicodedata.normalize("NFD", text).translate(_DIACRITICS).lower()
 
 
+_NORMALIZED_SENSITIVE_TOPICS = {_strip_accents(t) for t in SENSITIVE_TOPICS}
+
+
 def is_sensitive_topic(text: str) -> bool:
     """Détecte si le texte ou la requête aborde une thématique réglementaire sensible."""
     norm = _strip_accents(text)
     words = set(re.findall(r"\w+", norm))
-    return bool(words.intersection({_strip_accents(t) for t in SENSITIVE_TOPICS}))
+    return not words.isdisjoint(_NORMALIZED_SENSITIVE_TOPICS)
 
 
 def resolve_applicable_regulations(
