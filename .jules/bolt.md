@@ -148,3 +148,6 @@
 ## 2023-11-07 - [Optimization of Date Parsing with fromisoformat fallback]
 **Learning:** `datetime.date.fromisoformat()` natively supports exact ISO 8601 formatting, which avoids string splitting and exception handling overhead present in manual date parsing on typical paths. But it does raise `ValueError` for loosely formatted ISO dates like `2023-1-1`, requiring a fallback mechanism.
 **Action:** Used `try...except ValueError` block containing the fallback to `iso_str.split('-')` logic when dealing with loosely structured date strings.
+## 2024-05-18 - Hoist normalized constants and use `isdisjoint` over intersection
+**Learning:** In string matching algorithms, repeatedly normalizing a static collection (e.g. `SENSITIVE_TOPICS`) on every function call incurs significant overhead. Furthermore, when checking for any overlap between two sets, using `not set1.isdisjoint(set2)` is heavily optimized in C and significantly faster than checking boolean truthiness of `set1.intersection(set2)`.
+**Action:** Always hoist normalized constants to module level and use `isdisjoint` over `intersection` when only checking for existence of any overlap.
