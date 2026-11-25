@@ -340,7 +340,7 @@ async def get_poule_service(
                         }
                     )
         data["rencontres_restantes_par_equipe"] = restantes_par_equipe
-        data["phase_terminee"] = len(restantes_par_equipe) == 0
+        data["phase_terminee"] = bool(rencontres) and len(restantes_par_equipe) == 0
         comp_name = data.get("nom") or data.get("libelle") or ""
         data["phase_type"] = _detect_phase_type(comp_name)
 
@@ -474,6 +474,134 @@ async def format_poule_response(poule_data: dict) -> dict[str, Any]:
     return res
 
 
+def _hydrate_meilisearch_classements(data: dict[str, Any]) -> None:
+    """Normalise et calcule les stats de classement depuis les rencontres si toutes à 0."""
+    classements = data.get("classements")
+    if not isinstance(classements, list) or not classements:
+        return
+
+    rencontres = data.get("rencontres") or []
+    # Normaliser idEngagement -> id_engagement & equipe/nom
+    for entry in classements:
+        if not isinstance(entry, dict):
+            continue
+        if "id_engagement" not in entry and isinstance(entry.get("idEngagement"), dict):
+            entry["id_engagement"] = entry["idEngagement"]
+        eng_obj = entry.get("id_engagement") or entry.get("idEngagement")
+        org_obj = entry.get("organisme")
+        eng_nom = eng_obj.get("nom") if isinstance(eng_obj, dict) else ""
+        org_nom = org_obj.get("nom") if isinstance(org_obj, dict) else ""
+        team_name = str(
+            entry.get("equipe") or entry.get("nom") or org_nom or eng_nom or ""
+        ).strip()
+        if team_name:
+            entry.setdefault("equipe", team_name)
+            entry.setdefault("nom", team_name)
+
+    has_any_stats = any(
+        int(c.get("matchJoues") or c.get("match_joues") or 0) > 0
+        for c in classements
+        if isinstance(c, dict)
+    )
+    if has_any_stats or not rencontres:
+        return
+
+    from .common import _normalize_name
+
+    stats_by_name: dict[str, dict[str, int]] = {}
+    for r in rencontres:
+        if not isinstance(r, dict):
+            continue
+        if r.get("joue") not in (1, "1", True):
+            continue
+        sc1_raw = r.get("resultatEquipe1")
+        sc2_raw = r.get("resultatEquipe2")
+        if sc1_raw is None or sc2_raw is None or sc1_raw == "" or sc2_raw == "":
+            continue
+        try:
+            s1, s2 = int(sc1_raw), int(sc2_raw)
+        except (TypeError, ValueError):
+            continue
+        if s1 == 0 and s2 == 0:
+            continue
+
+        n1 = _normalize_name(str(r.get("nomEquipe1") or ""))
+        n2 = _normalize_name(str(r.get("nomEquipe2") or ""))
+        for n in (n1, n2):
+            if n and n not in stats_by_name:
+                stats_by_name[n] = {
+                    "points": 0,
+                    "matchJoues": 0,
+                    "gagnes": 0,
+                    "perdus": 0,
+                    "paniersMarques": 0,
+                    "paniersEncaisses": 0,
+                }
+        if n1 and n2:
+            stats_by_name[n1]["matchJoues"] += 1
+            stats_by_name[n2]["matchJoues"] += 1
+            stats_by_name[n1]["paniersMarques"] += s1
+            stats_by_name[n1]["paniersEncaisses"] += s2
+            stats_by_name[n2]["paniersMarques"] += s2
+            stats_by_name[n2]["paniersEncaisses"] += s1
+            if s1 > s2:
+                stats_by_name[n1]["gagnes"] += 1
+                stats_by_name[n1]["points"] += 2
+                stats_by_name[n2]["perdus"] += 1
+                stats_by_name[n2]["points"] += 1
+            elif s2 > s1:
+                stats_by_name[n2]["gagnes"] += 1
+                stats_by_name[n2]["points"] += 2
+                stats_by_name[n1]["perdus"] += 1
+                stats_by_name[n1]["points"] += 1
+
+    if not stats_by_name:
+        return
+
+    for entry in classements:
+        if not isinstance(entry, dict):
+            continue
+        name_norm = _normalize_name(str(entry.get("equipe") or entry.get("nom") or ""))
+        st = stats_by_name.get(name_norm)
+        if not st:
+            # Fallback par inclusion (ex: suffixe "- 1" dans rencontre mais pas dans engagement)
+            for k, v in stats_by_name.items():
+                if name_norm and (name_norm in k or k in name_norm):
+                    st = v
+                    break
+        if st:
+            diff = st["paniersMarques"] - st["paniersEncaisses"]
+            quot = (
+                round(st["paniersMarques"] / st["paniersEncaisses"], 3)
+                if st["paniersEncaisses"] > 0
+                else 0.0
+            )
+            entry.update(
+                {
+                    "points": st["points"],
+                    "matchJoues": st["matchJoues"],
+                    "gagnes": st["gagnes"],
+                    "perdus": st["perdus"],
+                    "paniersMarques": st["paniersMarques"],
+                    "paniersEncaisses": st["paniersEncaisses"],
+                    "difference": diff,
+                    "quotient": quot,
+                }
+            )
+
+    classements.sort(
+        key=lambda c: (
+            int(c.get("points") or 0),
+            int(c.get("difference") or 0),
+            int(c.get("paniersMarques") or 0),
+        ),
+        reverse=True,
+    )
+    for idx, entry in enumerate(classements, start=1):
+        if isinstance(entry, dict):
+            entry["position"] = idx
+
+
 async def _get_poule_from_meilisearch(poule_id: int | str) -> dict[str, Any]:
     """Reconstitue une poule (équipes et rencontres) depuis Meilisearch sans Directus."""
     try:
@@ -485,6 +613,7 @@ async def _get_poule_from_meilisearch(poule_id: int | str) -> dict[str, Any]:
         if callable(poule_fn):
             res = await cast("Any", poule_fn)(poule_id)
             if isinstance(res, dict):
+                _hydrate_meilisearch_classements(res)
                 return res
     except Exception as exc:
         logger.debug("Échec fallback Meilisearch poule %s: %s", poule_id, exc)

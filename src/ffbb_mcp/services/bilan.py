@@ -190,6 +190,14 @@ async def ffbb_saison_bilan_service(
     poule_ids = list(
         dict.fromkeys(str(e.get("poule_id")) for e in equipes if e.get("poule_id"))
     )
+    with contextlib.suppress(Exception):
+        from ffbb_data_client.helpers.meilisearch_fallback import (
+            register_poule_competition,
+        )
+
+        for e in equipes:
+            if e.get("poule_id") and e.get("competition_id"):
+                register_poule_competition(e["poule_id"], e["competition_id"])
     if not poule_ids:
         from ffbb_mcp.presentation import format_source_label
 
@@ -239,14 +247,26 @@ async def ffbb_saison_bilan_service(
         poule_phase_added = False
         for entry in classements:
             _, entry_eng_id = resolve_relation_field(entry, "id_engagement")
+            if not entry_eng_id and isinstance(entry.get("idEngagement"), dict):
+                entry_eng_id = str(entry["idEngagement"].get("id") or "")
             if (entry_eng_id or "") not in eng_ids:
                 continue
 
             if poule_phase_added:
                 continue
-            poule_phase_added = True
 
             stats = _extract_and_accumulate_bilan(entry, totaux)
+            if stats.get("match_joues", 0) == 0 and poule_data.get("rencontres"):
+                fallback_stats = _compute_bilan_from_rencontres(
+                    poule_data, eng_ids, club_nom
+                )
+                if fallback_stats and fallback_stats.get("match_joues", 0) > 0:
+                    for k in _BILAN_STAT_FIELDS:
+                        totaux[k] = (
+                            totaux[k] - stats.get(k, 0) + fallback_stats.get(k, 0)
+                        )
+                    stats = fallback_stats
+            poule_phase_added = True
             phases.append(
                 {
                     "competition": poule_to_comp.get(pid, poule_data.get("nom", "")),
@@ -259,7 +279,7 @@ async def ffbb_saison_bilan_service(
                 }
             )
 
-        if not classements:
+        if not poule_phase_added:
             stats_from_rencontres = _compute_bilan_from_rencontres(
                 poule_data, eng_ids, club_nom
             )
@@ -272,7 +292,7 @@ async def ffbb_saison_bilan_service(
                     "competition": poule_to_comp.get(pid, poule_data.get("nom", "")),
                     "poule_id": pid,
                     "position": None,
-                    "total_equipes": None,
+                    "total_equipes": len(classements) if classements else None,
                     "phase_type": _detect_phase_type(poule_to_comp.get(pid, "")),
                     "phase_terminee": poule_data.get("phase_terminee", False),
                     **stats,
@@ -281,8 +301,8 @@ async def ffbb_saison_bilan_service(
 
     phases.sort(key=lambda x: x["competition"])
 
-    saison_terminee = (
-        all(p.get("phase_terminee", True) for p in phases) if phases else True
+    saison_terminee = bool(phases) and all(
+        p.get("phase_terminee", False) for p in phases
     )
 
     competitions_incluses = sorted(
@@ -327,6 +347,13 @@ async def ffbb_saison_bilan_service(
     p = totaux.get("perdus", 0)
     j = totaux.get("match_joues", 0)
     cat_str = resolved_categorie or categorie or ""
+    if (
+        categorie
+        and resolved_categorie
+        and categorie.upper().startswith(resolved_categorie.upper())
+        and len(categorie.strip()) > len(resolved_categorie)
+    ):
+        cat_str = categorie.strip()
     vic_str = f"{g} victoire{'s' if g > 1 else ''}"
     def_str = f"{p} défaite{'s' if p > 1 else ''}"
     short_ans = f"Bilan de saison pour {club_nom} ({cat_str}) : {vic_str}, {def_str} ({j} match(s))."
@@ -508,6 +535,14 @@ async def _build_bilan_payload(
     unique_poule_ids = list(
         dict.fromkeys(str(e.get("poule_id")) for e in equipes if e.get("poule_id"))
     )
+    with contextlib.suppress(Exception):
+        from ffbb_data_client.helpers.meilisearch_fallback import (
+            register_poule_competition,
+        )
+
+        for e in equipes:
+            if e.get("poule_id") and e.get("competition_id"):
+                register_poule_competition(e["poule_id"], e["competition_id"])
     logger.debug(
         f"ffbb_bilan: cible_orgs_count={len(target_org_ids)} "
         f"equipes_count={len(equipes)} unique_poules_count={len(unique_poule_ids)}"
@@ -566,10 +601,14 @@ async def _build_bilan_payload(
             continue
         eng_ids_here = poule_to_eng.get(pid, _EMPTY_SET)
         classements = poule_data.get("classements") or []
+        poule_phase_added = False
         for entry in classements:
             if not isinstance(entry, dict):
                 continue
             eng, entry_eng_id = resolve_relation_field(entry, "id_engagement")
+            if not entry_eng_id and isinstance(entry.get("idEngagement"), dict):
+                eng = entry["idEngagement"]
+                entry_eng_id = str(eng.get("id") or "")
             entry_org_id = str(entry.get("organisme_id", ""))
 
             if (entry_eng_id or "") in eng_ids_here:
@@ -580,6 +619,17 @@ async def _build_bilan_payload(
                 continue
 
             stats = _extract_and_accumulate_bilan(entry, totaux)
+            if stats.get("match_joues", 0) == 0 and poule_data.get("rencontres"):
+                fallback_stats = _compute_bilan_from_rencontres(
+                    poule_data, eng_ids_here, club_nom
+                )
+                if fallback_stats and fallback_stats.get("match_joues", 0) > 0:
+                    for k in _BILAN_STAT_FIELDS:
+                        totaux[k] = (
+                            totaux[k] - stats.get(k, 0) + fallback_stats.get(k, 0)
+                        )
+                    stats = fallback_stats
+            poule_phase_added = True
 
             num_equipe = (
                 eng_to_num.get(entry_eng_id) if entry_eng_id else None
@@ -598,7 +648,7 @@ async def _build_bilan_payload(
                 }
             )
 
-        if not classements:
+        if not poule_phase_added:
             stats_from_rencontres = _compute_bilan_from_rencontres(
                 poule_data, eng_ids_here, club_nom
             )
@@ -667,8 +717,8 @@ async def _build_bilan_payload(
         target_phases = [p for p in phases if str(p.get("numero_equipe", "1")) == "1"]
         phase_courante = target_phases[-1] if target_phases else phases[-1]
 
-    saison_terminee = (
-        all(p.get("phase_terminee", True) for p in phases) if phases else True
+    saison_terminee = bool(phases) and all(
+        p.get("phase_terminee", False) for p in phases
     )
 
     def _comp_sort_key_by_age(comp_name: str) -> tuple[int, str]:

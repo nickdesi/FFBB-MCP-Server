@@ -1246,13 +1246,93 @@ class TestGetPouleService:
         expected = {
             "id": 123,
             "rencontres": [],
-            "phase_terminee": True,
+            "phase_terminee": False,
             "phase_type": "poule",
             "rencontres_restantes_par_equipe": {},
         }
         assert result1.get("data", result1) == expected
         assert result2.get("data", result2) == expected
         assert mock_client.get_poule_async.await_count == 1
+
+    def test_hydrate_meilisearch_classements_computes_zeroed_stats(self):
+        from ffbb_mcp.services.poule import _hydrate_meilisearch_classements
+
+        data = {
+            "id": "200000003063634",
+            "rencontres": [
+                {
+                    "id": "200000014942382",
+                    "joue": 1,
+                    "nomEquipe1": "IE - CTC CLERMONT SUD GERGOVIE BASKET - BB COURNON D'AUVERGNE",
+                    "nomEquipe2": "STADE CLERMONTOIS BASKET AUVERGNE",
+                    "resultatEquipe1": "46",
+                    "resultatEquipe2": "73",
+                },
+                {
+                    "id": "200000014942390",
+                    "joue": 0,
+                    "nomEquipe1": "STADE CLERMONTOIS BASKET AUVERGNE",
+                    "nomEquipe2": "BASKET CLUB ARBRESLOIS - 1",
+                    "resultatEquipe1": "",
+                    "resultatEquipe2": "",
+                },
+            ],
+            "classements": [
+                {
+                    "id": "200000003063634_1",
+                    "position": 1,
+                    "idEngagement": {
+                        "id": "200000005402096",
+                        "nom": "IE - CTC CLERMONT SUD GERGOVIE BASKET - BB COURNON D'AUVERGNE",
+                    },
+                    "organisme": {
+                        "id": "",
+                        "nom": "IE - CTC CLERMONT SUD GERGOVIE BASKET - BB COURNON D'AUVERGNE",
+                    },
+                    "points": 0,
+                    "matchJoues": 0,
+                    "gagnes": 0,
+                    "perdus": 0,
+                    "paniersMarques": 0,
+                    "paniersEncaisses": 0,
+                    "difference": 0,
+                },
+                {
+                    "id": "200000003063634_4",
+                    "position": 4,
+                    "idEngagement": {
+                        "id": "200000005402105",
+                        "nom": "STADE CLERMONTOIS BASKET AUVERGNE",
+                    },
+                    "organisme": {
+                        "id": "",
+                        "nom": "STADE CLERMONTOIS BASKET AUVERGNE",
+                    },
+                    "points": 0,
+                    "matchJoues": 0,
+                    "gagnes": 0,
+                    "perdus": 0,
+                    "paniersMarques": 0,
+                    "paniersEncaisses": 0,
+                    "difference": 0,
+                },
+            ],
+        }
+        _hydrate_meilisearch_classements(data)
+        scba = next(
+            c
+            for c in data["classements"]
+            if c["id_engagement"]["id"] == "200000005402105"
+        )
+        assert scba["position"] == 1
+        assert scba["equipe"] == "STADE CLERMONTOIS BASKET AUVERGNE"
+        assert scba["matchJoues"] == 1
+        assert scba["gagnes"] == 1
+        assert scba["perdus"] == 0
+        assert scba["points"] == 2
+        assert scba["paniersMarques"] == 73
+        assert scba["paniersEncaisses"] == 46
+        assert scba["difference"] == 27
 
 
 # ---------------------------------------------------------------------------
