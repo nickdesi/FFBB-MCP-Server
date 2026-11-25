@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
+import time
 from typing import Any
 
 from mcp.types import INTERNAL_ERROR, ErrorData
@@ -515,9 +517,25 @@ async def _get_organisme_from_meilisearch(organisme_id: int | str) -> dict[str, 
     }
 
 
+_EDGE_403_COOLDOWN_UNTIL: float = 0.0
+_EDGE_403_COOLDOWN_SEC: int = 900
+
+
 async def fetch_edge_equipe_page(competitions_url: str) -> dict[str, Any] | None:
     """Récupère et parse les données d'équipe (matchs, classement) depuis l'edge public competitions.ffbb.com."""
+    global _EDGE_403_COOLDOWN_UNTIL
     if not competitions_url:
+        return None
+    if os.environ.get("FFBB_ENABLE_EDGE_SCRAPE", "0").lower() not in (
+        "1",
+        "true",
+        "yes",
+    ):
+        from ffbb_mcp.client import is_directus_disabled
+
+        if is_directus_disabled():
+            return None
+    if time.monotonic() < _EDGE_403_COOLDOWN_UNTIL:
         return None
     url = (
         f"https://competitions.ffbb.com{competitions_url}"
@@ -539,6 +557,9 @@ async def fetch_edge_equipe_page(competitions_url: str) -> dict[str, Any] | None
 
         async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
             resp = await client.get(url, headers=headers)
+            if resp.status_code in (403, 429):
+                _EDGE_403_COOLDOWN_UNTIL = time.monotonic() + _EDGE_403_COOLDOWN_SEC
+                return None
             if resp.status_code != 200:
                 return None
             html = resp.text

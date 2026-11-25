@@ -92,8 +92,24 @@ def create_app(
     apply_sse_reconnect_patch()
     apply_fastmcp_json_formatting_patch()
 
+    def _checkpoint_http_cache_sqlite() -> None:
+        """Compacte le WAL de http_cache_async.db pour éviter son gonflement sur disque."""
+        import sqlite3
+        from pathlib import Path
+
+        data_dir = os.environ.get("FFBB_DATA_DIR", "/app/data")
+        db_path = Path(data_dir) / "http_cache_async.db"
+        if not db_path.exists():
+            return
+        try:
+            with sqlite3.connect(str(db_path), timeout=2.0) as conn:
+                conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        except Exception as exc:
+            logger.debug("SQLite WAL checkpoint ignoré : %s", exc)
+
     @contextlib.asynccontextmanager
     async def lifespan(app: Starlette) -> AsyncGenerator[None]:
+        _checkpoint_http_cache_sqlite()
         # Tâches de fond réservées au mode HTTP (1 client = 1 requête en stdio).
         background_tasks: list[asyncio.Task[None]] = []
         if os.environ.get("MCP_MODE", "stdio").lower() not in ("stdio", ""):

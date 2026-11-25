@@ -360,8 +360,10 @@ async def ffbb_search(
     ] = False,
     compact: Annotated[
         bool,
-        Field(description="Si True, réponse compacte allégée pour agents IA."),
-    ] = False,
+        Field(
+            description="Si True (défaut), réponse compacte allégée pour agents IA; False pour le payload complet."
+        ),
+    ] = True,
 ) -> dict[str, Any] | list[dict[str, Any]]:
     """Recherche FFBB unifiée — clubs, compétitions, matchs, salles, tournois.
 

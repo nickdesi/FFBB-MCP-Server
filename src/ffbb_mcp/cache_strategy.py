@@ -75,7 +75,7 @@ _STATIC_TTLS = {
     "lives": 15,
     "organisme": 43_200,  # 12h
     "search": 43_200,  # 12h
-    "poule": 5,  # 5s fallback; TTL dynamique via get_poule_ttl() ajuste selon matches en cours
+    "poule": 180,  # 3 min fallback; TTL dynamique via get_poule_ttl() ajuste à 15s si match en cours
     "salle": 604_800,  # 7 jours (immuable)
     "saisons": 86_400,  # 24h
     "competitions": 86_400,  # 24h
